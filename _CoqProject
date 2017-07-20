@@ -1,0 +1,10 @@
+-Q theories Monomorph
+-I src
+
+src/monoutil.ml
+src/g_monomorph.ml4
+src/monomorph.ml
+src/genc.ml
+src/monomorph_plugin.mllib
+theories/monomorph.v
+
