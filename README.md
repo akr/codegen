@@ -29,6 +29,10 @@ See sample/ directory.
 - Reynald Affeldt
 - Jacques Garrigue
 
+## Acknowledgment
+
+This work is supported by JSPS KAKENHI Grant Number 15K12013.
+
 ## Copyright
 
 Copyright (C) 2016- National Institute of Advanced Industrial Science and Technology (AIST)
