@@ -1,5 +1,5 @@
-all : Makefile.coq
-	$(MAKE) -f Makefile.coq
+all install : Makefile.coq
+	$(MAKE) -f Makefile.coq $@
 
 
 Makefile.coq : _CoqProject
