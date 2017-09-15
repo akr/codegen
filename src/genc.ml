@@ -22,7 +22,7 @@ open Pp
 open CErrors
 open Goptions
 
-open Monoutil
+open Cgenutil
 
 let c_id str =
   let buf = Buffer.create 0 in
@@ -70,7 +70,7 @@ let case_cstrfield_short ty j k =
 let case_cstrfield ty j k =
   case_cstrfield_short ty j k
 
-let gensym_id = Summary.ref 0 ~name:"MonomorphizationGensymID"
+let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 let gensym () =
   let n = !gensym_id in

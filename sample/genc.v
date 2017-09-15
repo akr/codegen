@@ -1,5 +1,5 @@
 From mathcomp Require Import ssreflect ssrbool eqtype ssrfun ssrnat seq.
-Require Import Monomorph.monomorph.
+Require Import codegen.codegen.
 
 Inductive TestType2 (A B : Type) := TestCons2 : A -> B -> TestType2 A B.
 Definition non_mangled_code := TestCons2 bool nat.

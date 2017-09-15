@@ -1,11 +1,11 @@
-# monomorphization plugin for Coq
+# codegen plugin for Coq
 
-This software provides Coq commands to monomorphize Gallina definitions and
-then generate C source code.
+This software provides Coq commands to generate C source code
+from Gallina definitions.
 
 ## Home page
 
-https://github.com/akr/monomorphization
+https://github.com/akr/codegen
 
 ## Requiements
 
@@ -17,7 +17,7 @@ https://github.com/akr/monomorphization
 
 ## How to run
 
-    coqide -I src -Q theories Monomorph sample/pow.v
+    coqide -I src -Q theories codegen sample/pow.v
 
 ## How to use
 

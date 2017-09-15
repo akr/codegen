@@ -22,7 +22,7 @@ open Pp
 open CErrors
 open Goptions
 
-exception MonomorphizationError of string
+exception CodeGenError of string
 
 let array_rev a =
   let n = Array.length a in
@@ -129,20 +129,20 @@ let rec mangle_type_buf_short buf ty =
       mangle_type_buf_short buf ty;
       Buffer.add_string buf "_to_";
       mangle_type_buf_short buf body
-  | Term.Rel i -> raise (MonomorphizationError "mangle_type_buf_short:rel")
-  | Term.Var name -> raise (MonomorphizationError "mangle_type_buf_short:var")
-  | Term.Meta i -> raise (MonomorphizationError "mangle_type_buf_short:meta")
-  | Term.Evar (ekey, termary) -> raise (MonomorphizationError "mangle_type_buf_short:evar")
-  | Term.Sort s -> raise (MonomorphizationError "mangle_type_buf_short:sort")
-  | Term.Cast (expr, kind, ty) -> raise (MonomorphizationError "mangle_type_buf_short:cast")
-  | Term.Lambda (name, ty, body) -> raise (MonomorphizationError "mangle_type_buf_short:lambda")
-  | Term.LetIn (name, expr, ty, body) -> raise (MonomorphizationError "mangle_type_buf_short:letin")
-  | Term.Const cu -> raise (MonomorphizationError "mangle_type_buf_short:const")
-  | Term.Construct cu -> raise (MonomorphizationError "mangle_type_buf_short:construct")
-  | Term.Case (ci, tyf, expr, brs) -> raise (MonomorphizationError "mangle_type_buf_short:case")
-  | Term.Fix ((ia, i), (nameary, tyary, funary)) -> raise (MonomorphizationError "mangle_type_buf_short:fix")
-  | Term.CoFix (i, (nameary, tyary, funary)) -> raise (MonomorphizationError "mangle_type_buf_short:cofix")
-  | Term.Proj (proj, expr) -> raise (MonomorphizationError "mangle_type_buf_short:proj")
+  | Term.Rel i -> raise (CodeGenError "mangle_type_buf_short:rel")
+  | Term.Var name -> raise (CodeGenError "mangle_type_buf_short:var")
+  | Term.Meta i -> raise (CodeGenError "mangle_type_buf_short:meta")
+  | Term.Evar (ekey, termary) -> raise (CodeGenError "mangle_type_buf_short:evar")
+  | Term.Sort s -> raise (CodeGenError "mangle_type_buf_short:sort")
+  | Term.Cast (expr, kind, ty) -> raise (CodeGenError "mangle_type_buf_short:cast")
+  | Term.Lambda (name, ty, body) -> raise (CodeGenError "mangle_type_buf_short:lambda")
+  | Term.LetIn (name, expr, ty, body) -> raise (CodeGenError "mangle_type_buf_short:letin")
+  | Term.Const cu -> raise (CodeGenError "mangle_type_buf_short:const")
+  | Term.Construct cu -> raise (CodeGenError "mangle_type_buf_short:construct")
+  | Term.Case (ci, tyf, expr, brs) -> raise (CodeGenError "mangle_type_buf_short:case")
+  | Term.Fix ((ia, i), (nameary, tyary, funary)) -> raise (CodeGenError "mangle_type_buf_short:fix")
+  | Term.CoFix (i, (nameary, tyary, funary)) -> raise (CodeGenError "mangle_type_buf_short:cofix")
+  | Term.Proj (proj, expr) -> raise (CodeGenError "mangle_type_buf_short:proj")
 
 let rec mangle_type_buf buf ty =
   mangle_type_buf_short buf ty

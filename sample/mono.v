@@ -1,4 +1,4 @@
-Require Import Monomorph.monomorph.
+Require Import codegen.codegen.
 
 Definition plus_1_2 := 1 + 2.
 Monomorphization plus_1_2.

@@ -22,7 +22,7 @@ open Pp
 open CErrors
 open Goptions
 
-open Monoutil
+open Cgenutil
 
 let rec copy_term term =
   match Term.kind_of_term term with
@@ -310,7 +310,7 @@ let rec mono_local_rec context term =
             fun acc ->
             Term.mkRel (List.hd acc - List.nth acc (i-1) + 1))
           else
-            raise (MonomorphizationError "mono_local_rec:rel"))
+            raise (CodeGenError "mono_local_rec:rel"))
   | Term.Var name -> fun acc -> Term.mkVar name
   | Term.Meta i -> fun acc -> Term.mkMeta i
   | Term.Evar (ekey, termary) ->
@@ -356,7 +356,7 @@ let rec mono_local_rec context term =
               fun acc -> Term.mkApp (Term.mkRel (List.hd acc - List.nth acc (i-1) + 1), Array.map (fun arg -> arg acc) argsary')
           | Some (num_type_args, refs) ->
               (if Array.length argsary < num_type_args then
-                raise (MonomorphizationError "mono_local_rec:app");
+                raise (CodeGenError "mono_local_rec:app");
               let type_args = Array.sub argsary 0 num_type_args in
               (* xxx: check no Rel in type_args *)
               if not (List.exists (eq_typeary type_args) !refs) then
@@ -572,7 +572,7 @@ let mono_global_visited = Summary.ref mono_global_visited_empty ~name:"Monomorph
 let mono_check_const env evdref ctntu =
   let fty = constant_type env evdref ctntu in
   if has_sort fty then
-    raise (MonomorphizationError "mono_check_const")
+    raise (CodeGenError "mono_check_const")
   else
     ()
 
@@ -620,7 +620,7 @@ and mono_global_const_app env evdref fctntu argsary =
   let fty = constant_type env evdref fctntu in
   let num_type_args = count_type_args fty in
   (if Array.length argsary < num_type_args then
-    raise (MonomorphizationError "mono_global_const_app"));
+    raise (CodeGenError "mono_global_const_app"));
   let type_args = Array.sub argsary 0 num_type_args in
   let rest_args = Array.sub argsary num_type_args (Array.length argsary - num_type_args) in
   let constant = mono_global_def env evdref fctntu type_args in
@@ -713,7 +713,7 @@ let terminate_mono env evdref term =
           let fty = constant_type env evdref (fctnt, u) in
           let num_type_args = count_type_args fty in
           (if Array.length args <> num_type_args then
-            raise (MonomorphizationError "terminate_mono"));
+            raise (CodeGenError "terminate_mono"));
           terminate_mono_global_def env evdref (ConstRef fctnt) args
       | _ -> error "not constant application")
   | _ -> error "must be constant application"
