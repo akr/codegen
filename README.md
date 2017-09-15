@@ -11,11 +11,16 @@ https://github.com/akr/codegen
 
 - Coq 8.6 (Coq 8.5 doesn't work)
 
-## How to build
+## How to build and install
 
     make
+    make install
 
 ## How to run
+
+    coqide sample/pow.v
+
+## How to run without install
 
     coqide -I src -Q theories codegen sample/pow.v
 
