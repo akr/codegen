@@ -20,10 +20,6 @@ https://github.com/akr/codegen
 
     coqide sample/pow.v
 
-## How to run without install
-
-    coqide -I src -Q theories codegen sample/pow.v
-
 ## How to use
 
 See sample/ directory.
