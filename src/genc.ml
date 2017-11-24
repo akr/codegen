@@ -20,7 +20,6 @@ open Names
 open Globnames
 open Pp
 open CErrors
-open Goptions
 
 open Cgenutil
 
@@ -39,7 +38,7 @@ let c_mangle_type ty = c_id (mangle_type ty)
 let case_swfunc ty = c_id ("sw_" ^ (mangle_type ty))
 
 let case_cstrlabel_short ty j =
-  let ((evd : Evd.evar_map), (env : Environ.env)) = Lemmas.get_current_context () in
+  let (evd, env) = Lemmas.get_current_context () in
   let indty =
     match Term.kind_of_term ty with
     | Term.App (f, argsary) -> f
@@ -55,7 +54,7 @@ let case_cstrlabel ty j =
   case_cstrlabel_short ty j
 
 let case_cstrfield_short ty j k =
-  let ((evd : Evd.evar_map), (env : Environ.env)) = Lemmas.get_current_context () in
+  let (evd, env) = Lemmas.get_current_context () in
   let indty =
     match Term.kind_of_term ty with
     | Term.App (f, argsary) -> f
@@ -105,7 +104,7 @@ let rec nargtys_and_rety_of_type n ty =
     | Term.Prod (name, ty', body) ->
         let (argtys, rety) = nargtys_and_rety_of_type (n-1) body in
         (ty :: argtys, rety)
-    | _ -> error "too few prods in type"
+    | _ -> user_err (Pp.str "too few prods in type")
 
 type context_elt =
   | CtxVar of string
@@ -126,7 +125,7 @@ let fargs_and_body_ary fname ty ia i nameary tyary funary =
   let ctxrec_ary = Array.map
     (fun j ->
       let nm = strnameary.(j) in
-      let fargs, body = fb_ary.(j) in
+      let fargs, _(* _ was previously named body but was not used *) = fb_ary.(j) in
       CtxRec (nm, Array.of_list fargs))
     (iota_ary 0 (Array.length funary))
   in
@@ -180,7 +179,7 @@ let genc_app context f argsary =
   match Term.kind_of_term f with
   | Term.Rel i ->
       (match List.nth context (i-1) with
-      | CtxVar _ -> error "indirect call not implemented"
+      | CtxVar _ -> user_err (str "indirect call not implemented")
       | CtxRec (fname, _) ->
           let argvars = Array.map (fun arg -> varname_of_rel context (Term.destRel arg)) argsary in
           let fname_argn = funcname_argnum fname (Array.length argvars) in
@@ -246,7 +245,7 @@ let genc_multi_assign assignments =
 let genc_goto context ctxrec argsary =
   let fname, argvars = ctxrec in
   (if Array.length argsary <> Array.length argvars then
-    error ("partial function invocation not supported yet"));
+    user_err (str "partial function invocation not supported yet");
   let fname_argn = funcname_argnum fname (Array.length argvars) in
   let assignments =
     (array_map2
@@ -255,7 +254,7 @@ let genc_goto context ctxrec argsary =
   in
   let pp_assigns = genc_multi_assign assignments in
   let pp_goto = (hv 0 (str "goto" ++ spc () ++ str fname_argn ++ str ";")) in
-  if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto
+  if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto)
 
 let genc_const context ctntu =
   genc_app context (Term.mkConstU ctntu) [| |]
@@ -263,7 +262,7 @@ let genc_const context ctntu =
 let split_case_tyf tyf =
   match Term.kind_of_term tyf with
   | Term.Lambda (name, ty, body) -> (ty, body)
-  | _ -> error "unexpected case type function"
+  | _ -> user_err (str "unexpected case type function")
 
 let rec strip_outer_lambdas ndecls term =
   if ndecls = 0 then
@@ -273,7 +272,7 @@ let rec strip_outer_lambdas ndecls term =
     | Term.Lambda (name, ty, body) ->
         let (decls, innermostbody) = strip_outer_lambdas (ndecls-1) body in
         ((name, ty) :: decls, innermostbody)
-    | _ -> error "case body lambda nesting is not enough"
+    | _ -> user_err (str "case body lambda nesting is not enough")
 
 let iota_ary m n =
   Array.init n (fun i -> m + i)
@@ -318,21 +317,19 @@ let genc_case_nobreak context ci tyf expr brs bodyfunc =
     let cstr_index = 1 in
     genc_case_branch_body context bodyfunc exprty exprvar ndecls br cstr_index
   else
-    hvb 0 ++
+    hv 0 (
     hv 0 (str "switch" ++ spc () ++ str "(" ++
       str (case_swfunc exprty) ++ str "(" ++
       str exprvar ++ str "))") ++ spc () ++
     str "{" ++ brk (1,2) ++
-    hvb 0 ++
+    hv 0 (
     pp_join_ary (spc ())
       (array_map3
         (genc_case_branch context bodyfunc exprty exprvar)
         ci.Constr.ci_cstr_ndecls
         brs
-        (iota_ary 1 (Array.length brs))) ++
-    close () ++
-    spc () ++ str "}" ++
-    close ()
+        (iota_ary 1 (Array.length brs)))) ++
+    spc () ++ str "}")
 
 let genc_case_break context ci tyf expr brs bodyfunc =
   genc_case_nobreak context ci tyf expr brs
@@ -360,7 +357,7 @@ let rec genc_body_var context namehint term termty =
       varname)
   | Term.Const ctntu ->
       genc_geninitvar termty namehint (genc_const context ctntu)
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); error "not implemented")
+  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
 
 (* not tail position. assign to the specified variable *)
 and genc_body_assign context retvar term =
@@ -378,7 +375,7 @@ and genc_body_assign context retvar term =
   | Term.Const ctntu ->
       genc_assign (str retvar) (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); error "not implemented")
+  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
 
 (* tail position.  usual return. *)
 let rec genc_body_tail context term =
@@ -400,7 +397,7 @@ let rec genc_body_tail context term =
   | Term.Const ctntu ->
       genc_return (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); error "not implemented")
+  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
 
 (* tail position.  assign and return. *)
 let rec genc_body_void_tail retvar context term =
@@ -422,7 +419,7 @@ let rec genc_body_void_tail retvar context term =
   | Term.Const ctntu ->
       genc_void_return retvar (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); error "not implemented")
+  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
 
 (*
 let rec copy_term term =
@@ -495,7 +492,7 @@ let rec scan_callsites_rec tail context term =
         ci.Constr.ci_cstr_nargs brs)
   | Term.Proj (proj, expr) ->
       scan_callsites_rec false context expr
-  | _ -> errorlabstrm "scan_callsites_rec" (hv 0 (str "unexpected term:" ++ spc () ++ Printer.pr_constr term))
+  | _ -> user_err ~hdr:"scan_callsites_rec" (hv 0 (str "unexpected term:" ++ spc () ++ Printer.pr_constr term))
 
 let scan_callsites i ntfcb_ary =
   let context = Array.to_list (array_rev (Array.mapi
@@ -518,11 +515,11 @@ let genc_func_single fname ty fargs context body =
   (*let (ty, fargs, context, body) = fargs_and_body fname term in*)
   let (argtys, rety) = argtys_and_rety_of_type ty in
   (if List.length argtys <> List.length fargs then
-    error ("function value not supported yet: " ^
+    user_err (str ("function value not supported yet: " ^
       string_of_int (List.length argtys) ^ " prods and " ^
-      string_of_int (List.length fargs) ^ " lambdas"));
+      string_of_int (List.length fargs) ^ " lambdas")));
   let fname_argn = funcname_argnum fname (List.length argtys) in
-  hvb 0 ++
+  hv 0 (
   str (c_mangle_type rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
@@ -530,8 +527,7 @@ let genc_func_single fname ty fargs context body =
   str "{" ++ brk (1,2) ++
   hv 0 (
     genc_body_tail context body) ++
-  spc () ++ str "}" ++
-  close ()
+  spc () ++ str "}")
 
 let find_headcalls ntfcb_ary callsites_ary =
   Array.concat
@@ -543,13 +539,12 @@ let find_headcalls ntfcb_ary callsites_ary =
 
 let genc_mufun_struct_one ntfcb =
   let nm, ty, fargs, context, body = ntfcb in
-  hvb 0 ++
+  hv 0 (
   str "struct" ++ spc () ++
   str nm ++ spc () ++
   str "{" ++ spc () ++
   pp_postjoin_list (str ";" ++ spc ()) (List.map genc_farg fargs) ++
-  str "};" ++
-  close ()
+  str "};")
 
 let genc_mufun_structs ntfcb_ary callsites_ary =
   let ntfcb_ary2 = find_headcalls ntfcb_ary callsites_ary in
@@ -560,7 +555,7 @@ let genc_mufun_entry mfnm i ntfcb =
   let nm, ty, fargs, context, body = ntfcb in
   let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
   let fname_argn = funcname_argnum nm (List.length argtys) in
-  hvb 0 ++
+  hv 0 (
   str (c_mangle_type rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
@@ -576,8 +571,7 @@ let genc_mufun_entry mfnm i ntfcb =
     hv 0 (str (c_mangle_type rety) ++ spc () ++ str "ret;") ++ spc () ++
     hv 0 (str mfnm ++ str "(" ++ int i ++ str "," ++ spc () ++ str "&args," ++ spc () ++ str "&ret);") ++ spc () ++
     hv 0 (str "return" ++ spc () ++ str "ret;")) ++
-  spc () ++ str "}" ++
-  close ()
+  spc () ++ str "}")
 
 let genc_mufun_entries mfnm ntfcb_ary callsites_ary =
   let ntfcb_ary2 = find_headcalls ntfcb_ary callsites_ary in
@@ -585,17 +579,16 @@ let genc_mufun_entries mfnm ntfcb_ary callsites_ary =
     (Array.mapi (genc_mufun_entry mfnm) ntfcb_ary2)
 
 let genc_mufun_forward_decl mfnm =
-  hvb 0 ++
+  hv 0 (
   str "void" ++ spc () ++
   str mfnm ++ str "(" ++
   hv 0 (
     hv 0 (str "int" ++ spc () ++ str "i") ++ str "," ++ spc () ++
     hv 0 (str "void*" ++ spc () ++ str "argsp") ++ str "," ++ spc () ++
-    hv 0 (str "void*" ++ spc () ++ str "retp")) ++ str ");" ++
-  close ()
+    hv 0 (str "void*" ++ spc () ++ str "retp")) ++ str ");")
 
 let genc_mufun_bodies_func mfnm i ntfcb_ary callsites_ary =
-  hvb 0 ++
+  hv 0 (
   str "void" ++ spc () ++
   str mfnm ++ str "(" ++
   hv 0 (
@@ -631,14 +624,13 @@ let genc_mufun_bodies_func mfnm i ntfcb_ary callsites_ary =
                   genc_body_void_tail ("(*(" ^ c_mangle_type rety ^ " *)retp)") context body ++ spc () ++
                   str "return;")))
             ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
-    str "}" ++
-    close ()
+    str "}")
 
 let genc_mufun_single_func mfnm i ntfcb_ary callsites_ary =
   let entry_nm, entry_ty, entry_fargs, entry_context, entry_body = ntfcb_ary.(i) in
   let (entry_argtys, entry_rety) = nargtys_and_rety_of_type (List.length entry_fargs) entry_ty in
   let entry_fname_argn = funcname_argnum entry_nm (List.length entry_argtys) in
-  hvb 0 ++
+  hv 0 (
   str (c_mangle_type entry_rety) ++ spc () ++
   str entry_fname_argn ++ str "(" ++
   hv 0 (genc_fargs entry_fargs) ++
@@ -667,8 +659,7 @@ let genc_mufun_single_func mfnm i ntfcb_ary callsites_ary =
             (if tailcall || (i <> 0 && i == j) then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
             genc_body_tail context body))
         ntfcb_ary)) ++
-  spc () ++ str "}" ++
-  close ()
+  spc () ++ str "}")
 
 let genc_func_mutual mfnm i ntfcb_ary callsites_ary =
   let num_entry_funcs = Array.fold_left (+) 0 (Array.map (fun (headcall, tailcall, partcall) -> if headcall then 1 else 0) callsites_ary) in
@@ -701,11 +692,11 @@ let get_name_type_body (name : Libnames.reference) =
           let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in
           let ty = Global.type_of_global_unsafe reference in
           (name, ty, b)
-      | None -> error "can't genc axiom"
+      | None -> user_err (Pp.str "can't genc axiom")
       end
-  | VarRef _ -> error "can't genc VarRef"
-  | IndRef _ -> error "can't genc IndRef"
-  | ConstructRef _ -> error "can't genc ConstructRef"
+  | VarRef _ -> user_err (Pp.str "can't genc VarRef")
+  | IndRef _ -> user_err (Pp.str "can't genc IndRef")
+  | ConstructRef _ -> user_err (Pp.str "can't genc ConstructRef")
 
 let genc libref_list =
   List.iter
