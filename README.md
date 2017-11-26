@@ -9,7 +9,7 @@ https://github.com/akr/codegen
 
 ## Requiements
 
-- Coq 8.6 (Coq 8.5 doesn't work)
+- Coq 8.7 (Coq 8.6 doesn't work)
 
 ## How to build and install
 
