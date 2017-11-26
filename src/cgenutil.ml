@@ -17,10 +17,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open Names
-open Globnames
 open Pp
 open CErrors
-open Goptions
 
 exception CodeGenError of string
 
@@ -144,7 +142,7 @@ let rec mangle_type_buf_short buf ty =
   | Term.CoFix (i, (nameary, tyary, funary)) -> raise (CodeGenError "mangle_type_buf_short:cofix")
   | Term.Proj (proj, expr) -> raise (CodeGenError "mangle_type_buf_short:proj")
 
-let rec mangle_type_buf buf ty =
+let mangle_type_buf buf ty =
   mangle_type_buf_short buf ty
 
 let mangle_type ty =

@@ -113,7 +113,7 @@ Print _buildDir.
 Print _rank_init.
 Print _rank_lookup.
 
-GenCFile "sample/rank_proved.c"
+GenCFile "rank_proved.c"
   _pred
   _neq0
   _buildDir2

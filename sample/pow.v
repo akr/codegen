@@ -29,5 +29,4 @@ Monomorphization fastpow.
 Print _fastpow.
 Print _fastpow_iter.
 
-GenCFile "sample/pow_proved.c" _fastpow_iter _fastpow.
-
+GenCFile "pow_proved.c" _fastpow_iter _fastpow.
