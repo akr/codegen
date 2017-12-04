@@ -345,8 +345,9 @@ let rec genc_body_var context namehint term termty =
   | Term.Rel i ->
       (mt (), varname_of_rel context i)
   | Term.LetIn (name, expr, exprty, body) ->
-      let (exprbody, varname) = genc_body_var context name expr exprty in
-      genc_body_var (CtxVar varname :: context) namehint body termty
+      let (exprbody, exprvarname) = genc_body_var context name expr exprty in
+      let (bodybody, bodyvarname) = genc_body_var (CtxVar exprvarname :: context) namehint body termty in
+      (exprbody ++ (if ismt exprbody then mt () else spc ()) ++ bodybody, bodyvarname)
   | Term.App (f, argsary) ->
       genc_geninitvar termty namehint (genc_app context f argsary)
   | Term.Case (ci, tyf, expr, brs) ->
@@ -366,7 +367,7 @@ and genc_body_assign context retvar term =
       genc_assign (str retvar) (str (varname_of_rel context i))
   | Term.LetIn (name, expr, exprty, body) ->
       let (exprbody, varname) = genc_body_var context name expr exprty in
-      genc_body_assign (CtxVar varname :: context) retvar body
+      exprbody ++ (if ismt exprbody then mt () else spc ()) ++ genc_body_assign (CtxVar varname :: context) retvar body
   | Term.App (f, argsary) ->
       genc_assign (str retvar) (genc_app context f argsary)
   | Term.Case (ci, tyf, expr, brs) ->

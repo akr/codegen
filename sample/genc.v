@@ -327,3 +327,7 @@ Definition TypeAlias := unit.
 Definition f (x : TypeAlias) := x.
 Monomorphization f.
 
+Definition foo11 n := let ret := if n is 0 then 0 else 0 - n in ret.
+Monomorphization foo11.
+GenC _foo11.
+
