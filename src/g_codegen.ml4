@@ -28,14 +28,15 @@ open Genc
 open Stdarg (* for wit_string *)
 (*open Constrarg*) (* for wit_global *)
 
-(* TODO: commented out temporarily
-it compiles with open Extraargs but theories/codegen.v fails to find out extraars.cmxs?! *)
-(*open Extraargs*) (* for lconstr(...). lconstr accepts "Com 1 + 1" addition to "Com (1 + 1)" *)
+(* for lconstr(...). lconstr accepts "Com 1 + 1" addition to "Com (1 + 1)"
+  which is used as Terminate Monomorphization id unit. *)
+open Ltac_plugin
+open Extraargs
 
 VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
     | [ "Monomorphization" ne_global_list(libref_list) ] ->
       [ monomorphization libref_list ]
-    | [ "Terminate" "Monomorphization" (*l*)constr(term) ] ->
+    | [ "Terminate" "Monomorphization" lconstr(term) ] ->
       [ terminate_monomorphization term ]
     | [ "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
     | [ "GenCFile" string(fn) ne_global_list(libref_list) ] ->
