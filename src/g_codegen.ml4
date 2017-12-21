@@ -23,6 +23,7 @@ let () = Mltop.add_known_plugin (fun () ->
 DECLARE PLUGIN "codegen_plugin"
 
 open Monomorph
+open Linear
 open Genc
 
 open Stdarg (* for wit_string *)
@@ -38,6 +39,8 @@ VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
       [ monomorphization libref_list ]
     | [ "Terminate" "Monomorphization" lconstr(term) ] ->
       [ terminate_monomorphization term ]
+    | [ "CodeGen" "Linear" lconstr(ty) ] ->
+      [ register_linear_type ty ]
     | [ "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
     | [ "GenCFile" string(fn) ne_global_list(libref_list) ] ->
       [ genc_file fn libref_list ]

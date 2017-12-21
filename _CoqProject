@@ -5,6 +5,7 @@
 src/cgenutil.ml
 src/g_codegen.ml4
 src/monomorph.ml
+src/linear.ml
 src/genc.ml
 src/codegen_plugin.mllib
 theories/codegen.v
