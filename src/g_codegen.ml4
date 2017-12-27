@@ -41,6 +41,10 @@ VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
       [ terminate_monomorphization term ]
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
       [ register_linear_type ty ]
+    | [ "CodeGen" "LinearCheck" ne_global_list(libref_list) ] ->
+      [ linear_type_check_list libref_list ]
+    | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
+      [ linear_type_check_test t1 t2 ]
     | [ "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
     | [ "GenCFile" string(fn) ne_global_list(libref_list) ] ->
       [ genc_file fn libref_list ]
