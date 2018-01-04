@@ -44,11 +44,12 @@ let is_linear_type env sigma ty =
 
 let check_not_linear_type env sigma ty =
   if is_linear_type env sigma ty then
-    raise (CodeGenError "unexpected linear type")
+    raise (CodeGenError "unexpected linear type binding")
 
 (* check follows:
    1. no reference to local linear variables (Ref)
    2. not bind local linear variable (Prod, Lambda, LetIn)
+   Note that this doesn't prohibit the term itself is a linear type.
  *)
 let rec check_no_linear_var env evdref linear_refs term =
   (match EConstr.kind !evdref term with
@@ -56,7 +57,7 @@ let rec check_no_linear_var env evdref linear_refs term =
       (match List.nth linear_refs (i-1) with
       | None -> () (* usual (non-linear) variable *)
       | Some cell -> (* linear variable *)
-          raise (CodeGenError "linear variable reference in forbidden part"))
+          raise (CodeGenError "unexpected linear variable reference"))
   | Var name -> ()
   | Meta i -> ()
   | Evar (ekey, termary) -> ()
@@ -104,10 +105,47 @@ let rec check_no_linear_var env evdref linear_refs term =
       check_no_linear_var env evdref linear_refs expr);
   Feedback.msg_info (str "codegen linear type f:" ++ spc() ++ Printer.pr_econstr_env env !evdref term)
 
-let check_linear_var env evdref locals num_innermost_locals term =
-  (match EConstr.kind !evdref term with
+let rec copy_linear_refs linear_refs =
+  match linear_refs with
+  | [] -> []
+  | None :: rest -> None :: copy_linear_refs rest
+  | Some r :: rest -> Some (ref !r) :: copy_linear_refs rest
+
+let rec eq_linear_refs linear_refs1 linear_refs2 =
+  match linear_refs1, linear_refs2 with
+  | [], [] -> true
+  | (None :: rest1), (None :: rest2) -> eq_linear_refs rest1 rest2
+  | (Some r1 :: rest1), (Some r2 :: rest2) -> !r1 = !r2 && eq_linear_refs rest1 rest2
+
+let rec update_linear_refs dst_linear_refs src_linear_refs =
+  match dst_linear_refs, src_linear_refs with
+  | [], [] -> ()
+  | (None :: rest1), (None :: rest2) -> update_linear_refs rest1 rest2
+  | (Some r1 :: rest1), (Some r2 :: rest2) -> (r1 := !r2; update_linear_refs rest1 rest2)
+
+let update_linear_refs_for_case linear_refs_ary dst_linear_refs =
+  Array.iter (fun linear_ref ->
+    if not (eq_linear_refs linear_refs_ary.(0) linear_ref) then
+      raise (CodeGenError "inconsistent linear variable use in match branches"))
+    linear_refs_ary;
+  update_linear_refs dst_linear_refs linear_refs_ary.(0)
+
+let rec check_outermost_lambdas env evdref linear_refs num_innermost_locals term =
+  match EConstr.kind !evdref term with
+  | Lambda (name, ty, body) ->
+      (check_no_linear_var env evdref linear_refs ty;
+      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+      let env2 = EConstr.push_rel decl env in
+      if is_linear_type env !evdref ty then
+        check_outermost_lambdas env evdref (Some (ref 0) :: linear_refs) (num_innermost_locals+1) body
+      else
+        check_outermost_lambdas env evdref (None :: linear_refs) (num_innermost_locals+1) body)
+  | _ -> check_linear_var env evdref linear_refs num_innermost_locals term
+and check_linear_var env evdref linear_refs num_innermost_locals term =
+  (Feedback.msg_info (str "check_linear_var:" ++ spc() ++ Printer.pr_econstr_env env !evdref term);
+  match EConstr.kind !evdref term with
   | Rel i ->
-      (match List.nth locals (i-1) with
+      (match List.nth linear_refs (i-1) with
       | None -> () (* usual (non-linear) variable *)
       | Some cell ->
           (* linear variable *)
@@ -118,23 +156,57 @@ let check_linear_var env evdref locals num_innermost_locals term =
               raise (CodeGenError "second reference to a linear variable")
           else
             raise (CodeGenError "linear variable reference outside of a function"))
-  | Var name -> raise (CodeGenError "shouldn't occur: var")
-  | Meta i -> raise (CodeGenError "shouldn't occur: meta")
-  | Evar (ekey, termary) -> raise (CodeGenError "shouldn't occur: evar")
-  | Sort s -> raise (CodeGenError "shouldn't occur: sort")
-  | Cast (expr, kind, ty) -> Feedback.msg_info (str "cast")
-  | Prod (name, ty, body) -> Feedback.msg_info (str "prod")
-  | Lambda (name, ty, body) -> Feedback.msg_info (str "lambda")
-  | LetIn (name, expr, ty, body) -> Feedback.msg_info (str "letin")
-  | App (f, argsary) -> Feedback.msg_info (str "app")
-  | Const ctntu -> Feedback.msg_info (str "const")
-  | Ind iu -> Feedback.msg_info (str "ind")
-  | Construct cstru -> Feedback.msg_info (str "construct")
-  | Case (ci, tyf, expr, brs) -> Feedback.msg_info (str "case")
+  | Var name -> ()
+  | Meta i -> ()
+  | Evar (ekey, termary) -> ()
+  | Sort s -> ()
+  | Cast (expr, kind, ty) ->
+      (check_linear_var env evdref linear_refs num_innermost_locals expr;
+      check_linear_var env evdref linear_refs num_innermost_locals ty)
+  | Prod (name, ty, body) ->
+      check_no_linear_var env evdref linear_refs term
+  | Lambda (name, ty, body) ->
+      check_outermost_lambdas env evdref linear_refs 0 term
+  | LetIn (name, expr, ty, body) ->
+      (check_no_linear_var env evdref linear_refs ty;
+      check_linear_var env evdref linear_refs num_innermost_locals expr;
+      let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
+      let env2 = EConstr.push_rel decl env in
+      if is_linear_type env !evdref ty then
+        check_linear_var env evdref (Some (ref 0) :: linear_refs) (num_innermost_locals+1) body
+      else
+        check_linear_var env evdref (None :: linear_refs) (num_innermost_locals+1) body)
+  | App (f, argsary) ->
+      (check_linear_var env evdref linear_refs num_innermost_locals f;
+      Array.iter (check_linear_var env evdref linear_refs num_innermost_locals) argsary)
+  | Const ctntu -> ()
+  | Ind iu -> ()
+  | Construct cstru -> ()
+  | Case (ci, tyf, expr, brs) ->
+      (check_no_linear_var env evdref linear_refs tyf;
+      check_linear_var env evdref linear_refs num_innermost_locals expr;
+      let linear_refs_ary = Array.map (fun _ -> copy_linear_refs linear_refs) brs in
+      let f linear_refs cstr_nargs br = check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br in
+      array_iter3 f linear_refs_ary ci.Constr.ci_cstr_nargs brs;
+      update_linear_refs_for_case linear_refs_ary linear_refs)
+
+
   | Fix ((ia, i), (nameary, tyary, funary)) -> Feedback.msg_info (str "fix")
   | CoFix (i, (nameary, tyary, funary)) -> Feedback.msg_info (str "cofix")
-  | Proj (proj, expr) -> Feedback.msg_info (str "proj"));
-  Feedback.msg_info (str "codegen linear type f:" ++ spc() ++ Printer.pr_econstr_env env !evdref term)
+  | Proj (proj, expr) -> Feedback.msg_info (str "proj"))
+and check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br =
+  if cstr_nargs = 0 then
+    check_linear_var env evdref linear_refs num_innermost_locals br
+  else
+    (match EConstr.kind !evdref br with
+    | Lambda (name, ty, body) ->
+        (check_no_linear_var env evdref linear_refs ty;
+        check_not_linear_type env !evdref ty;
+        let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+        let env2 = EConstr.push_rel decl env in
+        check_case_branch env evdref (None :: linear_refs) (num_innermost_locals+1) (cstr_nargs-1) body)
+    | _ ->
+      raise (CodeGenError "unexpected non-Lambda in a case branch"))
 
 let linear_type_check_single libref =
   let gref = Smartlocate.global_with_alias libref in

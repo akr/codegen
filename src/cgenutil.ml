@@ -36,6 +36,11 @@ let array_iter2 f a1 a2 =
     invalid_arg "Array.iter2: arrays must have the same length";
   Array.iteri (fun i -> f a1.(i)) a2
 
+let array_iter3 f a1 a2 a3 =
+  if Array.length a1 <> Array.length a2 || Array.length a1 <> Array.length a3 then
+    invalid_arg "Array.iter3: arrays must have the same length";
+  Array.iteri (fun i -> f a1.(i) a2.(i)) a3
+
 let array_for_all f a =
   try Array.iter (fun x -> if f x then () else raise Exit) a; true
   with Exit -> false
