@@ -116,12 +116,14 @@ let rec eq_linear_refs linear_refs1 linear_refs2 =
   | [], [] -> true
   | (None :: rest1), (None :: rest2) -> eq_linear_refs rest1 rest2
   | (Some r1 :: rest1), (Some r2 :: rest2) -> !r1 = !r2 && eq_linear_refs rest1 rest2
+  | _, _ -> raise (CodeGenError "inconsistent linear_refs")
 
 let rec update_linear_refs dst_linear_refs src_linear_refs =
   match dst_linear_refs, src_linear_refs with
   | [], [] -> ()
   | (None :: rest1), (None :: rest2) -> update_linear_refs rest1 rest2
   | (Some r1 :: rest1), (Some r2 :: rest2) -> (r1 := !r2; update_linear_refs rest1 rest2)
+  | _, _ -> raise (CodeGenError "inconsistent linear_refs")
 
 let update_linear_refs_for_case linear_refs_ary dst_linear_refs =
   Array.iter (fun linear_ref ->
@@ -129,6 +131,16 @@ let update_linear_refs_for_case linear_refs_ary dst_linear_refs =
       raise (CodeGenError "inconsistent linear variable use in match branches"))
     linear_refs_ary;
   update_linear_refs dst_linear_refs linear_refs_ary.(0)
+
+let push_rec_types env sigma (nameary,tyary,funary) =
+  let to_constr = EConstr.to_constr sigma in
+  Environ.push_rec_types (nameary, Array.map to_constr tyary, Array.map to_constr funary) env
+
+let rec ntimes n f v =
+  if n = 0 then
+    v
+  else
+    ntimes (n-1) f (f v)
 
 let rec check_outermost_lambdas env evdref linear_refs num_innermost_locals term =
   match EConstr.kind !evdref term with
@@ -161,8 +173,8 @@ and check_linear_var env evdref linear_refs num_innermost_locals term =
   | Evar (ekey, termary) -> ()
   | Sort s -> ()
   | Cast (expr, kind, ty) ->
-      (check_linear_var env evdref linear_refs num_innermost_locals expr;
-      check_linear_var env evdref linear_refs num_innermost_locals ty)
+      (check_no_linear_var env evdref linear_refs ty;
+      check_linear_var env evdref linear_refs num_innermost_locals expr)
   | Prod (name, ty, body) ->
       check_no_linear_var env evdref linear_refs term
   | Lambda (name, ty, body) ->
@@ -189,11 +201,20 @@ and check_linear_var env evdref linear_refs num_innermost_locals term =
       let f linear_refs cstr_nargs br = check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br in
       array_iter3 f linear_refs_ary ci.Constr.ci_cstr_nargs brs;
       update_linear_refs_for_case linear_refs_ary linear_refs)
-
-
-  | Fix ((ia, i), (nameary, tyary, funary)) -> Feedback.msg_info (str "fix")
-  | CoFix (i, (nameary, tyary, funary)) -> Feedback.msg_info (str "cofix")
-  | Proj (proj, expr) -> Feedback.msg_info (str "proj"))
+  | Fix ((ia, i), (nameary, tyary, funary)) ->
+      (let n = Array.length funary in
+      let env2 = push_rec_types env !evdref (nameary, tyary, funary) in
+      let linear_refs2 = ntimes n (List.cons None) linear_refs in
+      Array.iter (check_no_linear_var env evdref linear_refs) tyary;
+      Array.iter (check_linear_var env2 evdref linear_refs2 0) funary)
+  | CoFix (i, (nameary, tyary, funary)) ->
+      (let n = Array.length funary in
+      let env2 = push_rec_types env !evdref (nameary, tyary, funary) in
+      let linear_refs2 = ntimes n (List.cons None) linear_refs in
+      Array.iter (check_no_linear_var env evdref linear_refs) tyary;
+      Array.iter (check_linear_var env2 evdref linear_refs2 0) funary)
+  | Proj (proj, expr) ->
+      check_linear_var env evdref linear_refs num_innermost_locals expr)
 and check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br =
   if cstr_nargs = 0 then
     check_linear_var env evdref linear_refs num_innermost_locals br
