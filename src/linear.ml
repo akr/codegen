@@ -142,6 +142,15 @@ let rec ntimes n f v =
   else
     ntimes (n-1) f (f v)
 
+let add_linear_var linear_refs f =
+  let r = ref 0 in
+  let linear_refs2 = Some r :: linear_refs in
+  f linear_refs2;
+  if !r <> 1 then
+    raise (CodeGenError "linear var not lineary used")
+  else
+    ()
+
 let rec check_outermost_lambdas env evdref linear_refs num_innermost_locals term =
   match EConstr.kind !evdref term with
   | Lambda (name, ty, body) ->
@@ -149,7 +158,7 @@ let rec check_outermost_lambdas env evdref linear_refs num_innermost_locals term
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = EConstr.push_rel decl env in
       if is_linear_type env !evdref ty then
-        check_outermost_lambdas env evdref (Some (ref 0) :: linear_refs) (num_innermost_locals+1) body
+        add_linear_var linear_refs (fun linear_refs2 -> check_outermost_lambdas env evdref linear_refs2 (num_innermost_locals+1) body)
       else
         check_outermost_lambdas env evdref (None :: linear_refs) (num_innermost_locals+1) body)
   | _ -> check_linear_var env evdref linear_refs num_innermost_locals term
@@ -185,7 +194,7 @@ and check_linear_var env evdref linear_refs num_innermost_locals term =
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
       let env2 = EConstr.push_rel decl env in
       if is_linear_type env !evdref ty then
-        check_linear_var env evdref (Some (ref 0) :: linear_refs) (num_innermost_locals+1) body
+        add_linear_var linear_refs (fun linear_refs2 -> check_linear_var env evdref linear_refs2 (num_innermost_locals+1) body)
       else
         check_linear_var env evdref (None :: linear_refs) (num_innermost_locals+1) body)
   | App (f, argsary) ->
