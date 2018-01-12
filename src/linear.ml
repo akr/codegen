@@ -6,7 +6,7 @@ open EConstr
 
 open Cgenutil
 
-let linear_type_list_empty : t list = []
+let linear_type_list_empty : (t * bool) list = []
 
 let linear_type_list = Summary.ref linear_type_list_empty ~name:"CodeGenLinearTypeList"
 
@@ -15,8 +15,113 @@ let register_linear_type (ty : Constrexpr.constr_expr) =
   let sigma = Evd.from_env env in
   let (ty2, euc) = Constrintern.interp_constr env sigma ty in
   let ty3 = EConstr.of_constr ty2 in
-  linear_type_list := ty3 :: !linear_type_list;
+  linear_type_list := (ty3, true) :: !linear_type_list;
   Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty3)
+
+let whd_all env sigma term = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
+
+let rec is_linear_type_rec env sigma ty l =
+  match l with
+  | [] -> None
+  | (k, b) :: rest ->
+      if eq_constr sigma ty k then Some b else is_linear_type_rec env sigma ty rest
+
+let type_of_inductive_arity mind_arity : Term.constr =
+  match mind_arity with
+  | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
+  | Declarations.TemplateArity temp_arity -> Term.mkSort (Sorts.Type (temp_arity : Declarations.template_arity).Declarations.template_level)
+
+let valid_type_param env sigma decl =
+  match decl with
+  | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
+  | Context.Rel.Declaration.LocalDef _ -> false
+
+let rec destProdN_rec sigma term n =
+  if n = 0 then
+    ([], [], term)
+  else
+    match EConstr.kind sigma term with
+    | Prod (name, ty, body) ->
+        let (names, tys, body) = destProdN_rec sigma body (n-1) in
+        (name :: names, ty :: tys, body)
+    | _ ->
+        raise (CodeGenError "destProdN_rec: prod expected")
+
+let destProdN sigma term n =
+  let (names, tys, body) = destProdN_rec sigma term n in
+  (Array.of_list names, Array.of_list tys, body)
+
+let rec destProdX_rec sigma term =
+  match EConstr.kind sigma term with
+  | Prod (name, ty, body) ->
+      let (names, tys, body) = destProdX_rec sigma body in
+      (name :: names, ty :: tys, body)
+  | _ ->
+      raise (CodeGenError "destProdX_rec: prod expected")
+
+let destProdX sigma term =
+  let (names, tys, body) = destProdX_rec sigma term in
+  (Array.of_list names, Array.of_list tys, body)
+
+let rec is_linear_type_test env sigma ty =
+  if isProd sigma ty then
+    false
+  else
+    match is_linear_type_rec env sigma ty !linear_type_list with
+    | Some b -> b
+    | None ->
+      (match EConstr.kind sigma ty with
+      | Prod _ -> false
+      | Ind iu -> is_linear_ind env sigma iu [| |]
+      | App (f, argsary) ->
+          if isInd sigma f then
+            if array_for_all (is_linear_type_test env sigma) argsary &&
+                let iu = destInd sigma f in
+                is_linear_ind env sigma (destInd sigma f) argsary then
+              (linear_type_list := (ty, true) :: !linear_type_list; true)
+            else
+              (linear_type_list := (ty, false) :: !linear_type_list; false)
+          else
+            raise (CodeGenError "is_linear_type_test: unexpected type function application")
+      | _ -> raise (CodeGenError "is_linear_type_test: unexpected term"))
+and is_linear_ind env sigma iu argsary =
+  let ((mutind, i), _) = iu in (* strip EInstance.t *)
+  let mind_body = Environ.lookup_mind mutind env in
+  if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
+    false
+  else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
+    false
+  else
+    let env = Environ.push_rel_context (
+      List.map (fun oind_body ->
+        Context.Rel.Declaration.LocalAssum (Names.Name.Name oind_body.Declarations.mind_typename, type_of_inductive_arity oind_body.Declarations.mind_arity))
+        (List.rev (Array.to_list mind_body.Declarations.mind_packets))
+    ) env in
+    Array.exists
+      (fun oind_body ->
+        Array.exists
+          (fun user_lc ->
+            let (tparam_names, tparam_tys, body) = destProdN sigma user_lc mind_body.Declarations.mind_nparams in
+            (* typaram_names and typaram_tys should be match to mind_body.Declarations.mind_params_ctxt *)
+            let (cparam_names, cparam_tys, body) = destProdX sigma body in
+            let cparam_tys = Array.map (whd_all env sigma) cparam_tys in
+            let body = whd_all env sigma body in
+            (if not (isRel sigma body || (isApp sigma body && isRel sigma (fst (destApp sigma body)))) then
+              raise (CodeGenError "is_linear_ind: constractor has non-prod"));
+            (if Array.exists (isSort sigma) cparam_tys then raise (CodeGenError "is_linear_ind: constractor has type argument"));
+            Array.exists
+              (fun cparam_ty ->
+                if isRel sigma cparam_ty || (isApp sigma cparam_ty && isRel sigma (fst (destApp sigma cparam_ty))) then
+                  false
+                else
+                  is_linear_type_test env sigma cparam_ty)
+              cparam_tys)
+          (Array.map EConstr.of_constr oind_body.Declarations.mind_user_lc))
+      mind_body.Declarations.mind_packets
+
+let is_linear_type env sigma ty =
+  let ty2 = whd_all env sigma ty in
+  is_linear_type_test env sigma ty2
 
 let f env evdref term =
   (match EConstr.kind !evdref term with
@@ -38,9 +143,6 @@ let f env evdref term =
   | CoFix (i, (nameary, tyary, funary)) -> Feedback.msg_info (str "cofix")
   | Proj (proj, expr) -> Feedback.msg_info (str "proj"));
   Feedback.msg_info (str "codegen linear type f:" ++ spc() ++ Printer.pr_econstr_env env !evdref term)
-
-let is_linear_type env sigma ty =
-  List.exists (fun lty -> Reductionops.is_conv_leq env sigma ty lty) !linear_type_list
 
 let check_not_linear_type env sigma ty =
   if is_linear_type env sigma ty then
