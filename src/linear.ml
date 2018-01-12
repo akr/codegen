@@ -123,6 +123,7 @@ let is_linear_type env sigma ty =
   let ty2 = whd_all env sigma ty in
   is_linear_type_test env sigma ty2
 
+(*
 let f env evdref term =
   (match EConstr.kind !evdref term with
   | Rel i -> Feedback.msg_info (str "rel")
@@ -143,6 +144,7 @@ let f env evdref term =
   | CoFix (i, (nameary, tyary, funary)) -> Feedback.msg_info (str "cofix")
   | Proj (proj, expr) -> Feedback.msg_info (str "proj"));
   Feedback.msg_info (str "codegen linear type f:" ++ spc() ++ Printer.pr_econstr_env env !evdref term)
+*)
 
 let check_not_linear_type env sigma ty =
   if is_linear_type env sigma ty then
