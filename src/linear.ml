@@ -57,41 +57,43 @@ let rec destProdX_rec sigma term =
   | Prod (name, ty, body) ->
       let (names, tys, body) = destProdX_rec sigma body in
       (name :: names, ty :: tys, body)
-  | _ ->
-      raise (CodeGenError "destProdX_rec: prod expected")
+  | _ -> ([], [], term)
 
 let destProdX sigma term =
   let (names, tys, body) = destProdX_rec sigma term in
   (Array.of_list names, Array.of_list tys, body)
 
 let rec is_linear_type env sigma ty =
-  if isProd sigma ty then
-    false
+  match EConstr.kind sigma ty with
+  | Prod (name, namety, body) ->
+      is_linear_type env sigma namety;
+      is_linear_type env sigma body;
+      false
+  | Ind iu ->
+      (match is_registered_linear_type env sigma ty !linear_type_list with
+      | Some b -> b
+      | None -> is_linear_app env sigma ty ty [| |])
+  | App (f, argsary) ->
+      (match is_registered_linear_type env sigma ty !linear_type_list with
+      | Some b -> b
+      | None -> is_linear_app env sigma ty f argsary)
+  | _ -> user_err (str "is_linear_type: unexpected term:" ++ spc () ++ Printer.pr_econstr_env env sigma ty)
+and is_linear_app env sigma ty f argsary =
+  if isInd sigma f then
+    (Array.map (is_linear_type env sigma) argsary;
+    if is_linear_ind env sigma (destInd sigma f) argsary then
+      (linear_type_list := (ty, true) :: !linear_type_list; true)
+    else
+      (linear_type_list := (ty, false) :: !linear_type_list; false))
   else
-    match is_registered_linear_type env sigma ty !linear_type_list with
-    | Some b -> b
-    | None ->
-      (match EConstr.kind sigma ty with
-      | Prod _ -> false (* unreachable *)
-      | Ind iu -> is_linear_ind env sigma iu [| |]
-      | App (f, argsary) ->
-          if isInd sigma f then
-            let args_is_linear = Array.map (is_linear_type env sigma) argsary in
-            let f_is_linear = is_linear_ind env sigma (destInd sigma f) argsary in
-            if f_is_linear || Array.mem true args_is_linear then
-              (linear_type_list := (ty, true) :: !linear_type_list; true)
-            else
-              (linear_type_list := (ty, false) :: !linear_type_list; false)
-          else
-            raise (CodeGenError "is_linear_type: unexpected type application")
-      | _ -> raise (CodeGenError "is_linear_type: unexpected term"))
+    user_err (str "is_linear_app: unexpected type application:" ++ spc () ++ Printer.pr_econstr_env env sigma f)
 and is_linear_ind env sigma iu argsary =
   let ((mutind, i), _) = iu in (* strip EInstance.t *)
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
-    raise (CodeGenError "is_linear_ind: non-uniform inductive type")
+    user_err (str "is_linear_ind: non-uniform inductive type:" ++ spc () ++ Printer.pr_econstr_env env sigma (mkIndU iu))
   else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
-    raise (CodeGenError "is_linear_ind: invalid type parameter")
+    user_err (str "is_linear_ind: non-sort type parameter:" ++ spc () ++ Printer.pr_econstr_env env sigma (mkIndU iu))
   else
     let env = Environ.push_rel_context (
         List.map (fun oind_body ->
@@ -155,7 +157,7 @@ let f env evdref term =
 
 let check_not_linear_type env sigma ty =
   if is_linear env sigma ty then
-    raise (CodeGenError "unexpected linear type binding")
+    user_err (str "unexpected linear type binding:" ++ spc () ++ Printer.pr_econstr_env env sigma ty)
 
 (* check follows:
    1. no reference to local linear variables (Ref)
