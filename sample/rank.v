@@ -19,13 +19,19 @@ Definition bappend (s1 s2 : bits) := bseq (s1 ++ s2).
 Definition bcount (b : bool) i l (s : bits) :=
   count_mem b (take l (drop i s)).
 
-(* DArr implementation *)
-(* w is used after monadification *)
+(* nat array implementation for directories
+  MDArr is mutable array used for building phase
+  DArr is immutable array used for lookup phase
+  The elements must be lower than 2^w.
+  This restriction is proved using monadification *)
+Inductive MDArr : Type := mdarr : nat -> seq nat -> MDArr.
+Definition bwidth D := let: mdarr w d := D in w.
+Definition seq_of_MD D := let: mdarr w d := D in d.
+Definition emptyD w := mdarr w nil.
+Definition pushD D v := let: mdarr w d := D in mdarr w (v :: d).
+
 Inductive DArr : Type := darr : nat -> seq nat -> DArr.
-Definition bwidth D := let: darr w d := D in w.
-Definition seq_of_D D := let: darr w d := D in d.
-Definition emptyD w := darr w nil.
-Definition pushD D v := let: darr w d := D in darr w (v :: d).
+Definition freezeD D := let: mdarr w d := D in darr w d.
 Definition lookupD D i :=
   let: darr w d := D in nth 0 d (size d - i.+1).
 Definition sizeD D := let: darr w d := D in size d.
@@ -79,7 +85,7 @@ Definition rank_init b s :=
   let w1 := neq0 (bitlen (n %/ sz1 * sz1)) in
   let w2 := neq0 (bitlen (kp * sz2)) in
   let (D1, D2) := buildDir b s k sz2 w1 w2 in
-  mkAux b s k sz2 D1 D2.
+  mkAux b s k sz2 (freezeD D1) (freezeD D2).
 
 Definition rank_lookup aux i :=
   let b := query_bit aux in
@@ -113,13 +119,13 @@ Print _buildDir.
 Print _rank_init.
 Print _rank_lookup.
 
-CodeGen Linear DArr.
+CodeGen Linear MDArr.
 CodeGen LinearCheck _pred _neq0.
 CodeGen LinearCheck _buildDir2.
 CodeGen LinearCheck _buildDir1.
 CodeGen LinearCheck _buildDir.
 CodeGen LinearCheck _rank_init.
-Fail CodeGen LinearCheck _rank_lookup.
+CodeGen LinearCheck _rank_lookup.
 
 GenCFile "rank_proved.c"
   _pred
