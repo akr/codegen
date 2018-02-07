@@ -33,6 +33,7 @@ using Coq and monomorphization plugin.
 #include <time.h>
 #include <assert.h>
 #include <unistd.h>
+#include <inttypes.h>
 
 #include <stdbool.h>
 #define n0_true() true
@@ -239,17 +240,31 @@ void print_bits(bits s)
     putchar(get_bit(s, i) ? '1' : '0');
 }
 
+int64_t difftimespec(struct timespec t1, struct timespec t2)
+{
+  return ((int64_t)t2.tv_sec - (int64_t)t1.tv_sec) * 1000000000 +
+    (t2.tv_nsec - t1.tv_nsec);
+}
+
 void test_one(bits s, nat i)
 {
+  int res;
+  nat m;
+  struct timespec t1, t2;
+
   if (n1_bsize(s) < i) {
     fprintf(stderr, "index too big\n");
     exit(EXIT_FAILURE);
   }
 
   Aux aux = n2_rank_init(1, s);
-  nat m = n2_rank_lookup(aux, i);
+  res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t1);
+  if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
+  m = n2_rank_lookup(aux, i);
+  res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t2);
+  if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
   assert (m == n4_bcount(1, 0, i, s));
-  printf("rank(%lu) = %lu\n", i, m);
+  printf("rank(%lu) = %lu (%"PRId64"[ns])\n", i, m, difftimespec(t1, t2));
 }
 
 void test_all(bits s)
@@ -257,10 +272,17 @@ void test_all(bits s)
   Aux aux = n2_rank_init(1, s);
   nat n = n1_bsize(s);
   nat i;
+  struct timespec t1, t2;
   for (i = 0; i <= n; i++) {
-    nat m = n2_rank_lookup(aux, i);
+    int res;
+    nat m;
+    res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t1);
+    if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
+    m = n2_rank_lookup(aux, i);
+    res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t2);
+    if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
     assert (m == n4_bcount(1, 0, i, s));
-    printf("rank(%lu) = %lu\n", i, m);
+    printf("rank(%lu) = %lu (%"PRId64"[ns])\n", i, m, difftimespec(t1, t2));
   }
 }
 
