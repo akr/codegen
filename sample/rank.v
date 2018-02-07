@@ -120,14 +120,17 @@ Print _rank_init.
 Print _rank_lookup.
 
 CodeGen Linear MDArr.
+
+(*
 CodeGen LinearCheck _pred _neq0.
 CodeGen LinearCheck _buildDir2.
 CodeGen LinearCheck _buildDir1.
 CodeGen LinearCheck _buildDir.
 CodeGen LinearCheck _rank_init.
 CodeGen LinearCheck _rank_lookup.
+*)
 
-GenCFile "rank_proved.c"
+GenCFile "sample/rank_proved.c"
   _pred
   _neq0
   _buildDir2
