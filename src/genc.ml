@@ -22,6 +22,7 @@ open Pp
 open CErrors
 
 open Cgenutil
+open Linear
 
 let c_id str =
   let buf = Buffer.create 0 in
@@ -703,6 +704,7 @@ let genc libref_list =
   List.iter
     (fun libref ->
       let (name, ty, body) = get_name_type_body libref in
+      linear_type_check_term body;
       let pp = genc_func name ty body in
       Feedback.msg_info pp)
     libref_list
@@ -713,6 +715,7 @@ let genc_file fn libref_list =
   List.iter
     (fun libref ->
       let (name, ty, body) = get_name_type_body libref in
+      linear_type_check_term body;
       let pp = (genc_func name ty body) ++ Pp.fnl () in
       Pp.pp_with fmt pp)
     libref_list;

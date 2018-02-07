@@ -327,6 +327,14 @@ and check_linear_exp env evdref linear_refs num_innermost_locals term =
   else
     check_linear_valexp env evdref linear_refs num_innermost_locals term)
 
+let linear_type_check_term term =
+  if !type_linearity_list <> [] then
+    (let env = Global.env () in
+    let sigma = Evd.from_env env in
+    let evdref = ref sigma in
+    let eterm = EConstr.of_constr term in
+    check_linear_valexp env evdref [] 0 eterm)
+
 let linear_type_check_single libref =
   let gref = Smartlocate.global_with_alias libref in
   let env = Global.env () in
