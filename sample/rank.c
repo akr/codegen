@@ -59,44 +59,28 @@ typedef struct {
   nat max; /* maximum length [bit] */
 } bits_heap;
 
-typedef struct {
-  bits_heap *heap;
-  nat len; /* expected length [bit] */
-} bits;
+typedef bits_heap *bits;
 
-#define n1_bsize(s) ((s).len)
+#define n1_bsize(s) ((s)->len)
 
 bits alloc_bits(nat max)
 {
-  bits_heap *bh;
-  bh = malloc(sizeof(bits_heap));
-  if (bh == NULL) { perror("malloc"); exit(EXIT_FAILURE); }
+  bits s;
+  s = malloc(sizeof(bits_heap));
+  if (s == NULL) { perror("malloc"); exit(EXIT_FAILURE); }
   max = ((max + 63) / 64 * 64); /* aligned up to 64bit */
   if (max == 0) max = 64; /* avoid malloc(0) which is implementation-defined */
-  bh->buf = malloc(max / CHAR_BIT);
-  if (bh->buf == NULL) { perror("malloc"); exit(EXIT_FAILURE); }
-  bh->len = 0;
-  bh->max = max;
-  bits s;
-  s.heap = bh;
-  s.len = 0;
+  s->buf = malloc(max / CHAR_BIT);
+  if (s->buf == NULL) { perror("malloc"); exit(EXIT_FAILURE); }
+  s->len = 0;
+  s->max = max;
   return s;
-}
-
-bits copy_prefix(bits s, nat n)
-{
-  nat max = (n + 63) / 64 * 64;
-  if (max == 0) max = 64;
-  bits s2 = alloc_bits(max);
-  memcpy(s2.heap->buf, s.heap->buf, max / CHAR_BIT);
-  s2.len = s2.heap->len = n;
-  return s2;
 }
 
 bool get_bit(bits s, nat i)
 {
-  assert(i < s.len);
-  return (s.heap->buf[i / 64] >> (i % 64)) & 1;
+  assert(i < s->len);
+  return (s->buf[i / 64] >> (i % 64)) & 1;
 }
 
 nat get_bits(bits s, nat w, nat i)
@@ -109,26 +93,22 @@ nat get_bits(bits s, nat w, nat i)
 
 bits add_bit(bits s, bool b)
 {
-  if (s.len != s.heap->len)
-    s = copy_prefix(s, s.len);
-
-  if (s.heap->max <= s.len) {
+  if (s->max <= s->len) {
     uint64_t *buf;
     nat max;
-    max = s.heap->max * 2;
-    assert(s.heap->max < max);
-    buf = realloc(s.heap->buf, max / CHAR_BIT);
+    max = s->max * 2;
+    assert(s->max < max);
+    buf = realloc(s->buf, max / CHAR_BIT);
     if (buf == NULL) { perror("realloc"); exit(EXIT_FAILURE); }
-    s.heap->buf = buf;
-    s.heap->max = max;
+    s->buf = buf;
+    s->max = max;
   }
 
   if (b)
-    s.heap->buf[s.len / 64] |= (uint64_t)1 << (s.len % 64);
+    s->buf[s->len / 64] |= (uint64_t)1 << (s->len % 64);
   else
-    s.heap->buf[s.len / 64] &= ~((uint64_t)1 << (s.len % 64));
-  s.len++;
-  s.heap->len++;
+    s->buf[s->len / 64] &= ~((uint64_t)1 << (s->len % 64));
+  s->len++;
   return s;
 }
 
