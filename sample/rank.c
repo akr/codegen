@@ -154,6 +154,7 @@ typedef struct {
   nat w;
   bits s;
 } DArr;
+#define MDArr DArr
 
 DArr n1_emptyD(nat w)
 {
@@ -172,33 +173,35 @@ DArr n2_pushD(DArr d, nat n)
   return d;
 }
 
+#define n1_freezeD(D) (D)
+
 #define n2_lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
 #define n1_sizeD(d) (n1_bsize(d) / (d).w)
 
 typedef struct {
-  DArr D1;
-  DArr D2;
-} prod_DArr_DArr;
-#define n2_pair_DArr_DArr(D1, D2) ((prod_DArr_DArr){ (D1), (D2) })
-#define field0_pair_prod_DArr_DArr(x) ((x).D1)
-#define field1_pair_prod_DArr_DArr(x) ((x).D2)
+  MDArr D1;
+  MDArr D2;
+} prod_MDArr_MDArr;
+#define n2_pair_MDArr_MDArr(D1, D2) ((prod_MDArr_MDArr){ (D1), (D2) })
+#define field0_pair_prod_MDArr_MDArr(x) ((x).D1)
+#define field1_pair_prod_MDArr_MDArr(x) ((x).D2)
 
 typedef struct {
-  DArr D;
+  MDArr D;
   nat n;
-} prod_DArr_nat;
-#define n2_pair_DArr_nat(D, n) ((prod_DArr_nat){ (D), (n) })
-#define field0_pair_prod_DArr_nat(x) ((x).D)
-#define field1_pair_prod_DArr_nat(x) ((x).n)
+} prod_MDArr_nat;
+#define n2_pair_MDArr_nat(D, n) ((prod_MDArr_nat){ (D), (n) })
+#define field0_pair_prod_MDArr_nat(x) ((x).D)
+#define field1_pair_prod_MDArr_nat(x) ((x).n)
 
 typedef struct {
-  prod_DArr_DArr D12;
+  prod_MDArr_MDArr D12;
   nat n;
-} prod_prod_DArr_DArr_nat;
-#define n2_pair_prod_DArr_DArr_nat(D12, n) \
-  ((prod_prod_DArr_DArr_nat){ (D12), (n) })
-#define field0_pair_prod_prod_DArr_DArr_nat(x) ((x).D12)
-#define field1_pair_prod_prod_DArr_DArr_nat(x) ((x).n)
+} prod_prod_MDArr_MDArr_nat;
+#define n2_pair_prod_MDArr_MDArr_nat(D12, n) \
+  ((prod_prod_MDArr_MDArr_nat){ (D12), (n) })
+#define field0_pair_prod_prod_MDArr_MDArr_nat(x) ((x).D12)
+#define field1_pair_prod_prod_MDArr_MDArr_nat(x) ((x).n)
 
 static inline nat
 n1_bitlen(nat n)
