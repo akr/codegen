@@ -301,7 +301,8 @@ and check_linear_valexp env evdref linear_refs num_innermost_locals term =
   | Ind iu -> ()
   | Construct cstru -> ()
   | Case (ci, tyf, expr, brs) ->
-      ((* tyf is not checked because it is not a target of code generation. *)
+      ((* tyf is not checked because it is not a target of code generation.
+          check tyf is (fun _ -> termty) ? *)
       check_linear_valexp env evdref linear_refs num_innermost_locals expr;
       let linear_refs_ary = Array.map (fun _ -> copy_linear_refs linear_refs) brs in
       let f linear_refs cstr_nargs br = check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br in
