@@ -37,14 +37,28 @@ let type_linearity_list_empty : (t * type_linearity) list = []
 
 let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
 
+let rec is_concrete_inductive_type env evdref term =
+  let termty = Typing.e_type_of env evdref term in
+  if isSort !evdref termty then
+    match EConstr.kind !evdref term with
+    | Ind _ -> true
+    | App (f, argsary) ->
+        isInd !evdref f &&
+        Array.for_all (is_concrete_inductive_type env evdref) argsary
+    | _ -> false
+  else
+    false (* "list" is not "concrete" inductive type because it has concrete parameter *)
+
 let register_linear_type (ty : Constrexpr.constr_expr) =
   let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (ty2, euc) = Constrintern.interp_constr env sigma ty in
+  let evdref = ref (Evd.from_env env) in
+  let (ty2, euc) = Constrintern.interp_constr env !evdref ty in
   let ty3 = EConstr.of_constr ty2 in
-  let ty4 = nf_all env sigma (EConstr.of_constr ty2) in
+  let ty4 = nf_all env !evdref (EConstr.of_constr ty2) in
+  (if not (is_concrete_inductive_type env evdref ty4) then
+    user_err (str "codegen linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env !evdref ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
-  Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty3)
+  Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env !evdref ty3)
 
 let rec is_registered_linear_type env sigma ty l =
   match l with

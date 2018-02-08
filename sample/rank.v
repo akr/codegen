@@ -121,7 +121,7 @@ Print _rank_lookup.
 
 CodeGen Linear MDArr.
 
-(*
+(* GenCFile checks them internaly
 CodeGen LinearCheck _pred _neq0.
 CodeGen LinearCheck _buildDir2.
 CodeGen LinearCheck _buildDir1.
