@@ -1,4 +1,4 @@
-From mathcomp Require Import ssreflect ssrbool eqtype ssrfun ssrnat.
+From mathcomp Require Import all_ssreflect.
 
 Require Import codegen.codegen.
 
