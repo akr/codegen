@@ -57,16 +57,14 @@ typedef struct {
   uint64_t *buf;
   nat len; /* current length [bit] */
   nat max; /* maximum length [bit] */
-} bits_heap;
-
-typedef bits_heap *bits;
+} *bits;
 
 #define n1_bsize(s) ((s)->len)
 
 bits alloc_bits(nat max)
 {
   bits s;
-  s = malloc(sizeof(bits_heap));
+  s = malloc(sizeof(*s));
   if (s == NULL) { perror("malloc"); exit(EXIT_FAILURE); }
   max = ((max + 63) / 64 * 64); /* aligned up to 64bit */
   if (max == 0) max = 64; /* avoid malloc(0) which is implementation-defined */
