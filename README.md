@@ -16,13 +16,19 @@ https://github.com/akr/codegen
     make
     make install
 
-## How to run
+## Examples
 
-    coqide sample/pow.v
+power function:
 
-## How to use
+    coqc sample/pow.v # generates sample/pow_proved.c
+    gcc -g -Wall sample/pow.c -o sample/pow
+    sample/pow
 
-See sample/ directory.
+rank algorithm of succinct data structure:
+
+    coqc sample/rank.v # generates sample/rank_proved.c
+    gcc -g -Wall sample/rank.c -o sample/rank
+    sample/rank rand
 
 ## Authors
 
