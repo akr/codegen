@@ -31,7 +31,7 @@ let nf_all env sigma term = Reductionops.nf_all env sigma term
 
 let prod_appvect sigma c v = EConstr.of_constr (prod_appvect (EConstr.to_constr sigma c) (Array.map (EConstr.to_constr sigma) v))
 
-type type_linearity = Linear | Pure | Investigating
+type type_linearity = Linear | Unrestricted | Investigating
 
 let type_linearity_list_empty : (t * type_linearity) list = []
 
@@ -121,7 +121,7 @@ and is_linear_app env sigma ty f argsary =
   (*Feedback.msg_debug (str "is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match is_registered_linear_type env sigma ty !type_linearity_list with
   | Some Linear -> true
-  | Some Pure -> false
+  | Some Unrestricted -> false
   | Some Investigating -> false
   | None ->
       (type_linearity_list := (ty, Investigating) :: !type_linearity_list;
@@ -130,8 +130,8 @@ and is_linear_app env sigma ty f argsary =
           (Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
           type_linearity_list := (ty, Linear) :: !type_linearity_list; true)
         else
-          (Feedback.msg_info (str "codegen pure type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
-          type_linearity_list := (ty, Pure) :: !type_linearity_list; false)
+          (Feedback.msg_info (str "codegen unrestricted type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
+          type_linearity_list := (ty, Unrestricted) :: !type_linearity_list; false)
       else
         user_err (str "is_linear_app: unexpected type application:" ++ spc () ++ Printer.pr_econstr_env env sigma f))
 and is_linear_ind env sigma ty ie argsary =
