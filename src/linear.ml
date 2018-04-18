@@ -66,10 +66,10 @@ let rec is_registered_linear_type env sigma ty l =
   | (k, linearity) :: rest ->
       if eq_constr sigma ty k then Some linearity else is_registered_linear_type env sigma ty rest
 
-let type_of_inductive_arity mind_arity : Term.constr =
+let type_of_inductive_arity mind_arity : Constr.t =
   match mind_arity with
   | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
-  | Declarations.TemplateArity temp_arity -> Term.mkSort (Sorts.Type (temp_arity : Declarations.template_arity).Declarations.template_level)
+  | Declarations.TemplateArity temp_arity -> Constr.mkSort (Sorts.Type (temp_arity : Declarations.template_arity).Declarations.template_level)
 
 let valid_type_param env sigma decl =
   match decl with
@@ -111,8 +111,8 @@ let rec is_linear_type env sigma ty =
   (*Feedback.msg_debug (str "is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Prod (name, namety, body) ->
-      is_linear_type env sigma namety;
-      is_linear_type env sigma body;
+      ignore (is_linear_type env sigma namety);
+      ignore (is_linear_type env sigma body);
       false (* function (closure) must not reference outside linear variables *)
   | Ind iu -> is_linear_app env sigma ty ty [| |]
   | App (f, argsary) -> is_linear_app env sigma ty f argsary
@@ -143,7 +143,7 @@ and is_linear_ind env sigma ty ie argsary =
   else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
     user_err (str "is_linear_ind: non-sort type binder:" ++ spc () ++ Printer.pr_econstr_env env sigma (mkIndU ie))
   else
-    let ind_ary = Array.map (fun j -> Term.mkInd (mutind, j))
+    let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
         (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
     let env = Environ.push_rel_context (
         List.map (fun j ->

@@ -491,7 +491,7 @@ and stmt_rec env evdref term =
         (fun env' expr' shifter -> mkProj (proj, expr'))
 
 let stmt term =
-  let (evd, env) = Lemmas.get_current_context () in
+  let (evd, env) = Pfedit.get_current_context () in
   let evdref = ref evd in
   stmt_rec env evdref term
 
@@ -538,7 +538,7 @@ let mangle_function ctnt type_args =
   mangle_function_short ctnt type_args
 
 let mangle_constructor_short cstr param_args =
-  let (evd, env) = Lemmas.get_current_context () in
+  let (evd, env) = Pfedit.get_current_context () in
   let ((mutind, i), j) = cstr in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
@@ -558,14 +558,14 @@ let eq_monofunc ((c1, uc1), args1) ((c2, uc2), args2) =
   let rec loop i =
     if i = 0 then
       true
-    else if Term.eq_constr args1.(i-1) args2.(i-1) then
+    else if Constr.equal args1.(i-1) args2.(i-1) then
       loop (i-1)
     else
       false
   in
   loop (Array.length args1)
 
-let mono_global_visited_empty : ((global_reference * constr array) * constant) list = []
+let mono_global_visited_empty : ((global_reference * constr array) * Constant.t) list = []
 
 let mono_global_visited = Summary.ref mono_global_visited_empty ~name:"MonomorphizationVisited"
 
@@ -612,8 +612,9 @@ let rec mono_global_def env (evdref : Evd.evar_map ref) fctntu type_args =
     let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr !evdref term,
-       Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
-    Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
+       Entries.Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
+    Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
+      Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
     mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
     Feedback.msg_info (str "monomorphization end:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
     constant
@@ -637,7 +638,7 @@ and mono_constr_def env sigma fcstr mutind i j param_args =
     let id = find_unused_name (Id.of_string (mangle_constructor fcstr (Array.map (EConstr.to_constr sigma) param_args))) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr sigma term,
-       Monomorphic_const_entry Univ.ContextSet.empty) in
+       Entries.Monomorphic_const_entry Univ.ContextSet.empty) in
     mono_global_visited := ((ConstructRef fcstr, param_args), constant) :: !mono_global_visited;
     constant
 
@@ -653,7 +654,7 @@ and mono_global_cstr_app env sigma fcstru argsary =
   mkApp (mkConst constant, rest_args);
 
 and mono_global env evdref term =
-Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr (EConstr.to_constr !evdref term));
+Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref term));
   match EConstr.kind !evdref term with
   | Term.Rel i -> mkRel i
   | Var name -> mkVar name
@@ -706,8 +707,8 @@ let terminate_mono_global_def env evdref gref type_args =
     let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr !evdref term,
-       Monomorphic_const_entry Univ.ContextSet.empty) in
-    Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr (EConstr.to_constr !evdref term));
+       Entries.Monomorphic_const_entry Univ.ContextSet.empty) in
+    Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref term));
     mono_global_visited := ((gref, type_args), constant) :: !mono_global_visited
 
 let terminate_mono env evdref term =
@@ -725,7 +726,7 @@ let terminate_mono env evdref term =
   | _ -> user_err (Pp.str "must be constant application")
 
 let terminate_monomorphization (term : Constrexpr.constr_expr) =
-  let (evd, env) = Lemmas.get_current_context () in
+  let (evd, env) = Pfedit.get_current_context () in
   let evdref = ref evd in
   let (term2, euc) = Constrintern.interp_constr env evd term in
   terminate_mono env evdref term2

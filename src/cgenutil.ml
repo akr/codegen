@@ -119,10 +119,10 @@ let pp_postjoin_list sep l =
     l
 
 let rec mangle_type_buf_short buf ty =
-  match Term.kind_of_term ty with
+  match Constr.kind ty with
   | Term.Ind iu ->
       let (mutind, i) = Univ.out_punivs iu in
-      let ((evd : Evd.evar_map), (env : Environ.env)) = Lemmas.get_current_context () in
+      let ((evd : Evd.evar_map), (env : Environ.env)) = Pfedit.get_current_context () in
       let mutind_body = Environ.lookup_mind mutind env in
       Buffer.add_string buf (Id.to_string mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename)
   | Term.App (f, argsary) ->

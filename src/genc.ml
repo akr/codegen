@@ -39,13 +39,13 @@ let c_mangle_type ty = c_id (mangle_type ty)
 let case_swfunc ty = c_id ("sw_" ^ (mangle_type ty))
 
 let case_cstrlabel_short ty j =
-  let (evd, env) = Lemmas.get_current_context () in
+  let (evd, env) = Pfedit.get_current_context () in
   let indty =
-    match Term.kind_of_term ty with
+    match Constr.kind ty with
     | Term.App (f, argsary) -> f
     | _ -> ty
   in
-  let (mutind, i) = Univ.out_punivs (Term.destInd indty) in
+  let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
   let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
@@ -55,13 +55,13 @@ let case_cstrlabel ty j =
   case_cstrlabel_short ty j
 
 let case_cstrfield_short ty j k =
-  let (evd, env) = Lemmas.get_current_context () in
+  let (evd, env) = Pfedit.get_current_context () in
   let indty =
-    match Term.kind_of_term ty with
+    match Constr.kind ty with
     | Term.App (f, argsary) -> f
     | _ -> ty
   in
-  let (mutind, i) = Univ.out_punivs (Term.destInd indty) in
+  let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
   let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
@@ -91,7 +91,7 @@ let gensym_with_nameopt nameopt =
   | Some name -> gensym_with_name name
 
 let rec argtys_and_rety_of_type ty =
-  match Term.kind_of_term ty with
+  match Constr.kind ty with
   | Term.Prod (name, ty', body) ->
       let (argtys, rety) = argtys_and_rety_of_type body in
       (ty :: argtys, rety)
@@ -101,7 +101,7 @@ let rec nargtys_and_rety_of_type n ty =
   if n == 0 then
     ([], ty)
   else
-    match Term.kind_of_term ty with
+    match Constr.kind ty with
     | Term.Prod (name, ty', body) ->
         let (argtys, rety) = nargtys_and_rety_of_type (n-1) body in
         (ty :: argtys, rety)
@@ -109,10 +109,10 @@ let rec nargtys_and_rety_of_type n ty =
 
 type context_elt =
   | CtxVar of string
-  | CtxRec of string * (string * Term.types) array (* fname, argname_argtype_array *)
+  | CtxRec of string * (string * Constr.types) array (* fname, argname_argtype_array *)
 
 let rec fargs_and_body term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Lambda (name, ty, body) ->
       let fargs1, body1 = fargs_and_body body in
       let var = gensym_with_name name in
@@ -177,12 +177,12 @@ let varname_of_rel context i =
   | _ -> raise (Invalid_argument "unexpected context element")
 
 let genc_app context f argsary =
-  match Term.kind_of_term f with
+  match Constr.kind f with
   | Term.Rel i ->
       (match List.nth context (i-1) with
       | CtxVar _ -> user_err (str "indirect call not implemented")
       | CtxRec (fname, _) ->
-          let argvars = Array.map (fun arg -> varname_of_rel context (Term.destRel arg)) argsary in
+          let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
           let fname_argn = funcname_argnum fname (Array.length argvars) in
           str fname_argn ++ str "(" ++
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
@@ -190,7 +190,7 @@ let genc_app context f argsary =
   | Term.Const ctntu ->
       let fname = Label.to_string (KerName.label (Constant.canonical (Univ.out_punivs ctntu))) in
       let fname_argn = funcname_argnum fname (Array.length argsary) in
-      let argvars = Array.map (fun arg -> varname_of_rel context (Term.destRel arg)) argsary in
+      let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
       str fname_argn ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
@@ -202,7 +202,7 @@ let genc_app context f argsary =
       let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
       let fname = Id.to_string cons_id in
       let fname_argn = funcname_argnum fname (Array.length argsary) in
-      let argvars = Array.map (fun arg -> varname_of_rel context (Term.destRel arg)) argsary in
+      let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
       str fname_argn ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
@@ -250,7 +250,7 @@ let genc_goto context ctxrec argsary =
   let fname_argn = funcname_argnum fname (Array.length argvars) in
   let assignments =
     (array_map2
-      (fun (var, ty) arg -> (var, (varname_of_rel context (Term.destRel arg), ty)))
+      (fun (var, ty) arg -> (var, (varname_of_rel context (Constr.destRel arg), ty)))
       argvars argsary)
   in
   let pp_assigns = genc_multi_assign assignments in
@@ -258,10 +258,10 @@ let genc_goto context ctxrec argsary =
   if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto)
 
 let genc_const context ctntu =
-  genc_app context (Term.mkConstU ctntu) [| |]
+  genc_app context (Constr.mkConstU ctntu) [| |]
 
 let split_case_tyf tyf =
-  match Term.kind_of_term tyf with
+  match Constr.kind tyf with
   | Term.Lambda (name, ty, body) -> (ty, body)
   | _ -> user_err (str "unexpected case type function")
 
@@ -269,7 +269,7 @@ let rec strip_outer_lambdas ndecls term =
   if ndecls = 0 then
     ([], term)
   else
-    match Term.kind_of_term term with
+    match Constr.kind term with
     | Term.Lambda (name, ty, body) ->
         let (decls, innermostbody) = strip_outer_lambdas (ndecls-1) body in
         ((name, ty) :: decls, innermostbody)
@@ -311,7 +311,7 @@ let genc_case_branch context bodyfunc exprty exprvar ndecls br cstr_index =
 
 let genc_case_nobreak context ci tyf expr brs bodyfunc =
   let (exprty, rety) = split_case_tyf tyf in
-  let exprvar = varname_of_rel context (Term.destRel expr) in
+  let exprvar = varname_of_rel context (Constr.destRel expr) in
   if Array.length brs = 1 then
     let ndecls = ci.Constr.ci_cstr_ndecls.(0) in
     let br = brs.(0) in
@@ -342,7 +342,7 @@ let genc_geninitvar ty namehint init =
 
 (* not tail position. return a variable *)
 let rec genc_body_var context namehint term termty =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Rel i ->
       (mt (), varname_of_rel context i)
   | Term.LetIn (name, expr, exprty, body) ->
@@ -359,11 +359,11 @@ let rec genc_body_var context namehint term termty =
       varname)
   | Term.Const ctntu ->
       genc_geninitvar termty namehint (genc_const context ctntu)
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
+  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr term))
 
 (* not tail position. assign to the specified variable *)
 and genc_body_assign context retvar term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Rel i ->
       genc_assign (str retvar) (str (varname_of_rel context i))
   | Term.LetIn (name, expr, exprty, body) ->
@@ -377,18 +377,18 @@ and genc_body_assign context retvar term =
   | Term.Const ctntu ->
       genc_assign (str retvar) (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
+  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr term))
 
 (* tail position.  usual return. *)
 let rec genc_body_tail context term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Rel i ->
       genc_return (str (varname_of_rel context i))
   | Term.LetIn (name, expr, exprty, body) ->
       let (exprbody, varname) = genc_body_var context name expr exprty in
       exprbody ++ (if ismt exprbody then mt () else spc ()) ++ genc_body_tail (CtxVar varname :: context) body
   | Term.App (f, argsary) ->
-      (match Term.kind_of_term f with
+      (match Constr.kind f with
       | Term.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
@@ -399,18 +399,18 @@ let rec genc_body_tail context term =
   | Term.Const ctntu ->
       genc_return (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
+  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr term))
 
 (* tail position.  assign and return. *)
 let rec genc_body_void_tail retvar context term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Rel i ->
       genc_void_return retvar (str (varname_of_rel context i))
   | Term.LetIn (name, expr, exprty, body) ->
       let (exprbody, varname) = genc_body_var context name expr exprty in
       exprbody ++ (if ismt exprbody then mt () else spc ()) ++ genc_body_void_tail retvar (CtxVar varname :: context) body
   | Term.App (f, argsary) ->
-      (match Term.kind_of_term f with
+      (match Constr.kind f with
       | Term.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
@@ -421,11 +421,11 @@ let rec genc_body_void_tail retvar context term =
   | Term.Const ctntu ->
       genc_void_return retvar (genc_const context ctntu)
 
-  | _ -> (Feedback.msg_error (str "not impelemented: " ++ Printer.pr_constr term); user_err (str "not implemented"))
+  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr term))
 
 (*
 let rec copy_term term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
 x | Term.Rel i -> Term.mkRel i
   | Term.Var name -> Term.mkVar name
   | Term.Meta i -> Term.mkMeta i
@@ -469,7 +469,7 @@ let found_callsite tail context i n =
         partcall := true
 
 let rec scan_callsites_rec tail context term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Const ctntu -> ()
   | Term.Construct cstru -> ()
   | Term.Rel i ->
@@ -480,7 +480,7 @@ let rec scan_callsites_rec tail context term =
       (scan_callsites_rec false context expr;
       scan_callsites_rec tail (None :: context) body)
   | Term.App (f, argsary) ->
-      ((match Term.kind_of_term f with
+      ((match Constr.kind f with
       | Term.Rel i -> found_callsite tail context i (Array.length argsary)
       | _ -> scan_callsites_rec false context f);
       Array.iter (scan_callsites_rec false context) argsary)
@@ -674,7 +674,7 @@ let genc_func_mutual mfnm i ntfcb_ary callsites_ary =
     genc_mufun_bodies_func mfnm i ntfcb_ary callsites_ary
 
 let genc_func fname ty term =
-  match Term.kind_of_term term with
+  match Constr.kind term with
   | Term.Fix ((ia, i), (nameary, tyary, funary)) ->
       let ntfcb_ary = fargs_and_body_ary fname ty ia i nameary tyary funary in
       let callsites_ary = scan_callsites i ntfcb_ary in
