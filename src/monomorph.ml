@@ -222,10 +222,8 @@ let type_of env evdref term =
   expand_type env evdref ty
 
 let constant_type env evdref cu =
-  let ft = Environ.constant_type env cu in
-  match ft with
-  | Declarations.RegularArity ty, _ -> expand_type env evdref (EConstr.of_constr ty) (* xxx: handle univ *)
-  | Declarations.TemplateArity _, _ -> assert false
+  let (ty, uconstraints) = Environ.constant_type env cu in
+  expand_type env evdref (EConstr.of_constr ty)
 
 let rec count_type_args sigma fty =
   match EConstr.kind sigma fty with
@@ -597,7 +595,7 @@ let rec mono_global_def env (evdref : Evd.evar_map ref) fctntu type_args =
   else
     let id_term (*unused?*)= mkApp (mkConst fctnt, type_args) in
     Feedback.msg_info (str "monomorphization start:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let (term, uconstraints) = Environ.constant_value env fctntu in
+    let (Some term, termty, uconstraints) = Environ.constant_value_and_type env fctntu in
     let term = expand_type env evdref (EConstr.of_constr term) in
     Feedback.msg_info (str "monomorphization 1:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
     let term = beta_lambda_ary !evdref term type_args in
@@ -612,7 +610,9 @@ let rec mono_global_def env (evdref : Evd.evar_map ref) fctntu type_args =
     let term = deanonymize_term env !evdref term in
     (* Feedback.msg_info (Printer.pr_constr_env env !evdref id_term ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr term);*)
     let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
-    let constant = Declare.declare_definition id (EConstr.to_constr !evdref term, (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
+    let constant = Declare.declare_definition id
+      (EConstr.to_constr !evdref term,
+       Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
     Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
     mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
     Feedback.msg_info (str "monomorphization end:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
@@ -635,7 +635,9 @@ and mono_constr_def env sigma fcstr mutind i j param_args =
     let term = mkApp (mkConstruct fcstr, param_args) in
     let term = deanonymize_term env sigma term in
     let id = find_unused_name (Id.of_string (mangle_constructor fcstr (Array.map (EConstr.to_constr sigma) param_args))) in
-    let constant = Declare.declare_definition id (EConstr.to_constr sigma term, Univ.ContextSet.empty) in
+    let constant = Declare.declare_definition id
+      (EConstr.to_constr sigma term,
+       Monomorphic_const_entry Univ.ContextSet.empty) in
     mono_global_visited := ((ConstructRef fcstr, param_args), constant) :: !mono_global_visited;
     constant
 
@@ -702,7 +704,9 @@ let terminate_mono_global_def env evdref gref type_args =
     let term = id_term in
     let term = deanonymize_term env !evdref term in
     let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
-    let constant = Declare.declare_definition id (EConstr.to_constr !evdref term, Univ.ContextSet.empty) in
+    let constant = Declare.declare_definition id
+      (EConstr.to_constr !evdref term,
+       Monomorphic_const_entry Univ.ContextSet.empty) in
     Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr (EConstr.to_constr !evdref term));
     mono_global_visited := ((gref, type_args), constant) :: !mono_global_visited
 
@@ -724,5 +728,5 @@ let terminate_monomorphization (term : Constrexpr.constr_expr) =
   let (evd, env) = Lemmas.get_current_context () in
   let evdref = ref evd in
   let (term2, euc) = Constrintern.interp_constr env evd term in
-  terminate_mono env evdref (EConstr.of_constr term2)
+  terminate_mono env evdref term2
 

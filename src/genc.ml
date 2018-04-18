@@ -690,9 +690,10 @@ let get_name_type_body (name : Libnames.reference) =
   match reference with
   | ConstRef ctnt ->
       begin match Global.body_of_constant ctnt with
-      | Some b ->
+      | Some (b,_) ->
+          let env = Global.env () in
           let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in
-          let ty = Global.type_of_global_unsafe reference in
+          let (ty, _) = Global.type_of_global_in_context env reference in
           (name, ty, b)
       | None -> user_err (Pp.str "can't genc axiom")
       end
@@ -719,6 +720,6 @@ let genc_file fn libref_list =
       let pp = (genc_func name ty body) ++ Pp.fnl () in
       Pp.pp_with fmt pp)
     libref_list;
-  Format.pp_flush_formatter fmt;
+  Format.pp_print_flush fmt ();
   close_out ch;
   Feedback.msg_info (str ("file generated: " ^ fn)))

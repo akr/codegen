@@ -53,8 +53,8 @@ let register_linear_type (ty : Constrexpr.constr_expr) =
   let env = Global.env () in
   let evdref = ref (Evd.from_env env) in
   let (ty2, euc) = Constrintern.interp_constr env !evdref ty in
-  let ty3 = EConstr.of_constr ty2 in
-  let ty4 = nf_all env !evdref (EConstr.of_constr ty2) in
+  let ty3 = ty2 in
+  let ty4 = nf_all env !evdref ty2 in
   (if not (is_concrete_inductive_type env evdref ty4) then
     user_err (str "codegen linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env !evdref ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
@@ -351,7 +351,7 @@ let linear_type_check_single libref =
   match gref with
   | ConstRef cnst ->
       (let fctntu = Univ.in_punivs cnst in
-      let (term, uconstraints) = Environ.constant_value env fctntu in
+      let (Some term, termty, uconstraints) = Environ.constant_value_and_type env fctntu in
       let eterm = EConstr.of_constr term in
       check_linear_valexp env evdref [] 0 eterm;
       Feedback.msg_info (str "codegen linearity check passed:" ++ spc() ++ Printer.pr_constant env cnst);
@@ -365,9 +365,10 @@ let linear_type_check_list libref_list =
 
 let linear_type_check_test t1 t2 =
   let env = Global.env () in
-  let evdref = ref (Evd.from_env env) in
-  let t1a : EConstr.constr = Constrintern.interp_constr_evars env evdref t1 in
-  let t2a = Constrintern.interp_constr_evars env evdref t2 in
+  let evd = Evd.from_env env in
+  let (evd, t1a) = Constrintern.interp_constr_evars env evd t1 in
+  let (evd, t2a) = Constrintern.interp_constr_evars env evd t2 in
+  let evdref = ref evd in
   Feedback.msg_debug (str "linear_type_check_test t1:" ++ spc() ++ Printer.pr_econstr_env env !evdref t1a);
   Feedback.msg_debug (str "linear_type_check_test t2:" ++ spc() ++ Printer.pr_econstr_env env !evdref t2a);
   Feedback.msg_debug (str "linear_type_check_test is_conv:" ++ spc() ++ bool (Reductionops.is_conv env !evdref t1a t2a));
