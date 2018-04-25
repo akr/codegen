@@ -1,6 +1,8 @@
 all install : Makefile.coq
 	$(MAKE) -f Makefile.coq $@
 
+plugin : Makefile.coq
+	$(MAKE) -f Makefile.coq src/codegen_plugin.cmxs
 
 Makefile.coq : _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
