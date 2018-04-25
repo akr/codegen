@@ -349,13 +349,16 @@ let linear_type_check_single libref =
   let sigma = Evd.from_env env in
   let evdref = ref sigma in
   match gref with
-  | ConstRef cnst ->
-      (let fctntu = Univ.in_punivs cnst in
-      let (Some term, termty, uconstraints) = Environ.constant_value_and_type env fctntu in
-      let eterm = EConstr.of_constr term in
-      check_linear_valexp env evdref [] 0 eterm;
-      Feedback.msg_info (str "codegen linearity check passed:" ++ spc() ++ Printer.pr_constant env cnst);
-      ())
+  | ConstRef ctnt ->
+      (let fctntu = Univ.in_punivs ctnt in
+      let value_and_type = Environ.constant_value_and_type env fctntu in
+      (match value_and_type with
+      | (Some term, termty, uconstraints) ->
+        let eterm = EConstr.of_constr term in
+        check_linear_valexp env evdref [] 0 eterm;
+        Feedback.msg_info (str "codegen linearity check passed:" ++ spc() ++ Printer.pr_constant env ctnt);
+        ()
+      | _ -> user_err (str "constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
   | _ -> user_err (str "not constant")
 
 let linear_type_check_list libref_list =

@@ -595,29 +595,32 @@ let rec mono_global_def env (evdref : Evd.evar_map ref) fctntu type_args =
   else
     let id_term (*unused?*)= mkApp (mkConst fctnt, type_args) in
     Feedback.msg_info (str "monomorphization start:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let (Some term, termty, uconstraints) = Environ.constant_value_and_type env fctntu in
-    let term = expand_type env evdref (EConstr.of_constr term) in
-    Feedback.msg_info (str "monomorphization 1:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let term = beta_lambda_ary !evdref term type_args in
-    Feedback.msg_info (str "monomorphization 2:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let term = mono_local !evdref term in
-    Feedback.msg_info (str "monomorphization 3:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let term = mono_global env evdref term in
-    Feedback.msg_info (str "monomorphization 4:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let term = stmt term in
-    let term = seq_let !evdref term in
-    Feedback.msg_info (str "monomorphization 5:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    let term = deanonymize_term env !evdref term in
-    (* Feedback.msg_info (Printer.pr_constr_env env !evdref id_term ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr term);*)
-    let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
-    let constant = Declare.declare_definition id
-      (EConstr.to_constr !evdref term,
-       Entries.Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
-    Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
-      Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
-    mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
-    Feedback.msg_info (str "monomorphization end:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
-    constant
+    let value_and_type = Environ.constant_value_and_type env fctntu in
+    match value_and_type with
+    | (Some term, termty, uconstraints) ->
+      let term = expand_type env evdref (EConstr.of_constr term) in
+      Feedback.msg_info (str "monomorphization 1:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      let term = beta_lambda_ary !evdref term type_args in
+      Feedback.msg_info (str "monomorphization 2:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      let term = mono_local !evdref term in
+      Feedback.msg_info (str "monomorphization 3:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      let term = mono_global env evdref term in
+      Feedback.msg_info (str "monomorphization 4:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      let term = stmt term in
+      let term = seq_let !evdref term in
+      Feedback.msg_info (str "monomorphization 5:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      let term = deanonymize_term env !evdref term in
+      (* Feedback.msg_info (Printer.pr_constr_env env !evdref id_term ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr term);*)
+      let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
+      let constant = Declare.declare_definition id
+        (EConstr.to_constr !evdref term,
+         Entries.Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
+      Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
+        Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
+      mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
+      Feedback.msg_info (str "monomorphization end:" ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref id_term));
+      constant
+    | _ -> user_err (Pp.str "constant value couldn't obtained:" ++ Printer.pr_constant env fctnt)
 
 and mono_global_const_app env evdref fctntu argsary =
   let fty = constant_type env evdref fctntu in
