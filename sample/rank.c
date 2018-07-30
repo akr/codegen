@@ -39,7 +39,7 @@ using Coq and monomorphization plugin.
 #define n0_true() true
 #define n0_false() false
 
-#define nat uint64_t
+typedef uint64_t nat;
 #define n0_O() ((nat)0)
 #define n1_S(n) ((n)+1)
 #define sw_nat(n) (n)
