@@ -21,26 +21,14 @@ Fixpoint nenviron (nT : nenvtype) : Set :=
   | T :: nT' => prod T (nenviron nT')
   end.
 
-Check (1,(true,tt)).
-Check (1,(true,tt)) : nenviron [:: nat; bool].
-
 Definition nenv_nil : nenviron [::] := tt.
 Definition nenv_cons (T : Set) (v : T)
     (nT : nenvtype) (nenv : nenviron nT) : nenviron (T :: nT) :=
   (v, nenv).
 
-Check nenv_nil : nenviron nt_nil.
-Check nenv_cons bool true [::] nenv_nil.
-Check nenv_cons bool true _ (nenv_cons nat 0 _ nenv_nil).
-
 Notation "[ 'nenv:' ]" := nenv_nil.
 Notation "[ 'nenv:' x1 ; .. ; xn ]" :=
   (nenv_cons _ x1 _ (.. (nenv_cons _ xn _ nenv_nil) ..)).
-
-Check [nenv:].
-Check [nenv: true].
-Check [nenv: true; 0].
-Check [nenv: true; 0; (1,2)].
 
 Fixpoint nlookup (nT : nenvtype) (nenv : nenviron nT) (i : nat) :
     ntnth nT i :=
@@ -114,10 +102,6 @@ Fixpoint forall_ntT (nT : nenvtype)
 Definition arrow_ntT (nT : nenvtype) (result : Type) : Type :=
   forall_ntT nT (fun _ => result).
 
-Check arrow_ntT [:: bool; nat] Prop.
-Check (fun b => b = true) : arrow_ntT [:: bool] Prop.
-Check (fun n n' => n = S n') : arrow_ntT [:: nat; nat] Prop.
-
 Fixpoint uncurry_ntT (nT : nenvtype) (result : Type)
     (t : arrow_ntT nT result) (nenv : nenviron nT) : result :=
   match nT as nT return nenviron nT -> arrow_ntT nT result -> result with
@@ -125,16 +109,6 @@ Fixpoint uncurry_ntT (nT : nenvtype) (result : Type)
   | T :: nT' => fun nenv t =>
       uncurry_ntT nT' result (t nenv.1) nenv.2
   end nenv t.
-
-Compute let nT := [:: bool] in
-  let nenv := [nenv: true] in
-  uncurry_ntT nT Prop
-    (fun b => b = true) nenv.
-
-Compute let nT := [:: bool] in
-  let nenv := [nenv: false] in
-  uncurry_ntT nT Prop
-    (fun b => b = true) nenv.
 
 (* curried function type *)
 Fixpoint forall_ntS (nT : nenvtype)
@@ -146,34 +120,6 @@ Fixpoint forall_ntS (nT : nenvtype)
       let f' (nenv' : nenviron nT') := f (nenv_cons T v nT' nenv') in
       forall_ntS nT' f'
   end f.
-
-
-(*
-Fixpoint uncurry_ntS (nT : nenvtype) (result : nenviron nT -> Set)
-    (cf : forall_ntS nT result)
-    (nenv : nenviron nT) {struct nT} : result nenv.
-Proof.
-  refine (
-  match nT as nT return
-    forall (result : nenviron nT -> Set)
-           (cf : forall_ntS nT result)
-           (nenv : nenviron nT), result nenv
-  with
-  | [::] => fun result cf nenv =>
-      match nenv as nenv return (result nenv) with
-      | tt => cf
-      end
-  | T :: nT' => fun result cf nenv =>
-      (*let: (v, nenv') := nenv in*)
-      let result' (nenv'' : nenviron nT') :=
-        result (nenv_cons T nenv.1 nT' nenv'') in
-      eq_rec_r id (uncurry_ntS nT' result' (cf nenv.1) nenv.2) _
-  end result cf nenv).
-  rewrite {}/result'.
-  by case: nenv.
-Defined.
-Eval cbv beta zeta delta [uncurry_ntS] in uncurry_ntS.
-*)
 
 Fixpoint uncurry_ntS (nT : nenvtype) (Dr : nenviron nT -> Set)
     (f : forall_ntS nT Dr)
@@ -192,9 +138,6 @@ Fixpoint uncurry_ntS (nT : nenvtype) (Dr : nenviron nT -> Set)
         Dr (nenv_cons T v nT' nenv'') in
       uncurry_ntS nT' Dr' (f v) nenv'
   end Dr f nenv.
-
-Compute let nT := [:: bool; nat] in
-  forall_ntS nT (fun (_ : nenviron nT) => nat).
 
 (* curried function type *)
 Definition arrow_ntS nT Tr := forall_ntS nT (fun _ => Tr).
@@ -255,12 +198,6 @@ Fixpoint gtlookup (gT : genvtype) (name : string) : gty :=
   | name_G :: gT' => if name_G.1 == name then name_G.2 else gtlookup gT' name
   end.
 
-(*
-Print Opaque Dependencies gtlookup.
-Print gtlookup.
-Print Opaque Dependencies string_eqType.
-*)
-
 Fixpoint genviron (gT : genvtype) : Set :=
   match gT with
   | [::] => unit
@@ -277,11 +214,6 @@ Fixpoint glookup (gT : genvtype) (genv : genviron gT) (name : string) :
       if n == name as b return gtype (if b then G else gtlookup gT' name)
       then g else glookup gT' genv' name
   end genv.
-
-(*
-Print Opaque Dependencies glookup.
-Print Opaque Dependencies ascii_eqType.
-*)
 
 Definition genv_nil : genviron [::] := tt.
 Definition genv_cons (name : string) (G : gty) (g : gtype G)
@@ -309,21 +241,6 @@ Definition gtent (name : string) (nT : nenvtype) (Tr : Set) : (string * gty) :=
 Definition gent (name : string) (nT : nenvtype) (Tr : Set)
     (cf : arrow_ntS nT Tr) : (string * gtype (gtyC nT Tr)) :=
   (name, (uncurry nT Tr cf)).
-
-Check genv_nil.
-Check genv_cons "zero" _ ((fun _ => 0) : gtype (gtyC [::] nat)) _ genv_nil.
-Check genv_cons "true" _ ((fun _ => true) : gtype (gtyC [::] bool)) _ genv_nil.
-Check [genv:
-  ("zero", (uncurry [::] nat 0) : gtype (gtyC [::] nat));
-  ("true", (uncurry [::] bool true) : gtype (gtyC [::] bool));
-  ("not", (uncurry [:: bool] bool negb) : gtype (gtyC [:: bool] bool))
-].
-
-Check [genv:
-  (gent "zero" [::] nat 0);
-  (gent "true" [::] bool true);
-  (gent "not" [:: bool] bool negb)
-].
 
 (* beginning environment is empty *)
 Definition GT0 : genvtype := [::].
@@ -423,22 +340,6 @@ Notation "[ 'penv:' prf1 ; .. ; prfn ]" :=
   penv_cons gT nT _ _ genv nenv prf1
     (.. (penv_cons gT nT _ _ genv nenv prfn (penv_nil _ _ _ _)) ..)).
 
-Check let nT := [:: nat; nat] in
-  [penv: ].
-Check let nT := [::] in
-  let nenv := nenv_nil in
-  let P := uncurry_pty GT1 nT (fun genv => (0 = 0)) in
-  [penv: (erefl 0) : (ptype GT1 nT P GENV1 nenv)].
-Check let nT := [:: bool; bool] in
-  let nenv := [nenv: true; true] in
-  let P := uncurry_pty GT1 nT (fun genv (b b' : bool) => (b = b')) in
-  [penv: (erefl true) : (ptype GT1 nT P GENV1 nenv)].
-Check let nT := [:: nat; nat] in
-  let nenv := [nenv: 4; 3] in
-  let P := uncurry_pty GT1 nT
-    (fun genv (n' n : nat) => n' = glookup GT1 genv "S" (n,tt)) in
-  [penv: (erefl 4) : (ptype GT1 nT P GENV1 nenv)].
-
 Fixpoint plookup (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
     (genv : genviron gT) (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv)
     (i : nat) : ptype gT nT (ptnth gT nT pT i) genv nenv :=
@@ -486,11 +387,6 @@ Fixpoint uncurry_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT) (Tr : 
       uncurry_pt gT nT pT' Tr genv nenv (cf prf) penv'
   end penv cf.
 
-Compute let nT := [:: bool] in
-  let P := uncurry_pty GT1 nT (fun genv b => (b = true)) in
-  let pT := [:: P] in
-  forall_ntS nT ((arrow_pt GT1 nT pT nat) GENV1).
-
 (* curried normal and proof arguments function type *)
 Definition forall_nt_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
     (Tr : Set) : Set :=
@@ -501,20 +397,6 @@ Definition uncurry_nt_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
     (genv : genviron gT) (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv) : Tr :=
   let cf' := uncurry_ntS nT (fun nenv => arrow_pt gT nT pT Tr genv nenv) (cf genv) nenv in
   uncurry_pt gT nT pT Tr genv nenv cf' penv.
-
-Check let nT := [:: bool] in
-  let nenv := [nenv: true] in
-  let P := uncurry_pty GT1 nT (fun genv b => (b = true)) in
-  let pT := [:: P] in
-  [penv: (erefl true) : (ptype GT1 nT P GENV1 nenv)].
-Check let nT := [:: bool; bool] in
-  let nenv := [nenv: true; true] in
-  let P := uncurry_pty GT1 nT (fun genv (b b' : bool) => (b = b')) in
-  [penv: (erefl true) : (ptype GT1 nT P GENV1 nenv)].
-
-Check arrow_ntT [:: bool; nat] Prop.
-Check (fun b => b = true) : arrow_ntT [:: bool] Prop.
-Check (fun n n' => n = S n') : arrow_ntT [:: nat; nat] Prop.
 
 (* lenv, lemma environment *)
 
@@ -553,8 +435,6 @@ Fixpoint ltlookup (gT : genvtype) (lT : lenvtype gT) (name : string) : lty gT :=
   | name_H :: lT' => if name_H.1 == name then name_H.2 else ltlookup gT lT' name
   end.
 
-(*Print Opaque Dependencies ltlookup.*)
-
 Fixpoint lenviron (gT : genvtype) (lT : lenvtype gT) (genv : genviron gT) : Prop :=
   match lT with
   | [::] => True
@@ -572,8 +452,6 @@ Fixpoint llookup (gT : genvtype) (lT : lenvtype gT)
       if n == name as b return ltype gT (if b then H else ltlookup gT lT' name) genv
       then h else llookup gT lT' genv lenv' name
   end lenv.
-
-(*Print Opaque Dependencies llookup.*)
 
 Definition lenv_nil gT genv : lenviron gT [::] genv := I.
 Definition lenv_cons gT genv (name : string) (H : lty gT) (h : ltype gT H genv)
@@ -678,7 +556,6 @@ Definition renv_cons gT genv (name : string) (R : rty gT) (r : rtype gT R genv)
    (r, renv).
 
 Notation "[ 'renv:' ]" := (renv_nil _ _).
-Check [renv:].
 Notation "[ 'renv:' x1 ; .. ; xn ]" :=
   (renv_cons _ _ x1.1 _ x1.2 _ (.. (renv_cons _ _ xn.1 _ xn.2 _ (renv_nil _ _)) ..)).
 
@@ -771,10 +648,6 @@ Record cstrT (Tv : Set) : Type := CstrT {
   cstr_cstr : arrow_ntS cstr_Tms Tv;
 }.
 
-Compute CstrT nat [::] O.
-Compute CstrT nat [:: nat] S.
-Compute CstrT (prod bool nat) [:: bool; nat] (@pair bool nat).
-
 Definition Tms4Ct (Tv : Set) (Ct : cstrT Tv) : seq Set :=
   let: CstrT Tms cstr := Ct in Tms.
 
@@ -783,14 +656,6 @@ Definition cstr4Ct (Tv : Set) (Ct : cstrT Tv) : arrow_ntS (Tms4Ct Tv Ct) Tv :=
 
 Definition nmatcher_branch_type (Tv : Set) (Ct : cstrT Tv) (Tr : Set) : Set :=
   arrow_ntS (Tms4Ct Tv Ct) Tr.
-
-(*
-Fixpoint nmatcher_branch_type (Ts : seq Set) (Tr : Set) : Set :=
-  match Ts with
-  | [::] => Tr
-  | T :: Ts' => T -> nmatcher_branch_type Ts' Tr
-  end.
-*)
 
 Fixpoint curry_nmatch_branch' (Ts : seq Set) (Tr : Set)
     (branch : nenviron Ts -> Tr) : arrow_ntS Ts Tr :=
@@ -825,21 +690,6 @@ Definition dmatcher_branch_types Tv Cts Tr v :=
 
 Definition dmatcher_type (Tv : Set) (Cts : seq (cstrT Tv)) (Tr : Set) (v : Tv) :=
   arrow_ntS (dmatcher_branch_types Tv Cts Tr v) Tr.
-
-(*
-Definition nat_O := CstrT nat [::] O.
-Definition nat_S := CstrT nat [:: nat] S.
-Definition prod_bool_nat_pair :=
-  CstrT (prod bool nat) [:: bool; nat] (@pair bool nat).
-
-Compute dmatcher_branch_type nat nat_O unit.
-(* = fun x : nat => 0 = x -> unit *)
-Compute dmatcher_branch_type nat nat_S unit.
-(* = fun x : nat => forall x0 : nat, x0.+1 = x -> unit *)
-Compute dmatcher_branch_type (prod bool nat) prod_bool_nat_pair unit.
-(* = fun x : bool * nat =>
-  forall (x0 : bool) (x1 : nat), (x0, x1) = x -> unit *)
-*)
 
 Definition dmatch_pty (gT : genvtype) (nT : nenvtype)
     (i : nat) (Tv := ntnth nT i)
@@ -931,12 +781,12 @@ Record Matcher (Tv : Set) (Cts : seq (cstrT Tv)) : Type := mkMatcher {
 
   exp = v
       | app
-      | letapp v p := app in exp
       | rapp
-      | letrapp v := rapp in exp
-      | letproof p := proof in exp
       | nmatch v with | C v* => exp | ... end
       | dmatch v with | C v* p => exp | ... end
+      | letapp v p := app in exp
+      | letrapp v := rapp in exp
+      | letproof p := proof in exp
       | letnmatch v := v with | C v* => exp | ... end
       | letdmatch v := v with | C v* p => exp | ... end
 
@@ -960,29 +810,9 @@ Semantics:
 
 *)
 
-(*
-Inductive app_exp (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT) :
-    Set -> Type :=
-| app : forall (name : string) (nargs : seq nat) (Tr : Set)
-    (nT' := map (ntnth nT) nargs)
-    (H : gtyC nT' Tr = gtlookup gT name),
-    app_exp gT nT pT Tr.
-
-Definition eval_app (gT : genvtype) (genv : genviron gT)
-    (nT : nenvtype) (nenv : nenviron nT)
-    (pT : penvtype gT nT) (Tr : Set)
-    (e : app_exp gT nT pT Tr) : Tr :=
-  match e in (app_exp _ _ _ P) return P with
-  | app name nargs Tr nT' H =>
-      let f := glookup gT genv name in
-      let f' := eq_rec_r gtype f H in
-      f' (transplant_nenv nT nargs nenv)
-  end.
-*)
-
 Inductive papp_exp (gT : genvtype) (lT : lenvtype gT)
     (nT : nenvtype) (pT : penvtype gT nT) (P : pty gT nT) : Type :=
-| papp : forall (name : string) (nargs pargs : seq nat)
+| papp_expC : forall (name : string) (nargs pargs : seq nat)
     (nT' := map (ntnth nT) nargs) (pT' : penvtype gT nT')
     (P' : pty gT nT')
     (H1 : ltyC gT nT' pT' P' = ltlookup gT lT name)
@@ -998,7 +828,7 @@ Definition eval_papp (gT : genvtype) (lT : lenvtype gT)
 Proof.
   refine (
   match e in (papp_exp _ _ _ _ _) return (ptype gT nT P genv nenv) with
-  | papp name nargs pargs pT' P' H1 H2 H3 => _
+  | papp_expC name nargs pargs pT' P' H1 H2 H3 => _
   end).
   clear e.
   rename l into nT'.
@@ -1039,12 +869,9 @@ Proof.
   by apply penv'.
 Defined.
 
-(*Print Opaque Dependencies eval_papp.*)
-(*Eval cbv beta delta [eval_papp] in eval_papp.*)
-
 Inductive rapp_exp (gT : genvtype) (rT : renvtype gT)
     (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set) : Type :=
-| rapp : forall (name : string) (nargs : seq nat) (pargopt : option nat)
+| rapp_expC : forall (name : string) (nargs : seq nat) (pargopt : option nat)
     (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
     (H1 : rtyC gT nT' Popt Tr = rtlookup gT rT name)
     (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
@@ -1059,7 +886,7 @@ Definition eval_rapp (gT : genvtype) (rT : renvtype gT)
 Proof.
   refine (
   match re with
-  | rapp name nargs pargopt Popt H1 H2 => _
+  | rapp_expC name nargs pargopt Popt H1 H2 => _
   end).
   clear re.
   rename l into nT'.
@@ -1079,9 +906,6 @@ Proof.
   by exact (plookup gT nT pT genv nenv penv parg).
 Defined.
 
-(*Print Opaque Dependencies eval_rapp. *)
-(*Eval cbv beta delta [eval_rapp] in eval_rapp. *)
-
 Definition letapp_eq (gT : genvtype) (nT : nenvtype)
     (Tv : Set) (name : string) (nargs : seq nat)
     (nT' := map (ntnth nT) nargs)
@@ -1093,7 +917,7 @@ Definition letapp_eq (gT : genvtype) (nT : nenvtype)
 Inductive exp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     (nT : nenvtype) (pT : penvtype gT nT) : Set -> Type :=
 | var : forall (i : nat), exp gT lT rT nT pT (ntnth nT i)
-| tailapp : forall (Tr : Set) (name : string) (nargs : seq nat)
+| app : forall (Tr : Set) (name : string) (nargs : seq nat)
     (nT' := map (ntnth nT) nargs)
     (H : gtyC nT' Tr = gtlookup gT name),
     exp gT lT rT nT pT Tr
@@ -1103,14 +927,14 @@ Inductive exp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     (Peq : pty gT (Tv :: nT) := letapp_eq gT nT Tv name nargs H),
     exp gT lT rT (Tv :: nT) (Peq :: pt_shift0 gT Tv nT pT) Tr ->
     exp gT lT rT nT pT Tr
-| tailrapp : forall (Tr : Set),
+| rappC : forall (Tr : Set),
     rapp_exp gT rT nT pT Tr ->
     exp gT lT rT nT pT Tr
-| letrapp : forall (Tv Tr : Set),
+| letrappC : forall (Tv Tr : Set),
     rapp_exp gT rT nT pT Tv ->
     exp gT lT rT (Tv :: nT) (pt_shift0 gT Tv nT pT) Tr ->
     exp gT lT rT nT pT Tr
-| letproof : forall (Tr : Set) (P : pty gT nT),
+| letproofC : forall (Tr : Set) (P : pty gT nT),
     papp_exp gT lT nT pT P ->
     exp gT lT rT nT (P :: pT) Tr ->
     exp gT lT rT nT pT Tr
@@ -1159,6 +983,37 @@ with dmatch_exp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     dmatch_exp gT lT rT nT pT i Tr (Ct :: Cts) ->
     dmatch_exp gT lT rT nT pT i Tr Cts.
 
+Definition rapp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
+    (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set)
+    (name : string) (nargs : seq nat) (pargopt : option nat)
+    (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
+    (H1 : rtyC gT nT' Popt Tr = rtlookup gT rT name)
+    (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
+          match pargopt with None => None | Some parg => Some (ptnth gT nT pT parg) end)
+    : exp gT lT rT nT pT Tr :=
+  rappC gT lT rT nT pT Tr (rapp_expC gT rT nT pT Tr name nargs pargopt Popt H1 H2).
+
+Definition letrapp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
+    (nT : nenvtype) (pT : penvtype gT nT) (Tv Tr : Set)
+    (name : string) (nargs : seq nat) (pargopt : option nat)
+    (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
+    (H1 : rtyC gT nT' Popt Tv = rtlookup gT rT name)
+    (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
+          match pargopt with None => None | Some parg => Some (ptnth gT nT pT parg) end)
+    (body : exp gT lT rT (Tv :: nT) (pt_shift0 gT Tv nT pT) Tr)
+    : exp gT lT rT nT pT Tr :=
+  letrappC gT lT rT nT pT Tv Tr (rapp_expC gT rT nT pT Tv name nargs pargopt Popt H1 H2) body.
+
+Definition letproof (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
+    (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set) (name : string) (P : pty gT nT) (nargs pargs : seq nat)
+    (nT' := map (ntnth nT) nargs) (pT' : penvtype gT nT')
+    (P' : pty gT nT')
+    (H1 : ltyC gT nT' pT' P' = ltlookup gT lT name)
+    (H2 : transplant_pt gT nT nargs pT' = map (ptnth gT nT pT) pargs)
+    (H3 : transplant_pty gT nT nargs P' = P)
+    (body : exp gT lT rT nT (P :: pT) Tr) : exp gT lT rT nT pT Tr :=
+  letproofC gT lT rT nT pT Tr P (papp_expC gT lT nT pT P name nargs pargs pT' P' H1 H2 H3) body.
+
 (* matcher functions for basic types *)
 
 Definition Empty_set_nmatcher (Tr : Set) (v : Empty_set) : Tr :=
@@ -1176,7 +1031,6 @@ Lemma Empty_set_matcher_proofelim (Tr : Set) (v : Empty_set) :
 Proof.
   by [].
 Defined.
-Print Empty_set_matcher_proofelim.
 
 Definition Empty_set_matcher := mkMatcher Empty_set [::]
   Empty_set_nmatcher Empty_set_dmatcher Empty_set_matcher_proofelim.
@@ -1207,8 +1061,6 @@ Proof.
   move=> dtt ntt [] HO _ /=.
   by apply HO.
 Defined.
-Print unit_matcher_proofelim.
-Eval cbv beta zeta iota delta [unit_matcher_proofelim] in unit_matcher_proofelim.
 
 Definition unit_matcher := mkMatcher unit [:: unit_tt]
   unit_nmatcher unit_dmatcher unit_matcher_proofelim.
@@ -1244,8 +1096,6 @@ Proof.
     by apply HT.
   by apply HF.
 Defined.
-Print bool_matcher_proofelim.
-Eval cbv beta zeta iota delta [bool_matcher_proofelim] in bool_matcher_proofelim.
 
 Definition bool_matcher := mkMatcher bool [:: bool_true; bool_false]
   bool_nmatcher bool_dmatcher bool_matcher_proofelim.
@@ -1281,177 +1131,11 @@ Proof.
     by apply HO.
   by apply HS.
 Defined.
-Print nat_matcher_proofelim.
-Eval cbv beta zeta iota delta [nat_matcher_proofelim] in nat_matcher_proofelim.
 
 Definition nat_matcher := mkMatcher nat [:: nat_O; nat_S]
   nat_nmatcher nat_dmatcher nat_matcher_proofelim.
 
-(* various AST examples *)
-
-Check var [::] [::] [::] [:: bool] [::] 0.
-Check var [::] [::] [::] [:: bool] (pt_shift0 [::] bool [::] [::]) 0.
-
-Check
-  let gT := [:: (gtent "true" [::] bool)] in
-  let lT := [::] in
-  let rT := [::] in
-  let nT := [::] in
-  let pT := [::] in
-  (tailapp gT lT rT nT pT bool "true" (*nargs*)[::] erefl).
-
-(* letapp v0 := true in v0 *)
-Check
-  let gT := [:: (gtent "true" [::] bool)] in
-  let lT := [::] in let rT := [::] in let nT := [::] in let pT := [::] in
-  (letapp gT lT rT nT pT bool bool
-    "true" (*nargs*)[::] erefl)
-  (let nT := [:: bool] in
-    let pT := [:: fun genv nenv => nenv.1 = glookup gT genv "true" tt] in
-    (var gT lT rT nT pT 0)).
-
-(* letapp v0 := true in letapp v1 := negb v0 in v1 *)
-Check
-  let gT := [::
-    (gtent "true" [::] bool);
-    (gtent "negb" [:: bool] bool)
-  ] in
-  let lT := [::] in let rT := [::] in let nT := [::] in let pT := [::] in
-  (letapp gT lT rT nT pT bool bool
-    "true" (*nargs*)[::] erefl)
-  ((let nT' := [:: bool] in
-   let pT := [:: fun genv nenv => nenv.1 = glookup gT genv "true" tt] in
-   letapp gT lT rT nT' pT bool bool
-    "negb" (*nargs*)[:: 0] erefl)
-  (let nT := [:: bool; bool] in
-   let pT := [:: fun genv nenv => nenv.1 = glookup gT genv "negb" (nenv.2.1, tt);
-                 fun genv nenv => nenv.2.1 = glookup gT genv "true" tt] in
-  (var gT lT rT nT pT 0))).
-
-(* fun (e : Empty_set) => match e return unit with end *)
-Check nmatch_nil [::] [::] [::] [:: Empty_set] [::]
-  Empty_set unit [::] Empty_set_matcher.
-
-(* fun (v : unit) => match v with tt => v end *)
-Check nmatch_nil [::] [::] [::] [:: unit] [::]
-  unit unit [:: unit_tt] unit_matcher.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: unit] in let pT := [::] in
-  let Tv := unit in let Tr := unit in
-  nmatch_cons gT lT rT nT pT Tv Tr unit_tt [::] (var gT lT rT nT pT 0)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: unit_tt] unit_matcher).
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: unit] in let pT := [::] in
-  let Tv := unit in let Tr := unit in
-  nmatch gT lT rT nT pT Tr 0
-    (nmatch_cons gT lT rT nT pT Tv Tr unit_tt [::] (var gT lT rT nT pT 0)
-    (nmatch_nil gT lT rT nT pT Tv Tr [:: unit_tt] unit_matcher)).
-
-(* fun (v : unit) =>
-     match v as v' return v = v' -> unit with
-       tt => fun (H : v = tt) => v
-     end erefl *)
-Check fun (v : unit) =>
-  match v as v' return v = v' -> unit with
-    tt => fun (H : v = tt) => v
-  end erefl.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: unit] in let pT := [::] in
-  let Tv := unit in let Tr := unit in
-  dmatch gT lT rT nT pT Tr 0
-    (dmatch_cons gT lT rT nT pT 0 Tr unit_tt [::] (var gT lT rT nT (dmatch_pty gT nT 0 [::] tt :: pT) 0)
-    (dmatch_nil gT lT rT nT pT 0 Tr [:: unit_tt] unit_matcher)).
-
-(* fun (u : unit) (v : bool) => match v with true => u | false => u end *)
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: bool; unit] in let pT := [::] in
-  let Tv := bool in let Tr := unit in
-  nmatch_nil gT lT rT nT pT Tv Tr [:: bool_true; bool_false] bool_matcher.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: bool; unit] in let pT := [::] in
-  let Tv := bool in let Tr := unit in
-  nmatch_cons gT lT rT nT pT Tv Tr bool_true [:: bool_false] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: bool_true; bool_false] bool_matcher).
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: bool; unit] in let pT := [::] in
-  let Tv := bool in let Tr := unit in
-  nmatch_cons gT lT rT nT pT Tv Tr bool_false [::] (var gT lT rT nT pT 1)
-  (nmatch_cons gT lT rT nT pT Tv Tr bool_true [:: bool_false] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: bool_true; bool_false] bool_matcher)).
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: bool; unit] in let pT := [::] in
-  let Tv := bool in let Tr := unit in
-  nmatch gT lT rT nT pT Tr 0
-  (nmatch_cons gT lT rT nT pT Tv Tr bool_false [::] (var gT lT rT nT pT 1)
-  (nmatch_cons gT lT rT nT pT Tv Tr bool_true [:: bool_false] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: bool_true; bool_false] bool_matcher))).
-
-(* fun (u : unit) (v : bool) => match v as v' return v = v' -> unit with
-   true => fun (H : v = true) => u | false => fun (H : v = false) => u end erefl *)
-Check fun (u : unit) (v : bool) => match v as v' return v = v' -> unit with
-   true => fun (H : v = true) => u | false => fun (H : v = false) => u end erefl.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: bool; unit] in let pT := [::] in
-  let Tv := bool in let Tr := unit in
-  dmatch gT lT rT nT pT Tr 0
-  (dmatch_cons gT lT rT nT pT 0 Tr bool_false [::]
-    (var gT lT rT nT (dmatch_pty gT nT 0 [::] false :: pT) 1)
-  (dmatch_cons gT lT rT nT pT 0 Tr bool_true [:: bool_false]
-    (var gT lT rT nT (dmatch_pty gT nT 0 [::] true :: pT) 1)
-  (dmatch_nil gT lT rT nT pT 0 Tr [:: bool_true; bool_false] bool_matcher))).
-
-(* fun (u : unit) (v : nat) => match v with O => u | S n => u end *)
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat; unit] in let pT := [::] in
-  let Tv := nat in let Tr := unit in
-  nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat; unit] in let pT := [::] in
-  let Tv := nat in let Tr := unit in
-  nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher).
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat; unit] in let pT := [::] in
-  let Tv := nat in let Tr := unit in
-  nmatch_cons gT lT rT nT pT Tv Tr nat_S [::] (var gT lT rT (nat :: nT) (pt_shift0 gT nat nT pT) 2)
-  (nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher)).
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat; unit] in let pT := [::] in
-  let Tv := nat in let Tr := unit in
-  nmatch gT lT rT nT pT Tr 0
-  (nmatch_cons gT lT rT nT pT Tv Tr nat_S [::] (var gT lT rT (nat :: nT) (pt_shift0 gT nat nT pT) 2)
-  (nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S] (var gT lT rT nT pT 1)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher))).
-
-Check fun (u : unit) (v : nat) => match v as v' return v = v' -> unit with
-  O => fun (H : v = O) => u | S n => fun (H : v = S n) => u end erefl.
-Check
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat; unit] in let pT := [::] in
-  let Tv := nat in let Tr := unit in
-  dmatch gT lT rT nT pT Tr 0
-  (dmatch_cons gT lT rT nT pT 0 Tr nat_S [::]
-    (var gT lT rT (nat :: nT) (dmatch_pty gT nT 0 [:: nat] S :: pt_shift0 gT nat nT pT) 2)
-  (dmatch_cons gT lT rT nT pT 0 Tr nat_O [:: nat_S]
-    (var gT lT rT nT (dmatch_pty gT nT 0 [::] O :: pT) 1)
-  (dmatch_nil gT lT rT nT pT 0 Tr [:: nat_O; nat_S] nat_matcher))).
-
 (* evaluation (denotation) *)
-
-(*Axiom anyvalue : forall {T : Type}, T.*)
 
 Lemma penviron_shift0
   (gT : genvtype)
@@ -1552,7 +1236,7 @@ Fixpoint eval (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     (e : exp gT lT rT nT pT Tr) : Tr :=
   match e with
   | var i => nlookup nT nenv i
-  | tailapp Tr name nargs H => eval_app gT nT Tr genv nenv name nargs H
+  | app Tr name nargs H => eval_app gT nT Tr genv nenv name nargs H
   | letapp Tv Tr name nargs H body =>
       let v := eval_app gT nT Tv genv nenv name nargs H in
       let nT' := Tv :: nT in
@@ -1564,14 +1248,14 @@ Fixpoint eval (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
       let pT'' := Peq :: pT' in
       let penv'' := penv_cons gT nT' pT' Peq genv nenv' prfeq penv' in
       eval gT lT rT nT' pT'' Tr genv lenv renv nenv' penv'' body
-  | tailrapp Tr re => eval_rapp gT rT nT pT Tr genv renv nenv penv re
-  | letrapp Tv Tr re body =>
+  | rappC Tr re => eval_rapp gT rT nT pT Tr genv renv nenv penv re
+  | letrappC Tv Tr re body =>
       let v := eval_rapp gT rT nT pT Tv genv renv nenv penv re in
       let nT' := Tv :: nT in
       let nenv' := nenv_cons Tv v nT nenv in
       let penv' := eq_ind_r id penv (penviron_shift0 gT nT pT genv nenv Tv v) in
       eval gT lT rT nT' (pt_shift0 gT Tv nT pT) Tr genv lenv renv nenv' penv' body
-  | letproof Tr P pe body =>
+  | letproofC Tr P pe body =>
       let prf := eval_papp gT lT nT pT P genv lenv nenv penv pe in
       let pT' := P :: pT in
       let penv' := penv_cons gT nT pT P genv nenv prf penv in
@@ -1645,186 +1329,6 @@ with eval_dmatch (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
           genv lenv renv (nenv_cat Ts nT fields nenv) penv'' branch in
       frest (curry_dmatch_branch Tv' Ct Tr' v fbranch)
   end.
-
-(* Print Opaque Dependencies eval. *)
-
-(*
-Definition eval' := Eval cbv in eval.
-Print Opaque Dependencies eval'.
-*)
-
-(*Print All Dependencies eval.*)
-
-(* examples for eval *)
-
-(* let v0 := true in eval v0 *)
-Compute
-  let gT := [::] in
-  let genv : genviron gT := [genv:] in
-  let lT := [::] in
-  let lenv : lenviron gT lT genv := [lenv:] in
-  let rT := [::] in
-  let renv : renviron gT rT genv := [renv:] in
-  let nT := [:: bool] in
-  let nenv : nenviron nT := [nenv: true] in
-  let pT : penvtype gT nT := [::] in
-  let penv : penviron gT nT pT genv nenv := [penv:] in
-  let Tr := bool in
-  let e := var gT lT rT nT pT 0 in
-  eval gT lT rT nT pT Tr genv lenv renv nenv penv e.
-
-Check
-  let gT := [::
-    (gtent "zero" [::] nat);
-    (gtent "true" [::] bool);
-    (gtent "negb" [:: bool] bool)
-  ] in
-  let genv : genviron gT := [genv:
-    (gent "zero" [::] _ 0);
-    (gent "true" [::] _ true);
-    (gent "negb" [:: bool] _ negb)
-  ] in
-  0.
-
-(* let v0 := true in v0 *)
-Compute
-  let gT := _ in
-  let genv : genviron gT := [genv:
-    (gent "zero" [::] _ 0);
-    (gent "true" [::] _ true);
-    (gent "negb" [:: bool] _ negb)
-  ] in
-  let lT := [::] in
-  let lenv := [lenv:] in
-  let rT := [::] in
-  let renv : renviron gT rT genv := [renv:] in
-  let nT := [::] in
-  let nenv : nenviron nT := [nenv:] in
-  let pT : penvtype gT nT := [::] in
-  let penv : penviron gT nT pT genv nenv := [penv:] in
-  let Tr := bool in
-  let e :=
-    letapp gT lT rT nT pT bool bool
-      "true" (*nargs*)[::] erefl
-      (let nt2 := bool :: nT in
-       let Peq := letapp_eq gT nT bool "true" [::] erefl in
-       let pt2 := Peq :: pt_shift0 gT bool nT pT in
-      (var gT lT rT nt2 pt2 0))
-  in eval gT lT rT nT pT Tr genv lenv renv nenv penv e.
-
-(* let v0 := true in let v1 := negb v0 in v1 *)
-Compute
-  let gT := _ in
-  let genv : genviron gT := [genv:
-    (gent "zero" [::] _ 0);
-    (gent "true" [::] _ true);
-    (gent "negb" [:: bool] _ negb)
-  ] in
-  let lT := [::] in
-  let lenv := [lenv:] in
-  let rT := [::] in
-  let renv : renviron gT rT genv := [renv:] in
-  let nT := [::] in
-  let nenv : nenviron nT := [nenv:] in
-  let pT : penvtype gT nT := [::] in
-  let penv : penviron gT nT pT genv nenv := [penv:] in
-  let Tr := bool in
-  let e :=
-    letapp gT lT rT nT pT bool bool "true" (*nargs*)[::] erefl
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool "true" [::] erefl :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    letapp gT lT rT nT pT bool bool "negb" (*nargs*)[:: 0] erefl
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool "negb" [:: 0] erefl :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    (var gT lT rT nT pT 0)))
-  in eval gT lT rT nT pT Tr genv lenv renv nenv penv e.
-
-(* let v0 := true in let v1 := negb v0 in let v2 := negb v1 in v2 *)
-Compute
-  let gT := _ in
-  let genv : genviron gT := [genv:
-    (gent "zero" [::] _ 0);
-    (gent "true" [::] _ true);
-    (gent "negb" [:: bool] _ negb)
-  ] in
-  let lT := [::] in
-  let lenv := [lenv:] in
-  let rT := [::] in
-  let renv : renviron gT rT genv := [renv:] in
-  let nT := [::] in
-  let nenv : nenviron nT := [nenv:] in
-  let pT : penvtype gT nT := [::] in
-  let penv : penviron gT nT pT genv nenv := [penv:] in
-  let Tr := bool in
-  let e :=
-    letapp gT lT rT nT pT bool bool "true" (*nargs*)[::] erefl
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool "true" [::] erefl :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    letapp gT lT rT nT pT bool bool "negb" (*nargs*)[:: 0] erefl
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool "negb" [::0] erefl :: pt_shift0 gT bool nT pT in let nT := nT' in
-    letapp gT lT rT nT pT bool bool "negb" (*nargs*)[:: 0] erefl
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool "negb" [::0] erefl :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    var gT lT rT nT pT 0)))
-  in eval gT lT rT nT pT Tr genv lenv renv nenv penv e.
-
-(* [nenv: v0=b] let v1 := negb v0 in let v2 := negb v1 in v2 *)
-Compute
-  let gT := _ in
-  let genv : genviron gT := [genv:
-    (gent "zero" [::] _ 0);
-    (gent "true" [::] _ true);
-    (gent "negb" [:: bool] _ negb)
-  ] in
-  let lT := [::] in
-  let lenv : lenviron gT lT genv := [lenv:] in
-  let rT := [::] in
-  let renv : renviron gT rT genv := [renv:] in
-  let b := true in
-  let nT := [:: bool] in
-  let nenv : nenviron nT := [nenv: b] in
-  let pT : penvtype gT nT := [::] in
-  let penv : penviron gT nT pT genv nenv := [penv:] in
-  let Tr := bool in
-  let e :=
-    let name := "negb" in let nargs := [::0] in let H := erefl in
-    letapp gT lT rT nT pT bool bool name nargs H
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    let name := "negb" in let nargs := [::0] in let H := erefl in
-    letapp gT lT rT nT pT bool bool name nargs H
-    (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
-     let nT := nT' in
-    var gT lT rT nT pT 0))
-  in eval gT lT rT nT pT Tr genv lenv renv nenv penv e.
-
-(* let u := tt in match u with tt => u end *)
-Compute
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: unit] in let pT := [::] in
-  let Tv := unit in let Tr := unit in
-  eval gT lT rT nT pT Tr [genv:] [lenv:] [renv:] [nenv: tt] [penv:]
-    (nmatch gT lT rT nT pT Tr 0
-    (nmatch_cons gT lT rT nT pT Tv Tr unit_tt [::] (var gT lT rT nT pT 0)
-    (nmatch_nil gT lT rT nT pT Tv Tr [:: unit_tt] unit_matcher))).
-
-(* let n := 10 in match n with O => n | S n' => n' end *)
-Compute
-  let gT := [::] in let lT := [::] in let rT := [::] in
-  let nT := [:: nat] in let pT := [::] in
-  let Tv := nat in let Tr := nat in
-  eval gT lT rT nT pT Tr [genv:] [lenv:] [renv:] [nenv: 10] [penv:]
-  (nmatch gT lT rT nT pT Tr 0
-  (nmatch_cons gT lT rT nT pT Tv Tr nat_S [::] (var gT lT rT (nat :: nT) (pt_shift0 gT nat nT pT) 0)
-  (nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S] (var gT lT rT nT pT 0)
-  (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher)))).
 
 (* Convert several definitions into our environment *)
 
@@ -1902,21 +1406,6 @@ Definition downto0_body (downto0 : nat -> unit) (n : nat) : unit :=
 Fixpoint downto0 (n : nat) {struct n} : unit :=
   downto0_body downto0 n.
 
-(* import the function type.
-  Currently we support function type only in global constant
-  (not local variable).
-  Due to this limitation, we need to define recursive function type
-  to our global environment before defining body's AST.
-  The AST need to call the recursive function.
- *)
-(*
-Definition GTENT3 := gtent "downto0" [:: nat] unit.
-Definition GT3' := [:: GTENT3].
-Definition GT3 : genvtype := GT3' ++ GT2.
-Definition LT3 : lenvtype GT3 := lt_shift0 GTENT3 GT2 LT2.
-Definition LENV3 : lenviron GT3 LT3 := LENV2.
-*)
-
 (* Define the AST for downto0_body *)
 Definition downto0_AST :=
   let gT := GT2 in
@@ -1930,30 +1419,11 @@ Definition downto0_AST :=
   nmatch gT lT rT nT pT Tr i
     (nmatch_cons gT lT rT nT pT Tv Tr nat_S [::]
         (let nT := nat :: nT in let pT := [::] in
-         tailrapp gT lT rT nT pT Tr
-           (rapp gT rT nT pT Tr "downto0" [:: (*n*)0] None None erefl erefl))
+         rappC gT lT rT nT pT Tr
+           (rapp_expC gT rT nT pT Tr "downto0" [:: (*n*)0] None None erefl erefl))
       (nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S]
-          (tailapp gT lT rT nT pT Tr "tt" [::] erefl)
+          (app gT lT rT nT pT Tr "tt" [::] erefl)
         (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher))).
-
-(*
-Definition crtype (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set) (genv : genviron gT) : Set :=
-  match Popt with
-  | None => arrow_ntS nT Tr
-  | Some P => forall_ntS nT (fun (nenv : nenviron nT) => P genv nenv)
-  end.
-
-Definition uncurryR (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set) (genv : genviron gT)
-    (cf : crtype gT nT Popt Tr genv) :=
-  match Popt with Popt return crtype gT nT Popt Tr genv ->  with
-  | None => fun nenv => uncurry_S nT Tr cf nenv
-  | Some P => fun nenv => uncurry_ntS nT
-                            (fun (nenv : nenviron nT) => P genv nenv) cf nenv
-  end cf .
-  uncurry_ntS nT  nT Tr cf : rtype gT (rtyC gT nT Popt Tr).
-*)
 
 (* We can define downto0_body' using the AST *)
 Definition downto0_body' (downto0 : nat -> unit) (n : nat) : unit :=
@@ -2040,62 +1510,23 @@ Proof.
   by apply leqnn.
 Defined.
 
-(*
-Fixpoint upto' (i n : nat) (acc : Acc lt (n - i)) : unit :=
-  (if i < n as b' return b' = (i < n) -> unit then
-    fun H => upto' i.+1 n (upto_lemma i n (i < n) i.+1 acc erefl H erefl)
-  else
-    fun H => tt) erefl.
-
-Fixpoint upto'' (i n : nat) (acc : Acc lt (n - i)) : unit :=
-  let b := i < n in let Hb : b = (i < n) := erefl in
-  (if b as b' return b' = b -> unit then
-    fun Hm =>
-      let j := i.+1 in let Hj : j = i.+1 := erefl in
-      upto'' j n (upto_lemma i n b j acc Hb Hm Hj)
-  else
-    fun Hm => tt) erefl.
-*)
-
-Definition upto_body
-    (upto : forall (i n : nat) (acc : Acc lt (n - i)), unit)
+Definition upto_body (upto : forall (i n : nat) (acc : Acc lt (n - i)), unit)
     (i n : nat) (acc : Acc lt (n - i)) : unit :=
   let b := i < n in let Hb : b = (i < n) := erefl in
-  (if b as b' return b' = b -> unit then
-    fun Hm =>
-      let j := i.+1 in let Hj : j = i.+1 := erefl in
-      let acc' := upto_lemma i n b j acc Hb Hm Hj in
-      upto j n acc'
-  else
-    fun Hm => tt) erefl.
+  match b as b' return b' = b -> unit with
+  | true => fun (Hm : true = b) =>
+    let j := i.+1 in let Hj : j = i.+1 := erefl in
+    let acc' := upto_lemma i n b j acc Hb Hm Hj in
+    upto j n acc'
+  | false => fun (Hm : false = b) => tt
+  end erefl.
 
 Fixpoint upto' (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit :=
   upto_body upto' i n acc.
 
-Lemma upto'_ok : upto = upto'. reflexivity. Qed.
+Lemma upto'_ok : upto = upto'. Proof. reflexivity. Qed.
 
-Definition upto_lemma_nt := (*nargs:j,b,n,i*)[::nat;bool;nat;nat].
-
-(*
-Definition upto_lemma_pt' : penvtype GT3 upto_lemma_nt := [::
-    (fun genv nenv =>
-      let j := nenv.1 in let b := nenv.2.1 in
-      let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
-      j = glookup GT3 genv "S" (i,tt) (*i.+1*));
-    (fun genv nenv =>
-      let j := nenv.1 in let b := nenv.2.1 in
-      let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
-      b = true);
-    (fun genv nenv =>
-      let j := nenv.1 in let b := nenv.2.1 in
-      let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
-      b = glookup GT3 genv "ltn" (i,(n,tt)));
-    (fun genv nenv =>
-      let j := nenv.1 in let b := nenv.2.1 in
-      let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
-      Acc lt (n - i))
-  ].
-*)
+Definition upto_lemma_nt := [::(*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
 
 Definition upto_lemma_pt : penvtype GT3 upto_lemma_nt :=
   let u := uncurry_pty GT3 upto_lemma_nt in
@@ -2105,14 +1536,6 @@ Definition upto_lemma_pt : penvtype GT3 upto_lemma_nt :=
     (u (fun genv j b n i => b = glookup GT3 genv "ltn" (i,(n,tt))));
     (u (fun genv j b n i => Acc lt (n - i)))
   ].
-
-(*
-Definition upto_lemma_P' : pty GT3 upto_lemma_nt :=
-  (fun genv nenv =>
-    let j := nenv.1 in let b := nenv.2.1 in
-    let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
-    Acc lt (n - j)).
-*)
 
 Definition upto_lemma_P : pty GT3 upto_lemma_nt :=
   uncurry_pty GT3 upto_lemma_nt
@@ -2138,150 +1561,69 @@ Definition LENV4 : lenviron GT4 LT4 GENV4 :=
     let acc := penv.2.2.2.1 in
     upto_lemma i n b j acc Hb Hm Hj) : ltype gT upto_lemma_lty genv), LENV3).
 
-(* upto j n acc' *)
-Definition upto_true_AST1 :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::(*i*)nat;(*n*)nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat] in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty gT nT in
-    [::
-      (u (fun genv j b n i => Acc lt (n - j)));
-      (u (fun genv j b n i => j = glookup gT genv "S" (i,tt) (*i.+1*)));
-      (u (fun genv j b n i => true = b));
-      (u (fun genv j b n i => b = glookup gT genv "ltn" (i,(n,tt))));
-      (u (fun genv j b n i => Acc lt (n - i)))
-    ] in
-  let Tr := unit in
-  tailrapp gT lT rT nT pT Tr
-    (rapp gT rT nT pT Tr "upto" [::(*j*)0;(*n*)2] (Some (*parg*)0) _ erefl erefl).
+(* Eval cbv zeta delta [upto_body_AST upto_if_AST upto_false_AST upto_true_AST3 upto_true_AST2 upto_true_AST1] in upto_body_AST . *)
 
-(* let acc' := upto_lemma i n b j acc Hb Hm Hj in ... *)
-Definition upto_true_AST2 :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::nat;nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat] in
-  let u := uncurry_pty GT3 upto_lemma_nt in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty GT3 upto_lemma_nt in
-    [::
-      (u (fun genv j b n i => j = glookup gT genv "S" (i,tt) (*i.+1*)));
-      (u (fun genv j b n i => true = b));
-      (u (fun genv j b n i => b = glookup gT genv "ltn" (i,(n,tt))));
-      (u (fun genv j b n i => Acc lt (n - i)))
-    ] in
-  let Tr := unit in
-  let P := u (fun genv j b n i => Acc lt (n - j)) in
-  letproof gT lT rT nT pT Tr P
-    (papp gT lT nT pT P "upto_lemma" [::0;1;2;3] [::0;1;2;3]
-      (*pT'*)_ (*P'*)_ erefl erefl erefl)
-  upto_true_AST1.
+Section upto_body_AST.
+Let nT1 := [:: (*n*)nat; (*i*)nat].
+Let nT2 := [:: (*b*)bool; (*n*)nat; (*i*)nat].
+Let nT3 := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
+Let rtyF := Some (fun (_ : genviron GT4) (nenv : (*i*)nat * ((*n*)nat * unit)) =>
+  Acc lt ((*n*)nenv.2.1 - (*i*)nenv.1)).
+Let rT := [:: ("upto", rtyC GT4 nT1 rtyF unit)].
+Let pT1 := [:: fun (_ : genviron GT4) (nenv : nenviron nT1) => Acc lt ((*n*)nenv.1 - (*i*)nenv.2.1)].
+Let pT2 := [:: (*Hb*)fun (genv : genviron GT4) (nenv : nenviron nT2) =>
+                  (*b*)nenv.1 = glookup GT4 genv "ltn" ((*i*)nenv.2.2.1, ((*n*)nenv.2.1, tt));
+  (*acc*)fun (_ : genviron GT4) (nenv : nenviron nT2) => Acc lt ((*n*)nenv.2.1 - (*i*)nenv.2.2.1)].
+Let pT3 := (fun (_ : genviron GT4) (nenv : nenviron nT2) => false = nenv.1) :: pT2.
+Let pT4 := (fun (_ : genviron GT4) (nenv : nenviron nT2) => true = nenv.1) :: pT2.
+Let pT5 := [:: fun (genv : genviron GT4) (nenv : nenviron nT3) =>
+    (*j*)nenv.1 = glookup GT4 genv "S" ((*i*)nenv.2.2.2.1, tt);
+  fun (_ : genviron GT4) (nenv : nenviron nT3) => true = (*b*)nenv.2.1;
+  fun (genv : genviron GT4) (nenv : nenviron nT3) =>
+    (*b*)nenv.2.1 = glookup GT4 genv "ltn" ((*i*)nenv.2.2.2.1, ((*n*)nenv.2.2.1, tt));
+  fun (_ : genviron GT4) (nenv : nenviron nT3) =>
+    Acc lt ((*n*)nenv.2.2.1 - (*i*)nenv.2.2.2.1)].
+Let pT6 := (fun (_ : genviron GT4) (nenv : nenviron nT3) =>
+  Acc lt ((*n*)nenv.2.2.1 - (*j*)nenv.1)) :: pT5.
 
-(* let j := i.+1 in let Hj : j = i.+1 := erefl in ... *)
-Definition upto_true_AST3 :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::nat;nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*b*)bool; (*n*)nat; (*i*)nat] in
-  let u := uncurry_pty gT nT in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty gT nT in
-    [::
-      (u (fun genv b n i => true = b));
-      (u (fun genv b n i => b = glookup gT genv "ltn" (i,(n,tt))));
-      (u (fun genv b n i => Acc lt (n - i)))
-    ] in
-  let Tv := nat in
-  let Tr := unit in
-  letapp gT lT rT nT pT Tv Tr "S" (*nargs*)[::(*i*)2] erefl
-  upto_true_AST2.
+Let upto_lemma_pty := fun (_ : genviron GT4) (nenv : nenviron upto_lemma_nt) =>
+  Acc lt ((*n*)nenv.2.2.1 - (*j*)nenv.1).
 
-(* tt *)
-Definition upto_false_AST :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::nat;nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*b*)bool; (*n*)nat; (*i*)nat] in
-  let u := uncurry_pty gT nT in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty gT nT in
-    [::
-      (u (fun genv b n i => false = b));
-      (u (fun genv b n i => b = glookup gT genv "ltn" (i,(n,tt))));
-      (u (fun genv b n i => Acc lt (n - i)))
-    ] in
-  let Tr := unit in
-  tailapp gT lT rT nT pT Tr "tt" (*nargs*)[::] erefl.
+(* This reduces (b = glookup GT4 genv "ltn" (i, (n, tt))) to
+  nenv.1 = genv.2.2.2.2.2.2.2.2.1 (nenv.2.2.1, (nenv.2.1, tt)).
+Eval cbv beta zeta iota delta [pT2 uncurry_pty nT2 uncurry_ntT glookup GT4 GT3 GT3' GT2 GTENT3 GTENT2 GT2' GT1 GT1' GT0 cat
+gtent eq_op Equality.op Equality.class string_eqType string_eqMixin eqstr string_dec
+string_rec string_rect sumbool_rec sumbool_rect Ascii.ascii_dec Ascii.ascii_rec Ascii.ascii_rect
+Bool.bool_dec bool_rec bool_rect] in pT2. *)
 
-(* if b as b' return b = b' -> unit then fun Hm => ... else fun Hm => ...) erefl *)
-Definition upto_if_AST :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::nat;nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*b*)bool; (*n*)nat; (*i*)nat] in
-  let u := uncurry_pty gT nT in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty gT nT in
-    [::
-      (u (fun genv b n i => b = glookup gT genv "ltn" (i,(n,tt))));
-      (u (fun genv b n i => Acc lt (n - i)))
-    ] in
-  let Tr := unit in
-  dmatch gT lT rT nT pT Tr (*b*)0
-    (dmatch_cons gT lT rT nT pT 0 Tr bool_false [::] upto_false_AST
-      (dmatch_cons gT lT rT nT pT 0 Tr bool_true [:: bool_false] upto_true_AST3
-        (dmatch_nil gT lT rT nT pT 0 Tr [:: bool_true; bool_false] bool_matcher))).
-
-(* let b := i < n in let Hb : b = (i < n) := erefl in ... *)
+(*
+letapp b Hb := ltn i n in
+  dmatch b with
+  | true Hm =>
+      letapp j Hj := S i in
+      letproof acc' := upto_lemma i n b j acc Hb Hm Hj in
+      upto j n acc'
+  | false Hm =>
+      tt
+  end
+*)
 Definition upto_body_AST :=
-  let gT := GT4 in
-  let lT := LT4 in (*upto_lemma*)
-  let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::nat;nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
-  let nT := [:: (*(*b*)bool;*) (*n*)nat; (*i*)nat] in
-  let u := uncurry_pty gT nT in
-  let pT : penvtype gT nT :=
-    let u := uncurry_pty gT nT in
-    [::
-      (u (fun genv n i => Acc lt (n - i)))
-    ] in
-  let Tv := bool in
-  let Tr := unit in
-  letapp gT lT rT nT pT Tv Tr "ltn" (*nargs*)[::(*i*)1;(*n*)0] erefl
-  upto_if_AST.
+  letapp GT4 LT4 rT nT1 pT1 bool unit (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
+    (dmatch GT4 LT4 rT nT2 pT2 unit (*b*)0
+      (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | false Hm *) bool_false [::]
+        (app GT4 LT4 rT nT2 pT3 unit "tt" [::] erefl)
+        (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | true Hm *) bool_true [:: bool_false]
+          (letapp GT4 LT4 rT nT2 pT4 nat unit (* j Hj := *) "S" [:: (*i*)2] erefl
+            (letproof GT4 LT4 rT nT3 pT5 unit (* acc' := *) "upto_lemma" upto_lemma_pty
+              [:: (*j*)0; (*b*)1; (*n*)2; (*i*)3]
+              [:: (*Hj*)0; (*Hm*)1; (*Hb*)2; (*acc*)3]
+              upto_lemma_pt upto_lemma_P erefl erefl erefl
+              (rapp GT4 LT4 rT nT3 pT6 unit
+                "upto" [:: (*j*)0; (*n*)2] (Some (*acc'*)0) rtyF erefl erefl)))
+          (dmatch_nil GT4 LT4 rT nT2 pT2 (*b*)0 unit [:: bool_true; bool_false]
+             bool_matcher)))).
 
-(*Eval cbv zeta delta [upto_body_AST upto_if_AST] in upto_body_AST.*)
+End upto_body_AST.
 
 (* We can define upto_body' using the AST *)
 Definition upto_body' (upto : forall (i n : nat), Acc lt (n - i) -> unit)
@@ -2308,10 +1650,10 @@ Definition upto_body' (upto : forall (i n : nat), Acc lt (n - i) -> unit)
   ] in
   let penv : penviron gT nT pT genv nenv := (acc,I) in
   let Tr := unit in
-  eval gT lT rT nT pT Tr genv lenv renv nenv penv (upto_body_AST : exp gT lT rT nT _ Tr).
+  eval gT lT rT nT pT Tr genv lenv renv nenv penv upto_body_AST.
 
 (* upto_body and upto_body' are convertible *)
-Definition upto_body_ok : upto_body = upto_body' := erefl.
+Lemma upto_body_ok : upto_body = upto_body'. Proof. reflexivity. Qed.
 
 (* We confirmed the body of upto is correctly represented by the AST and
   upto itself is a simple recursive function just calling the body.
