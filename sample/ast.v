@@ -784,11 +784,11 @@ Record Matcher (Tv : Set) (Cts : seq (cstrT Tv)) : Type := mkMatcher {
       | rapp
       | nmatch v with | C v* => exp | ... end
       | dmatch v with | C v* p => exp | ... end
-      | letapp v p := app in exp
-      | letrapp v := rapp in exp
-      | letproof p := proof in exp
-      | letnmatch v := v with | C v* => exp | ... end
-      | letdmatch v := v with | C v* p => exp | ... end
+      | leta v p := app in exp
+      | letr v := rapp in exp
+      | letp p := proof in exp
+      | letn v := v with | C v* => exp | ... end
+      | letd v := v with | C v* p => exp | ... end
 
   app = f v*
   rapp = r v* [p]
@@ -803,10 +803,10 @@ Semantics:
   - nT/nenv : normal (non-dependent) environment
   - pT/penv : proof environment
 
-  letapp binds a new variable v0 in nenv to the value of (f v1...) and
+  leta binds a new variable v0 in nenv to the value of (f v1...) and
   a new variable in penv to the proof of (v0 = f v1...).
-  letrapp binds a new variable v0 in nenv to the value of (r v1... [p]).
-  letproof binds a new variable p0 in penv to the value of (h v1... p1...).
+  letr binds a new variable v0 in nenv to the value of (r v1... [p]).
+  letp binds a new variable p0 in penv to the value of (h v1... p1...).
 
 *)
 
@@ -906,7 +906,7 @@ Proof.
   by exact (plookup gT nT pT genv nenv penv parg).
 Defined.
 
-Definition letapp_eq (gT : genvtype) (nT : nenvtype)
+Definition leta_eq (gT : genvtype) (nT : nenvtype)
     (Tv : Set) (name : string) (nargs : seq nat)
     (nT' := map (ntnth nT) nargs)
     (H : gtyC nT' Tv = gtlookup gT name) : pty gT (Tv :: nT) :=
@@ -921,34 +921,34 @@ Inductive exp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     (nT' := map (ntnth nT) nargs)
     (H : gtyC nT' Tr = gtlookup gT name),
     exp gT lT rT nT pT Tr
-| letapp : forall (Tv Tr : Set) (name : string) (nargs : seq nat)
+| leta : forall (Tv Tr : Set) (name : string) (nargs : seq nat)
     (nT' := map (ntnth nT) nargs)
     (H : gtyC nT' Tv = gtlookup gT name)
-    (Peq : pty gT (Tv :: nT) := letapp_eq gT nT Tv name nargs H),
+    (Peq : pty gT (Tv :: nT) := leta_eq gT nT Tv name nargs H),
     exp gT lT rT (Tv :: nT) (Peq :: pt_shift0 gT Tv nT pT) Tr ->
     exp gT lT rT nT pT Tr
 | rappC : forall (Tr : Set),
     rapp_exp gT rT nT pT Tr ->
     exp gT lT rT nT pT Tr
-| letrappC : forall (Tv Tr : Set),
+| letrC : forall (Tv Tr : Set),
     rapp_exp gT rT nT pT Tv ->
     exp gT lT rT (Tv :: nT) (pt_shift0 gT Tv nT pT) Tr ->
     exp gT lT rT nT pT Tr
-| letproofC : forall (Tr : Set) (P : pty gT nT),
+| letpC : forall (Tr : Set) (P : pty gT nT),
     papp_exp gT lT nT pT P ->
     exp gT lT rT nT (P :: pT) Tr ->
     exp gT lT rT nT pT Tr
 | nmatch : forall (Tr : Set) (i : nat) (Tv := ntnth nT i),
     nmatch_exp gT lT rT nT pT Tv Tr [::] ->
     exp gT lT rT nT pT Tr
-| letnmatch : forall (Tv2 Tr : Set) (i : nat) (Tv1 := ntnth nT i),
+| letn : forall (Tv2 Tr : Set) (i : nat) (Tv1 := ntnth nT i),
     nmatch_exp gT lT rT nT pT Tv1 Tv2 [::] ->
     exp gT lT rT (Tv2 :: nT) (pt_shift0 gT Tv2 nT pT) Tr ->
     exp gT lT rT nT pT Tr
 | dmatch : forall (Tr : Set) (i : nat),
     dmatch_exp gT lT rT nT pT i Tr [::] ->
     exp gT lT rT nT pT Tr
-| letdmatch : forall (Tv2 Tr : Set) (i : nat),
+| letd : forall (Tv2 Tr : Set) (i : nat),
     dmatch_exp gT lT rT nT pT i Tv2 [::] ->
     exp gT lT rT (Tv2 :: nT) (pt_shift0 gT Tv2 nT pT) Tr ->
     exp gT lT rT nT pT Tr
@@ -983,36 +983,14 @@ with dmatch_exp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
     dmatch_exp gT lT rT nT pT i Tr (Ct :: Cts) ->
     dmatch_exp gT lT rT nT pT i Tr Cts.
 
-Definition rapp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
-    (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set)
-    (name : string) (nargs : seq nat) (pargopt : option nat)
-    (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
-    (H1 : rtyC gT nT' Popt Tr = rtlookup gT rT name)
-    (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
-          match pargopt with None => None | Some parg => Some (ptnth gT nT pT parg) end)
-    : exp gT lT rT nT pT Tr :=
+Definition rapp gT lT rT nT pT Tr name nargs pargopt Popt H1 H2 :=
   rappC gT lT rT nT pT Tr (rapp_expC gT rT nT pT Tr name nargs pargopt Popt H1 H2).
 
-Definition letrapp (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
-    (nT : nenvtype) (pT : penvtype gT nT) (Tv Tr : Set)
-    (name : string) (nargs : seq nat) (pargopt : option nat)
-    (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
-    (H1 : rtyC gT nT' Popt Tv = rtlookup gT rT name)
-    (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
-          match pargopt with None => None | Some parg => Some (ptnth gT nT pT parg) end)
-    (body : exp gT lT rT (Tv :: nT) (pt_shift0 gT Tv nT pT) Tr)
-    : exp gT lT rT nT pT Tr :=
-  letrappC gT lT rT nT pT Tv Tr (rapp_expC gT rT nT pT Tv name nargs pargopt Popt H1 H2) body.
+Definition letr gT lT rT nT pT Tv Tr name nargs pargopt Popt H1 H2 body :=
+  letrC gT lT rT nT pT Tv Tr (rapp_expC gT rT nT pT Tv name nargs pargopt Popt H1 H2) body.
 
-Definition letproof (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
-    (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set) (name : string) (P : pty gT nT) (nargs pargs : seq nat)
-    (nT' := map (ntnth nT) nargs) (pT' : penvtype gT nT')
-    (P' : pty gT nT')
-    (H1 : ltyC gT nT' pT' P' = ltlookup gT lT name)
-    (H2 : transplant_pt gT nT nargs pT' = map (ptnth gT nT pT) pargs)
-    (H3 : transplant_pty gT nT nargs P' = P)
-    (body : exp gT lT rT nT (P :: pT) Tr) : exp gT lT rT nT pT Tr :=
-  letproofC gT lT rT nT pT Tr P (papp_expC gT lT nT pT P name nargs pargs pT' P' H1 H2 H3) body.
+Definition letp gT lT rT nT pT Tr name P nargs pargs pT' P' H1 H2 H3 body :=
+  letpC gT lT rT nT pT Tr P (papp_expC gT lT nT pT P name nargs pargs pT' P' H1 H2 H3) body.
 
 (* matcher functions for basic types *)
 
@@ -1022,7 +1000,7 @@ Definition Empty_set_nmatcher (Tr : Set) (v : Empty_set) : Tr :=
 
 Definition Empty_set_dmatcher (Tr : Set) (v : Empty_set) : Tr :=
   match v as v' return v' = v -> Tr with
-  end (erefl v).
+  end erefl.
 
 Lemma Empty_set_matcher_proofelim (Tr : Set) (v : Empty_set) :
   True ->
@@ -1047,7 +1025,7 @@ Definition unit_dmatcher (Tr : Set) (v : unit)
     (branch_tt : tt = v -> Tr) : Tr :=
   match v as v' return v' = v -> Tr with
   | tt => branch_tt
-  end (erefl v).
+  end erefl.
 
 Lemma unit_matcher_proofelim (Tr : Set) (v : unit)
   (dbranch_tt : tt = v -> Tr)
@@ -1080,7 +1058,7 @@ Definition bool_dmatcher (Tr : Set) (v : bool)
   match v as v' return v' = v -> Tr with
   | true => branch_true
   | false => branch_false
-  end (erefl v).
+  end erefl.
 
 Lemma bool_matcher_proofelim (Tr : Set) (v : bool)
   (dbranch_true : true = v -> Tr) (dbranch_false : false = v -> Tr)
@@ -1115,7 +1093,7 @@ Definition nat_dmatcher (Tr : Set) (v : nat)
   match v as v' return v' = v -> Tr with
   | O => branch_O
   | S n => branch_S n
-  end (erefl v).
+  end erefl.
 
 Lemma nat_matcher_proofelim (Tr : Set) (v : nat)
   (dbranch_O : O = v -> Tr) (dbranch_S : forall n, S n = v -> Tr)
@@ -1237,25 +1215,25 @@ Fixpoint eval (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
   match e with
   | var i => nlookup nT nenv i
   | app Tr name nargs H => eval_app gT nT Tr genv nenv name nargs H
-  | letapp Tv Tr name nargs H body =>
+  | leta Tv Tr name nargs H body =>
       let v := eval_app gT nT Tv genv nenv name nargs H in
       let nT' := Tv :: nT in
       let pT' := pt_shift0 gT Tv nT pT in
       let nenv' := nenv_cons Tv v nT nenv in
       let penv' := eq_ind_r id penv (penviron_shift0 gT nT pT genv nenv Tv v) in
-      let Peq := letapp_eq gT nT Tv name nargs H in
+      let Peq := leta_eq gT nT Tv name nargs H in
       let prfeq : ptype gT nT' Peq genv nenv' := erefl in
       let pT'' := Peq :: pT' in
       let penv'' := penv_cons gT nT' pT' Peq genv nenv' prfeq penv' in
       eval gT lT rT nT' pT'' Tr genv lenv renv nenv' penv'' body
   | rappC Tr re => eval_rapp gT rT nT pT Tr genv renv nenv penv re
-  | letrappC Tv Tr re body =>
+  | letrC Tv Tr re body =>
       let v := eval_rapp gT rT nT pT Tv genv renv nenv penv re in
       let nT' := Tv :: nT in
       let nenv' := nenv_cons Tv v nT nenv in
       let penv' := eq_ind_r id penv (penviron_shift0 gT nT pT genv nenv Tv v) in
       eval gT lT rT nT' (pt_shift0 gT Tv nT pT) Tr genv lenv renv nenv' penv' body
-  | letproofC Tr P pe body =>
+  | letpC Tr P pe body =>
       let prf := eval_papp gT lT nT pT P genv lenv nenv penv pe in
       let pT' := P :: pT in
       let penv' := penv_cons gT nT pT P genv nenv prf penv in
@@ -1264,7 +1242,7 @@ Fixpoint eval (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
       let Tv := ntnth nT i in
       let v := nlookup nT nenv i in
       (eval_nmatch gT lT rT nT pT genv lenv renv nenv penv Tv Tr [::] branches) v
-  | letnmatch Tv2 Tr i branches body =>
+  | letn Tv2 Tr i branches body =>
       let Tv1 := ntnth nT i in
       let v1 := nlookup nT nenv i in
       let v2 := eval_nmatch gT lT rT nT pT genv lenv renv nenv penv Tv1 Tv2 [::] branches v1 in
@@ -1274,7 +1252,7 @@ Fixpoint eval (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
       eval gT lT rT nT' (pt_shift0 gT Tv2 nT pT) Tr genv lenv renv nenv' penv' body
   | dmatch Tr i branches =>
       eval_dmatch gT lT rT nT pT genv lenv renv nenv penv i Tr [::] branches
-  | letdmatch Tv2 Tr i branches body =>
+  | letd Tv2 Tr i branches body =>
       let v2 := eval_dmatch gT lT rT nT pT genv lenv renv nenv penv i Tv2 [::] branches in
       let nT' := Tv2 :: nT in
       let nenv' := nenv_cons Tv2 v2 nT nenv in
@@ -1347,14 +1325,14 @@ Definition negb_negb_AST :=
   let pT : penvtype gT nT := [::] in
   let Tr := bool in
     let name := "negb" in let nargs := [::0] in let H := erefl in
-    letapp gT lT rT nT pT bool bool name nargs H
+    leta gT lT rT nT pT bool bool name nargs H
     (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
+     let pT := leta_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
      let nT := nT' in
     let name := "negb" in let nargs := [::0] in let H := erefl in
-    letapp gT lT rT nT pT bool bool name nargs H
+    leta gT lT rT nT pT bool bool name nargs H
     (let nT' := bool :: nT in
-     let pT := letapp_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
+     let pT := leta_eq gT nT bool name nargs H :: pt_shift0 gT bool nT pT in
      let nT := nT' in
     var gT lT rT nT pT 0)).
 
@@ -1479,13 +1457,20 @@ Selective unfolding is possible using Ltac, though. *)
 
 (* Now, we try to import a (non-structural) recursive function *)
 
+Fail Fixpoint upto (i n : nat) : unit :=
+  match i < n with
+  | true => upto i.+1 n
+  | false => tt
+  end.
+(* Cannot guess decreasing argument of fix. *)
+
 (* upto can be defined using Fixpoint and proof-editing mode *)
 Fixpoint upto (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit.
-Proof.
   refine (
-    match i < n as b' return b' = (i < n) -> unit with
+    match i < n as b' return (b' = (i < n)) -> unit with
     | true => fun (H : true = (i < n)) => upto i.+1 n _
-    | false => fun (H : false = (i < n)) => tt end erefl).
+    | false => fun (H : false = (i < n)) => tt
+    end erefl).
   apply Acc_inv with (x:=n-i); first by [].
   apply/ltP.
   rewrite subnSK; last by [].
@@ -1510,7 +1495,7 @@ Proof.
   by apply leqnn.
 Defined.
 
-Definition upto_body (upto : forall (i n : nat) (acc : Acc lt (n - i)), unit)
+Definition upto_body (upto : forall (i n : nat), Acc lt (n - i) -> unit)
     (i n : nat) (acc : Acc lt (n - i)) : unit :=
   let b := i < n in let Hb : b = (i < n) := erefl in
   match b as b' return b' = b -> unit with
@@ -1597,24 +1582,24 @@ string_rec string_rect sumbool_rec sumbool_rect Ascii.ascii_dec Ascii.ascii_rec 
 Bool.bool_dec bool_rec bool_rect] in pT2. *)
 
 (*
-letapp b Hb := ltn i n in
+leta b Hb := ltn i n in
   dmatch b with
   | true Hm =>
-      letapp j Hj := S i in
-      letproof acc' := upto_lemma i n b j acc Hb Hm Hj in
+      leta j Hj := S i in
+      letp acc' := upto_lemma i n b j acc Hb Hm Hj in
       upto j n acc'
   | false Hm =>
       tt
   end
 *)
 Definition upto_body_AST :=
-  letapp GT4 LT4 rT nT1 pT1 bool unit (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
+  leta GT4 LT4 rT nT1 pT1 bool unit (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
     (dmatch GT4 LT4 rT nT2 pT2 unit (*b*)0
       (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | false Hm *) bool_false [::]
         (app GT4 LT4 rT nT2 pT3 unit "tt" [::] erefl)
         (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | true Hm *) bool_true [:: bool_false]
-          (letapp GT4 LT4 rT nT2 pT4 nat unit (* j Hj := *) "S" [:: (*i*)2] erefl
-            (letproof GT4 LT4 rT nT3 pT5 unit (* acc' := *) "upto_lemma" upto_lemma_pty
+          (leta GT4 LT4 rT nT2 pT4 nat unit (* j Hj := *) "S" [:: (*i*)2] erefl
+            (letp GT4 LT4 rT nT3 pT5 unit (* acc' := *) "upto_lemma" upto_lemma_pty
               [:: (*j*)0; (*b*)1; (*n*)2; (*i*)3]
               [:: (*Hj*)0; (*Hm*)1; (*Hb*)2; (*acc*)3]
               upto_lemma_pt upto_lemma_P erefl erefl erefl
