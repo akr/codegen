@@ -4,6 +4,7 @@ From mathcomp Require Import all_ssreflect.
 Require Import ssrstr.
 Require Import String.
 Require Import Wf_nat.
+Require FunctionalExtensionality.
 
 (* normal (non-dependent) variables *)
 Definition nenvtype : Type := seq Set.
@@ -1455,86 +1456,157 @@ It means the resulting term will be entire program which can be very big.
 So, we don't use this definition here.
 Selective unfolding is possible using Ltac, though. *)
 
-(* Now, we try to import a (non-structural) recursive function *)
+(* Now, we try to import a (non-structural) recursive function using Fix of Wf.v *)
+(* "upto" recurses with an argument "i" to "N" increasingly.  *)
+Parameter N:nat.
 
-Fail Fixpoint upto (i n : nat) : unit :=
-  match i < n with
-  | true => upto i.+1 n
-  | false => tt
-  end.
-(* Cannot guess decreasing argument of fix. *)
+Definition m i := N - i.
+Definition R := (Wf_nat.ltof nat m).
+Definition Rwf : well_founded R := Wf_nat.well_founded_ltof _ m.
 
-(* upto can be defined using Fixpoint and proof-editing mode *)
-Fixpoint upto (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit.
-  refine (
-    match i < n as b' return (b' = (i < n)) -> unit with
-    | true => fun (H : true = (i < n)) => upto i.+1 n _
-    | false => fun (H : false = (i < n)) => tt
-    end erefl).
-  apply Acc_inv with (x:=n-i); first by [].
-  apply/ltP.
-  rewrite subnSK; last by [].
-  by apply leqnn.
-Defined.
-
-(* We define upto in separated style: lemma, body and recursive function.
-  This style makes us possible to compare the body and AST without
-  concerning recursion.  *)
-
-Lemma upto_lemma (i n : nat) (b : bool) (j : nat)
-  (acc : Acc lt (n - i))
-  (Hb : b = (i < n))
-  (Hm : true = b)
-  (Hj : j = i.+1) : Acc lt (n - j).
+Definition upto_F (i : nat)
+    (f : forall (i' : nat), (m i' < m i)%coq_nat -> bool) : bool.
 Proof.
-  rewrite {}Hj.
-  rewrite {}Hb in Hm.
-  apply Acc_inv with (x:=n-i); first by [].
+  refine (
+    match i < N as b' return (b' = (i < N)) -> bool with
+    | true => fun (H : true = (i < N)) => f i.+1 _
+    | false => fun (H : false = (i < N)) => true
+    end erefl).
+  apply/ltP.
+  rewrite subnSK; last by [].
+  by apply leqnn.
+Defined.
+Definition upto_fix := Fix Rwf (fun _ => bool) upto_F.
+Definition upto (i : nat) : bool := upto_fix i.
+
+(* We can reasoning about the non-structural recursive function *)
+
+Lemma upto_true i : upto i = true.
+Proof.
+  rewrite /upto /upto_fix.
+  pattern i.
+  apply (well_founded_ind Rwf).
+  clear i.
+  move=> i IH.
+  rewrite Fix_eq.
+    rewrite /upto_F /=.
+    case: ltnP.
+      rewrite -/upto_F.
+      move=> H.
+      apply IH.
+      rewrite /R /Wf_nat.ltof /=.
+      apply/ltP.
+      rewrite subnSK; last by [].
+      by apply leqnn.
+    by [].
+  clear i IH.
+  move=> i f g H.
+  congr upto_F.
+  apply FunctionalExtensionality.functional_extensionality_dep => k.
+  by apply FunctionalExtensionality.functional_extensionality.
+Qed.
+
+(* upto function can be defined without Fix:
+  - upto_rec is a recursive function defined with Fixpoint
+  - upto_noFix invokes upto_rec
+ *)
+
+(* upto_rec needs decreasing Acc argument *)
+Fixpoint upto_rec (i : nat) (a : Acc R i) {struct a} : bool.
+Proof.
+  refine (
+    match i < N as b' return (b' = (i < N) -> bool) with
+    | true => fun H : true = (i < N) =>
+        upto_rec i.+1 _
+    | false => fun H : false = (i < N) => true
+    end erefl).
+  apply (Acc_inv a).
   apply/ltP.
   rewrite subnSK; last by [].
   by apply leqnn.
 Defined.
 
-Definition upto_body (upto : forall (i n : nat), Acc lt (n - i) -> unit)
-    (i n : nat) (acc : Acc lt (n - i)) : unit :=
+Definition upto_noFix (i : nat) : bool :=
+  upto_rec i (Rwf i).
+
+(* upto and upto_cal are convertible *)
+Goal upto = upto_noFix. Proof. reflexivity. Qed.
+
+(* We split upto into upto_lemma, upto_body, upto_rec' and upto_noFix'.
+  upto_body corresponds to an AST we will define. *)
+Lemma upto_lemma (i : nat) (n : nat) (b : bool) (j : nat)
+    (a : Acc R i)
+    (Hn : n = N) (Hb : b = (i < n)) (Hm : true = b) (Hj : j = i.+1) :
+    Acc R j.
+Proof.
+  apply (Acc_inv a).
+  apply/ltP.
+  rewrite Hj.
+  rewrite subnSK.
+    by apply leqnn.
+  rewrite -Hn -Hb -Hm.
+  by reflexivity.
+Defined.
+
+Definition upto_body
+    (upto_rec : forall (i : nat), Acc R i -> bool)
+    (i : nat) (a : Acc R i) : bool :=
+  let n := N in let Hn : n = N := erefl in
   let b := i < n in let Hb : b = (i < n) := erefl in
-  match b as b' return b' = b -> unit with
-  | true => fun (Hm : true = b) =>
-    let j := i.+1 in let Hj : j = i.+1 := erefl in
-    let acc' := upto_lemma i n b j acc Hb Hm Hj in
-    upto j n acc'
-  | false => fun (Hm : false = b) => tt
+  match b as b' return (b' = b -> bool) with
+  | true => fun Hm : true = b =>
+      let j := i.+1 in let Hj : j = i.+1 := erefl in
+      let a' := upto_lemma i n b j a Hn Hb Hm Hj in
+      upto_rec j a'
+  | false => fun Hm : false = b => true
   end erefl.
 
-Fixpoint upto' (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit :=
-  upto_body upto' i n acc.
+Fixpoint upto_rec' (i : nat) (acc : Acc R i) {struct acc} : bool :=
+  upto_body upto_rec' i acc.
 
-Lemma upto'_ok : upto = upto'. Proof. reflexivity. Qed.
+Definition upto_noFix' (i : nat) : bool :=
+  upto_rec' i (Rwf i).
+
+(* upto_noFix' is convertible to upto_noFix *)
+
+Lemma upto_noFix'_ok : upto_noFix = upto_noFix'. Proof. reflexivity. Qed.
+
+(* We import "N" at first *)
+
+Definition GTENT4 := gtent "N" [::] nat.
+Definition GT4' := [:: GTENT4].
+Definition GT4 : genvtype := GT4' ++ GT3.
+Definition GENV4 : genviron GT4 := ((uncurry [::] _ N), GENV3).
+Definition LT4 : lenvtype GT4 := lt_shift0 GTENT4 GT3 LT3.
+Definition LENV4 : lenviron GT4 LT4 GENV4 := LENV3.
+
+(* *)
 
 Definition upto_lemma_nt := [::(*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
 
-Definition upto_lemma_pt : penvtype GT3 upto_lemma_nt :=
-  let u := uncurry_pty GT3 upto_lemma_nt in
+Definition upto_lemma_pt : penvtype GT4 upto_lemma_nt :=
+  let u := uncurry_pty GT4 upto_lemma_nt in
   [::
-    (u (fun genv j b n i => j = glookup GT3 genv "S" (i,tt) (*i.+1*)));
+    (u (fun genv j b n i => j = glookup GT4 genv "S" (i,tt) (*i.+1*)));
     (u (fun genv j b n i => true = b));
-    (u (fun genv j b n i => b = glookup GT3 genv "ltn" (i,(n,tt))));
-    (u (fun genv j b n i => Acc lt (n - i)))
+    (u (fun genv j b n i => b = glookup GT4 genv "ltn" (i,(n,tt))));
+    (u (fun genv j b n i => n = glookup GT4 genv "N" tt));
+    (u (fun genv j b n i => Acc R i))
   ].
 
-Definition upto_lemma_P : pty GT3 upto_lemma_nt :=
-  uncurry_pty GT3 upto_lemma_nt
-    (fun genv j b n i => Acc lt (n - j)).
+Definition upto_lemma_P : pty GT4 upto_lemma_nt :=
+  uncurry_pty GT4 upto_lemma_nt
+    (fun genv j b n i => Acc R j).
 
-Definition upto_lemma_lty := ltyC GT3 upto_lemma_nt upto_lemma_pt upto_lemma_P.
+Definition upto_lemma_lty := ltyC GT4 upto_lemma_nt upto_lemma_pt upto_lemma_P.
 
-Definition GT4 := GT3.
-Definition GENV4 := GENV3.
-Definition LT4 : lenvtype GT4 := ("upto_lemma", upto_lemma_lty) :: LT3.
+Definition GT5 := GT4.
+Definition GENV5 := GENV4.
+Definition LT5 : lenvtype GT5 := ("upto_lemma", upto_lemma_lty) :: LT4.
 
-Definition LENV4 : lenviron GT4 LT4 GENV4 :=
-  let gT := GT4 in
-  let genv := GENV4 in
+Definition LENV5 : lenviron GT5 LT5 GENV5 :=
+  let gT := GT5 in
+  let genv := GENV5 in
   let nT := upto_lemma_nt in
   let pT := upto_lemma_pt in
   (((fun (nenv : nenviron nT)
@@ -1543,36 +1615,44 @@ Definition LENV4 : lenviron GT4 LT4 GENV4 :=
     let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
     let Hj := penv.1 in let Hm := penv.2.1 in
     let Hb := penv.2.2.1 in
-    let acc := penv.2.2.2.1 in
-    upto_lemma i n b j acc Hb Hm Hj) : ltype gT upto_lemma_lty genv), LENV3).
-
-(* Eval cbv zeta delta [upto_body_AST upto_if_AST upto_false_AST upto_true_AST3 upto_true_AST2 upto_true_AST1] in upto_body_AST . *)
+    let Hn := penv.2.2.2.1 in
+    let acc := penv.2.2.2.2.1 in
+    upto_lemma i n b j acc Hn Hb Hm Hj) : ltype gT upto_lemma_lty genv), LENV3).
 
 Section upto_body_AST.
-Let nT1 := [:: (*n*)nat; (*i*)nat].
-Let nT2 := [:: (*b*)bool; (*n*)nat; (*i*)nat].
-Let nT3 := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
-Let rtyF := Some (fun (_ : genviron GT4) (nenv : (*i*)nat * ((*n*)nat * unit)) =>
-  Acc lt ((*n*)nenv.2.1 - (*i*)nenv.1)).
-Let rT := [:: ("upto", rtyC GT4 nT1 rtyF unit)].
-Let pT1 := [:: fun (_ : genviron GT4) (nenv : nenviron nT1) => Acc lt ((*n*)nenv.1 - (*i*)nenv.2.1)].
-Let pT2 := [:: (*Hb*)fun (genv : genviron GT4) (nenv : nenviron nT2) =>
-                  (*b*)nenv.1 = glookup GT4 genv "ltn" ((*i*)nenv.2.2.1, ((*n*)nenv.2.1, tt));
-  (*acc*)fun (_ : genviron GT4) (nenv : nenviron nT2) => Acc lt ((*n*)nenv.2.1 - (*i*)nenv.2.2.1)].
-Let pT3 := (fun (_ : genviron GT4) (nenv : nenviron nT2) => false = nenv.1) :: pT2.
-Let pT4 := (fun (_ : genviron GT4) (nenv : nenviron nT2) => true = nenv.1) :: pT2.
-Let pT5 := [:: fun (genv : genviron GT4) (nenv : nenviron nT3) =>
-    (*j*)nenv.1 = glookup GT4 genv "S" ((*i*)nenv.2.2.2.1, tt);
-  fun (_ : genviron GT4) (nenv : nenviron nT3) => true = (*b*)nenv.2.1;
-  fun (genv : genviron GT4) (nenv : nenviron nT3) =>
-    (*b*)nenv.2.1 = glookup GT4 genv "ltn" ((*i*)nenv.2.2.2.1, ((*n*)nenv.2.2.1, tt));
-  fun (_ : genviron GT4) (nenv : nenviron nT3) =>
-    Acc lt ((*n*)nenv.2.2.1 - (*i*)nenv.2.2.2.1)].
-Let pT6 := (fun (_ : genviron GT4) (nenv : nenviron nT3) =>
-  Acc lt ((*n*)nenv.2.2.1 - (*j*)nenv.1)) :: pT5.
+Let nT1 := [:: (*i*)nat].
+Let nT2 := [:: (*n*)nat; (*i*)nat].
+Let nT3 := [:: (*b*)bool; (*n*)nat; (*i*)nat].
+Let nT4 := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
+Let rtyF := Some (fun (_ : genviron GT5) (nenv : (*i*)nat * unit) =>
+  Acc R (*i*)nenv.1).
+Let rT := [:: ("upto", rtyC GT5 nT1 rtyF bool)].
+Let pT1 := [:: fun (_ : genviron GT5) (nenv : nenviron nT1) => Acc R (*i*)nenv.1].
+Let pT2 := [:: (*Hn*)fun (genv : genviron GT5) (nenv : nenviron nT2) =>
+                  (*n*)nenv.1 = glookup GT5 genv "N" tt;
+  (*acc*)fun (_ : genviron GT5) (nenv : nenviron nT2) => Acc R (*i*)nenv.2.1].
+Let pT3 := [:: (*Hb*)fun (genv : genviron GT5) (nenv : nenviron nT3) =>
+                  (*b*)nenv.1 = glookup GT5 genv "ltn"
+                                  ((*i*)nenv.2.2.1, ((*n*)nenv.2.1, tt));
+  (*Hn*)fun (genv : genviron GT5) (nenv : nenviron nT3) =>
+                  (*n*)nenv.2.1 = glookup GT5 genv "N" tt;
+  (*acc*)fun (_ : genviron GT5) (nenv : nenviron nT3) => Acc R (*i*)nenv.2.2.1].
+Let pT4 := (fun (_ : genviron GT5) (nenv : nenviron nT3) => false = (*b*)nenv.1) :: pT3.
+Let pT5 := (fun (_ : genviron GT5) (nenv : nenviron nT3) => true = (*b*)nenv.1) :: pT3.
+Let pT6 := [:: (*Hj*)fun (genv : genviron GT5) (nenv : nenviron nT4) =>
+    (*j*)nenv.1 = glookup GT5 genv "S" ((*i*)nenv.2.2.2.1, tt);
+  (*Hm*)fun (_ : genviron GT5) (nenv : nenviron nT4) => true = (*b*)nenv.2.1;
+  (*Hb*)fun (genv : genviron GT5) (nenv : nenviron nT4) =>
+    (*b*)nenv.2.1 = glookup GT5 genv "ltn" ((*i*)nenv.2.2.2.1, ((*n*)nenv.2.2.1, tt));
+  (*Hn*)fun (genv : genviron GT5) (nenv : nenviron nT4) =>
+                  (*n*)nenv.2.2.1 = glookup GT5 genv "N" tt;
+  (*acc*)fun (_ : genviron GT5) (nenv : nenviron nT4) =>
+    Acc R (*i*)nenv.2.2.2.1].
+Let pT7 := (fun (_ : genviron GT5) (nenv : nenviron nT4) =>
+  Acc R (*j*)nenv.1) :: pT6.
 
-Let upto_lemma_pty := fun (_ : genviron GT4) (nenv : nenviron upto_lemma_nt) =>
-  Acc lt ((*n*)nenv.2.2.1 - (*j*)nenv.1).
+Let upto_lemma_pty := fun (_ : genviron GT5) (nenv : nenviron upto_lemma_nt) =>
+  Acc R (*j*)nenv.1.
 
 (* This reduces (b = glookup GT4 genv "ltn" (i, (n, tt))) to
   nenv.1 = genv.2.2.2.2.2.2.2.2.1 (nenv.2.2.1, (nenv.2.1, tt)).
@@ -1582,86 +1662,88 @@ string_rec string_rect sumbool_rec sumbool_rect Ascii.ascii_dec Ascii.ascii_rec 
 Bool.bool_dec bool_rec bool_rect] in pT2. *)
 
 (*
+leta n Hn := N in
 leta b Hb := ltn i n in
   dmatch b with
   | true Hm =>
       leta j Hj := S i in
-      letp acc' := upto_lemma i n b j acc Hb Hm Hj in
-      upto j n acc'
+      letp acc' := upto_lemma i n b j acc Hn Hb Hm Hj in
+      upto j acc'
   | false Hm =>
-      tt
+      true
   end
 *)
 Definition upto_body_AST :=
-  leta GT4 LT4 rT nT1 pT1 bool unit (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
-    (dmatch GT4 LT4 rT nT2 pT2 unit (*b*)0
-      (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | false Hm *) bool_false [::]
-        (app GT4 LT4 rT nT2 pT3 unit "tt" [::] erefl)
-        (dmatch_cons GT4 LT4 rT nT2 pT2 (*b*)0 unit (* | true Hm *) bool_true [:: bool_false]
-          (leta GT4 LT4 rT nT2 pT4 nat unit (* j Hj := *) "S" [:: (*i*)2] erefl
-            (letp GT4 LT4 rT nT3 pT5 unit (* acc' := *) "upto_lemma" upto_lemma_pty
-              [:: (*j*)0; (*b*)1; (*n*)2; (*i*)3]
-              [:: (*Hj*)0; (*Hm*)1; (*Hb*)2; (*acc*)3]
-              upto_lemma_pt upto_lemma_P erefl erefl erefl
-              (rapp GT4 LT4 rT nT3 pT6 unit
-                "upto" [:: (*j*)0; (*n*)2] (Some (*acc'*)0) rtyF erefl erefl)))
-          (dmatch_nil GT4 LT4 rT nT2 pT2 (*b*)0 unit [:: bool_true; bool_false]
-             bool_matcher)))).
+  leta GT5 LT5 rT nT1 pT1 nat bool (* n Hn := *) "N" [::] erefl
+    (leta GT5 LT5 rT nT2 pT2 bool bool (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
+      (dmatch GT5 LT5 rT nT3 pT3 bool (*b*)0
+        (dmatch_cons GT5 LT5 rT nT3 pT3 (*b*)0 bool (* | false Hm *) bool_false [::]
+          (app GT5 LT5 rT nT3 pT4 bool "true" [::] erefl)
+          (dmatch_cons GT5 LT5 rT nT3 pT3 (*b*)0 bool (* | true Hm *) bool_true [:: bool_false]
+            (leta GT5 LT5 rT nT3 pT5 nat bool (* j Hj := *) "S" [:: (*i*)2] erefl
+              (letp GT5 LT5 rT nT4 pT6 bool (* acc' := *) "upto_lemma" upto_lemma_pty
+                [:: (*j*)0; (*b*)1; (*n*)2; (*i*)3]
+                [:: (*Hj*)0; (*Hm*)1; (*Hb*)2; (*Hn*)3; (*acc*)4]
+                upto_lemma_pt upto_lemma_P erefl erefl erefl
+                (rapp GT5 LT5 rT nT4 pT7 bool
+                  "upto" [:: (*j*)0] (Some (*acc'*)0) rtyF erefl erefl)))
+            (dmatch_nil GT5 LT5 rT nT3 pT3 (*b*)0 bool [:: bool_true; bool_false]
+               bool_matcher))))).
+
+(* Eval cbv zeta delta [upto_body_AST] in upto_body_AST. *)
 
 End upto_body_AST.
 
 (* We can define upto_body' using the AST *)
-Definition upto_body' (upto : forall (i n : nat), Acc lt (n - i) -> unit)
-    (i n : nat) (acc : Acc lt (n - i)) : unit :=
-  let gT := GT4 in
-  let genv := GENV4 in
-  let lT := LT4 in
-  let lenv := LENV4 in
+Definition upto_body' (upto : forall (i : nat), Acc R i -> bool)
+    (i : nat) (acc : Acc R i) : bool :=
+  let gT := GT5 in
+  let genv := GENV5 in
+  let lT := LT5 in
+  let lenv := LENV5 in
   let rT : renvtype gT := [:: ("upto",
-                 rtyC gT [::(*i*)nat; (*n*)nat]
+                 rtyC gT [::(*i*)nat]
                   (Some (fun genv nenv =>
-                        let i := nenv.1 in let n := nenv.2.1 in
-                        Acc lt (n - i)))
-                  unit) ] in
+                        let i := nenv.1 in
+                        Acc R i))
+                  bool) ] in
   let renv : renviron gT rT genv :=
-    [renv: rent gT "upto" [::nat;nat]
-                (Some (fun genv i n => Acc lt (n - i)))
-                unit genv upto] in
-  let nT := [:: (*n*)nat; (*i*)nat] in
-  let nenv : nenviron nT := [nenv: n; i] in
+    [renv: rent gT "upto" [::nat]
+                (Some (fun genv i => Acc R i))
+                bool genv upto] in
+  let nT := [:: (*i*)nat] in
+  let nenv : nenviron nT := [nenv: i] in
   let u := uncurry_pty gT nT in
   let pT : penvtype gT nT := [::
-    (u (fun genv n i => Acc lt (n - i)))
+    (u (fun genv i => Acc R i))
   ] in
   let penv : penviron gT nT pT genv nenv := (acc,I) in
-  let Tr := unit in
+  let Tr := bool in
   eval gT lT rT nT pT Tr genv lenv renv nenv penv upto_body_AST.
 
 (* upto_body and upto_body' are convertible *)
 Lemma upto_body_ok : upto_body = upto_body'. Proof. reflexivity. Qed.
 
-(* We confirmed the body of upto is correctly represented by the AST and
-  upto itself is a simple recursive function just calling the body.
-  We consider the AST represent upto correctly.
-  So, we import upto into our global environment.
+(* We confirmed upto_body_AST correctly represent by upto_body.
+  upto_rec' is a simple recursive function just calling upto_body and
+  upto_noFix' just calls upto_rec' with initial decreasing argument.
+  So, upto_body_AST represents most of upto_noFix'.
+
+  Also, upto_noFix' is convertible to upto_noFix.
+  So, upto_body_AST represents most of upto_noFix.
+
+  We import upto_noFix, which is mostly corresponds to upto_body_AST,
+  into our global environment.
 *)
 
-(* Since our genv cannot have Prop argument, we need to define
-  a function without Prop argument.
-  Acc argument is easy to generate from non-dependent argument.
-*)
+Definition GTENT6 := gtent "upto" [:: nat] bool.
+Definition GT6' := [:: GTENT6].
+Definition GT6 : genvtype := GT6' ++ GT5.
+Definition GENV6 : genviron GT6 := ((uncurry [:: nat] _ upto_noFix), GENV5).
+Definition LT6 : lenvtype GT6 := lt_shift0 GTENT6 GT5 LT5.
+Definition LENV6 : lenviron GT6 LT6 GENV6 := LENV5.
 
-Definition upto_without_acc (i n : nat) :=
-  upto i n (lt_wf (n - i)).
-
-Definition GTENT5 := gtent "upto" [:: nat; nat] unit.
-Definition GT5' := [:: GTENT5].
-Definition GT5 : genvtype := GT5' ++ GT4.
-Definition GENV5 : genviron GT5 := ((uncurry [:: nat;nat] _ upto_without_acc), GENV4).
-Definition LT5 : lenvtype GT5 := lt_shift0 GTENT5 GT4 LT4.
-Definition LENV5 : lenviron GT5 LT5 GENV5 := LENV4.
-
-(* Note that the recursive function can be defined using the AST.
+(* Note that the recursive function, upto_rec', can be defined using the AST.
   It needs that upto_body should be reduced before Coq termination checker.
 *)
 
@@ -1670,16 +1752,16 @@ Definition LENV5 : lenviron GT5 LT5 GENV5 := LENV4.
 | Recursive definition of upto'' is ill-formed.
 | ...
 | Recursive call to upto'' has not enough arguments.
-| Recursive definition is: "fun i n : nat => [eta upto_body' upto'' i n]".
+| Recursive definition is: "fun i : nat => [eta upto_body' upto'' i]".
 *)
-Fail Fixpoint upto'' (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit :=
-  upto_body' upto'' i n acc.
+Fail Fixpoint upto'' (i : nat) (acc : Acc R i) {struct acc} : bool :=
+  upto_body' upto'' i acc.
 
 (* However, upto_body'', the normal form of upto_body' is usable *)
 Definition upto_body'' := Eval cbv in upto_body'.
 Print upto_body''.
-Lemma upto_body''_ok : upto_body' = upto_body''. reflexivity. Qed.
+Lemma upto_body''_ok : upto_body' = upto_body''. Proof. reflexivity. Qed.
 
-Fixpoint upto'' (i n : nat) (acc : Acc lt (n - i)) {struct acc} : unit :=
-  upto_body'' upto'' i n acc.
-Lemma upto''_ok : upto = upto''. reflexivity. Qed.
+Fixpoint upto'' (i : nat) (acc : Acc R i) {struct acc} : bool :=
+  upto_body'' upto'' i acc.
+Lemma upto''_ok : upto_rec = upto''. reflexivity. Qed.
