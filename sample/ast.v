@@ -1476,14 +1476,13 @@ Proof.
   rewrite subnSK; last by [].
   by apply leqnn.
 Defined.
-Definition upto_fix := Fix Rwf (fun _ => bool) upto_F.
-Definition upto (i : nat) : bool := upto_fix i.
+Definition upto_Fix : nat -> bool := Fix Rwf (fun _ => bool) upto_F.
 
 (* We can reasoning about the non-structural recursive function *)
 
-Lemma upto_true i : upto i = true.
+Lemma upto_true i : upto_Fix i = true.
 Proof.
-  rewrite /upto /upto_fix.
+  rewrite /upto_Fix.
   pattern i.
   apply (well_founded_ind Rwf).
   clear i.
@@ -1507,17 +1506,17 @@ Proof.
 Qed.
 
 (* upto function can be defined without Fix:
-  - upto_rec is a recursive function defined with Fixpoint
-  - upto_noFix invokes upto_rec
+  - upto_rec' is a recursive function defined with Fixpoint
+  - upto_noFix' invokes upto_rec
  *)
 
 (* upto_rec needs decreasing Acc argument *)
-Fixpoint upto_rec (i : nat) (a : Acc R i) {struct a} : bool.
+Fixpoint upto_rec' (i : nat) (a : Acc R i) {struct a} : bool.
 Proof.
   refine (
     match i < N as b' return (b' = (i < N) -> bool) with
     | true => fun H : true = (i < N) =>
-        upto_rec i.+1 _
+        upto_rec' i.+1 _
     | false => fun H : false = (i < N) => true
     end erefl).
   apply (Acc_inv a).
@@ -1526,11 +1525,11 @@ Proof.
   by apply leqnn.
 Defined.
 
-Definition upto_noFix (i : nat) : bool :=
-  upto_rec i (Rwf i).
+Definition upto_noFix' (i : nat) : bool :=
+  upto_rec' i (Rwf i).
 
 (* upto and upto_cal are convertible *)
-Goal upto = upto_noFix. Proof. reflexivity. Qed.
+Goal upto_Fix = upto_noFix'. Proof. reflexivity. Qed.
 
 (* We split upto into upto_lemma, upto_body, upto_rec' and upto_noFix'.
   upto_body corresponds to an AST we will define. *)
@@ -1561,15 +1560,16 @@ Definition upto_body
   | false => fun Hm : false = b => true
   end erefl.
 
-Fixpoint upto_rec' (i : nat) (acc : Acc R i) {struct acc} : bool :=
-  upto_body upto_rec' i acc.
+Fixpoint upto_rec (i : nat) (acc : Acc R i) {struct acc} : bool :=
+  upto_body upto_rec i acc.
 
-Definition upto_noFix' (i : nat) : bool :=
-  upto_rec' i (Rwf i).
+Definition upto (i : nat) : bool :=
+  upto_rec i (Rwf i).
 
-(* upto_noFix' is convertible to upto_noFix *)
+(* upto is convertible to upto_noFix and upto_Fix *)
 
-Lemma upto_noFix'_ok : upto_noFix = upto_noFix'. Proof. reflexivity. Qed.
+Lemma upto_ok' : upto = upto_noFix'. Proof. reflexivity. Qed.
+Lemma upto_ok : upto = upto_Fix. Proof. reflexivity. Qed.
 
 (* We import "N" at first *)
 
@@ -1739,7 +1739,7 @@ Lemma upto_body_ok : upto_body = upto_body'. Proof. reflexivity. Qed.
 Definition GTENT6 := gtent "upto" [:: nat] bool.
 Definition GT6' := [:: GTENT6].
 Definition GT6 : genvtype := GT6' ++ GT5.
-Definition GENV6 : genviron GT6 := ((uncurry [:: nat] _ upto_noFix), GENV5).
+Definition GENV6 : genviron GT6 := ((uncurry [:: nat] _ upto), GENV5).
 Definition LT6 : lenvtype GT6 := lt_shift0 GTENT6 GT5 LT5.
 Definition LENV6 : lenviron GT6 LT6 GENV6 := LENV5.
 
