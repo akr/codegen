@@ -1465,7 +1465,7 @@ Definition R := (Wf_nat.ltof nat m).
 Definition Rwf : well_founded R := Wf_nat.well_founded_ltof _ m.
 
 Definition upto_F (i : nat)
-    (f : forall (i' : nat), (m i' < m i)%coq_nat -> bool) : bool.
+    (f : forall (i' : nat), R i' i -> bool) : bool.
 Proof.
   refine (
     match i < N as b' return (b' = (i < N)) -> bool with
@@ -1476,13 +1476,13 @@ Proof.
   rewrite subnSK; last by [].
   by apply leqnn.
 Defined.
-Definition upto_Fix : nat -> bool := Fix Rwf (fun _ => bool) upto_F.
+Definition upto : nat -> bool := Fix Rwf (fun _ => bool) upto_F.
 
 (* We can reasoning about the non-structural recursive function *)
 
-Lemma upto_true i : upto_Fix i = true.
+Lemma upto_true i : upto i = true.
 Proof.
-  rewrite /upto_Fix.
+  rewrite /upto.
   pattern i.
   apply (well_founded_ind Rwf).
   clear i.
@@ -1529,7 +1529,7 @@ Definition upto_noFix' (i : nat) : bool :=
   upto_rec' i (Rwf i).
 
 (* upto and upto_cal are convertible *)
-Goal upto_Fix = upto_noFix'. Proof. reflexivity. Qed.
+Goal upto = upto_noFix'. Proof. reflexivity. Qed.
 
 (* We split upto into upto_lemma, upto_body, upto_rec' and upto_noFix'.
   upto_body corresponds to an AST we will define. *)
@@ -1563,13 +1563,13 @@ Definition upto_body
 Fixpoint upto_rec (i : nat) (acc : Acc R i) {struct acc} : bool :=
   upto_body upto_rec i acc.
 
-Definition upto (i : nat) : bool :=
+Definition upto_noFix (i : nat) : bool :=
   upto_rec i (Rwf i).
 
 (* upto is convertible to upto_noFix and upto_Fix *)
 
 Lemma upto_ok' : upto = upto_noFix'. Proof. reflexivity. Qed.
-Lemma upto_ok : upto = upto_Fix. Proof. reflexivity. Qed.
+Lemma upto_ok : upto = upto_noFix. Proof. reflexivity. Qed.
 
 (* We import "N" at first *)
 
