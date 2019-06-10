@@ -100,18 +100,18 @@ Definition rank_lookup aux i :=
   lookupD D1 j1 + lookupD D2 j2 +
   bcount b (j2 * sz2) j3 s.
 
-Terminate Monomorphization addn.
-Terminate Monomorphization subn.
-Terminate Monomorphization muln.
-Terminate Monomorphization divn.
-Terminate Monomorphization modn.
-Terminate Monomorphization bitlen.
-Terminate Monomorphization bcount.
-Terminate Monomorphization eqb.
-Terminate Monomorphization negb.
-Terminate Monomorphization eqn.
-Monomorphization rank_init.
-Monomorphization rank_lookup.
+CodeGen Terminate Monomorphization addn.
+CodeGen Terminate Monomorphization subn.
+CodeGen Terminate Monomorphization muln.
+CodeGen Terminate Monomorphization divn.
+CodeGen Terminate Monomorphization modn.
+CodeGen Terminate Monomorphization bitlen.
+CodeGen Terminate Monomorphization bcount.
+CodeGen Terminate Monomorphization eqb.
+CodeGen Terminate Monomorphization negb.
+CodeGen Terminate Monomorphization eqn.
+CodeGen Monomorphization rank_init.
+CodeGen Monomorphization rank_lookup.
 
 Print _buildDir2.
 Print _buildDir1.
@@ -130,7 +130,7 @@ CodeGen LinearCheck _rank_init.
 CodeGen LinearCheck _rank_lookup.
 *)
 
-GenCFile "sample/rank_proved.c"
+CodeGen GenCFile "sample/rank_proved.c"
   _pred
   _neq0
   _buildDir2

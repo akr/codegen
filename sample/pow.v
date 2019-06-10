@@ -22,11 +22,11 @@ Fixpoint fastpow_iter a k x :=
 
 Definition fastpow a k := fastpow_iter a k 1.
 
-Terminate Monomorphization odd.
-Terminate Monomorphization muln.
-Terminate Monomorphization uphalf.
-Monomorphization fastpow.
+CodeGen Terminate Monomorphization odd.
+CodeGen Terminate Monomorphization muln.
+CodeGen Terminate Monomorphization uphalf.
+CodeGen Monomorphization fastpow.
 Print _fastpow.
 Print _fastpow_iter.
 
-GenCFile "sample/pow_proved.c" _fastpow_iter _fastpow.
+CodeGen GenCFile "sample/pow_proved.c" _fastpow_iter _fastpow.

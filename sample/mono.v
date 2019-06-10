@@ -1,13 +1,13 @@
 Require Import codegen.codegen.
 
 Definition plus_1_2 := 1 + 2.
-Monomorphization plus_1_2.
+CodeGen Monomorphization plus_1_2.
 Print _plus_1_2.
 
 Definition foo :=
   let id := (fun (T : Type) (x : T) => x) in
   (id bool true, id nat 0).
-Monomorphization foo.
+CodeGen Monomorphization foo.
 
 Print _foo.
 (*
@@ -24,38 +24,38 @@ Definition id (T : Type) (x : T) := x.
 
 Definition bar :=
   (id bool true, id nat 0, id bool true).
-Monomorphization bar.
+CodeGen Monomorphization bar.
 
 Print _bar.
 Print _id_bool.
 Print _id_nat.
 
 Definition baz := (id bool true, id nat 0).
-Monomorphization baz.
+CodeGen Monomorphization baz.
 Print _baz.
 
 Goal _bar = (id bool true, id nat 0, id bool true).
 reflexivity.
 Qed.
 
-Terminate Monomorphization id unit.
+CodeGen Terminate Monomorphization id unit.
 Print _id_unit.
 
 Definition qux := id unit tt.
-Monomorphization qux.
+CodeGen Monomorphization qux.
 Print _qux.
 Print _id_unit.
 
 Definition zero := 0.
-Monomorphization zero.
+CodeGen Monomorphization zero.
 Print _zero.
 
 Definition one := 1.
-Monomorphization one.
+CodeGen Monomorphization one.
 Print _one.
 
 Definition list1 := cons 1 nil.
-Monomorphization list1.
+CodeGen Monomorphization list1.
 Print _list1.
 
 Goal _list1 = cons 1 nil.
@@ -63,5 +63,5 @@ reflexivity.
 Qed.
 
 Definition pair00 := (0, 0).
-Monomorphization pair00.
+CodeGen Monomorphization pair00.
 Print _pair00.
