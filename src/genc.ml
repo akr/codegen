@@ -42,7 +42,7 @@ let case_cstrlabel_short ty j =
   let env = Global.env () in
   let indty =
     match Constr.kind ty with
-    | Term.App (f, argsary) -> f
+    | Constr.App (f, argsary) -> f
     | _ -> ty
   in
   let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
@@ -58,7 +58,7 @@ let case_cstrfield_short ty j k =
   let env = Global.env () in
   let indty =
     match Constr.kind ty with
-    | Term.App (f, argsary) -> f
+    | Constr.App (f, argsary) -> f
     | _ -> ty
   in
   let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
@@ -92,7 +92,7 @@ let gensym_with_nameopt nameopt =
 
 let rec argtys_and_rety_of_type ty =
   match Constr.kind ty with
-  | Term.Prod (name, ty', body) ->
+  | Constr.Prod (name, ty', body) ->
       let (argtys, rety) = argtys_and_rety_of_type body in
       (ty :: argtys, rety)
   | _ -> ([], ty)
@@ -102,7 +102,7 @@ let rec nargtys_and_rety_of_type n ty =
     ([], ty)
   else
     match Constr.kind ty with
-    | Term.Prod (name, ty', body) ->
+    | Constr.Prod (name, ty', body) ->
         let (argtys, rety) = nargtys_and_rety_of_type (n-1) body in
         (ty :: argtys, rety)
     | _ -> user_err (Pp.str "too few prods in type")
@@ -115,7 +115,7 @@ type context_elt =
 
 let rec fargs_and_body env term =
   match Constr.kind term with
-  | Term.Lambda (name, ty, body) ->
+  | Constr.Lambda (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = Environ.push_rel decl env in
       let fargs1, env1, body1 = fargs_and_body env2 body in
@@ -185,7 +185,7 @@ let varname_of_rel context i =
 
 let genc_app context f argsary =
   match Constr.kind f with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       (match List.nth context (i-1) with
       | CtxVar _ -> user_err (str "indirect call not implemented")
       | CtxRec (fname, _) ->
@@ -194,14 +194,14 @@ let genc_app context f argsary =
           str fname_argn ++ str "(" ++
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
-  | Term.Const ctntu ->
+  | Constr.Const ctntu ->
       let fname = Label.to_string (KerName.label (Constant.canonical (Univ.out_punivs ctntu))) in
       let fname_argn = funcname_argnum fname (Array.length argsary) in
       let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
       str fname_argn ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
-  | Term.Construct cstru ->
+  | Constr.Construct cstru ->
       let ((mutind, i), j) = Univ.out_punivs cstru in
       let env = Global.env () in
       let mind_body = Environ.lookup_mind mutind env in
@@ -269,7 +269,7 @@ let genc_const context ctntu =
 
 let split_case_tyf tyf =
   match Constr.kind tyf with
-  | Term.Lambda (name, ty, body) -> (ty, body)
+  | Constr.Lambda (name, ty, body) -> (ty, body)
   | _ -> user_err (str "unexpected case type function")
 
 let rec strip_outer_lambdas ndecls term =
@@ -277,7 +277,7 @@ let rec strip_outer_lambdas ndecls term =
     ([], term)
   else
     match Constr.kind term with
-    | Term.Lambda (name, ty, body) ->
+    | Constr.Lambda (name, ty, body) ->
         let (decls, innermostbody) = strip_outer_lambdas (ndecls-1) body in
         ((name, ty) :: decls, innermostbody)
     | _ -> user_err (str "case body lambda nesting is not enough")
@@ -350,44 +350,44 @@ let genc_geninitvar ty namehint init =
 (* not tail position. return a variable *)
 let rec genc_body_var env sigmaref context namehint term termty =
   match Constr.kind term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       (mt (), varname_of_rel context i)
-  | Term.LetIn (name, expr, exprty, body) ->
+  | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
       let env2 = Environ.push_rel decl env in
       let (exprbody, exprvarname) = genc_body_var env sigmaref context name expr exprty in
       let (bodybody, bodyvarname) = genc_body_var env2 sigmaref (CtxVar exprvarname :: context) namehint body termty in
       (exprbody ++ (if ismt exprbody then mt () else spc ()) ++ bodybody, bodyvarname)
-  | Term.App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       genc_geninitvar termty namehint (genc_app context f argsary)
-  | Term.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       let varname = gensym_with_name namehint in
       (genc_vardecl termty varname ++ spc () ++
        genc_case_break env sigmaref context ci tyf expr brs
         (fun envb sigmaref context2 body -> genc_body_assign envb sigmaref context2 varname body),
       varname)
-  | Term.Const ctntu ->
+  | Constr.Const ctntu ->
       genc_geninitvar termty namehint (genc_const context ctntu)
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
 
 (* not tail position. assign to the specified variable *)
 and genc_body_assign env sigmaref context retvar term =
   match Constr.kind term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       genc_assign (str retvar) (str (varname_of_rel context i))
-  | Term.LetIn (name, expr, exprty, body) ->
+  | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
       (if ismt exprbody then mt () else spc ()) ++
       genc_body_assign env2 sigmaref (CtxVar varname :: context) retvar body
-  | Term.App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       genc_assign (str retvar) (genc_app context f argsary)
-  | Term.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_break env sigmaref context ci tyf expr brs
         (fun envb sigmaref context2 body -> genc_body_assign envb sigmaref context2 retvar body)
-  | Term.Const ctntu ->
+  | Constr.Const ctntu ->
       genc_assign (str retvar) (genc_const context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
@@ -395,25 +395,25 @@ and genc_body_assign env sigmaref context retvar term =
 (* tail position.  usual return. *)
 let rec genc_body_tail env sigmaref context term =
   match Constr.kind term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       genc_return (str (varname_of_rel context i))
-  | Term.LetIn (name, expr, exprty, body) ->
+  | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
       (if ismt exprbody then mt () else spc ()) ++
       genc_body_tail env2 sigmaref (CtxVar varname :: context) body
-  | Term.App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       (match Constr.kind f with
-      | Term.Rel i ->
+      | Constr.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
           | _ -> genc_return (genc_app context f argsary))
       | _ -> genc_return (genc_app context f argsary))
-  | Term.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_nobreak env sigmaref context ci tyf expr brs genc_body_tail
-  | Term.Const ctntu ->
+  | Constr.Const ctntu ->
       genc_return (genc_const context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
@@ -421,26 +421,26 @@ let rec genc_body_tail env sigmaref context term =
 (* tail position.  assign and return. *)
 let rec genc_body_void_tail env sigmaref retvar context term =
   match Constr.kind term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       genc_void_return retvar (str (varname_of_rel context i))
-  | Term.LetIn (name, expr, exprty, body) ->
+  | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
       (if ismt exprbody then mt () else spc ()) ++
       genc_body_void_tail env2 sigmaref retvar (CtxVar varname :: context) body
-  | Term.App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       (match Constr.kind f with
-      | Term.Rel i ->
+      | Constr.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
           | _ -> genc_void_return retvar (genc_app context f argsary))
       | _ -> genc_void_return retvar (genc_app context f argsary))
-  | Term.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_nobreak env sigmaref context ci tyf expr brs
         (fun envb sigmaref -> genc_body_void_tail envb sigmaref retvar)
-  | Term.Const ctntu ->
+  | Constr.Const ctntu ->
       genc_void_return retvar (genc_const context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
@@ -492,23 +492,23 @@ let found_callsite tail context i n =
 
 let rec scan_callsites_rec env sigmaref tail context term =
   match Constr.kind term with
-  | Term.Const ctntu -> ()
-  | Term.Construct cstru -> ()
-  | Term.Rel i ->
+  | Constr.Const ctntu -> ()
+  | Constr.Construct cstru -> ()
+  | Constr.Rel i ->
       found_funref context i
-  | Term.Cast (expr, kind, ty) ->
+  | Constr.Cast (expr, kind, ty) ->
       scan_callsites_rec env sigmaref false context expr
-  | Term.LetIn (name, expr, ty, body) ->
+  | Constr.LetIn (name, expr, ty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
       let env2 = Environ.push_rel decl env in
       (scan_callsites_rec env sigmaref false context expr;
       scan_callsites_rec env2 sigmaref tail (None :: context) body)
-  | Term.App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       ((match Constr.kind f with
-      | Term.Rel i -> found_callsite tail context i (Array.length argsary)
+      | Constr.Rel i -> found_callsite tail context i (Array.length argsary)
       | _ -> scan_callsites_rec env sigmaref false context f);
       Array.iter (scan_callsites_rec env sigmaref false context) argsary)
-  | Term.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       (scan_callsites_rec env sigmaref false context expr;
       array_iter2
         (fun nargs br ->
@@ -521,7 +521,7 @@ let rec scan_callsites_rec env sigmaref tail context term =
             env in
           scan_callsites_rec env2 sigmaref tail context2 br2)
         ci.Constr.ci_cstr_nargs brs)
-  | Term.Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       scan_callsites_rec env sigmaref false context expr
   | _ -> user_err ~hdr:"scan_callsites_rec" (hv 0 (str "unexpected term:" ++ spc () ++ Printer.pr_constr_env env !sigmaref term))
 
@@ -704,7 +704,7 @@ let genc_func_mutual sigmaref mfnm i ntfcb_ary callsites_ary =
 
 let genc_func env sigmaref fname ty term =
   match Constr.kind term with
-  | Term.Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let env2 = Environ.push_rec_types (nameary, tyary, funary) env in
       let ntfcb_ary = fargs_and_body_ary env2 fname ty ia i nameary tyary funary in
       let callsites_ary = scan_callsites sigmaref i ntfcb_ary in
@@ -715,7 +715,7 @@ let genc_func env sigmaref fname ty term =
       let context = List.rev_map (fun (var, ty) -> CtxVar var) fargs in
       genc_func_single envb sigmaref fname ty fargs context body
 
-let get_name_type_body env (name : Libnames.reference) =
+let get_name_type_body env (name : Libnames.qualid) =
   let reference = Smartlocate.global_with_alias name in
   match reference with
   | ConstRef ctnt ->

@@ -376,9 +376,11 @@ let linear_type_check_test t1 t2 =
   Feedback.msg_debug (str "linear_type_check_test t2:" ++ spc() ++ Printer.pr_econstr_env env !evdref t2a);
   Feedback.msg_debug (str "linear_type_check_test is_conv:" ++ spc() ++ bool (Reductionops.is_conv env !evdref t1a t2a));
   Feedback.msg_debug (str "linear_type_check_test is_conv_leq:" ++ spc() ++ bool (Reductionops.is_conv_leq env !evdref t1a t2a));
-  let (sigma1, ib1) = Reductionops.infer_conv env !evdref t1a t2a in
-  Feedback.msg_debug (str "linear_type_check_test infer_conv:" ++ spc() ++ bool ib1);
-  let (sigma2, ib2) = Reductionops.infer_conv ~pb:Reduction.CONV env !evdref t1a t2a in
-  Feedback.msg_debug (str "linear_type_check_test infer_conv(CONV):" ++ spc() ++ bool ib2)
+  (match Reductionops.infer_conv env !evdref t1a t2a with
+  | Some _ -> Feedback.msg_debug (str "linear_type_check_test infer_conv succeed")
+  | None -> Feedback.msg_debug (str "linear_type_check_test infer_conv failed"));
+  (match Reductionops.infer_conv ~pb:Reduction.CONV env !evdref t1a t2a with
+  | Some _ -> Feedback.msg_debug (str "linear_type_check_test infer_conv(CONV) succeed")
+  | None -> Feedback.msg_debug (str "linear_type_check_test infer_conv(CONV) failed"))
 
 

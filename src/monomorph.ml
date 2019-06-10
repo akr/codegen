@@ -28,7 +28,7 @@ open EConstr
 
 let rec copy_term sigma term =
   match EConstr.kind sigma term with
-  | Term.Rel i -> mkRel i
+  | Constr.Rel i -> mkRel i
   | Var name -> mkVar name
   | Meta i -> mkMeta i
   | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (copy_term sigma) termary))
@@ -51,7 +51,7 @@ let rec copy_term sigma term =
 
 let rec subst_term sigma context term =
   match EConstr.kind sigma term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
       (if List.length context <= i-1 then
         mkRel i
       else
@@ -105,12 +105,12 @@ let rec subst_term sigma context term =
 
 let is_sort sigma term =
   match EConstr.kind sigma term with
-  | Term.Sort s -> true
+  | Constr.Sort s -> true
   | _ -> false
 
 let rec has_sort sigma term =
   match EConstr.kind sigma term with
-  | Term.Rel i -> false
+  | Constr.Rel i -> false
   | Var name -> false
   | Meta i -> false
   | Evar (ekey, termary) -> false
@@ -134,7 +134,7 @@ let rec has_sort sigma term =
 let deanonymize_term env sigma term =
   let rec r env term =
     match kind sigma term with
-    | Term.Rel i -> term
+    | Constr.Rel i -> term
     | Var name -> term
     | Meta i -> term
     | Evar (ekey, termary) -> mkEvar (ekey, Array.map (r env) termary)
@@ -183,7 +183,7 @@ let expand_type env sigmaref term =
         r2 env term
   and r2 env term =
     match EConstr.kind !sigmaref term with
-    | Term.Rel i -> term
+    | Constr.Rel i -> term
     | Var name -> term
     | Meta i -> term
     | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (r env) termary))
@@ -227,7 +227,7 @@ let constant_type env evdref cu =
 
 let rec count_type_args sigma fty =
   match EConstr.kind sigma fty with
-  | Term.Prod (name, ty, body) ->
+  | Constr.Prod (name, ty, body) ->
     if is_sort sigma ty then
       1 + count_type_args sigma body
     else
@@ -269,7 +269,7 @@ let beta_lambda_list sigma expr args =
     List.fold_left
       (fun e _ ->
         match EConstr.kind sigma e with
-        | Term.Lambda (name, ty, body) -> body
+        | Constr.Lambda (name, ty, body) -> body
         | _ -> raise (Invalid_argument "beta_lambda_list"))
       expr args
   in
@@ -284,7 +284,7 @@ let beta_prod_list sigma expr args =
     List.fold_left
       (fun e _ ->
         match EConstr.kind sigma e with
-        | Term.Prod (name, ty, body) -> body
+        | Constr.Prod (name, ty, body) -> body
         | _ -> raise (Invalid_argument "beta_prod_list"))
       expr args
   in
@@ -296,7 +296,7 @@ let beta_prod_ary sigma ty args =
 let rec mono_local_rec sigma context term =
 (*Feedback.msg_info (str "mono_local_rec:start");*)
   match EConstr.kind sigma term with
-  | Term.Rel i ->
+  | Constr.Rel i ->
 (*Feedback.msg_info (str "mono_local_rec:rel:i=" ++ int i);*)
       (match List.nth context (i-1) with
       | None ->
@@ -406,12 +406,12 @@ let mono_local sigma term = mono_local_rec sigma [] term [0]
 
 let simple_fun_p sigma term =
   match EConstr.kind sigma term with
-  | Term.Rel _ | Const _ | Construct _ -> true
+  | Constr.Rel _ | Const _ | Construct _ -> true
   | _ -> false
 
 let simple_arg_p sigma term =
   match EConstr.kind sigma term with
-  | Term.Rel _ -> true
+  | Constr.Rel _ -> true
   | _ -> false
 
 let rec hoist_terms env evdref simple_p terms bodyfun =
@@ -442,7 +442,7 @@ and hoist_term1 env evdref simple_p term bodyfun =
 
 and stmt_rec env evdref term =
   match EConstr.kind !evdref term with
-  | Term.Rel i -> term
+  | Constr.Rel i -> term
   | Var name -> term
   | Meta i -> term
   | Evar (ekey, termary) -> term
@@ -497,7 +497,7 @@ let stmt term =
 
 let rec seq_let sigma term =
   match EConstr.kind sigma term with
-  | Term.Rel i -> term
+  | Constr.Rel i -> term
   | Var name -> term
   | Meta i -> term
   | Evar (ekey, termary) -> term
@@ -659,7 +659,7 @@ and mono_global_cstr_app env sigma fcstru argsary =
 and mono_global env evdref term =
 Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref term));
   match EConstr.kind !evdref term with
-  | Term.Rel i -> mkRel i
+  | Constr.Rel i -> mkRel i
   | Var name -> mkVar name
   | Meta i -> mkMeta i
   | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env evdref) termary))
@@ -716,7 +716,7 @@ let terminate_mono_global_def env evdref gref type_args =
 
 let terminate_mono env evdref term =
   match EConstr.kind !evdref term with
-  | Term.Const (ctnt, u) -> mono_check_const env evdref (ctnt, EInstance.kind !evdref u); terminate_mono_global_def env evdref (ConstRef ctnt) [| |]
+  | Constr.Const (ctnt, u) -> mono_check_const env evdref (ctnt, EInstance.kind !evdref u); terminate_mono_global_def env evdref (ConstRef ctnt) [| |]
   | App (f, args) ->
       (match kind !evdref f with
       | Const (fctnt, u) ->
