@@ -35,9 +35,9 @@ open Ltac_plugin
 open Extraargs
 
 VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
-    | [ "Monomorphization" ne_global_list(libref_list) ] ->
+    | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
       [ monomorphization libref_list ]
-    | [ "Terminate" "Monomorphization" lconstr(term) ] ->
+    | [ "CodeGen" "Terminate" "Monomorphization" lconstr(term) ] ->
       [ terminate_monomorphization term ]
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
       [ register_linear_type ty ]
@@ -45,7 +45,7 @@ VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
       [ linear_type_check_list libref_list ]
     | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
       [ linear_type_check_test t1 t2 ]
-    | [ "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
-    | [ "GenCFile" string(fn) ne_global_list(libref_list) ] ->
+    | [ "CodeGen" "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
+    | [ "CodeGen" "GenCFile" string(fn) ne_global_list(libref_list) ] ->
       [ genc_file fn libref_list ]
 END;;

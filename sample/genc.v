@@ -3,19 +3,19 @@ Require Import codegen.codegen.
 
 Inductive TestType2 (A B : Type) := TestCons2 : A -> B -> TestType2 A B.
 Definition non_mangled_code := TestCons2 bool nat.
-Monomorphization non_mangled_code.
+CodeGen Monomorphization non_mangled_code.
 Print _non_mangled_code.
 
 Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
 Definition swap_bb p := @swap bool bool p.
-Monomorphization swap_bb.
+CodeGen Monomorphization swap_bb.
 Print _swap_bb.
 Print _swap_bool_bool.
 Print _pair_bool_bool.
 Goal swap = _swap_bool_bool. Proof. reflexivity. Qed.
 Goal swap_bb = _swap_bb. Proof. reflexivity. Qed.
 
-GenC _swap_bool_bool _swap_bb.
+CodeGen GenC _swap_bool_bool _swap_bb.
 
 (*
 #include <stdbool.h>
@@ -45,9 +45,9 @@ n1_swap_bb(prod_bool_bool v3_p)
 
 *)
 
-Monomorphization negb.
+CodeGen Monomorphization negb.
 Print _negb.
-GenC _negb.
+CodeGen GenC _negb.
 
 (*
 bool
@@ -79,48 +79,48 @@ n1_negb(bool v4_b)
 *)
 
 Definition plus_1_2 := 1 + 2.
-Monomorphization plus_1_2.
+CodeGen Monomorphization plus_1_2.
 Print _plus_1_2.
-GenC _plus_1_2.
+CodeGen GenC _plus_1_2.
 
 Definition foo1 := fun (x : nat) => x.
-Monomorphization foo1.
-GenC _foo1.
+CodeGen Monomorphization foo1.
+CodeGen GenC _foo1.
 
 Definition foo2 := fun (x : nat) => let y := x in y.
-Monomorphization foo2.
-GenC _foo2.
+CodeGen Monomorphization foo2.
+CodeGen GenC _foo2.
 
 Definition foo3 := fun (x : nat) => let y := x in y.
-Monomorphization foo3.
-GenC _foo3.
+CodeGen Monomorphization foo3.
+CodeGen GenC _foo3.
 
 Definition foo4 := fun (x y : nat) => x + y.
-Monomorphization foo4.
-GenC _foo4.
+CodeGen Monomorphization foo4.
+CodeGen GenC _foo4.
 
 Definition foo5 := fun (x y z : nat) => x + y + z.
-Monomorphization foo5.
-GenC _foo5.
+CodeGen Monomorphization foo5.
+CodeGen GenC _foo5.
 
 Definition foo6 := fun (x : nat) => match x with O => x | S _ => x end.
-Monomorphization foo6.
-GenC _foo6.
+CodeGen Monomorphization foo6.
+CodeGen GenC _foo6.
 
 Definition zero := 0.
 Definition foo7 := zero.
-Monomorphization foo7.
-GenC _zero.
-GenC _foo7.
+CodeGen Monomorphization foo7.
+CodeGen GenC _zero.
+CodeGen GenC _foo7.
 
 Definition foo8 := fun (x : nat) => x + zero.
-Monomorphization foo8.
+CodeGen Monomorphization foo8.
 Print _foo8.
-GenC _foo8.
+CodeGen GenC _foo8.
 
 Definition foo9 := fun (x : nat) => match x with O => zero | S n => n + x end + x.
-Monomorphization foo9.
-GenC _foo9.
+CodeGen Monomorphization foo9.
+CodeGen GenC _foo9.
 
 (*
 Section Sec1.
@@ -128,9 +128,9 @@ Variable a : nat.
 Fixpoint foo10 b := a + b.
 End Sec1.
 Definition foo10' := foo10.
-Monomorphization foo10'.
+CodeGen Monomorphization foo10'.
 Print _foo10.
-GenC _foo10.
+CodeGen GenC _foo10.
 *)
 
 (* usual addition.  not tail recursion *)
@@ -139,9 +139,9 @@ Fixpoint add1 a b :=
   | 0 => b
   | S n => S (add1 n b)
   end.
-Monomorphization add1.
+CodeGen Monomorphization add1.
 Print _add1.
-GenC _add1.
+CodeGen GenC _add1.
 
 (* tail recursion which is translated into goto *)
 Fixpoint add2 a b :=
@@ -149,9 +149,9 @@ Fixpoint add2 a b :=
   | 0 => b
   | S n => add2 n (S b)
   end.
-Monomorphization add2.
+CodeGen Monomorphization add2.
 Print _add2.
-GenC _add2.
+CodeGen GenC _add2.
 
 (* argument outside of fix is supported *)
 (*
@@ -163,9 +163,9 @@ Fixpoint add3 b :=
   | S n => S (add3 n)
   end.
 End Sec2.
-Monomorphization add3.
+CodeGen Monomorphization add3.
 Print _add3.
-GenC _add3.
+CodeGen GenC _add3.
 *)
 
 (* needs tmp. variable to swap x and y at tail recursion *)
@@ -174,9 +174,9 @@ Fixpoint swapargtest (n x y : nat) :=
   | 0 => x
   | S nn => swapargtest nn y x
   end.
-Monomorphization swapargtest.
+CodeGen Monomorphization swapargtest.
 Print _swapargtest.
-GenC _swapargtest.
+CodeGen GenC _swapargtest.
 
 (* mutual recursion.  only tail calls *)
 Fixpoint evenp n :=
@@ -198,14 +198,14 @@ Compute oddp 1.
 Compute oddp 2.
 
 (* beginning goto not required because the entry function is beginning *)
-Monomorphization evenp.
+CodeGen Monomorphization evenp.
 Print _evenp.
-GenC _evenp.
+CodeGen GenC _evenp.
 
 (* generate beginning goto because the entry function is not beginning *)
-Monomorphization oddp.
+CodeGen Monomorphization oddp.
 Print _oddp.
-GenC _oddp.
+CodeGen GenC _oddp.
 
 (* strange_pow2 n m = 2 ^ n + m *)
 (* This recursive function contains tail call and non-tail call *)
@@ -228,9 +228,9 @@ Compute strange_pow2 2 0.
 Compute strange_pow2 3 0.
 Compute strange_pow2 4 0.
 
-Monomorphization strange_pow2.
+CodeGen Monomorphization strange_pow2.
 Print _strange_pow2.
-GenC _strange_pow2.
+CodeGen GenC _strange_pow2.
 
 (* Two non-tail call.  No tail call. *)
 Fixpoint fib n :=
@@ -249,9 +249,9 @@ Compute fib 5.
 Compute fib 6.
 Compute fib 7.
 
-Monomorphization fib.
+CodeGen Monomorphization fib.
 Print _fib.
-GenC _fib.
+CodeGen GenC _fib.
 
 (* mutually recursive.  tail call and non-tail call *)
 Fixpoint fib2 n :=
@@ -274,9 +274,9 @@ Compute fib2 5.
 Compute fib2 6.
 Compute fib2 7.
 
-Monomorphization fib2.
+CodeGen Monomorphization fib2.
 Print _fib2.
-GenC _fib2.
+CodeGen GenC _fib2.
 
 (* artificial example.
   mftest and mftest3 has non-tail call.  mftest2 has only tail call. *)
@@ -296,17 +296,17 @@ with mftest3 n :=
   | S nn => mftest nn
   end.
 
-Monomorphization mftest.
+CodeGen Monomorphization mftest.
 Print _mftest.
-GenC _mftest.
+CodeGen GenC _mftest.
 
 Fixpoint pow a k :=
   match k with
   | O => 1
   | S k' => a * pow a k'
   end.
-Monomorphization pow.
-GenC _pow.
+CodeGen Monomorphization pow.
+CodeGen GenC _pow.
 (*
 nat
 n2_pow(nat v88_a, nat v87_k)
@@ -325,9 +325,9 @@ n2_pow(nat v88_a, nat v87_k)
 
 Definition TypeAlias := unit.
 Definition f (x : TypeAlias) := x.
-Monomorphization f.
+CodeGen Monomorphization f.
 
 Definition foo11 n := let ret := if n is 0 then 0 else 0 - n in ret.
-Monomorphization foo11.
-GenC _foo11.
+CodeGen Monomorphization foo11.
+CodeGen GenC _foo11.
 
