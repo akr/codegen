@@ -1,5 +1,9 @@
-(* intrinsically typed reflection of a Gallina subset supporting non-structural recursion *)
+(* GADT-style typed AST for GA which  defines a Gallina subset supporting non-structural recursion *)
+(* This file is proof of concept of reflection mechanism of future codegen. *)
 
+(*
+From mathcomp Require Import ssreflect ssrnat seq eqtype.
+*)
 From mathcomp Require Import all_ssreflect.
 Require Import ssrstr.
 Require Import String.
@@ -183,10 +187,16 @@ Definition gtyC (nT : nenvtype) (Tr : Set) : gty := (nT, Tr).
 Definition nt4gty (G : gty) : nenvtype := G.1.
 Definition Tr4gty (G : gty) : Set := G.2.
 
+(*
 Definition gtype (G : gty) : Set :=
   let nT := nt4gty G in
   let Tr := Tr4gty G in
   forall (nenv : nenviron nT), Tr.
+Print gtype.
+Compute gtype.
+Eval cbv zeta beta delta [gtype nt4gty Tr4gty] in gtype.
+*)
+Definition gtype (G : gty) : Set := nenviron G.1 -> G.2.
 
 Definition default_G : gty := gtyC [::] unit.
 Definition default_g : gtype default_G := fun _ => tt.
@@ -268,6 +278,7 @@ Definition GENV1 : genviron GT1 := genv_cat GT1' GT0 [genv:
   (gent "S" [:: nat] _ S);
   (gent "negb" [:: bool] _ negb);
   (gent "ltn" [:: nat; nat] _ ltn)
+(*  (gent "ltn" [:: nat; nat] _ (fun x : nat => ssrfun.fun_of_simpl (ltn x))) *)
 ] GENV0.
 
 (* closed-term Prop representation *)
@@ -390,13 +401,13 @@ Fixpoint uncurry_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT) (Tr : 
 
 (* curried normal and proof arguments function type *)
 Definition forall_nt_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
-    (Tr : Set) : Set :=
-  forall (genv : genviron gT), forall_ntS nT ((arrow_pt gT nT pT Tr) genv).
+    (Tr : Set) (genv : genviron gT) : Set :=
+  forall_ntS nT ((arrow_pt gT nT pT Tr) genv).
 
 Definition uncurry_nt_pt (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
-    (Tr : Set) (cf : forall_nt_pt gT nT pT Tr)
-    (genv : genviron gT) (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv) : Tr :=
-  let cf' := uncurry_ntS nT (fun nenv => arrow_pt gT nT pT Tr genv nenv) (cf genv) nenv in
+    (Tr : Set) (genv : genviron gT) (cf : forall_nt_pt gT nT pT Tr genv)
+    (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv) : Tr :=
+  let cf' := uncurry_ntS nT (fun nenv => arrow_pt gT nT pT Tr genv nenv) cf nenv in
   uncurry_pt gT nT pT Tr genv nenv cf' penv.
 
 (* lenv, lemma environment *)
@@ -493,37 +504,50 @@ Definition lt_shift0 (name_G : string * gty) (gT : genvtype)
 (* renv, recursive function environment *)
 
 Definition rty gT : Type :=
-  {nT:nenvtype & option (pty gT nT)} * Set.
+  {nT:nenvtype & penvtype gT nT} * Set.
 
 Definition rtyC (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set) : rty gT :=
-  (existT (fun nT => option (pty gT nT)) nT Popt, Tr).
+    (pT : penvtype gT nT) (Tr : Set) : rty gT :=
+  (existT (fun nT => penvtype gT nT) nT pT, Tr).
 
 Definition nt4rty (gT : genvtype) (R : rty gT) : nenvtype := projT1 R.1.
-Definition Popt4rty (gT : genvtype) (R : rty gT) : option (pty gT (nt4rty gT R)) := projT2 R.1.
+Definition pt4rty (gT : genvtype) (R : rty gT) : penvtype gT (nt4rty gT R) := projT2 R.1.
 Definition Tr4rty (gT : genvtype) (R : rty gT) : Set := R.2.
-
-Definition Popttype (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT))
-    (genv : genviron gT) (nenv : nenviron nT) : Prop :=
-  match Popt with
-  | None => True
-  | Some P => ptype gT nT P genv nenv
-  end.
 
 Definition rtype (gT : genvtype) (R : rty gT) (genv : genviron gT) : Set :=
   let nT := nt4rty gT R in
-  let Popt := Popt4rty gT R in
+  let pT := pt4rty gT R in
   let Tr := Tr4rty gT R in
   forall (nenv : nenviron nT)
-         (penv : Popttype gT nT Popt genv nenv),
+         (penv : penviron gT nT pT genv nenv),
          Tr.
 
+Definition rtypeE (gT : genvtype) (R : rty gT) (genv : genviron gT) : Type :=
+  let nT := nt4rty gT R in
+  let pT := pt4rty gT R in
+  let Tr := Tr4rty gT R in
+  forall (nenv : nenviron nT)
+         (result : Tr), Prop.
+
 Definition default_R (gT : genvtype) : rty gT :=
-  rtyC gT [::] None unit.
+  rtyC gT [::] [::] unit.
 Definition default_r (gT : genvtype) (genv : genviron gT) :
     rtype gT (default_R gT) genv :=
   fun _ _ => tt.
+Definition default_rE (gT : genvtype) (genv : genviron gT) : rtypeE gT (default_R gT) genv :=
+  fun (nenv : nenviron [::])
+      (result: unit) => result = tt.
+
+Goal forall gT (nT := [::]) (pT := [::]) (Tr := unit)
+  (genv : genviron gT) (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv)
+  (result : Tr),
+  default_r gT genv nenv penv = result <->
+  default_rE gT genv nenv result.
+  simpl.
+  move=> gT genv nenv penv result.
+  rewrite /default_r /default_rE.
+  by [].
+Qed.
 
 Definition renvtype (gT : genvtype) : Type := seq (string * rty gT).
 
@@ -560,65 +584,71 @@ Notation "[ 'renv:' ]" := (renv_nil _ _).
 Notation "[ 'renv:' x1 ; .. ; xn ]" :=
   (renv_cons _ _ x1.1 _ x1.2 _ (.. (renv_cons _ _ xn.1 _ xn.2 _ (renv_nil _ _)) ..)).
 
-Definition arrow_Popt (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set)
-    (genv : genviron gT) (nenv : nenviron nT) : Set :=
-  match Popt with
-  | None => Tr
-  | Some P => ptype gT nT P genv nenv -> Tr
-  end.
-
-Definition uncurry_Popt (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set)
-    (genv : genviron gT) (nenv : nenviron nT)
-    (cf : arrow_Popt gT nT Popt Tr genv nenv)
-    (prf : Popttype gT nT Popt genv nenv) : Tr :=
-  match Popt as Popt
-      return Popttype gT nT Popt genv nenv -> arrow_Popt gT nT Popt Tr genv nenv -> Tr
-  with
-  | None => fun prf cf => cf
-  | Some P => fun prf cf => cf prf
-  end prf cf.
-
-Definition forall_nt_Popt (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set)
-    (genv : genviron gT) : Set :=
-  forall_ntS nT (arrow_Popt gT nT Popt Tr genv).
-
-Definition uncurry_nt_Popt (gT : genvtype) (nT : nenvtype)
-    (Popt : option (pty gT nT)) (Tr : Set)
+Definition uncurryR (gT : genvtype) (nT : nenvtype) (pT : penvtype gT nT)
+    (Tr : Set)
     (genv : genviron gT)
-    (cf : forall_nt_Popt gT nT Popt Tr genv)
-    (nenv : nenviron nT) (prf : Popttype gT nT Popt genv nenv) : Tr :=
-    let cf' := uncurry_ntS nT (fun nenv => arrow_Popt gT nT Popt Tr genv nenv) cf nenv in
-    uncurry_Popt gT nT Popt Tr genv nenv cf' prf.
-
-Definition oapp {A B : Type} (f : A -> B) (v : option A) : option B :=
-  match v with
-  | None => None
-  | Some v => Some (f v)
-  end.
-
-Definition uncurryR (gT : genvtype) (nT : nenvtype)
-    (cPopt : option (genviron gT -> arrow_ntT nT Prop))
-    (Tr : Set) (Popt := oapp (uncurry_pty gT nT) cPopt)
-    (genv : genviron gT)
-    (cf : forall_nt_Popt gT nT Popt Tr genv) :
-    rtype gT (rtyC gT nT Popt Tr) genv :=
-  uncurry_nt_Popt gT nT Popt Tr genv cf.
+    (cf : forall_nt_pt gT nT pT Tr genv) :
+    rtype gT (rtyC gT nT pT Tr) genv :=
+  uncurry_nt_pt gT nT pT Tr genv cf.
 
 Definition rtent (gT : genvtype) (name : string) (nT : nenvtype)
-    (cPopt : option (genviron gT -> arrow_ntT nT Prop))
+    (pT : penvtype gT nT)
     (Tr : Set) : (string * rty gT) :=
-  (name, rtyC gT nT (oapp (uncurry_pty gT nT) cPopt) Tr).
+  (name, rtyC gT nT pT Tr).
 
 Definition rent (gT : genvtype) (name : string) (nT : nenvtype)
-    (cPopt : option (genviron gT -> arrow_ntT nT Prop))
-    (Tr : Set) (Popt := oapp (uncurry_pty gT nT) cPopt)
+    (pT : penvtype gT nT) (Tr : Set)
     (genv : genviron gT)
-    (cf : forall_nt_Popt gT nT Popt Tr genv) :
-    (string * rtype gT (rtyC gT nT Popt Tr) genv) :=
-  (name, (uncurryR gT nT cPopt Tr genv cf)).
+    (cf : forall_nt_pt gT nT pT Tr genv) :
+    (string * rtype gT (rtyC gT nT pT Tr) genv) :=
+  (name, (uncurryR gT nT pT Tr genv cf)).
+
+Definition rty_shift0 (name_G : string * gty) (gT : genvtype)
+    (gT' := name_G::gT)
+    (R : rty gT) : rty gT'.
+Proof.
+  refine (_, Tr4rty gT R).
+  exists (nt4rty gT R).
+  refine (map _ (pt4rty gT R)).
+  move=> prf genv'.
+  by exact (prf genv'.2).
+Defined.
+
+Definition rt_shift0 (name_G : string * gty) (gT : genvtype)
+    (rT : renvtype gT) : renvtype (name_G::gT) :=
+  map (fun name_H => (name_H.1, rty_shift0 name_G gT name_H.2)) rT.
+
+Fixpoint renvironE (gT : genvtype) (rT : renvtype gT) (genv : genviron gT) : Type :=
+  match rT with
+  | [::] => unit
+  | name_R :: rT' => prod (rtypeE gT name_R.2 genv) (renvironE gT rT' genv)
+  end.
+
+Fixpoint rlookupE (gT : genvtype) (rT : renvtype gT)
+    (genv : genviron gT) (renvE : renvironE gT rT genv)
+    (name : string) : rtypeE gT (rtlookup gT rT name) genv :=
+  match rT as rT return renvironE gT rT genv -> rtypeE gT (rtlookup gT rT name) genv with
+  | [::] => fun renv => default_rE gT genv
+  | (n, R) :: rT' => fun renvE =>
+      let r := renvE.1 in
+      let renvE' := renvE.2 in
+      if n == name as b return rtypeE gT (if b then R else rtlookup gT rT' name) genv
+      then r else rlookupE gT rT' genv renvE' name
+  end renvE.
+
+Definition proofelim_renv_ok (gT : genvtype) (rT : renvtype gT)
+  (genv : genviron gT) (renv : renviron gT rT genv) (renvE : renvironE gT rT genv)
+  := forall (name : string) (R := rtlookup gT rT name)
+  (nT := nt4rty gT R) (pT := pt4rty gT R) (Tr := Tr4rty gT R)
+  (f := rlookup gT rT genv renv name)
+  (fE := rlookupE gT rT genv renvE name)
+  (nenv : nenviron nT) (penv : penviron gT nT pT genv nenv)
+  (result : Tr),
+  f nenv penv = result <-> fE nenv result.
+
+Goal proofelim_renv_ok [::] [::] tt tt tt.
+by [].
+Qed.
 
 (* utilitiy functions for exp and eval *)
 
@@ -792,7 +822,7 @@ Record Matcher (Tv : Set) (Cts : seq (cstrT Tv)) : Type := mkMatcher {
       | letd v := v with | C v* p => exp | ... end
 
   app = f v*
-  rapp = r v* [p]
+  rapp = r v* p*
   papp = h v* p*
 
 Semantics:
@@ -806,7 +836,7 @@ Semantics:
 
   leta binds a new variable v0 in nenv to the value of (f v1...) and
   a new variable in penv to the proof of (v0 = f v1...).
-  letr binds a new variable v0 in nenv to the value of (r v1... [p]).
+  letr binds a new variable v0 in nenv to the value of (r v1... p1...).
   letp binds a new variable p0 in penv to the value of (h v1... p1...).
 
 *)
@@ -872,13 +902,68 @@ Proof.
   by apply penv'.
 Defined.
 
-Inductive rapp_exp (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set) : Type :=
-| rapp_expC : forall (name : string) (nargs : seq nat) (pargopt : option nat)
-    (nT' := map (ntnth nT) nargs) (Popt : option (pty gT nT'))
-    (H1 : rtyC gT nT' Popt Tr = rtlookup gT rT name)
-    (H2 : match Popt with None => None | Some P => Some (transplant_pty gT nT nargs P) end =
-          match pargopt with None => None | Some parg => Some (ptnth gT nT pT parg) end),
-    rapp_exp nT pT Tr.
+Section RAPP.
+
+Variables (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set).
+
+Inductive rapp_exp : Type :=
+| rapp_expC : forall (name : string) (nargs : seq nat) (pargs : seq nat)
+    (nT' := map (ntnth nT) nargs) (pT' : penvtype gT nT')
+    (H1 : rtyC gT nT' pT' Tr = rtlookup gT rT name)
+    (H2 : transplant_pt gT nT nargs pT' = map (ptnth gT nT pT) pargs),
+    rapp_exp.
+
+(* doesn't use pT *)
+Inductive rappE_exp : Type :=
+| rapp_expCE : forall (name : string) (nargs : seq nat)
+    (nT' := map (ntnth nT) nargs)
+    (H1 : {pT' | rtyC gT nT' pT' Tr = rtlookup gT rT name}),
+    rappE_exp.
+
+Definition proofelim_rapp
+   (re : rapp_exp) : rappE_exp :=
+  match re with
+  | rapp_expC name nargs pargs pT' H1 H2 =>
+    rapp_expCE name nargs (exist _ _ H1)
+  end.
+
+End RAPP.
+
+Print rapp_exp.
+
+Lemma eval_rapp_penv'
+(nT : nenvtype)
+(pT : penvtype gT nT)
+(genv : genviron gT)
+(nenv : nenviron nT)
+(penv : penviron gT nT pT genv nenv)
+(nargs pargs : seq nat)
+(nT' := [seq ntnth nT i | i <- nargs])
+(pT' : penvtype gT nT')
+(H2 : transplant_pt gT nT nargs pT' = [seq ptnth gT nT pT i | i <- pargs])
+(nenv' := transplant_nenv nT nargs nenv : nenviron nT') :
+penviron gT nT' pT' genv (transplant_nenv nT nargs nenv : nenviron nT').
+Proof.
+  elim: pargs pT' H2.
+    by case.
+  move=> parg pargs IH pT' H2.
+  simpl in H2.
+  rewrite /transplant_pt in H2.
+  case: pT' IH H2 => [|P' pT' IH H2]; first by [].
+  simpl in H2.
+  case: H2 => H3 H2.
+  simpl.
+  split.
+    clear H2.
+    rewrite /transplant_pty in H3.
+    rewrite /ptype /=.
+    rewrite /nenv'.
+    apply (@f_equal _ _ (fun f => f genv nenv)) in H3.
+    rewrite H3.
+    by apply (plookup gT nT pT genv nenv penv parg).
+  apply IH.
+  by apply H2.
+Defined.
 
 Definition eval_rapp (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set)
     (genv : genviron gT) (renv : renviron gT rT genv)
@@ -887,25 +972,27 @@ Definition eval_rapp (nT : nenvtype) (pT : penvtype gT nT) (Tr : Set)
 Proof.
   refine (
   match re with
-  | rapp_expC name nargs pargopt Popt H1 H2 => _
+  | rapp_expC name nargs pargs pT' H1 H2 => _
   end).
   clear re.
   rename l into nT'.
   set f := rlookup gT rT genv renv name.
-  rewrite<- H1 in f.
+  change (Tr4rty gT (rtyC gT nT' pT' Tr)).
   set nenv' : nenviron nT' := transplant_nenv nT nargs nenv.
-  specialize (f nenv').
-  rewrite /nt4rty /Popt4rty /Tr4rty /Popttype /ptype /= in f.
-  clear H1.
-  apply: f.
-  case: Popt H2; last by [].
-  move=> P.
-  case: pargopt; last by [].
-  move=> parg.
-  case=> H.
-  rewrite (_ : P genv nenv' = ptnth gT nT pT parg genv nenv); last by rewrite -H.
-  by exact (plookup gT nT pT genv nenv penv parg).
+  move: f.
+  change (
+    rtype gT (rtlookup gT rT name) genv ->
+    Tr4rty gT (rtyC gT nT' pT' Tr)
+  ).
+  rewrite -{1}H1.
+  move=> f.
+  apply (f nenv').
+  by exact (eval_rapp_penv' nT pT genv nenv penv
+           nargs pargs pT' H2).
 Defined.
+
+Print eval_rapp.
+Eval cbv beta delta [eval_rapp] in eval_rapp.
 
 Definition leta_eq (nT : nenvtype) (Tv : Set) (name : string) (nargs : seq nat)
     (nT' := map (ntnth nT) nargs)
@@ -960,8 +1047,8 @@ with dmatch_exp (nT : nenvtype) (pT : penvtype gT nT) :
     exp nT' pT' Tr -> dmatch_exp nT pT i Tr (Ct :: Cts) ->
     dmatch_exp nT pT i Tr Cts.
 
-Definition rapp nT pT Tr name nargs pargopt Popt H1 H2 :=
-  rappC nT pT Tr (rapp_expC nT pT Tr name nargs pargopt Popt H1 H2).
+Definition rapp nT pT Tr name nargs pargs pT' H1 H2 :=
+  rappC nT pT Tr (rapp_expC nT pT Tr name nargs pargs pT' H1 H2).
 
 Definition letr nT pT Tv Tr name nargs pargopt Popt H1 H2 body :=
   letrC nT pT Tv Tr (rapp_expC nT pT Tv name nargs pargopt Popt H1 H2) body.
@@ -1292,6 +1379,9 @@ with eval_dmatch (gT : genvtype) (lT : lenvtype gT) (rT : renvtype gT)
 Definition LT1 : lenvtype GT1 := [::].
 Definition LENV1 : lenviron GT1 LT1 GENV1 := [lenv:].
 
+Definition RT1 : renvtype GT1 := [::].
+Definition RENV1 : renviron GT1 RT1 GENV1 := [renv:].
+
 (* Original definition of simple (non-recursive) function *)
 Definition negb_negb b := negb (negb b).
 
@@ -1348,6 +1438,9 @@ Definition GENV2 : genviron GT2 := genv_cat GT2' GT1 [genv: GENT2] GENV1.
 Definition LT2 := lt_shift0 GTENT2 GT1 LT1.
 Definition LENV2 : lenviron GT2 LT2 GENV2 := LENV1.
 
+Definition RT2 := rt_shift0 GTENT2 GT1 RT1.
+Definition RENV2 : renviron GT2 RT2 GENV2 := RENV1.
+
 (* Now, we try to import a (structural) recursive function *)
 
 (* We assume a body of recursive function is defined separately.
@@ -1367,7 +1460,7 @@ Fixpoint downto0 (n : nat) {struct n} : unit :=
 Definition downto0_AST :=
   let gT := GT2 in
   let lT := LT2 in
-  let rT : renvtype gT := [:: ("downto0", rtyC gT [::nat] None unit)] in
+  let rT : renvtype gT := ("downto0", rtyC gT [::nat] [::] unit) :: RT2 in
   let nT := [:: (*n*)nat] in
   let pT := [::] in
   let Tr := unit in
@@ -1377,10 +1470,13 @@ Definition downto0_AST :=
     (nmatch_cons gT lT rT nT pT Tv Tr nat_S [::]
         (let nT := nat :: nT in let pT := [::] in
          rappC gT lT rT nT pT Tr
-           (rapp_expC gT rT nT pT Tr "downto0" [:: (*n*)0] None None erefl erefl))
+           (rapp_expC gT rT nT pT Tr "downto0" [:: (*n*)0] [::] [::] erefl erefl))
       (nmatch_cons gT lT rT nT pT Tv Tr nat_O [:: nat_S]
           (app gT lT rT nT pT Tr "tt" [::] erefl)
         (nmatch_nil gT lT rT nT pT Tv Tr [:: nat_O; nat_S] nat_matcher))).
+
+Compute renviron GT2 (("downto0", rtyC GT2 [::nat] [::] unit) :: RT2) GENV2.
+Check rent GT2 "downto0" [:: nat] [::] unit GENV2 downto0.
 
 (* We can define downto0_body' using the AST *)
 Definition downto0_body' (downto0 : nat -> unit) (n : nat) : unit :=
@@ -1388,9 +1484,9 @@ Definition downto0_body' (downto0 : nat -> unit) (n : nat) : unit :=
   let genv := GENV2 in
   let lT := LT2 in
   let lenv := LENV2 in
-  let rT : renvtype gT := [:: ("downto0", rtyC gT [::nat] None unit)] in
+  let rT : renvtype gT := ("downto0", rtyC gT [::nat] [::] unit) :: RT2 in
   let renv : renviron gT rT genv :=
-    [renv: rent gT "downto0" [:: nat] None unit genv (downto0)] in
+    ((uncurryR gT [:: nat] [::] unit genv downto0), RENV2) in
   let nT := [:: nat] in
   let nenv : nenviron nT := [nenv: n] in
   let pT : penvtype gT nT := [::] in
@@ -1404,7 +1500,8 @@ Definition downto0_body_ok : downto0_body = downto0_body' := erefl.
 (* We confirmed the body of downto0 is correctly represented by the AST and
   downto0 itself is a simple recursive function just calling the body.
   We consider the AST represent downto0 correctly.
-  So, we import downto0 into our global environment. *)
+  So, we import downto0 into our global environment, GENV.
+  This is possible because the type of downto0 it not a dependent type. *)
 
 Definition GTENT3 := gtent "downto0" [:: nat] unit.
 Definition GT3' := [:: GTENT3].
@@ -1412,6 +1509,8 @@ Definition GT3 : genvtype := GT3' ++ GT2.
 Definition GENV3 : genviron GT3 := ((uncurry [:: nat] _ downto0), GENV2).
 Definition LT3 : lenvtype GT3 := lt_shift0 GTENT3 GT2 LT2.
 Definition LENV3 : lenviron GT3 LT3 GENV3 := LENV2.
+Definition RT3 : renvtype GT3 := rt_shift0 GTENT3 GT2 RT2.
+Definition RENV3 : renviron GT3 RT3 GENV3 := RENV2.
 
 (* Note that unfortunately, downto0' using downto0_body' causes an error:
 | Recursive definition of downto0' is ill-formed.
@@ -1537,6 +1636,7 @@ Definition upto_body
       upto_rec j a'
   | false => fun Hm : false = b => true
   end erefl.
+About upto_body.
 
 Fixpoint upto_rec (i : nat) (acc : Acc R i) {struct acc} : bool :=
   upto_body upto_rec i acc.
@@ -1561,6 +1661,8 @@ Definition GT4 : genvtype := GT4' ++ GT3.
 Definition GENV4 : genviron GT4 := ((uncurry [::] _ N), GENV3).
 Definition LT4 : lenvtype GT4 := lt_shift0 GTENT4 GT3 LT3.
 Definition LENV4 : lenviron GT4 LT4 GENV4 := LENV3.
+Definition RT4 : renvtype GT4 := rt_shift0 GTENT4 GT3 RT3.
+Definition RENV4 : renviron GT4 RT4 GENV4 := RENV3.
 
 (* *)
 
@@ -1582,16 +1684,12 @@ Definition upto_lemma_P : pty GT4 upto_lemma_nt :=
 
 Definition upto_lemma_lty := ltyC GT4 upto_lemma_nt upto_lemma_pt upto_lemma_P.
 
-Definition GT5 := GT4.
-Definition GENV5 := GENV4.
-Definition LT5 : lenvtype GT5 := ("upto_lemma", upto_lemma_lty) :: LT4.
-
-Definition LENV5 : lenviron GT5 LT5 GENV5 :=
-  let gT := GT5 in
-  let genv := GENV5 in
+Definition upto_lemma_proof : ltype GT4 upto_lemma_lty GENV4 :=
+  let gT := GT4 in
+  let genv := GENV4 in
   let nT := upto_lemma_nt in
   let pT := upto_lemma_pt in
-  (((fun (nenv : nenviron nT)
+  fun (nenv : nenviron nT)
       (penv : penviron gT nT pT genv nenv) =>
     let j := nenv.1 in let b := nenv.2.1 in
     let n := nenv.2.2.1 in let i := nenv.2.2.2.1 in
@@ -1599,15 +1697,44 @@ Definition LENV5 : lenviron GT5 LT5 GENV5 :=
     let Hb := penv.2.2.1 in
     let Hn := penv.2.2.2.1 in
     let acc := penv.2.2.2.2.1 in
-    upto_lemma i n b j acc Hn Hb Hm Hj) : ltype gT upto_lemma_lty genv), LENV3).
+    upto_lemma i n b j acc Hn Hb Hm Hj.
+
+Check Rwf.
+(* Rwf
+     : well_founded R*)
+
+Definition Rwf_nt : nenvtype := [:: (*i*)nat].
+Definition Rwf_pt : penvtype GT4 Rwf_nt := [::].
+Definition Rwf_P : pty GT4 Rwf_nt :=
+  uncurry_pty GT4 Rwf_nt (fun genv i => Acc R i).
+Definition Rwf_lty := ltyC GT4 Rwf_nt Rwf_pt Rwf_P.
+
+Definition Rwf_proof : ltype GT4 Rwf_lty GENV4 :=
+  let gT := GT4 in
+  let genv := GENV4 in
+  let nT := Rwf_nt in
+  let pT := Rwf_pt in
+  fun (nenv : nenviron nT)
+      (penv : penviron gT nT pT genv nenv) =>
+    let i := nenv.1 in
+    Rwf i.
+
+Definition GT5 := GT4.
+Definition GENV5 := GENV4.
+Definition LT5 : lenvtype GT5 := ("upto_lemma", upto_lemma_lty) :: ("Rwf", Rwf_lty) :: LT4.
+Definition LENV5 : lenviron GT5 LT5 GENV5 :=
+  (upto_lemma_proof, (Rwf_proof, LENV3)).
+
+Definition RT5 := RT4.
+Definition RENV5 := RENV4.
 
 Section upto_body_AST.
 Let nT1 := [:: (*i*)nat].
 Let nT2 := [:: (*n*)nat; (*i*)nat].
 Let nT3 := [:: (*b*)bool; (*n*)nat; (*i*)nat].
 Let nT4 := [:: (*j*)nat; (*b*)bool; (*n*)nat; (*i*)nat].
-Let rtyF := Some (fun (_ : genviron GT5) (nenv : (*i*)nat * unit) =>
-  Acc R (*i*)nenv.1).
+Let rtyF := [::
+  (*a*)(fun (_ : genviron GT5) (nenv : (*i*)nat * unit) => Acc R (*i*)nenv.1)].
 Let rT := [:: ("upto_rec", rtyC GT5 nT1 rtyF bool)].
 Let pT1 := [:: fun (_ : genviron GT5) (nenv : nenviron nT1) => Acc R (*i*)nenv.1].
 Let pT2 := [:: (*Hn*)fun (genv : genviron GT5) (nenv : nenviron nT2) =>
@@ -1633,8 +1760,10 @@ Let pT6 := [:: (*Hj*)fun (genv : genviron GT5) (nenv : nenviron nT4) =>
 Let pT7 := (fun (_ : genviron GT5) (nenv : nenviron nT4) =>
   Acc R (*j*)nenv.1) :: pT6.
 
+(*
 Let upto_lemma_pty := fun (_ : genviron GT5) (nenv : nenviron upto_lemma_nt) =>
   Acc R (*j*)nenv.1.
+*)
 
 (* This reduces (b = glookup GT4 genv "ltn" (i, (n, tt))) to
   nenv.1 = genv.2.2.2.2.2.2.2.2.1 (nenv.2.2.1, (nenv.2.1, tt)).
@@ -1655,7 +1784,7 @@ leta b Hb := ltn i n in
       true
   end
 *)
-Definition upto_body_AST :=
+Definition upto_body_AST : exp GT5 LT5 rT nT1 pT1 bool :=
   leta GT5 LT5 rT nT1 pT1 nat bool (* n Hn := *) "N" [::] erefl
     (leta GT5 LT5 rT nT2 pT2 bool bool (* b Hb := *) "ltn" [:: (*i*)1; (*n*)0] erefl
       (dmatch GT5 LT5 rT nT3 pT3 bool (*b*)0
@@ -1663,12 +1792,12 @@ Definition upto_body_AST :=
           (app GT5 LT5 rT nT3 pT4 bool "true" [::] erefl)
           (dmatch_cons GT5 LT5 rT nT3 pT3 (*b*)0 bool (* | true Hm *) bool_true [:: bool_false]
             (leta GT5 LT5 rT nT3 pT5 nat bool (* j Hj := *) "S" [:: (*i*)2] erefl
-              (letp GT5 LT5 rT nT4 pT6 bool (* acc' := *) "upto_lemma" upto_lemma_pty
+              (letp GT5 LT5 rT nT4 pT6 bool (* acc' := *) "upto_lemma" upto_lemma_P
                 [:: (*j*)0; (*b*)1; (*n*)2; (*i*)3]
                 [:: (*Hj*)0; (*Hm*)1; (*Hb*)2; (*Hn*)3; (*a*)4]
                 upto_lemma_pt upto_lemma_P erefl erefl erefl
                 (rapp GT5 LT5 rT nT4 pT7 bool
-                  "upto_rec" [:: (*j*)0] (Some (*a'*)0) rtyF erefl erefl)))
+                  "upto_rec" [:: (*j*)0] [:: (*a'*)0] rtyF erefl erefl)))
             (dmatch_nil GT5 LT5 rT nT3 pT3 (*b*)0 bool [:: bool_true; bool_false]
                bool_matcher))))).
 
@@ -1677,23 +1806,17 @@ Definition upto_body_AST :=
 End upto_body_AST.
 
 (* We can define upto_body' using the AST *)
-Definition upto_body' (upto : forall (i : nat), Acc R i -> bool)
+Definition upto_body' (upto_rec : forall (i : nat), Acc R i -> bool)
     (i : nat) (acc : Acc R i) : bool :=
   let gT := GT5 in
   let genv := GENV5 in
   let lT := LT5 in
   let lenv := LENV5 in
-  let rT : renvtype gT := [:: ("upto_rec",
-                 rtyC gT [::(*i*)nat]
-                  (Some (fun genv nenv =>
-                        let i := nenv.1 in
-                        Acc R i))
-                  bool) ] in
+  let nT := [::(*i*)nat] in
+  let pT := [:: (fun (genv : genviron gT) (nenv : nenviron nT) => Acc R (*i*)nenv.1)] in
+  let rT : renvtype gT := ("upto_rec", rtyC gT nT pT bool) :: RT5 in
   let renv : renviron gT rT genv :=
-    [renv: rent gT "upto_rec" [::nat]
-                (Some (fun genv i => Acc R i))
-                bool genv upto] in
-  let nT := [:: (*i*)nat] in
+    ((uncurryR gT nT pT bool genv upto_rec), RENV5) in
   let nenv : nenviron nT := [nenv: i] in
   let u := uncurry_pty gT nT in
   let pT : penvtype gT nT := [::
@@ -1707,23 +1830,82 @@ Definition upto_body' (upto : forall (i : nat), Acc R i -> bool)
 Lemma upto_body_ok : upto_body = upto_body'. Proof. reflexivity. Qed.
 
 (* We confirmed upto_body_AST correctly represent by upto_body.
-  upto_rec' is a simple recursive function just calling upto_body and
-  upto_noFix' just calls upto_rec' with initial decreasing argument.
-  So, upto_body_AST represents most of upto_noFix'.
+  Now, we insert upto_rec into RENV.
 
-  Also, upto_noFix' is convertible to upto_noFix.
-  So, upto_body_AST represents most of upto_noFix.
+  upto_rec is defined as a very simple fixpoint of upto_body:
+ 
+  Fixpoint upto_rec (i : nat) (acc : Acc R i) {struct acc} : bool :=
+    upto_body upto_rec i acc.
 
-  We import upto_noFix, which is mostly corresponds to upto_body_AST,
-  into our global environment.
+  So, the gap between upto_body and upto_rec is very small.
 *)
 
-Definition GTENT6 := gtent "upto" [:: nat] bool.
-Definition GT6' := [:: GTENT6].
-Definition GT6 : genvtype := GT6' ++ GT5.
-Definition GENV6 : genviron GT6 := ((uncurry [:: nat] _ upto), GENV5).
-Definition LT6 : lenvtype GT6 := lt_shift0 GTENT6 GT5 LT5.
+Definition GT6 := GT5.
+Definition GENV6 := GENV5.
+Definition LT6 : lenvtype GT6 := LT5.
 Definition LENV6 : lenviron GT6 LT6 GENV6 := LENV5.
+
+Definition RT6 : renvtype GT6 := let nT := [::(*i*)nat] in
+  ("upto_rec", rtyC GT6 nT
+  [:: (fun (genv : genviron GT6) (nenv : nenviron nT) => Acc R (*i*)nenv.1)] bool) :: RT5.
+Definition RENV6 : renviron GT6 RT6 GENV6 :=
+  let gT := GT6 in
+  let genv := GENV6 in
+  let nT := [::(*i*)nat] in
+  let pT := [:: (fun (genv : genviron GT6) (nenv : nenviron nT) => Acc R (*i*)nenv.1)] in
+  ((uncurryR gT nT pT bool genv upto_rec), RENV5).
+
+(*
+  Now, we define an AST for upto function.
+  upto is convertible to upto_noFix defined as:
+
+  Definition upto_noFix (i : nat) : bool := upto_rec i (Rwf i).
+
+  The body of upto_noFix can be represented as:
+
+  let a := Rwf i in upto_rec i a
+*)
+
+Section upto_AST.
+Let nT1 := [:: (*i*)nat].
+Let pT1 : penvtype GT6 nT1 := [::].
+Let nT2 := nT1.
+Let pT2 := [:: fun (_ : genviron GT6) (nenv : nenviron nT2) => Acc R (*i*)nenv.1].
+Let pT2' := pT2.
+
+Definition upto_AST :=
+  letp GT6 LT6 RT6 nT1 pT1 bool "Rwf" Rwf_P [:: (*i*)0] [::] Rwf_pt Rwf_P erefl erefl erefl
+  (rapp GT6 LT6 RT6 nT2 pT2 bool "upto_rec" [:: (*i*)0] [:: (*a*)0] pT2' erefl erefl).
+
+End upto_AST.
+
+Definition upto' (i : nat) : bool :=
+  let gT := GT6 in
+  let genv := GENV6 in
+  let lT := LT6 in
+  let lenv := LENV6 in
+  let nT := [::(*i*)nat] in
+  let pT : penvtype gT nT := [::] in
+  let rT : renvtype gT := RT6 in
+  let renv : renviron gT rT genv := RENV6 in
+  let nenv : nenviron nT := [nenv: i] in
+  let penv : penviron gT nT pT genv nenv := I in
+  let Tr := bool in
+  eval gT lT rT nT pT Tr genv lenv renv nenv penv upto_AST.
+
+Lemma upto_AST_ok : upto = upto'. Proof. reflexivity. Qed.
+
+(* We confirmed that upto_AST represent upto (and upto_noFix) correctly.
+
+  We import upto into our global environment, GENV.
+*)
+
+Definition GTENT7 := gtent "upto" [:: nat] bool.
+Definition GT7' := [:: GTENT7].
+Definition GT7 : genvtype := GT7' ++ GT6.
+Definition GENV7 : genviron GT7 := ((uncurry [:: nat] _ upto), GENV6).
+Definition LT7 : lenvtype GT7 := lt_shift0 GTENT7 GT6 LT6.
+Definition LENV7 : lenviron GT7 LT7 GENV7 := LENV6.
 
 (* Note that the recursive function, upto_rec', can be defined using the AST.
   It needs that upto_body should be reduced before Coq termination checker.
