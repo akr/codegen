@@ -23,31 +23,32 @@ open CErrors
 
 open Cgenutil
 
-open Term
 open EConstr
 
 let rec copy_term sigma term =
   match EConstr.kind sigma term with
   | Constr.Rel i -> mkRel i
-  | Var name -> mkVar name
-  | Meta i -> mkMeta i
-  | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (copy_term sigma) termary))
-  | Sort s -> mkSort (ESorts.kind sigma s)
-  | Cast (expr, kind, ty) -> mkCast (copy_term sigma expr, kind, copy_term sigma ty)
-  | Prod (name, ty, body) -> mkProd (name, copy_term sigma ty, copy_term sigma body)
-  | Lambda (name, ty, body) -> mkLambda (name, copy_term sigma ty, copy_term sigma body)
-  | LetIn (name, expr, ty, body) -> mkLetIn (name, copy_term sigma expr, copy_term sigma ty, copy_term sigma body)
-  | App (f, argsary) -> mkApp (copy_term sigma f, Array.map (copy_term sigma) argsary)
-  | Const cu -> mkConstU cu
-  | Ind iu -> mkIndU iu
-  | Construct cu -> mkConstructU cu
-  | Case (ci, tyf, expr, brs) -> mkCase (ci, copy_term sigma tyf, copy_term sigma expr, Array.map (copy_term sigma) brs)
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Var name -> mkVar name
+  | Constr.Meta i -> mkMeta i
+  | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (copy_term sigma) termary))
+  | Constr.Sort s -> mkSort (ESorts.kind sigma s)
+  | Constr.Cast (expr, kind, ty) -> mkCast (copy_term sigma expr, kind, copy_term sigma ty)
+  | Constr.Prod (name, ty, body) -> mkProd (name, copy_term sigma ty, copy_term sigma body)
+  | Constr.Lambda (name, ty, body) -> mkLambda (name, copy_term sigma ty, copy_term sigma body)
+  | Constr.LetIn (name, expr, ty, body) -> mkLetIn (name, copy_term sigma expr, copy_term sigma ty, copy_term sigma body)
+  | Constr.App (f, argsary) -> mkApp (copy_term sigma f, Array.map (copy_term sigma) argsary)
+  | Constr.Const cu -> mkConstU cu
+  | Constr.Ind iu -> mkIndU iu
+  | Constr.Construct cu -> mkConstructU cu
+  | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, copy_term sigma tyf, copy_term sigma expr, Array.map (copy_term sigma) brs)
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       mkFix ((ia, i), (nameary, Array.map (copy_term sigma) tyary, Array.map (copy_term sigma) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       mkCoFix (i, (nameary, Array.map (copy_term sigma) tyary, Array.map (copy_term sigma) funary))
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       mkProj (proj, copy_term sigma expr)
+  | Constr.Int n ->
+      mkInt n
 
 let rec subst_term sigma context term =
   match EConstr.kind sigma term with
@@ -58,27 +59,28 @@ let rec subst_term sigma context term =
         match List.nth context (i-1) with
         | None -> mkRel i
         | Some tm -> tm) (* assume tm has no Rel. *)
-  | Var name -> mkVar name
-  | Meta i -> mkMeta i
-  | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (subst_term sigma context) termary))
-  | Sort s -> mkSort (ESorts.kind sigma s)
-  | Cast (expr, kind, ty) -> mkCast (subst_term sigma context expr, kind, subst_term sigma context ty)
-  | Prod (name, ty, body) -> mkProd (name, subst_term sigma context ty, subst_term sigma (None :: context) body)
-  | Lambda (name, ty, body) -> mkLambda (name, subst_term sigma context ty, subst_term sigma (None :: context) body)
-  | LetIn (name, expr, ty, body) -> mkLetIn (name, subst_term sigma context expr, subst_term sigma context ty, subst_term sigma (None :: context) body)
-  | App (f, argsary) -> mkApp (subst_term sigma context f, Array.map (subst_term sigma context) argsary)
-  | Const cu -> mkConstU cu
-  | Ind iu -> mkIndU iu
-  | Construct cu -> mkConstructU cu
-  | Case (ci, tyf, expr, brs) -> mkCase (ci, subst_term sigma context tyf, subst_term sigma context expr, Array.map (subst_term sigma context) brs)
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Var name -> mkVar name
+  | Constr.Meta i -> mkMeta i
+  | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (subst_term sigma context) termary))
+  | Constr.Sort s -> mkSort (ESorts.kind sigma s)
+  | Constr.Cast (expr, kind, ty) -> mkCast (subst_term sigma context expr, kind, subst_term sigma context ty)
+  | Constr.Prod (name, ty, body) -> mkProd (name, subst_term sigma context ty, subst_term sigma (None :: context) body)
+  | Constr.Lambda (name, ty, body) -> mkLambda (name, subst_term sigma context ty, subst_term sigma (None :: context) body)
+  | Constr.LetIn (name, expr, ty, body) -> mkLetIn (name, subst_term sigma context expr, subst_term sigma context ty, subst_term sigma (None :: context) body)
+  | Constr.App (f, argsary) -> mkApp (subst_term sigma context f, Array.map (subst_term sigma context) argsary)
+  | Constr.Const cu -> mkConstU cu
+  | Constr.Ind iu -> mkIndU iu
+  | Constr.Construct cu -> mkConstructU cu
+  | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, subst_term sigma context tyf, subst_term sigma context expr, Array.map (subst_term sigma context) brs)
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let context2 = Array.fold_right (fun _ ctx -> None :: ctx) funary context in
       mkFix ((ia, i), (nameary, Array.map (subst_term sigma context) tyary, Array.map (subst_term sigma context2) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       let context2 = Array.fold_right (fun _ ctx -> None :: ctx) funary context in
       mkCoFix (i, (nameary, Array.map (subst_term sigma context) tyary, Array.map (subst_term sigma context2) funary))
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       mkProj (proj, subst_term sigma context expr)
+  | Constr.Int n -> mkInt n
 
 (*let rec has_rel term =
   match Term.kind_of_term term with
@@ -111,62 +113,64 @@ let is_sort sigma term =
 let rec has_sort sigma term =
   match EConstr.kind sigma term with
   | Constr.Rel i -> false
-  | Var name -> false
-  | Meta i -> false
-  | Evar (ekey, termary) -> false
-  | Sort s -> true
-  | Cast (expr, kind, ty) -> has_sort sigma expr || has_sort sigma ty
-  | Prod (name, ty, body) -> has_sort sigma ty || has_sort sigma body
-  | Lambda (name, ty, body) -> has_sort sigma ty || has_sort sigma body
-  | LetIn (name, expr, ty, body) -> has_sort sigma expr || has_sort sigma ty || has_sort sigma body
-  | App (f, argsary) -> has_sort sigma f || array_exists (has_sort sigma) argsary
-  | Const cu -> false
-  | Ind iu -> false
-  | Construct cu -> false
-  | Case (ci, tyf, expr, brs) -> has_sort sigma tyf || has_sort sigma expr || array_exists (has_sort sigma) brs
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Var name -> false
+  | Constr.Meta i -> false
+  | Constr.Evar (ekey, termary) -> false
+  | Constr.Sort s -> true
+  | Constr.Cast (expr, kind, ty) -> has_sort sigma expr || has_sort sigma ty
+  | Constr.Prod (name, ty, body) -> has_sort sigma ty || has_sort sigma body
+  | Constr.Lambda (name, ty, body) -> has_sort sigma ty || has_sort sigma body
+  | Constr.LetIn (name, expr, ty, body) -> has_sort sigma expr || has_sort sigma ty || has_sort sigma body
+  | Constr.App (f, argsary) -> has_sort sigma f || array_exists (has_sort sigma) argsary
+  | Constr.Const cu -> false
+  | Constr.Ind iu -> false
+  | Constr.Construct cu -> false
+  | Constr.Case (ci, tyf, expr, brs) -> has_sort sigma tyf || has_sort sigma expr || array_exists (has_sort sigma) brs
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       array_exists (has_sort sigma) tyary || array_exists (has_sort sigma) funary
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       array_exists (has_sort sigma) tyary || array_exists (has_sort sigma) funary
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       has_sort sigma expr
+  | Constr.Int n -> false
 
 let deanonymize_term env sigma term =
   let rec r env term =
     match kind sigma term with
     | Constr.Rel i -> term
-    | Var name -> term
-    | Meta i -> term
-    | Evar (ekey, termary) -> mkEvar (ekey, Array.map (r env) termary)
-    | Sort s -> term
-    | Cast (expr, kind, ty) -> mkCast (r env expr, kind, r env ty)
-    | Prod (name, ty, body) ->
+    | Constr.Var name -> term
+    | Constr.Meta i -> term
+    | Constr.Evar (ekey, termary) -> mkEvar (ekey, Array.map (r env) termary)
+    | Constr.Sort s -> term
+    | Constr.Cast (expr, kind, ty) -> mkCast (r env expr, kind, r env ty)
+    | Constr.Prod (name, ty, body) ->
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
         let env2 = EConstr.push_rel decl env in
         Namegen.mkProd_name env sigma (name, r env ty, r env2 body)
-    | Lambda (name, ty, body) ->
+    | Constr.Lambda (name, ty, body) ->
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
         let env2 = EConstr.push_rel decl env in
         Namegen.mkLambda_name env sigma (name, r env ty, r env2 body)
-    | LetIn (name, expr, ty, body) ->
+    | Constr.LetIn (name, expr, ty, body) ->
         let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
         let env2 = EConstr.push_rel decl env in
-        mkLetIn (Namegen.named_hd env sigma ty name, r env expr, r env ty, r env2 body)
-    | App (f, argsary) -> mkApp (r env f, Array.map (r env) argsary)
-    | Const (cnst, u) -> term
-    | Ind (ind, u) -> term
-    | Construct (cstr, u) -> term
-    | Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
-    | Fix ((ia, i), (nameary, tyary, funary)) ->
+        mkLetIn (Context.map_annot (Namegen.named_hd env sigma ty) name, r env expr, r env ty, r env2 body)
+    | Constr.App (f, argsary) -> mkApp (r env f, Array.map (r env) argsary)
+    | Constr.Const (cnst, u) -> term
+    | Constr.Ind (ind, u) -> term
+    | Constr.Construct (cstr, u) -> term
+    | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
+    | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
         let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
-        let nameary2 = array_map2 (Namegen.named_hd env sigma) tyary nameary in
+        let nameary2 = array_map2 (fun ty -> Context.map_annot (Namegen.named_hd env sigma ty)) tyary nameary in
         mkFix ((ia, i), (nameary2, Array.map (r env) tyary, Array.map (r env2) funary))
-    | CoFix (i, (nameary, tyary, funary)) ->
+    | Constr.CoFix (i, (nameary, tyary, funary)) ->
         let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
-        let nameary2 = array_map2 (Namegen.named_hd env sigma) tyary nameary in
+        let nameary2 = array_map2 (fun ty -> Context.map_annot (Namegen.named_hd env sigma ty)) tyary nameary in
         mkCoFix (i, (nameary2, Array.map (r env) tyary, Array.map (r env2) funary))
-    | Proj (proj, expr) ->
+    | Constr.Proj (proj, expr) ->
         mkProj (proj, r env expr)
+    | Constr.Int n -> term
   in
   r env term
 
@@ -175,50 +179,53 @@ let expand_type env sigmaref term =
     if EConstr.isProd !sigmaref term then
       r2 env term
     else
-      let termty = Typing.e_type_of env sigmaref term in
+      let (sigma, termty) = Typing.type_of env !sigmaref term in
+      (sigmaref := sigma;
       if EConstr.isSort !sigmaref termty then
         let term' = Reduction.whd_all env (EConstr.to_constr !sigmaref term )in
         r2 env (EConstr.of_constr term')
       else
-        r2 env term
+        r2 env term)
   and r2 env term =
     match EConstr.kind !sigmaref term with
     | Constr.Rel i -> term
-    | Var name -> term
-    | Meta i -> term
-    | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (r env) termary))
-    | Sort s -> term
-    | Cast (expr, kind, ty) -> mkCast (r env expr, kind, r env ty)
-    | Prod (name, ty, body) ->
+    | Constr.Var name -> term
+    | Constr.Meta i -> term
+    | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (r env) termary))
+    | Constr.Sort s -> term
+    | Constr.Cast (expr, kind, ty) -> mkCast (r env expr, kind, r env ty)
+    | Constr.Prod (name, ty, body) ->
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
         let env2 = EConstr.push_rel decl env in
         mkProd (name, r env ty, r env2 body)
-    | Lambda (name, ty, body) ->
+    | Constr.Lambda (name, ty, body) ->
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
         let env2 = EConstr.push_rel decl env in
         mkLambda (name, r env ty, r env2 body)
-    | LetIn (name, expr, ty, body) ->
+    | Constr.LetIn (name, expr, ty, body) ->
         let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
         let env2 = EConstr.push_rel decl env in
         mkLetIn (name, r env expr, r env ty, r env2 body)
-    | App (f, argsary) -> mkApp (r env f, Array.map (r env) argsary)
-    | Const (cnst, u) -> term
-    | Ind (ind, u) -> term
-    | Construct (cstr, u) -> term
-    | Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
-    | Fix ((ia, i), (nameary, tyary, funary)) ->
+    | Constr.App (f, argsary) -> mkApp (r env f, Array.map (r env) argsary)
+    | Constr.Const (cnst, u) -> term
+    | Constr.Ind (ind, u) -> term
+    | Constr.Construct (cstr, u) -> term
+    | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
+    | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
         let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr !sigmaref) tyary, Array.map (EConstr.to_constr !sigmaref) funary) env in
         mkFix ((ia, i), (nameary, Array.map (r env) tyary, Array.map (r env2) funary))
-    | CoFix (i, (nameary, tyary, funary)) ->
+    | Constr.CoFix (i, (nameary, tyary, funary)) ->
         let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr !sigmaref) tyary, Array.map (EConstr.to_constr !sigmaref) funary) env in
         mkCoFix (i, (nameary, Array.map (r env) tyary, Array.map (r env2) funary))
-    | Proj (proj, expr) ->
+    | Constr.Proj (proj, expr) ->
         mkProj (proj, r env expr)
+    | Constr.Int n -> term
   in
   r env term
 
 let type_of env evdref term =
-  let ty = Typing.e_type_of env evdref term in
+  let (sigma, ty) = Typing.type_of env !evdref term in
+  evdref := sigma;
   expand_type env evdref ty
 
 let constant_type env evdref cu =
@@ -311,26 +318,26 @@ let rec mono_local_rec sigma context term =
             mkRel (List.hd acc - List.nth acc (i-1) + 1))
           else
             raise (CodeGenError "mono_local_rec:rel"))
-  | Var name -> fun acc -> mkVar name
-  | Meta i -> fun acc -> mkMeta i
-  | Evar (ekey, termary) ->
+  | Constr.Var name -> fun acc -> mkVar name
+  | Constr.Meta i -> fun acc -> mkMeta i
+  | Constr.Evar (ekey, termary) ->
       let ary = Array.map (mono_local_rec sigma context) termary in
       fun acc -> mkEvar (ekey, Array.map (fun f -> f acc) ary)
-  | Sort s -> fun acc -> mkSort (ESorts.kind sigma s)
-  | Cast (expr, kind, ty) ->
+  | Constr.Sort s -> fun acc -> mkSort (ESorts.kind sigma s)
+  | Constr.Cast (expr, kind, ty) ->
       let expr' = mono_local_rec sigma context expr in
       let ty' = mono_local_rec sigma context ty in
       fun acc -> mkCast (expr' acc, kind, ty' acc)
-  | Prod (name, ty, body) ->
+  | Constr.Prod (name, ty, body) ->
       let ty' = mono_local_rec sigma context ty in
       let body' = mono_local_rec sigma (None :: context) body in
       fun acc -> mkProd (name, ty' acc, body' ((1 + List.hd acc) :: acc))
-  | Lambda (name, ty, body) ->
+  | Constr.Lambda (name, ty, body) ->
 (*Feedback.msg_info (str "mono_local_rec:lambda");*)
       let ty' = mono_local_rec sigma context ty in
       let body' = mono_local_rec sigma (None :: context) body in
       fun acc -> mkLambda (name, ty' acc, body' ((1 + List.hd acc) :: acc))
-  | LetIn (name, expr, ty, body) ->
+  | Constr.LetIn (name, expr, ty, body) ->
 (*Feedback.msg_info (str "mono_local_rec:let");*)
       let num_type_args = count_type_args sigma ty in
 (*Feedback.msg_info (str "mono_local_rec:let:1:num_type_args=" ++ int num_type_args);*)
@@ -347,9 +354,9 @@ let rec mono_local_rec sigma context term =
         (fun b e t -> mkLetIn (name, e acc, t acc, b))
         (body' ((List.length exprs + List.hd acc) :: acc))
         exprs tys
-  | App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       (match kind sigma f with
-      | Rel i ->
+      | Constr.Rel i ->
           (match List.nth context (i-1) with
           | None ->
               let argsary' = Array.map (mono_local_rec sigma context) argsary in
@@ -370,43 +377,44 @@ let rec mono_local_rec sigma context term =
           let f' = mono_local_rec sigma context f in
           let argsary' = Array.map (mono_local_rec sigma context) argsary in
           fun acc -> mkApp (f' acc, Array.map (fun arg -> arg acc) argsary'))
-  | Const cu -> fun acc -> mkConstU cu
-  | Ind iu ->
+  | Constr.Const cu -> fun acc -> mkConstU cu
+  | Constr.Ind iu ->
 (*Feedback.msg_info (str "mono_local_rec:ind");*)
       fun acc -> mkIndU iu
-  | Construct cu ->
+  | Constr.Construct cu ->
 (*Feedback.msg_info (str "mono_local_rec:construct");*)
       fun acc -> mkConstructU cu
-  | Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, expr, brs) ->
       let tyf' = mono_local_rec sigma context tyf in
       let expr' = mono_local_rec sigma context expr in
       let brs' = Array.map (mono_local_rec sigma context) brs in
       fun acc ->
       mkCase (ci, tyf' acc, expr' acc, Array.map (fun br -> br acc) brs')
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let n = Array.length funary in
       let tyary' = Array.map (mono_local_rec sigma context) tyary in
       let funary' = Array.map (mono_local_rec sigma (ncons n None context)) funary in
       fun acc ->
       let acc' = List.rev (iota_list (List.hd acc + 1) n) @ acc in
       mkFix ((ia, i), (nameary, Array.map (fun ty -> ty acc) tyary', Array.map (fun f -> f acc') funary'))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       let n = Array.length funary in
       let tyary' = Array.map (mono_local_rec sigma context) tyary in
       let funary' = Array.map (mono_local_rec sigma (ncons n None context)) funary in
       fun acc ->
       let acc' = List.rev (iota_list (List.hd acc + 1) n) @ acc in
       mkCoFix (i, (nameary, Array.map (fun ty -> ty acc) tyary', Array.map (fun f -> f acc') funary'))
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       let expr' = mono_local_rec sigma context expr in
       fun acc ->
       mkProj (proj, expr' acc)
+  | Constr.Int n -> fun acc -> mkInt n
 
 let mono_local sigma term = mono_local_rec sigma [] term [0]
 
 let simple_fun_p sigma term =
   match EConstr.kind sigma term with
-  | Constr.Rel _ | Const _ | Construct _ -> true
+  | Constr.Rel _ | Constr.Const _ | Constr.Construct _ -> true
   | _ -> false
 
 let simple_arg_p sigma term =
@@ -425,7 +433,7 @@ let rec hoist_terms env evdref simple_p terms bodyfun =
             bodyfun env (shifter term :: rest') shifter)
       else
         let ty = type_of env evdref term in
-        let name = Names.Name.Anonymous in
+        let name = Context.annotR Names.Name.Anonymous in
         let expr = stmt_rec env evdref term in
         let env1 = EConstr.push_rel (Context.Rel.Declaration.LocalDef (name, expr, ty)) env in
         EConstr.mkLetIn (name, expr, ty,
@@ -443,23 +451,23 @@ and hoist_term1 env evdref simple_p term bodyfun =
 and stmt_rec env evdref term =
   match EConstr.kind !evdref term with
   | Constr.Rel i -> term
-  | Var name -> term
-  | Meta i -> term
-  | Evar (ekey, termary) -> term
-  | Sort s -> term
-  | Cast (expr, kind, ty) ->
+  | Constr.Var name -> term
+  | Constr.Meta i -> term
+  | Constr.Evar (ekey, termary) -> term
+  | Constr.Sort s -> term
+  | Constr.Cast (expr, kind, ty) ->
       hoist_term1 env evdref (simple_arg_p !evdref) expr
         (fun env' expr' shifter -> mkCast (expr', kind, shifter ty))
-  | Prod (name, ty, body) -> term
-  | Lambda (name, ty, body) ->
+  | Constr.Prod (name, ty, body) -> term
+  | Constr.Lambda (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (name, ty, stmt_rec env2 evdref body)
-  | LetIn (name, expr, ty, body) ->
+  | Constr.LetIn (name, expr, ty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLetIn (name, stmt_rec env evdref expr, ty, stmt_rec env2 evdref body)
-  | App (f, argsary) ->
+  | Constr.App (f, argsary) ->
       let fty = type_of env evdref f in
       let num_type_args = count_type_args !evdref fty in
       let targs = Array.sub argsary 0 num_type_args in
@@ -471,60 +479,63 @@ and stmt_rec env evdref term =
           hoist_terms env1 evdref (simple_arg_p !evdref) (Array.to_list vargs1)
             (fun env2 fargs2 shifter2 ->
               mkApp (shifter2 f1, (Array.append (Array.map shifter2 targs1) (Array.of_list fargs2)))))
-  | Const cu -> term
-  | Ind iu -> term
-  | Construct cu -> term
-  | Case (ci, tyf, expr, branches) ->
+  | Constr.Const cu -> term
+  | Constr.Ind iu -> term
+  | Constr.Construct cu -> term
+  | Constr.Case (ci, tyf, expr, branches) ->
       hoist_term1 env evdref (simple_arg_p !evdref) expr
         (fun env' expr' shifter ->
           mkCase (ci, (shifter tyf), expr', Array.map (fun branch -> stmt_rec env' evdref (shifter branch)) branches))
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let decls = array_map2 (fun n ty -> Context.Rel.Declaration.LocalAssum (n, ty)) nameary tyary in
       let env2 = Array.fold_left (fun e d -> EConstr.push_rel d e) env decls in
       mkFix ((ia, i), (nameary, tyary, Array.map (stmt_rec env2 evdref) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       let decls = array_map2 (fun n ty -> Context.Rel.Declaration.LocalAssum (n, ty)) nameary tyary in
       let env2 = Array.fold_left (fun e d -> EConstr.push_rel d e) env decls in
       mkCoFix (i, (nameary, tyary, Array.map (stmt_rec env2 evdref) funary))
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       hoist_term1 env evdref (simple_arg_p !evdref) expr
         (fun env' expr' shifter -> mkProj (proj, expr'))
+  | Constr.Int n -> term
 
 let stmt term =
-  let (evd, env) = Pfedit.get_current_context () in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
   let evdref = ref evd in
   stmt_rec env evdref term
 
 let rec seq_let sigma term =
   match EConstr.kind sigma term with
   | Constr.Rel i -> term
-  | Var name -> term
-  | Meta i -> term
-  | Evar (ekey, termary) -> term
-  | Sort s -> term
-  | Cast (expr, kind, ty) ->
+  | Constr.Var name -> term
+  | Constr.Meta i -> term
+  | Constr.Evar (ekey, termary) -> term
+  | Constr.Sort s -> term
+  | Constr.Cast (expr, kind, ty) ->
       mkCast (seq_let sigma expr, kind, ty)
-  | Prod (name, ty, body) -> term
-  | Lambda (name, ty, body) ->
+  | Constr.Prod (name, ty, body) -> term
+  | Constr.Lambda (name, ty, body) ->
       mkLambda (name, ty, seq_let sigma body)
-  | LetIn (name, expr, ty, body) ->
+  | Constr.LetIn (name, expr, ty, body) ->
       (match kind sigma expr with
-      | LetIn (name1, expr1, ty1, body1) ->
+      | Constr.LetIn (name1, expr1, ty1, body1) ->
           seq_let sigma
             (mkLetIn (name1, expr1, ty1,
               mkLetIn (name, body1, Vars.lift 1 ty, Vars.liftn 1 2 body)))
       | _ -> mkLetIn (name, seq_let sigma expr, ty, seq_let sigma body))
-  | App (f, argsary) -> term
-  | Const cu -> term
-  | Ind iu -> term
-  | Construct cu -> term
-  | Case (ci, tyf, expr, branches) ->
+  | Constr.App (f, argsary) -> term
+  | Constr.Const cu -> term
+  | Constr.Ind iu -> term
+  | Constr.Construct cu -> term
+  | Constr.Case (ci, tyf, expr, branches) ->
       mkCase (ci, tyf, expr, Array.map (seq_let sigma) branches)
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       mkFix ((ia, i), (nameary, tyary, Array.map (seq_let sigma) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       mkCoFix (i, (nameary, tyary, Array.map (seq_let sigma) funary))
-  | Proj (proj, expr) -> term
+  | Constr.Proj (proj, expr) -> term
+  | Constr.Int n -> term
 
 let mangle_function_short ctnt type_args =
   let label = Constant.label ctnt in
@@ -538,7 +549,7 @@ let mangle_function ctnt type_args =
   mangle_function_short ctnt type_args
 
 let mangle_constructor_short cstr param_args =
-  let (evd, env) = Pfedit.get_current_context () in
+  let env = Global.env () in
   let ((mutind, i), j) = cstr in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
@@ -565,7 +576,7 @@ let eq_monofunc ((c1, uc1), args1) ((c2, uc2), args2) =
   in
   loop (Array.length args1)
 
-let mono_global_visited_empty : ((global_reference * constr array) * Constant.t) list = []
+let mono_global_visited_empty : ((GlobRef.t * constr array) * Constant.t) list = []
 
 let mono_global_visited = Summary.ref mono_global_visited_empty ~name:"MonomorphizationVisited"
 
@@ -614,7 +625,7 @@ let rec mono_global_def env (evdref : Evd.evar_map ref) fctntu type_args =
       let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
       let constant = Declare.declare_definition id
         (EConstr.to_constr !evdref term,
-         Entries.Monomorphic_const_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
+         Entries.Monomorphic_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
       Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
         Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
       mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
@@ -641,7 +652,7 @@ and mono_constr_def env sigma fcstr mutind i j param_args =
     let id = find_unused_name (Id.of_string (mangle_constructor fcstr (Array.map (EConstr.to_constr sigma) param_args))) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr sigma term,
-       Entries.Monomorphic_const_entry Univ.ContextSet.empty) in
+       Entries.Monomorphic_entry Univ.ContextSet.empty) in
     mono_global_visited := ((ConstructRef fcstr, param_args), constant) :: !mono_global_visited;
     constant
 
@@ -660,29 +671,30 @@ and mono_global env evdref term =
 Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref term));
   match EConstr.kind !evdref term with
   | Constr.Rel i -> mkRel i
-  | Var name -> mkVar name
-  | Meta i -> mkMeta i
-  | Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env evdref) termary))
-  | Sort s -> mkSort (ESorts.kind !evdref s)
-  | Cast (expr, kind, ty) -> mkCast (mono_global env evdref expr, kind, mono_global env evdref ty)
-  | Prod (name, ty, body) -> mkProd (name, mono_global env evdref ty, mono_global env evdref body)
-  | Lambda (name, ty, body) -> mkLambda (name, mono_global env evdref ty, mono_global env evdref body)
-  | LetIn (name, expr, ty, body) -> mkLetIn (name, mono_global env evdref expr, mono_global env evdref ty, mono_global env evdref body)
-  | App (f, argsary) ->
+  | Constr.Var name -> mkVar name
+  | Constr.Meta i -> mkMeta i
+  | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env evdref) termary))
+  | Constr.Sort s -> mkSort (ESorts.kind !evdref s)
+  | Constr.Cast (expr, kind, ty) -> mkCast (mono_global env evdref expr, kind, mono_global env evdref ty)
+  | Constr.Prod (name, ty, body) -> mkProd (name, mono_global env evdref ty, mono_global env evdref body)
+  | Constr.Lambda (name, ty, body) -> mkLambda (name, mono_global env evdref ty, mono_global env evdref body)
+  | Constr.LetIn (name, expr, ty, body) -> mkLetIn (name, mono_global env evdref expr, mono_global env evdref ty, mono_global env evdref body)
+  | Constr.App (f, argsary) ->
       (match kind !evdref f with
-      | Const (fctnt,u) -> mono_global_const_app env evdref (fctnt,EInstance.kind !evdref u) (Array.map (mono_global env evdref) argsary)
-      | Construct (fcstr,u) -> mono_global_cstr_app env !evdref (fcstr,EInstance.kind !evdref u) (Array.map (mono_global env evdref) argsary)
+      | Constr.Const (fctnt,u) -> mono_global_const_app env evdref (fctnt,EInstance.kind !evdref u) (Array.map (mono_global env evdref) argsary)
+      | Constr.Construct (fcstr,u) -> mono_global_cstr_app env !evdref (fcstr,EInstance.kind !evdref u) (Array.map (mono_global env evdref) argsary)
       | _ -> mkApp (mono_global env evdref f, Array.map (mono_global env evdref) argsary))
-  | Const (ctnt,u) -> mono_check_const env evdref (ctnt,EInstance.kind !evdref u); mono_global_const_app env evdref (ctnt,EInstance.kind !evdref u) [| |]
-  | Ind iu -> mkIndU iu
-  | Construct (cstr,u) -> mono_global_cstr_app env !evdref (cstr,EInstance.kind !evdref u) [| |]
-  | Case (ci, tyf, expr, brs) -> mkCase (ci, mono_global env evdref tyf, mono_global env evdref expr, Array.map (mono_global env evdref) brs)
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Const (ctnt,u) -> mono_check_const env evdref (ctnt,EInstance.kind !evdref u); mono_global_const_app env evdref (ctnt,EInstance.kind !evdref u) [| |]
+  | Constr.Ind iu -> mkIndU iu
+  | Constr.Construct (cstr,u) -> mono_global_cstr_app env !evdref (cstr,EInstance.kind !evdref u) [| |]
+  | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, mono_global env evdref tyf, mono_global env evdref expr, Array.map (mono_global env evdref) brs)
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       mkFix ((ia, i), (nameary, Array.map (mono_global env evdref) tyary, Array.map (mono_global env evdref) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, (nameary, tyary, funary)) ->
       mkCoFix (i, (nameary, Array.map (mono_global env evdref) tyary, Array.map (mono_global env evdref) funary))
-  | Proj (proj, expr) ->
+  | Constr.Proj (proj, expr) ->
       mkProj (proj, mono_global env evdref expr)
+  | Constr.Int n -> mkInt n
 
 let mono env evdref term = mono_global env evdref (mono_local !evdref term)
 
@@ -710,16 +722,16 @@ let terminate_mono_global_def env evdref gref type_args =
     let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr !evdref) type_args)) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr !evdref term,
-       Entries.Monomorphic_const_entry Univ.ContextSet.empty) in
+       Entries.Monomorphic_entry Univ.ContextSet.empty) in
     Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr_env env !evdref (EConstr.to_constr !evdref term));
     mono_global_visited := ((gref, type_args), constant) :: !mono_global_visited
 
 let terminate_mono env evdref term =
   match EConstr.kind !evdref term with
   | Constr.Const (ctnt, u) -> mono_check_const env evdref (ctnt, EInstance.kind !evdref u); terminate_mono_global_def env evdref (ConstRef ctnt) [| |]
-  | App (f, args) ->
+  | Constr.App (f, args) ->
       (match kind !evdref f with
-      | Const (fctnt, u) ->
+      | Constr.Const (fctnt, u) ->
           let fty = constant_type env evdref (fctnt, EInstance.kind !evdref u) in
           let num_type_args = count_type_args !evdref fty in
           (if Array.length args <> num_type_args then
@@ -729,7 +741,8 @@ let terminate_mono env evdref term =
   | _ -> user_err (Pp.str "must be constant application")
 
 let terminate_monomorphization (term : Constrexpr.constr_expr) =
-  let (evd, env) = Pfedit.get_current_context () in
+  let env = Global.env () in
+  let evd = Evd.from_env env in
   let evdref = ref evd in
   let (term2, euc) = Constrintern.interp_constr env evd term in
   terminate_mono env evdref term2

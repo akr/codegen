@@ -16,11 +16,13 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
+DECLARE PLUGIN "codegen_plugin"
+
+{
+
 let () = Mltop.add_known_plugin (fun () ->
   Feedback.msg_info Pp.(str"codegen 0.1"))
   "codegen"
-
-DECLARE PLUGIN "codegen_plugin"
 
 open Monomorph
 open Linear
@@ -34,18 +36,20 @@ open Stdarg (* for wit_string *)
 open Ltac_plugin
 open Extraargs
 
+}
+
 VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
-      [ monomorphization libref_list ]
+      { monomorphization libref_list }
     | [ "CodeGen" "Terminate" "Monomorphization" lconstr(term) ] ->
-      [ terminate_monomorphization term ]
+      { terminate_monomorphization term }
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
-      [ register_linear_type ty ]
+      { register_linear_type ty }
     | [ "CodeGen" "LinearCheck" ne_global_list(libref_list) ] ->
-      [ linear_type_check_list libref_list ]
+      { linear_type_check_list libref_list }
     | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
-      [ linear_type_check_test t1 t2 ]
-    | [ "CodeGen" "GenC" ne_global_list(libref_list) ] -> [ genc libref_list ]
+      { linear_type_check_test t1 t2 }
+    | [ "CodeGen" "GenC" ne_global_list(libref_list) ] -> { genc libref_list }
     | [ "CodeGen" "GenCFile" string(fn) ne_global_list(libref_list) ] ->
-      [ genc_file fn libref_list ]
-END;;
+      { genc_file fn libref_list }
+END

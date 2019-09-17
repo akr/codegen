@@ -119,7 +119,7 @@ let rec fargs_and_body env term =
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = Environ.push_rel decl env in
       let fargs1, env1, body1 = fargs_and_body env2 body in
-      let var = gensym_with_name name in
+      let var = gensym_with_name (Context.binder_name name) in
       let fargs2 = (var, ty) :: fargs1 in
       (fargs2, env1, body1)
   | _ -> ([], env, term)
@@ -299,6 +299,7 @@ let genc_case_branch_body env (sigmaref : Evd.evar_map ref) context (bodyfunc : 
   let decls2 =
     List.map2
       (fun (name, ty) field_index ->
+        let name = Context.binder_name name in
         let varname = gensym_with_name name in
         let cstr_field = case_cstrfield exprty cstr_index field_index in
         (CtxVar varname, genc_varinit ty varname (str cstr_field ++ str "(" ++ str exprvar ++ str ")")))
@@ -343,17 +344,18 @@ let genc_case_break env sigmaref context ci tyf expr brs bodyfunc =
   genc_case_nobreak env sigmaref context ci tyf expr brs
     (fun envb sigmaref context2 body -> bodyfunc envb sigmaref context2 body ++ spc () ++ str "break;")
 
-let genc_geninitvar ty namehint init =
+let genc_geninitvar ty (namehint : Names.Name.t) init =
   let varname = gensym_with_name namehint in
   (genc_varinit ty varname init, varname)
 
 (* not tail position. return a variable *)
-let rec genc_body_var env sigmaref context namehint term termty =
+let rec genc_body_var env sigmaref context (namehint : Names.Name.t) term termty =
   match Constr.kind term with
   | Constr.Rel i ->
       (mt (), varname_of_rel context i)
   | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
+      let name = Context.binder_name name in
       let env2 = Environ.push_rel decl env in
       let (exprbody, exprvarname) = genc_body_var env sigmaref context name expr exprty in
       let (bodybody, bodyvarname) = genc_body_var env2 sigmaref (CtxVar exprvarname :: context) namehint body termty in
@@ -377,6 +379,7 @@ and genc_body_assign env sigmaref context retvar term =
       genc_assign (str retvar) (str (varname_of_rel context i))
   | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
+      let name = Context.binder_name name in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
@@ -399,6 +402,7 @@ let rec genc_body_tail env sigmaref context term =
       genc_return (str (varname_of_rel context i))
   | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
+      let name = Context.binder_name name in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
@@ -425,6 +429,7 @@ let rec genc_body_void_tail env sigmaref retvar context term =
       genc_void_return retvar (str (varname_of_rel context i))
   | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
+      let name = Context.binder_name name in
       let env2 = Environ.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigmaref context name expr exprty in
       exprbody ++
@@ -706,6 +711,7 @@ let genc_func env sigmaref fname ty term =
   match Constr.kind term with
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let env2 = Environ.push_rec_types (nameary, tyary, funary) env in
+      let nameary = Array.map Context.binder_name nameary in
       let ntfcb_ary = fargs_and_body_ary env2 fname ty ia i nameary tyary funary in
       let callsites_ary = scan_callsites sigmaref i ntfcb_ary in
       let mfnm = gensym_with_str fname in
@@ -722,7 +728,7 @@ let get_name_type_body env (name : Libnames.qualid) =
       begin match Global.body_of_constant ctnt with
       | Some (b,_) ->
           let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in
-          let (ty, _) = Global.type_of_global_in_context env reference in
+          let (ty, _) = Typeops.type_of_global_in_context env reference in
           (name, ty, b)
       | None -> user_err (Pp.str "can't genc axiom")
       end

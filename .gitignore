@@ -1,4 +1,5 @@
 Makefile.coq
+src/g_codegen.ml
 *.bak
 *.swp
 *.a
