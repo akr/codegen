@@ -1,6 +1,12 @@
 From mathcomp Require Import ssreflect ssrbool eqtype ssrfun ssrnat seq.
 Require Import codegen.codegen.
 
+Definition succ2 n := S (S n).
+CodeGen Monomorphization succ2.
+Print _succ2.
+CodeGen GenC _succ2.
+CodeGen GenC _succ2.
+
 Inductive TestType2 (A B : Type) := TestCons2 : A -> B -> TestType2 A B.
 Definition non_mangled_code := TestCons2 bool nat.
 CodeGen Monomorphization non_mangled_code.

@@ -90,6 +90,33 @@ let gensym_with_nameopt nameopt =
   | None -> gensym ()
   | Some name -> gensym_with_name name
 
+let local_gensym_id : (int ref) list ref = ref []
+
+let  local_gensym_with f =
+  local_gensym_id := (ref 0) :: !local_gensym_id;
+  let ret = f () in
+  local_gensym_id := List.tl !local_gensym_id;
+  ret
+
+let local_gensym () =
+  let idref = List.hd !local_gensym_id in
+  let n = !idref in
+  idref := n + 1;
+  "l" ^ string_of_int n
+
+let local_gensym_with_str suffix =
+  local_gensym () ^ "_" ^ (c_id suffix)
+
+let local_gensym_with_name name =
+  match name with
+  | Names.Name.Anonymous -> local_gensym ()
+  | Names.Name.Name id -> local_gensym () ^ "_" ^ (c_id (Id.to_string id))
+
+let local_gensym_with_nameopt nameopt =
+  match nameopt with
+  | None -> local_gensym ()
+  | Some name -> local_gensym_with_name name
+
 let rec argtys_and_rety_of_type ty =
   match Constr.kind ty with
   | Constr.Prod (name, ty', body) ->
@@ -119,7 +146,7 @@ let rec fargs_and_body env term =
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = Environ.push_rel decl env in
       let fargs1, env1, body1 = fargs_and_body env2 body in
-      let var = gensym_with_name (Context.binder_name name) in
+      let var = local_gensym_with_name (Context.binder_name name) in
       let fargs2 = (var, ty) :: fargs1 in
       (fargs2, env1, body1)
   | _ -> ([], env, term)
@@ -237,7 +264,7 @@ let genc_multi_assign assignments =
           loop blocked_ass)
         else
           (let a_lhs, (a_rhs, a_ty) = a in
-          let tmp = gensym () in
+          let tmp = local_gensym () in
           let pp = genc_varinit a_ty tmp (str a_lhs) in
           (if Pp.ismt !rpp then rpp := pp else rpp := !rpp ++ spc () ++ pp);
           let ass2 = List.map
@@ -300,7 +327,7 @@ let genc_case_branch_body env (sigmaref : Evd.evar_map ref) context (bodyfunc : 
     List.map2
       (fun (name, ty) field_index ->
         let name = Context.binder_name name in
-        let varname = gensym_with_name name in
+        let varname = local_gensym_with_name name in
         let cstr_field = case_cstrfield exprty cstr_index field_index in
         (CtxVar varname, genc_varinit ty varname (str cstr_field ++ str "(" ++ str exprvar ++ str ")")))
        decls
@@ -345,7 +372,7 @@ let genc_case_break env sigmaref context ci tyf expr brs bodyfunc =
     (fun envb sigmaref context2 body -> bodyfunc envb sigmaref context2 body ++ spc () ++ str "break;")
 
 let genc_geninitvar ty (namehint : Names.Name.t) init =
-  let varname = gensym_with_name namehint in
+  let varname = local_gensym_with_name namehint in
   (genc_varinit ty varname init, varname)
 
 (* not tail position. return a variable *)
@@ -363,7 +390,7 @@ let rec genc_body_var env sigmaref context (namehint : Names.Name.t) term termty
   | Constr.App (f, argsary) ->
       genc_geninitvar termty namehint (genc_app context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
-      let varname = gensym_with_name namehint in
+      let varname = local_gensym_with_name namehint in
       (genc_vardecl termty varname ++ spc () ++
        genc_case_break env sigmaref context ci tyf expr brs
         (fun envb sigmaref context2 body -> genc_body_assign envb sigmaref context2 varname body),
@@ -708,6 +735,7 @@ let genc_func_mutual sigmaref mfnm i ntfcb_ary callsites_ary =
     genc_mufun_bodies_func sigmaref mfnm i ntfcb_ary callsites_ary
 
 let genc_func env sigmaref fname ty term =
+  local_gensym_with (fun () ->
   match Constr.kind term with
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let env2 = Environ.push_rec_types (nameary, tyary, funary) env in
@@ -719,7 +747,7 @@ let genc_func env sigmaref fname ty term =
   | _ ->
       let fargs, envb, body = fargs_and_body env term in
       let context = List.rev_map (fun (var, ty) -> CtxVar var) fargs in
-      genc_func_single envb sigmaref fname ty fargs context body
+      genc_func_single envb sigmaref fname ty fargs context body)
 
 let get_name_type_body env (name : Libnames.qualid) =
   let reference = Smartlocate.global_with_alias name in
