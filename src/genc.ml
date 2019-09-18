@@ -145,8 +145,8 @@ let rec fargs_and_body env term =
   | Constr.Lambda (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = Environ.push_rel decl env in
-      let fargs1, env1, body1 = fargs_and_body env2 body in
       let var = local_gensym_with_name (Context.binder_name name) in
+      let fargs1, env1, body1 = fargs_and_body env2 body in
       let fargs2 = (var, ty) :: fargs1 in
       (fargs2, env1, body1)
   | _ -> ([], env, term)
