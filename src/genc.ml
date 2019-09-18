@@ -75,7 +75,7 @@ let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 let gensym () =
   let n = !gensym_id in
   gensym_id := n + 1;
-  "v" ^ string_of_int n
+  "g" ^ string_of_int n
 
 let gensym_with_str suffix =
   gensym () ^ "_" ^ (c_id suffix)
@@ -102,7 +102,7 @@ let local_gensym () =
   let idref = List.hd !local_gensym_id in
   let n = !idref in
   idref := n + 1;
-  "l" ^ string_of_int n
+  "v" ^ string_of_int n
 
 let local_gensym_with_str suffix =
   local_gensym () ^ "_" ^ (c_id suffix)
