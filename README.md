@@ -9,8 +9,8 @@ https://github.com/akr/codegen
 
 ## Requiements
 
-- Coq 8.10+beta2 (Coq 8.9 doesn't work)
-- OCaml 4.07
+- Coq 8.10+beta3 (Coq 8.9 doesn't work)
+- OCaml 4.09.0
 
 ## How to build and install
 
