@@ -742,8 +742,8 @@ let terminate_mono env evdref term =
 
 let terminate_monomorphization (term : Constrexpr.constr_expr) =
   let env = Global.env () in
-  let evd = Evd.from_env env in
-  let evdref = ref evd in
-  let (term2, euc) = Constrintern.interp_constr env evd term in
+  let sigma = Evd.from_env env in
+  let (sigma, term2) = Constrintern.interp_constr_evars env sigma term in
+  let evdref = ref sigma in
   terminate_mono env evdref term2
 

@@ -53,10 +53,11 @@ let rec is_concrete_inductive_type env evdref term =
 
 let register_linear_type (ty : Constrexpr.constr_expr) =
   let env = Global.env () in
-  let evdref = ref (Evd.from_env env) in
-  let (ty2, euc) = Constrintern.interp_constr env !evdref ty in
+  let sigma = Evd.from_env env in
+  let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
   let ty3 = ty2 in
-  let ty4 = nf_all env !evdref ty2 in
+  let ty4 = nf_all env sigma ty2 in
+  let evdref = ref sigma in
   (if not (is_concrete_inductive_type env evdref ty4) then
     user_err (str "codegen linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env !evdref ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
