@@ -228,28 +228,6 @@ let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string
       cstr_configs = Array.mapi f ind_cfg.cstr_configs }
     !ind_config_map
 
-(*
-let register_ind
-      (coq_type : Constrexpr.constr_expr)
-      (c_type : string)
-      (c_swfunc : string option)
-      (ind_cstr_list : (Libnames.qualid * string list) list) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, indapp) = Constrintern.interp_constr_evars env sigma indapp in
-  let indapp = Reductionops.nf_all env sigma indapp in
-  let indapp = EConstr.to_constr sigma indapp in
-  check_indapp env sigma indapp;
-  check_indapp_not_registered env sigma indapp;
-  ignore indapp;
-
-
-  ind_cstr_list
-  |> List.iter (fun (y,ss) ->
-      Feedback.msg_notice (Ppconstr.pr_qualid y);
-      ss |> List.iter (fun s -> Feedback.msg_notice (Pp.str s)))
-*)
-
 let c_id str =
   let buf = Buffer.create 0 in
   String.iter
