@@ -263,7 +263,7 @@ let c_id str =
 let funcname_argnum fname n =
   "n" ^ string_of_int n ^ (c_id fname)
 
-let c_mangle_type ty =
+let c_typename ty =
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg -> ind_cfg.c_type
   | None -> c_id (mangle_type ty)
@@ -443,7 +443,7 @@ let fargs_and_body_ary env fname ty ia i nameary tyary funary =
 
 let genc_farg farg =
   let (var, ty) = farg in
-  hv 2 (str (c_mangle_type ty) ++ spc () ++ str var)
+  hv 2 (str (c_typename ty) ++ spc () ++ str var)
 
 let genc_fargs fargs =
   match fargs with
@@ -455,10 +455,10 @@ let genc_fargs fargs =
         rest
 
 let genc_vardecl ty varname =
-  hv 0 (str (c_mangle_type ty) ++ spc () ++ str varname ++ str ";")
+  hv 0 (str (c_typename ty) ++ spc () ++ str varname ++ str ";")
 
 let genc_varinit ty varname init =
-  hv 0 (str (c_mangle_type ty) ++ spc () ++ str varname ++ spc () ++ str "=" ++ spc () ++ init ++ str ";")
+  hv 0 (str (c_typename ty) ++ spc () ++ str varname ++ spc () ++ str "=" ++ spc () ++ init ++ str ";")
 
 let genc_assign lhs rhs =
   hv 0 (lhs ++ spc () ++ str "=" ++ spc () ++ rhs ++ str ";")
@@ -843,7 +843,7 @@ let genc_func_single env sigmaref fname ty fargs context body =
       string_of_int (List.length fargs) ^ " lambdas")));
   let fname_argn = funcname_argnum fname (List.length argtys) in
   hv 0 (
-  str (c_mangle_type rety) ++ spc () ++
+  str (c_typename rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
   str ")" ++ spc () ++
@@ -879,7 +879,7 @@ let genc_mufun_entry mfnm i ntfcb =
   let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
   let fname_argn = funcname_argnum nm (List.length argtys) in
   hv 0 (
-  str (c_mangle_type rety) ++ spc () ++
+  str (c_typename rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
   str ")" ++ spc () ++
@@ -891,7 +891,7 @@ let genc_mufun_entry mfnm i ntfcb =
         (List.map
           (fun (var, ty) -> hv 0 (str var))
         fargs) ++ spc () ++ str "};") ++ spc () ++
-    hv 0 (str (c_mangle_type rety) ++ spc () ++ str "ret;") ++ spc () ++
+    hv 0 (str (c_typename rety) ++ spc () ++ str "ret;") ++ spc () ++
     hv 0 (str mfnm ++ str "(" ++ int i ++ str "," ++ spc () ++ str "&args," ++ spc () ++ str "&ret);") ++ spc () ++
     hv 0 (str "return" ++ spc () ++ str "ret;")) ++
   spc () ++ str "}")
@@ -925,7 +925,7 @@ let genc_mufun_bodies_func sigmaref mfnm i ntfcb_ary callsites_ary =
         (fun (nm, ty, fargs, context, envb, body) ->
            pp_join_list (spc ())
              (List.map
-               (fun (var, ty) -> hv 0 (str (c_mangle_type ty) ++ spc () ++ str var ++ str ";"))
+               (fun (var, ty) -> hv 0 (str (c_typename ty) ++ spc () ++ str var ++ str ";"))
                fargs))
         ntfcb_ary) ++ spc () ++
     hv 0 (str "switch" ++ spc () ++ str "(i)") ++ spc () ++ str "{" ++ brk (1,2) ++
@@ -944,7 +944,7 @@ let genc_mufun_bodies_func sigmaref mfnm i ntfcb_ary callsites_ary =
                       (fun (var, ty) -> hv 0 (str var ++ spc () ++ str "=" ++ spc () ++ str "((struct" ++ spc () ++ str nm ++ spc () ++ str "*)argsp)->" ++ str var ++ str ";"))
                       fargs) ++ spc () ++
                   (if tailcall then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
-                  genc_body_void_tail envb sigmaref ("(*(" ^ c_mangle_type rety ^ " *)retp)") context body ++ spc () ++
+                  genc_body_void_tail envb sigmaref ("(*(" ^ c_typename rety ^ " *)retp)") context body ++ spc () ++
                   str "return;")))
             ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
     str "}")
@@ -954,7 +954,7 @@ let genc_mufun_single_func sigmaref mfnm i ntfcb_ary callsites_ary =
   let (entry_argtys, entry_rety) = nargtys_and_rety_of_type (List.length entry_fargs) entry_ty in
   let entry_fname_argn = funcname_argnum entry_nm (List.length entry_argtys) in
   hv 0 (
-  str (c_mangle_type entry_rety) ++ spc () ++
+  str (c_typename entry_rety) ++ spc () ++
   str entry_fname_argn ++ str "(" ++
   hv 0 (genc_fargs entry_fargs) ++
   str ")" ++ spc () ++
@@ -968,7 +968,7 @@ let genc_mufun_single_func sigmaref mfnm i ntfcb_ary callsites_ary =
           else
             pp_join_list (spc ())
               (List.map
-                (fun (var, ty) -> hv 0 (str (c_mangle_type ty) ++ spc () ++ str var ++ str ";"))
+                (fun (var, ty) -> hv 0 (str (c_typename ty) ++ spc () ++ str var ++ str ";"))
                 fargs))
         ntfcb_ary) ++
     (if i = 0 then mt () else hv 0 (str "goto" ++ spc () ++ str entry_fname_argn ++ str ";") ++ spc ()) ++
