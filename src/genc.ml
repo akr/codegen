@@ -821,6 +821,7 @@ let genc_func_single env sigmaref fname ty fargs context body =
       string_of_int (List.length fargs) ^ " lambdas")));
   let fname_argn = funcname_argnum fname (List.length argtys) in
   hv 0 (
+  str "static" ++ spc () ++
   str (c_typename rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
@@ -857,6 +858,7 @@ let genc_mufun_entry mfnm i ntfcb =
   let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
   let fname_argn = funcname_argnum nm (List.length argtys) in
   hv 0 (
+  str "static" ++ spc () ++
   str (c_typename rety) ++ spc () ++
   str fname_argn ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
@@ -881,6 +883,7 @@ let genc_mufun_entries mfnm ntfcb_ary callsites_ary =
 
 let genc_mufun_forward_decl mfnm =
   hv 0 (
+  str "static" ++ spc () ++
   str "void" ++ spc () ++
   str mfnm ++ str "(" ++
   hv 0 (
@@ -890,6 +893,7 @@ let genc_mufun_forward_decl mfnm =
 
 let genc_mufun_bodies_func sigmaref mfnm i ntfcb_ary callsites_ary =
   hv 0 (
+  str "static" ++ spc () ++
   str "void" ++ spc () ++
   str mfnm ++ str "(" ++
   hv 0 (
@@ -932,6 +936,7 @@ let genc_mufun_single_func sigmaref mfnm i ntfcb_ary callsites_ary =
   let (entry_argtys, entry_rety) = nargtys_and_rety_of_type (List.length entry_fargs) entry_ty in
   let entry_fname_argn = funcname_argnum entry_nm (List.length entry_argtys) in
   hv 0 (
+  str "static" ++ spc () ++
   str (c_typename entry_rety) ++ spc () ++
   str entry_fname_argn ++ str "(" ++
   hv 0 (genc_fargs entry_fargs) ++

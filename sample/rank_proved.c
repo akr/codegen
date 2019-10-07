@@ -1,3 +1,4 @@
+static
 nat
 n1_pred(nat v0_n)
 {
@@ -7,7 +8,8 @@ n1_pred(nat v0_n)
     case_S_nat: { nat v1_u = field0_S_nat(v0_n); return v1_u; }
   }
 }
-nat n1_neq0(nat v0_n) { nat v1_n = n1_pred(v0_n); return n1_S(v1_n); }
+static nat n1_neq0(nat v0_n) { nat v1_n = n1_pred(v0_n); return n1_S(v1_n); }
+static
 prod_MDArr_nat
 n7_buildDir2(bool v0_b,
              bits v1_s,
@@ -35,6 +37,7 @@ n7_buildDir2(bool v0_b,
     }
   }
 }
+static
 prod_prod_MDArr_MDArr_nat
 n10_buildDir1(bool v0_b,
               bits v1_s,
@@ -81,6 +84,7 @@ n10_buildDir1(bool v0_b,
     }
   }
 }
+static
 prod_MDArr_MDArr
 n6_buildDir(bool v0_b, bits v1_s, nat v2_k, nat v3_sz2, nat v4_w1, nat v5_w2)
 {
@@ -128,6 +132,7 @@ n6_buildDir(bool v0_b, bits v1_s, nat v2_k, nat v3_sz2, nat v4_w1, nat v5_w2)
   MDArr v26_m = n2_pushD(v23_D2, v24_m2);
   return n2_pair_MDArr_MDArr(v25_m, v26_m);
 }
+static
 Aux
 n2_rank_init(bool v0_b, bits v1_s)
 {
@@ -159,6 +164,7 @@ n2_rank_init(bool v0_b, bits v1_s)
   DArr v19_d = n1_freezeD(v17_D2);
   return n6_mkAux(v0_b, v1_s, v4_k, v6_sz2, v18_d, v19_d);
 }
+static
 nat
 n2_rank_lookup(Aux v0_aux, nat v1_i)
 {

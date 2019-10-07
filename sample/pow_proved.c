@@ -1,3 +1,4 @@
+static
 nat
 n3_fastpow_iter(nat v0_a, nat v1_k, nat v2_x)
 {
@@ -27,6 +28,7 @@ n3_fastpow_iter(nat v0_a, nat v1_k, nat v2_x)
     }
   }
 }
+static
 nat
 n2_fastpow(nat v0_a, nat v1_k)
 {
