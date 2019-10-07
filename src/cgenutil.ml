@@ -156,3 +156,19 @@ let mangle_type ty =
   mangle_type_buf buf ty;
   Buffer.contents buf
 
+type cstr_config = {
+  coq_cstr : Id.t;
+  c_cstr : string option;
+  c_caselabel : string; (* meaningful if c_swfnc is not None *)
+  c_accessors : string array (* meaningful if c_swfnc is not None *)
+}
+
+type ind_config = {
+  coq_type : Constr.t;
+  c_type : string;
+  c_swfunc : string option;
+  cstr_configs : cstr_config array
+}
+
+type ind_cstr_caselabel_accessors = Id.t * string * string list
+

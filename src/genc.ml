@@ -24,6 +24,232 @@ open CErrors
 open Cgenutil
 open Linear
 
+let array_find_index_opt (p : 'a -> bool) (ary : 'a array) : int option =
+  let len = Array.length ary in
+  let rec aux i =
+    if len <= i then
+      None
+    else if p (Array.get ary i) then
+      Some i
+    else
+      aux (i + 1)
+  in
+  aux 0
+
+let array_copy_set (ary : 'a array) (i : int) (v : 'a) : 'a array =
+  let ret = Array.copy ary in
+  Array.set ret i v;
+  ret
+
+let array_find_index (p : 'a -> bool) (ary : 'a array) : int =
+  match array_find_index_opt p ary with
+  | None -> raise Not_found
+  | Some i -> i
+
+let quote_coq_string s =
+  let buf = Buffer.create (String.length s + 2) in
+  let rec f i =
+    match String.index_from_opt s i '"' with
+    | None ->
+        Buffer.add_substring buf s i (String.length s - i)
+    | Some j ->
+        Buffer.add_substring buf s i (j - i);
+        Buffer.add_string buf "\"\"";
+        f (j+1)
+  in
+  Buffer.add_char buf '"';
+  f 0;
+  Buffer.add_char buf '"';
+  Buffer.contents buf
+
+let nf_interp_constr env sigma t =
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+  let t = Reductionops.nf_all env sigma t in
+  let t = EConstr.to_constr sigma t in
+  (sigma, t)
+
+module ConstrMap = Map.Make(Constr)
+let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
+
+let codegen_print_inductive_type env sigma ind_cfg =
+  Feedback.msg_info (str "CodeGen Inductive Type" ++ spc () ++
+    Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
+    str (quote_coq_string ind_cfg.c_type) ++ str ".")
+
+let codegen_print_inductive_constructor env sigma ind_cfg cstr_cfg =
+  match cstr_cfg.c_cstr with
+  | Some c_cstr ->
+    Feedback.msg_info (str "CodeGen Inductive Constructor" ++ spc () ++
+      Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
+      Ppconstr.pr_id cstr_cfg.coq_cstr ++ spc () ++
+      str (quote_coq_string c_cstr) ++ str ".")
+  | None -> ()
+
+let codegen_print_inductive_match env sigma ind_cfg =
+  let f cstr_cfg =
+     Ppconstr.pr_id cstr_cfg.coq_cstr ++ spc () ++
+     str (quote_coq_string cstr_cfg.c_caselabel) ++ pp_prejoin_ary (spc ())
+       (Array.map (fun accessor -> str (quote_coq_string accessor))
+         cstr_cfg.c_accessors)
+  in
+  match ind_cfg.c_swfunc with
+  | Some c_swfunc ->
+      Feedback.msg_info (str "CodeGen Inductive Match" ++ spc () ++
+        Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
+        str (quote_coq_string c_swfunc) ++ pp_prejoin_ary (spc ())
+          (Array.map f ind_cfg.cstr_configs))
+  | None -> ()
+
+let codegen_print_inductive1 env sigma ind_cfg =
+  codegen_print_inductive_type env sigma ind_cfg;
+  Array.iter (codegen_print_inductive_constructor env sigma ind_cfg)
+    ind_cfg.cstr_configs;
+  codegen_print_inductive_match env sigma ind_cfg
+
+let codegen_print_inductive coq_type_list =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  if coq_type_list = [] then
+    ConstrMap.iter (fun key ind_cfg -> codegen_print_inductive1 env sigma ind_cfg) !ind_config_map
+  else
+    coq_type_list |> List.iter (fun user_coq_type ->
+      let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+      match ConstrMap.find_opt coq_type !ind_config_map with
+      | None -> raise (CodeGenError "inductive type not registered")
+      | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
+
+let get_ind_coq_type env coq_type =
+  let (f, args) = Constr.decompose_app coq_type in
+  (if not (Constr.isInd f) then raise (CodeGenError "not an inductive type"));
+  let ind = Univ.out_punivs (Constr.destInd f) in
+  let (mutind, i) = ind in
+  let mutind_body = Environ.lookup_mind mutind env in
+  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+  (mutind_body, i, oneind_body, args)
+
+(* check
+ * - coq_type is f args1...argN
+ * - f is Ind
+ * - f is not conductive
+ * - f has N parameters
+ * - f has no arguments
+ * - ...
+ *)
+let check_ind_coq_type env sigma coq_type =
+  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
+      mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
+       raise (CodeGenError "coinductive type not supported"));
+  (if mutind_body.Declarations.mind_nparams <>
+     mutind_body.Declarations.mind_nparams_rec then
+       raise (CodeGenError "inductive type has a recursively non-uniform parameter"));
+  ignore oneind_body
+
+let ind_coq_type_registered_p coq_type =
+  match ConstrMap.find_opt coq_type !ind_config_map with
+  | Some _ -> true
+  | None -> false
+
+let check_ind_coq_type_not_registered coq_type =
+  if ind_coq_type_registered_p coq_type then
+    raise (CodeGenError "inductive type not registered")
+
+let get_ind_config coq_type =
+  match ConstrMap.find_opt coq_type !ind_config_map with
+  | Some ind_cfg -> ind_cfg
+  | None -> raise (CodeGenError "inductive type already registered")
+
+let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  check_ind_coq_type_not_registered coq_type;
+  check_ind_coq_type env sigma coq_type;
+  let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
+    Array.map (fun cstrname -> {
+      coq_cstr = cstrname;
+      c_cstr = None;
+      c_caselabel = "";
+      c_accessors = [||] }) in
+  let ent = {
+    coq_type=coq_type;
+    c_type=c_type;
+    c_swfunc=None;
+    cstr_configs=cstr_cfgs } in
+  ind_config_map := ConstrMap.add coq_type ent !ind_config_map
+
+let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
+    (c_cstr : string) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let ind_cfg = get_ind_config coq_type in
+  let j = match array_find_index_opt (Id.equal coq_cstr) oneind_body.Declarations.mind_consnames with
+    | Some j -> j
+    | None -> raise (CodeGenError "inductive type constructor not found")
+  in
+  let cstr_cfg = Array.get ind_cfg.cstr_configs j in
+  (match cstr_cfg.c_cstr with
+  | Some _ -> raise (CodeGenError "inductive type constructor already registered")
+  | None -> ());
+  ind_config_map := ConstrMap.add coq_type
+    { ind_cfg with
+      cstr_configs = array_copy_set ind_cfg.cstr_configs j { cstr_cfg with c_cstr = Some c_cstr } }
+    !ind_config_map
+
+let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
+    (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let ind_cfg = get_ind_config coq_type in
+  (match ind_cfg.c_swfunc with
+  | Some _ -> raise (CodeGenError "inductive match configuration already registered")
+  | None -> ());
+  (if List.length cstr_caselabel_accessors_list <> Array.length oneind_body.Declarations.mind_consnames then
+    raise (CodeGenError "inductive match: invalid number of constructors"));
+  let f j cstr_cfg =
+    let consname = Array.get oneind_body.Declarations.mind_consnames j in
+    let p (cstr, caselabel, accessors) = Id.equal consname cstr in
+    let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
+    let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
+      | None -> raise (CodeGenError "inductive match: constructor not found");
+      | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
+    (if Array.get oneind_body.Declarations.mind_consnrealdecls j <> List.length accessors then
+      raise (CodeGenError "inductive match: invalid number of field accessors"));
+    { cstr_cfg with c_caselabel = caselabel; c_accessors = Array.of_list accessors }
+  in
+  ind_config_map := ConstrMap.add coq_type
+    { ind_cfg with
+      c_swfunc = Some swfunc;
+      cstr_configs = Array.mapi f ind_cfg.cstr_configs }
+    !ind_config_map
+
+(*
+let register_ind
+      (coq_type : Constrexpr.constr_expr)
+      (c_type : string)
+      (c_swfunc : string option)
+      (ind_cstr_list : (Libnames.qualid * string list) list) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, indapp) = Constrintern.interp_constr_evars env sigma indapp in
+  let indapp = Reductionops.nf_all env sigma indapp in
+  let indapp = EConstr.to_constr sigma indapp in
+  check_indapp env sigma indapp;
+  check_indapp_not_registered env sigma indapp;
+  ignore indapp;
+
+
+  ind_cstr_list
+  |> List.iter (fun (y,ss) ->
+      Feedback.msg_notice (Ppconstr.pr_qualid y);
+      ss |> List.iter (fun s -> Feedback.msg_notice (Pp.str s)))
+*)
+
 let c_id str =
   let buf = Buffer.create 0 in
   String.iter
@@ -34,38 +260,79 @@ let c_id str =
     str;
   Buffer.contents buf
 
-let c_mangle_type ty = c_id (mangle_type ty)
+let funcname_argnum fname n =
+  "n" ^ string_of_int n ^ (c_id fname)
 
-let case_swfunc ty = c_id ("sw_" ^ (mangle_type ty))
+let c_mangle_type ty =
+  match ConstrMap.find_opt ty !ind_config_map with
+  | Some ind_cfg -> ind_cfg.c_type
+  | None -> c_id (mangle_type ty)
+
+let c_cstrname ty cstru =
+  let ((mutind, i), j) = Univ.out_punivs cstru in
+  match ConstrMap.find_opt ty !ind_config_map with
+  | Some ind_cfg ->
+      (match ind_cfg.cstr_configs.(j-1).c_cstr with
+      | Some c_cstr -> c_cstr
+      | None -> raise (CodeGenError "inductive constructor configuration not registered"))
+  | None ->
+      let env = Global.env () in
+      let mind_body = Environ.lookup_mind mutind env in
+      let oind_body = mind_body.Declarations.mind_packets.(i) in
+      let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
+      let nargs = oind_body.Declarations.mind_consnrealargs.(j-1) in
+      let fname = Id.to_string cons_id in
+      let fname_argn = funcname_argnum fname nargs in
+      fname_argn
+
+let case_swfunc ty =
+  match ConstrMap.find_opt ty !ind_config_map with
+  | Some ind_cfg ->
+      (match ind_cfg.c_swfunc with
+      | Some c_swfunc -> c_swfunc
+      | None -> raise (CodeGenError "inductive match configuration not registered"))
+  | None -> c_id ("sw_" ^ (mangle_type ty))
 
 let case_cstrlabel_short ty j =
-  let env = Global.env () in
-  let indty =
-    match Constr.kind ty with
-    | Constr.App (f, argsary) -> f
-    | _ -> ty
-  in
-  let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
-  let mutind_body = Environ.lookup_mind mutind env in
-  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-  let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-  c_id ("case_" ^ consname ^ "_" ^ (mangle_type ty))
+  match ConstrMap.find_opt ty !ind_config_map with
+  | Some ind_cfg ->
+      (match ind_cfg.c_swfunc with
+      | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
+      | None -> raise (CodeGenError "inductive match configuration not registered"))
+  | None ->
+      let env = Global.env () in
+      let indty =
+        match Constr.kind ty with
+        | Constr.App (f, argsary) -> f
+        | _ -> ty
+      in
+      let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
+      let mutind_body = Environ.lookup_mind mutind env in
+      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
+      c_id ("case_" ^ consname ^ "_" ^ (mangle_type ty))
 
 let case_cstrlabel ty j =
   case_cstrlabel_short ty j
 
 let case_cstrfield_short ty j k =
-  let env = Global.env () in
-  let indty =
-    match Constr.kind ty with
-    | Constr.App (f, argsary) -> f
-    | _ -> ty
-  in
-  let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
-  let mutind_body = Environ.lookup_mind mutind env in
-  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-  let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-  c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type ty))
+  match ConstrMap.find_opt ty !ind_config_map with
+  | Some ind_cfg ->
+      (match ind_cfg.c_swfunc with
+      | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
+      | None -> raise (CodeGenError "inductive match configuration not registered"))
+  | None ->
+      let env = Global.env () in
+      let indty =
+        match Constr.kind ty with
+        | Constr.App (f, argsary) -> f
+        | _ -> ty
+      in
+      let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
+      let mutind_body = Environ.lookup_mind mutind env in
+      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
+      c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type ty))
 
 let case_cstrfield ty j k =
   case_cstrfield_short ty j k
@@ -202,15 +469,12 @@ let genc_return arg =
 let genc_void_return retvar arg =
   hv 0 (genc_assign (str retvar) arg ++ spc () ++ str "return;")
 
-let funcname_argnum fname n =
-  "n" ^ string_of_int n ^ (c_id fname)
-
 let varname_of_rel context i =
   match List.nth context (i-1) with
   | CtxVar varname -> varname
   | _ -> raise (Invalid_argument "unexpected context element")
 
-let genc_app context f argsary =
+let genc_app env sigma context f argsary =
   match Constr.kind f with
   | Constr.Rel i ->
       (match List.nth context (i-1) with
@@ -229,13 +493,9 @@ let genc_app context f argsary =
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
   | Constr.Construct cstru ->
-      let ((mutind, i), j) = Univ.out_punivs cstru in
-      let env = Global.env () in
-      let mind_body = Environ.lookup_mind mutind env in
-      let oind_body = mind_body.Declarations.mind_packets.(i) in
-      let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
-      let fname = Id.to_string cons_id in
-      let fname_argn = funcname_argnum fname (Array.length argsary) in
+      let ty = EConstr.to_constr sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma (EConstr.of_constr (Constr.mkApp (f, argsary))))) in
+      (*Feedback.msg_info (Printer.pr_constr_env env sigma ty);*)
+      let fname_argn = c_cstrname ty cstru in
       let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
       str fname_argn ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
@@ -291,8 +551,8 @@ let genc_goto context ctxrec argsary =
   let pp_goto = (hv 0 (str "goto" ++ spc () ++ str fname_argn ++ str ";")) in
   if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto)
 
-let genc_const context ctntu =
-  genc_app context (Constr.mkConstU ctntu) [| |]
+let genc_const env sigma context ctntu =
+  genc_app env sigma context (Constr.mkConstU ctntu) [| |]
 
 let split_case_tyf tyf =
   match Constr.kind tyf with
@@ -353,10 +613,10 @@ let genc_case_nobreak env sigmaref context ci tyf expr brs (bodyfunc : Environ.e
     let cstr_index = 1 in
     genc_case_branch_body env sigmaref context bodyfunc exprty exprvar ndecls br cstr_index
   else
+    let swfunc = case_swfunc exprty in
+    let swexpr = if swfunc = "" then str exprvar else str swfunc ++ str "(" ++ str exprvar ++ str ")" in
     hv 0 (
-    hv 0 (str "switch" ++ spc () ++ str "(" ++
-      str (case_swfunc exprty) ++ str "(" ++
-      str exprvar ++ str "))") ++ spc () ++
+    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
     str "{" ++ brk (1,2) ++
     hv 0 (
     pp_join_ary (spc ())
@@ -388,7 +648,7 @@ let rec genc_body_var env sigmaref context (namehint : Names.Name.t) term termty
       let (bodybody, bodyvarname) = genc_body_var env2 sigmaref (CtxVar exprvarname :: context) namehint body termty in
       (exprbody ++ (if ismt exprbody then mt () else spc ()) ++ bodybody, bodyvarname)
   | Constr.App (f, argsary) ->
-      genc_geninitvar termty namehint (genc_app context f argsary)
+      genc_geninitvar termty namehint (genc_app env !sigmaref context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
       let varname = local_gensym_with_name namehint in
       (genc_vardecl termty varname ++ spc () ++
@@ -396,7 +656,7 @@ let rec genc_body_var env sigmaref context (namehint : Names.Name.t) term termty
         (fun envb sigmaref context2 body -> genc_body_assign envb sigmaref context2 varname body),
       varname)
   | Constr.Const ctntu ->
-      genc_geninitvar termty namehint (genc_const context ctntu)
+      genc_geninitvar termty namehint (genc_const env !sigmaref context ctntu)
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
 
 (* not tail position. assign to the specified variable *)
@@ -413,12 +673,12 @@ and genc_body_assign env sigmaref context retvar term =
       (if ismt exprbody then mt () else spc ()) ++
       genc_body_assign env2 sigmaref (CtxVar varname :: context) retvar body
   | Constr.App (f, argsary) ->
-      genc_assign (str retvar) (genc_app context f argsary)
+      genc_assign (str retvar) (genc_app env !sigmaref context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_break env sigmaref context ci tyf expr brs
         (fun envb sigmaref context2 body -> genc_body_assign envb sigmaref context2 retvar body)
   | Constr.Const ctntu ->
-      genc_assign (str retvar) (genc_const context ctntu)
+      genc_assign (str retvar) (genc_const env !sigmaref context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
 
@@ -440,12 +700,12 @@ let rec genc_body_tail env sigmaref context term =
       | Constr.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
-          | _ -> genc_return (genc_app context f argsary))
-      | _ -> genc_return (genc_app context f argsary))
+          | _ -> genc_return (genc_app env !sigmaref context f argsary))
+      | _ -> genc_return (genc_app env !sigmaref context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_nobreak env sigmaref context ci tyf expr brs genc_body_tail
   | Constr.Const ctntu ->
-      genc_return (genc_const context ctntu)
+      genc_return (genc_const env !sigmaref context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
 
@@ -467,13 +727,13 @@ let rec genc_body_void_tail env sigmaref retvar context term =
       | Constr.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto context (fname, argvars) argsary
-          | _ -> genc_void_return retvar (genc_app context f argsary))
-      | _ -> genc_void_return retvar (genc_app context f argsary))
+          | _ -> genc_void_return retvar (genc_app env !sigmaref context f argsary))
+      | _ -> genc_void_return retvar (genc_app env !sigmaref context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_nobreak env sigmaref context ci tyf expr brs
         (fun envb sigmaref -> genc_body_void_tail envb sigmaref retvar)
   | Constr.Const ctntu ->
-      genc_void_return retvar (genc_const context ctntu)
+      genc_void_return retvar (genc_const env !sigmaref context ctntu)
 
   | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env !sigmaref term))
 

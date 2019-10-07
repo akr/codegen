@@ -36,9 +36,59 @@ open Stdarg (* for wit_string *)
 open Ltac_plugin
 open Extraargs
 
+open Pcoq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
+(* open Pcoq.Constr *) (* for global(id) in VERNAC ARGUMENT EXTEND *)
 }
 
+(*
+  CodeGen Inductive Type COQ_TYPE "C_TYPE".
+  CodeGen Inductive Constructor COQ_TYPE CONSTRUCTOR "C_CONSTRUCTOR".
+  CodeGen Inductive Match COQ_TYPE "C_SWFUNC" (CONSTRUCTOR "C_CASELABEL" "C_ACCESSOR"...)*.
+
+  Print CodeGen Inductive.              show all inductive types for codegen.
+  Print CodeGen Inductive COQ_TYPE...   show the specified inductive types for codegen.
+
+  Example:
+
+  CodeGen Inductive Type bool "bool".
+  CodeGen Inductive Constructor bool true "true".
+  CodeGen Inductive Constructor bool false "false".
+  CodeGen Inductive Match bool "" true "default" false "case 0".
+  Print CodeGen Inductive bool.
+
+  CodeGen Inductive Type nat "uint64_t".
+  CodeGen Inductive Constructor nat O "0".
+  CodeGen Inductive Constructor nat S "succ".
+  CodeGen Inductive Match nat "" O "case 0" S "default" "pred".
+  Print CodeGen Inductive nat.
+
+  CodeGen Inductive Type (option bool) "int".
+  CodeGen Inductive Constructor (option bool) None "(-1)".
+  CodeGen Inductive Constructor (option bool) Some "(int)".
+  CodeGen Inductive Match (option bool) "" None "case -1" Some "default" "".
+  Print CodeGen Inductive (option bool).
+
+  Print CodeGen Inductive.
+*)
+
+VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
+| [ ident(coq_cstr) string(caselabel) string_list(accessors) ] ->
+  { (coq_cstr, caselabel, accessors) }
+END
+
+VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
+    | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
+      { codegen_print_inductive coq_type_list }
+END
+
 VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
+    | [ "CodeGen" "Inductive" "Type" constr(coq_type) string(c_type) ] ->
+      { register_ind_type coq_type c_type }
+    | [ "CodeGen" "Inductive" "Constructor" constr(coq_type) ident(coq_cstr) string(c_cstr) ] ->
+      { register_ind_cstr coq_type coq_cstr c_cstr }
+    | [ "CodeGen" "Inductive" "Match" constr(coq_type) string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
+      { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
       { monomorphization libref_list }
     | [ "CodeGen" "Terminate" "Monomorphization" lconstr(term) ] ->
