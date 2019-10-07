@@ -38,15 +38,14 @@ let type_linearity_list_empty : (t * type_linearity) list = []
 
 let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
 
-let rec is_concrete_inductive_type env evdref term =
-  let (sigma, termty) = Typing.type_of env !evdref term in
-  (evdref := sigma;
-  if isSort !evdref termty then
-    match EConstr.kind !evdref term with
+let rec is_concrete_inductive_type env sigma term =
+  let termty = Retyping.get_type_of env sigma term in
+  (if isSort sigma termty then
+    match EConstr.kind sigma term with
     | Constr.Ind _ -> true
     | Constr.App (f, argsary) ->
-        isInd !evdref f &&
-        Array.for_all (is_concrete_inductive_type env evdref) argsary
+        isInd sigma f &&
+        Array.for_all (is_concrete_inductive_type env sigma) argsary
     | _ -> false
   else
     false) (* "list" is not "concrete" inductive type because it has concrete parameter *)
@@ -57,11 +56,10 @@ let register_linear_type (ty : Constrexpr.constr_expr) =
   let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
   let ty3 = ty2 in
   let ty4 = nf_all env sigma ty2 in
-  let evdref = ref sigma in
-  (if not (is_concrete_inductive_type env evdref ty4) then
-    user_err (str "codegen linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env !evdref ty4));
+  (if not (is_concrete_inductive_type env sigma ty4) then
+    user_err (str "codegen linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env sigma ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
-  Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env !evdref ty3)
+  Feedback.msg_info (str "codegen linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty3)
 
 let rec is_registered_linear_type env sigma ty l =
   match l with
@@ -237,12 +235,12 @@ let ty_of_decl decl =
   | Context.Rel.Declaration.LocalAssum (name, ty) -> ty
   | Context.Rel.Declaration.LocalDef (name, expr, ty) -> ty
 
-let with_local_var env evdref decl linear_refs num_innermost_locals f =
+let with_local_var env sigma decl linear_refs num_innermost_locals f =
   let env2 = EConstr.push_rel decl env in
   let name = name_of_decl decl in
   let ty = ty_of_decl decl in
   let num_innermost_locals2 = num_innermost_locals+1 in
-  if not (is_linear env !evdref ty) then
+  if not (is_linear env sigma ty) then
     f env2 (None :: linear_refs) num_innermost_locals2
   else
     let r = ref 0 in
@@ -253,20 +251,19 @@ let with_local_var env evdref decl linear_refs num_innermost_locals f =
     else
       ()
 
-let rec check_outermost_lambdas env evdref linear_refs num_innermost_locals term =
-  ((*Feedback.msg_debug (str "check_outermost_lambdas:" ++ spc() ++ Printer.pr_econstr_env env !evdref term);*)
-  match EConstr.kind !evdref term with
+let rec check_outermost_lambdas env sigma linear_refs num_innermost_locals term =
+  ((*Feedback.msg_debug (str "check_outermost_lambdas:" ++ spc() ++ Printer.pr_econstr_env env sigma term);*)
+  match EConstr.kind sigma term with
   | Constr.Lambda (name, ty, body) ->
-      (check_type_linearity env !evdref ty;
+      (check_type_linearity env sigma ty;
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-      with_local_var env evdref decl linear_refs num_innermost_locals
-        (fun env2 linear_refs2 num_innermost_locals2 -> check_outermost_lambdas env2 evdref linear_refs2 num_innermost_locals2 body))
-  | _ -> check_linear_valexp env evdref linear_refs num_innermost_locals term)
-and check_linear_valexp env evdref linear_refs num_innermost_locals term =
-  ((*Feedback.msg_debug (str "check_linear_valexp:" ++ spc() ++ Printer.pr_econstr_env env !evdref term);*)
-  let (sigma, termty) = Typing.type_of env !evdref term in
-  evdref := sigma;
-  match EConstr.kind !evdref term with
+      with_local_var env sigma decl linear_refs num_innermost_locals
+        (fun env2 linear_refs2 num_innermost_locals2 -> check_outermost_lambdas env2 sigma linear_refs2 num_innermost_locals2 body))
+  | _ -> check_linear_valexp env sigma linear_refs num_innermost_locals term)
+and check_linear_valexp env sigma linear_refs num_innermost_locals term =
+  ((*Feedback.msg_debug (str "check_linear_valexp:" ++ spc() ++ Printer.pr_econstr_env env sigma term);*)
+  let termty = Retyping.get_type_of env sigma term in
+  match EConstr.kind sigma term with
   | Constr.Rel i ->
       (match List.nth linear_refs (i-1) with
       | None -> () (* usual (non-linear) variable *)
@@ -276,70 +273,69 @@ and check_linear_valexp env evdref linear_refs num_innermost_locals term =
             if !cell = 0 then
               cell := 1
             else
-              user_err (str "second reference to a linear variable:" ++ spc () ++ Printer.pr_econstr_env env !evdref term)
+              user_err (str "second reference to a linear variable:" ++ spc () ++ Printer.pr_econstr_env env sigma term)
           else
-            user_err (str "linear variable reference outside of a function:" ++ spc () ++ Printer.pr_econstr_env env !evdref term))
+            user_err (str "linear variable reference outside of a function:" ++ spc () ++ Printer.pr_econstr_env env sigma term))
   | Constr.Var name -> ()
   | Constr.Meta i -> ()
   | Constr.Evar (ekey, termary) -> ()
   | Constr.Sort s -> ()
   | Constr.Cast (expr, kind, ty) ->
-      (check_type_linearity env !evdref ty;
-      check_linear_valexp env evdref linear_refs num_innermost_locals expr)
+      (check_type_linearity env sigma ty;
+      check_linear_valexp env sigma linear_refs num_innermost_locals expr)
   | Constr.Prod (name, ty, body) ->
-      check_type_linearity env !evdref term
+      check_type_linearity env sigma term
   | Constr.Lambda (name, ty, body) ->
-      check_outermost_lambdas env evdref linear_refs 0 term
+      check_outermost_lambdas env sigma linear_refs 0 term
   | Constr.LetIn (name, expr, ty, body) ->
-      (check_type_linearity env !evdref ty;
-      check_linear_valexp env evdref linear_refs num_innermost_locals expr;
+      (check_type_linearity env sigma ty;
+      check_linear_valexp env sigma linear_refs num_innermost_locals expr;
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
-      with_local_var env evdref decl linear_refs num_innermost_locals
-        (fun env2 linear_refs2 num_innermost_locals2 -> check_linear_valexp env2 evdref linear_refs2 num_innermost_locals2 body))
+      with_local_var env sigma decl linear_refs num_innermost_locals
+        (fun env2 linear_refs2 num_innermost_locals2 -> check_linear_valexp env2 sigma linear_refs2 num_innermost_locals2 body))
   | Constr.App (f, argsary) ->
-      (check_linear_valexp env evdref linear_refs num_innermost_locals f;
-      Array.iter (check_linear_valexp env evdref linear_refs num_innermost_locals) argsary;
-      if Array.exists (fun arg -> let (sigma, ty) = Typing.type_of env !evdref arg in
-                       evdref := sigma;
-                       is_linear env !evdref ty) argsary &&
-         isProd !evdref termty then
-        user_err (str "application with linear argument cannot return function value:" ++ spc () ++ Printer.pr_econstr_env env !evdref term))
+      (check_linear_valexp env sigma linear_refs num_innermost_locals f;
+      Array.iter (check_linear_valexp env sigma linear_refs num_innermost_locals) argsary;
+      if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
+                       is_linear env sigma ty) argsary &&
+         isProd sigma termty then
+        user_err (str "application with linear argument cannot return function value:" ++ spc () ++ Printer.pr_econstr_env env sigma term))
   | Constr.Const ctntu -> ()
   | Constr.Ind iu -> ()
   | Constr.Construct cstru -> ()
   | Constr.Case (ci, tyf, expr, brs) ->
       ((* tyf is not checked because it is not a target of code generation.
           check tyf is (fun _ -> termty) ? *)
-      check_linear_valexp env evdref linear_refs num_innermost_locals expr;
+      check_linear_valexp env sigma linear_refs num_innermost_locals expr;
       let linear_refs_ary = Array.map (fun _ -> copy_linear_refs linear_refs) brs in
-      let f linear_refs cstr_nargs br = check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br in
+      let f linear_refs cstr_nargs br = check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br in
       array_iter3 f linear_refs_ary ci.Constr.ci_cstr_nargs brs;
       update_linear_refs_for_case linear_refs_ary linear_refs)
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       (let n = Array.length funary in
-      let env2 = push_rec_types env !evdref (nameary, tyary, funary) in
+      let env2 = push_rec_types env sigma (nameary, tyary, funary) in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
-      Array.iter (check_type_linearity env !evdref) tyary;
-      Array.iter (check_linear_valexp env2 evdref linear_refs2 0) funary)
+      Array.iter (check_type_linearity env sigma) tyary;
+      Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
   | Constr.CoFix (i, (nameary, tyary, funary)) ->
       (let n = Array.length funary in
-      let env2 = push_rec_types env !evdref (nameary, tyary, funary) in
+      let env2 = push_rec_types env sigma (nameary, tyary, funary) in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
-      Array.iter (check_type_linearity env !evdref) tyary;
-      Array.iter (check_linear_valexp env2 evdref linear_refs2 0) funary)
+      Array.iter (check_type_linearity env sigma) tyary;
+      Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
   | Constr.Proj (proj, expr) ->
-      check_linear_valexp env evdref linear_refs num_innermost_locals expr
+      check_linear_valexp env sigma linear_refs num_innermost_locals expr
   | Constr.Int n -> ())
-and check_case_branch env evdref linear_refs num_innermost_locals cstr_nargs br =
+and check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br =
   if cstr_nargs = 0 then
-    check_linear_valexp env evdref linear_refs num_innermost_locals br
+    check_linear_valexp env sigma linear_refs num_innermost_locals br
   else
-    (match EConstr.kind !evdref br with
+    (match EConstr.kind sigma br with
     | Constr.Lambda (name, ty, body) ->
-        (check_type_linearity env !evdref ty;
+        (check_type_linearity env sigma ty;
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-        with_local_var env evdref decl linear_refs num_innermost_locals
-          (fun env2 linear_refs2 num_innermost_locals2 -> check_case_branch env2 evdref linear_refs2 num_innermost_locals2 (cstr_nargs-1) body))
+        with_local_var env sigma decl linear_refs num_innermost_locals
+          (fun env2 linear_refs2 num_innermost_locals2 -> check_case_branch env2 sigma linear_refs2 num_innermost_locals2 (cstr_nargs-1) body))
     | _ ->
       user_err (str "unexpected non-Lambda in a case branch")) (* should eta-expansion? *)
 
@@ -347,15 +343,13 @@ let linear_type_check_term term =
   if !type_linearity_list <> [] then
     (let env = Global.env () in
     let sigma = Evd.from_env env in
-    let evdref = ref sigma in
     let eterm = EConstr.of_constr term in
-    check_linear_valexp env evdref [] 0 eterm)
+    check_linear_valexp env sigma [] 0 eterm)
 
 let linear_type_check_single libref =
   let gref = Smartlocate.global_with_alias libref in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let evdref = ref sigma in
   match gref with
   | ConstRef ctnt ->
       (let fctntu = Univ.in_punivs ctnt in
@@ -363,7 +357,7 @@ let linear_type_check_single libref =
       (match value_and_type with
       | (Some term, termty, uconstraints) ->
         let eterm = EConstr.of_constr term in
-        check_linear_valexp env evdref [] 0 eterm;
+        check_linear_valexp env sigma [] 0 eterm;
         Feedback.msg_info (str "codegen linearity check passed:" ++ spc() ++ Printer.pr_constant env ctnt);
         ()
       | _ -> user_err (str "constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
@@ -376,18 +370,17 @@ let linear_type_check_list libref_list =
 
 let linear_type_check_test t1 t2 =
   let env = Global.env () in
-  let evd = Evd.from_env env in
-  let (evd, t1a) = Constrintern.interp_constr_evars env evd t1 in
-  let (evd, t2a) = Constrintern.interp_constr_evars env evd t2 in
-  let evdref = ref evd in
-  Feedback.msg_debug (str "linear_type_check_test t1:" ++ spc() ++ Printer.pr_econstr_env env !evdref t1a);
-  Feedback.msg_debug (str "linear_type_check_test t2:" ++ spc() ++ Printer.pr_econstr_env env !evdref t2a);
-  Feedback.msg_debug (str "linear_type_check_test is_conv:" ++ spc() ++ bool (Reductionops.is_conv env !evdref t1a t2a));
-  Feedback.msg_debug (str "linear_type_check_test is_conv_leq:" ++ spc() ++ bool (Reductionops.is_conv_leq env !evdref t1a t2a));
-  (match Reductionops.infer_conv env !evdref t1a t2a with
+  let sigma = Evd.from_env env in
+  let (sigma, t1a) = Constrintern.interp_constr_evars env sigma t1 in
+  let (sigma, t2a) = Constrintern.interp_constr_evars env sigma t2 in
+  Feedback.msg_debug (str "linear_type_check_test t1:" ++ spc() ++ Printer.pr_econstr_env env sigma t1a);
+  Feedback.msg_debug (str "linear_type_check_test t2:" ++ spc() ++ Printer.pr_econstr_env env sigma t2a);
+  Feedback.msg_debug (str "linear_type_check_test is_conv:" ++ spc() ++ bool (Reductionops.is_conv env sigma t1a t2a));
+  Feedback.msg_debug (str "linear_type_check_test is_conv_leq:" ++ spc() ++ bool (Reductionops.is_conv_leq env sigma t1a t2a));
+  (match Reductionops.infer_conv env sigma t1a t2a with
   | Some _ -> Feedback.msg_debug (str "linear_type_check_test infer_conv succeed")
   | None -> Feedback.msg_debug (str "linear_type_check_test infer_conv failed"));
-  (match Reductionops.infer_conv ~pb:Reduction.CONV env !evdref t1a t2a with
+  (match Reductionops.infer_conv ~pb:Reduction.CONV env sigma t1a t2a with
   | Some _ -> Feedback.msg_debug (str "linear_type_check_test infer_conv(CONV) succeed")
   | None -> Feedback.msg_debug (str "linear_type_check_test infer_conv(CONV) failed"))
 
