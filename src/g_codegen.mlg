@@ -81,7 +81,7 @@ VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
       { codegen_print_inductive coq_type_list }
 END
 
-VERNAC COMMAND EXTEND Monomorphization CLASSIFIED AS SIDEFF
+VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Type" constr(coq_type) string(c_type) ] ->
       { register_ind_type coq_type c_type }
     | [ "CodeGen" "Inductive" "Constructor" constr(coq_type) ident(coq_cstr) string(c_cstr) ] ->
