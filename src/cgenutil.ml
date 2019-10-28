@@ -172,3 +172,18 @@ type ind_config = {
 
 type ind_cstr_caselabel_accessors = Id.t * string * string list
 
+type s_or_d = SorD_S | SorD_D
+
+let pr_s_or_d sd =
+  match sd with
+  | SorD_S -> Pp.str "s"
+  | SorD_D -> Pp.str "d"
+
+type id_or_underscore = Id.t option
+
+type sp_instance_names = {
+  spi_cfunc_name : string option;
+  spi_partapp_id : Id.t option;
+  spi_specialized_id : Id.t option
+}
+

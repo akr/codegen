@@ -25,8 +25,10 @@ let () = Mltop.add_known_plugin (fun () ->
   "codegen"
 
 open Monomorph
+open Specialize
 open Linear
 open Genc
+open Cgenutil
 
 open Stdarg (* for wit_string *)
 (*open Constrarg*) (* for wit_global *)
@@ -43,10 +45,10 @@ open Pcoq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen Inductive Type COQ_TYPE "C_TYPE".
   CodeGen Inductive Constructor COQ_TYPE CONSTRUCTOR "C_CONSTRUCTOR".
-  CodeGen Inductive Match COQ_TYPE "C_SWFUNC" (CONSTRUCTOR "C_CASELABEL" "C_ACCESSOR"...)*.
+  CodeGen Inductive Match COQ_TYPE "C_SWFUNC" (CONSTRUCTOR "C_CASELABEL" "C_ACCESSOR"* )*.
 
   Print CodeGen Inductive.              show all inductive types for codegen.
-  Print CodeGen Inductive COQ_TYPE...   show the specified inductive types for codegen.
+  Print CodeGen Inductive COQ_TYPE*     show the specified inductive types for codegen.
 
   Example:
 
@@ -71,14 +73,55 @@ open Pcoq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
   Print CodeGen Inductive.
 *)
 
+(*
+  CodeGen Specialize FUNCTION SorD*
+
+  Print CodeGen Specialization.
+  Print CodeGen Specialization FUNCTION+.
+
+  Example:
+
+  CodeGen Specialization Arguments id s d.
+  CodeGen Specialization Instance id nat.
+  CodeGen Specialization Instance id nat => id_nat.
+  CodeGen Specialization Instance id nat => id_nat id_nat_specialized.
+
+  CodeGen Specialization Specialize id nat
+
+  Print CodeGen Specialization id.
+
+  CodeGen Global Inline QUALID...
+  CodeGen Local Inline QUALID QUALID...
+
+*)
+
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
 | [ ident(coq_cstr) string(caselabel) string_list(accessors) ] ->
   { (coq_cstr, caselabel, accessors) }
 END
 
+VERNAC ARGUMENT EXTEND s_or_d
+| [ "s" ] -> { SorD_S }
+| [ "d" ] -> { SorD_D }
+END
+
+VERNAC ARGUMENT EXTEND id_or_underscore
+| [ ident(id) ] -> { Some id }
+| [ "_" ] -> { None }
+END
+
+VERNAC ARGUMENT EXTEND sp_instance_names
+| [ "=>" string_opt(cfunc) id_or_underscore(partapp_id) id_or_underscore(specialized_id) ] -> { { spi_cfunc_name = cfunc; spi_partapp_id = partapp_id; spi_specialized_id = specialized_id } }
+| [ "=>" string_opt(cfunc) id_or_underscore(partapp_id) ] -> { { spi_cfunc_name = cfunc; spi_partapp_id = partapp_id; spi_specialized_id = None } }
+| [ "=>" string_opt(cfunc) ] -> { { spi_cfunc_name = cfunc; spi_partapp_id = None; spi_specialized_id = None } }
+| [ ] -> { { spi_cfunc_name = None; spi_partapp_id = None; spi_specialized_id = None } }
+END
+
 VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
     | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
       { codegen_print_inductive coq_type_list }
+    | [ "Print" "CodeGen" "Specialization" ref_list(funcs)] ->
+      { codegen_print_specialization funcs }
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
@@ -88,6 +131,22 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { register_ind_cstr coq_type coq_cstr c_cstr }
     | [ "CodeGen" "Inductive" "Match" constr(coq_type) string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+
+    | [ "CodeGen" "Specialization" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
+      { codegen_specialization_arguments func sd_list }
+    | [ "CodeGen" "Specialization" "AutoArguments" ref_list(func_list) ] ->
+      { codegen_specialization_auto_arguments func_list }
+
+    | [ "CodeGen" "Specialization" "Instance" ref(func) constr_list(args) sp_instance_names(names) ] ->
+      { codegen_specialization_instance func args names }
+
+    | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
+      { codegen_global_inline funcs }
+    | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
+      { codegen_local_inline func funcs }
+
+    | [ "CodeGen" "Specialization" "Specialize" ref(func) constr_list(args) ] ->
+      { codegen_specialization_specialize func args }
 
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
       { monomorphization libref_list }
