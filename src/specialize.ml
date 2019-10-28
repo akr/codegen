@@ -508,6 +508,92 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (match specialize_ctnt_app env sigma ctnt args with None -> term | Some e -> e)
       | _ -> term
 
+let rec count_false_in_prefix n refs =
+  if n <= 0 then
+    0
+  else
+    match refs with
+    | [] -> 0
+    | r :: rest ->
+        if !r then
+          count_false_in_prefix (n-1) rest
+        else
+          1 + count_false_in_prefix (n-1) rest
+
+(* xxx: consider linear type *)
+let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
+  Feedback.msg_info (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term);
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Const _ | Construct _ -> fun () -> term
+  | Rel i ->
+      (List.nth refs (i-1)) := true;
+      fun () -> mkRel (i - count_false_in_prefix (i-1) refs)
+  | Evar (ev, es) ->
+      let fs = Array.map (delete_unused_let_rec env sigma refs) es in
+      fun () -> mkEvar (ev, Array.map (fun f -> f ()) fs)
+  | Proj (proj, e) ->
+      let f = delete_unused_let_rec env sigma refs e in
+      fun () -> mkProj (proj, f ())
+  | Cast (e,ck,t) ->
+      let fe = delete_unused_let_rec env sigma refs e in
+      let ft = delete_unused_let_rec env sigma refs t in
+      fun () -> mkCast(fe (), ck, ft ())
+  | App (f, args) ->
+      let ff = delete_unused_let_rec env sigma refs f in
+      let fargs = Array.map (delete_unused_let_rec env sigma refs) args in
+      fun () -> mkApp (ff (), Array.map (fun g -> g ()) fargs)
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let r = ref false in
+      let refs2 = r :: refs in
+      let fe = delete_unused_let_rec env sigma refs e in
+      let ft = delete_unused_let_rec env sigma refs t in
+      let fb = delete_unused_let_rec env2 sigma refs2 b in
+      fun () -> if !r then mkLetIn (x, fe (), ft (), fb ()) else fb ()
+  | Case (ci, p, item, branches) ->
+      let fp = delete_unused_let_rec env sigma refs p in
+      let fitem = delete_unused_let_rec env sigma refs item in
+      let fbranches = Array.map (delete_unused_let_rec env sigma refs) branches in
+      fun () -> mkCase (ci, fp (), fitem (), Array.map (fun g -> g ()) fbranches)
+  | Prod (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let refs2 = (ref true) :: refs in
+      let ft = delete_unused_let_rec env sigma refs t in
+      let fb = delete_unused_let_rec env2 sigma refs2 b in
+      fun () -> mkProd (x, ft (), fb ())
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let refs2 = (ref true) :: refs in
+      let ft = delete_unused_let_rec env sigma refs t in
+      let fe = delete_unused_let_rec env2 sigma refs2 e in
+      fun () -> mkLambda (x, ft (), fe ())
+  | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let rs = List.init (Array.length funary) (fun _ -> ref true) in
+      let refs2 = List.append rs refs in
+      let ftyary = Array.map (delete_unused_let_rec env sigma refs) tyary in
+      let ffunary = Array.map (delete_unused_let_rec env2 sigma refs2) funary in
+      fun () -> mkFix ((ia, i), (nameary, Array.map (fun g -> g ()) ftyary, Array.map (fun g -> g ()) ffunary))
+  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let rs = List.init (Array.length funary) (fun _ -> ref true) in
+      let refs2 = List.append rs refs in
+      let ftyary = Array.map (delete_unused_let_rec env sigma refs) tyary in
+      let ffunary = Array.map (delete_unused_let_rec env2 sigma refs2) funary in
+      fun () -> mkCoFix (i, (nameary, Array.map (fun g -> g ()) ftyary, Array.map (fun g -> g ()) ffunary))
+
+let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  Feedback.msg_info (Pp.str "delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term);
+  let f = delete_unused_let_rec env sigma [] term in
+  let result = f () in
+  Feedback.msg_info (Pp.str "delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result);
+  check_convertible "specialize" env sigma term result;
+  result
+
 let gensym_specialized_num = Summary.ref 0 ~name:"CodegenSpecializedNum"
 let gensym_specialized () =
   let n = !gensym_specialized_num in
@@ -548,6 +634,8 @@ let codegen_specialization_specialize
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
   let term4 = specialize env sigma term3 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
+  let term5 = delete_unused_let env sigma term4 in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
 
   let name =
     match sp_inst.sp_specialized_id with
@@ -555,7 +643,7 @@ let codegen_specialization_specialize
     | None -> gensym_specialized ()
   in
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term4)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term5)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
