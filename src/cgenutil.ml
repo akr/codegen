@@ -49,6 +49,27 @@ let array_exists f a =
   try Array.iter (fun x -> if f x then raise Exit) a; false
   with Exit -> true
 
+(* map from right to left *)
+let array_map_right f a =
+  let n = Array.length a in
+  if n = 0 then
+    [||]
+  else
+    let vlast = f a.(n-1) in
+    let result = Array.make n vlast in
+    for i = n-2 downto 0 do
+      result.(i) <- f a.(i)
+    done;
+    result
+
+let array_fold_right_map f a e =
+  let eref = ref e in
+  let a' = array_map_right
+    (fun v -> let (v',e') = f v !eref in eref := e'; v')
+    a
+  in
+  (a', !eref)
+
 let rec ncons n x s =
   if n = 0 then
     s
