@@ -35,6 +35,7 @@ type specialization_instance = {
   sp_partapp_ctnt : Constant.t;
   sp_specialized_id : Id.t option;
   sp_specialized_ctnt : Constant.t option;
+  sp_cfunc_name : string option;
 }
 
 type specialization_config = {
@@ -99,14 +100,15 @@ let ctnt_of_qualid env qualid =
 
 let codegen_specialization_define_arguments ctnt sd_list =
   let sp_cfg = { sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
-  specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map
+  specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
+  sp_cfg
 
 let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) =
   let env = Global.env () in
   let ctnt = ctnt_of_qualid env func in
   (if Cmap.mem ctnt !specialize_config_map then
     user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constant env ctnt));
-  codegen_specialization_define_arguments ctnt sd_list
+  ignore (codegen_specialization_define_arguments ctnt sd_list)
 
 let rec determine_sd_list env sigma ty =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
@@ -125,16 +127,21 @@ let rec determine_sd_list env sigma ty =
       sd :: determine_sd_list env sigma c
   | _ -> []
 
+let codegen_specialization_auto_arguments_internal
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (ctnt : Constant.t) : specialization_config =
+  match Cmap.find_opt ctnt !specialize_config_map with
+  | Some sp_cfg -> sp_cfg (* already defined *)
+  | None ->
+      let (ty, _) = Environ.constant_type env (Univ.in_punivs ctnt) in
+      let ty = EConstr.of_constr ty in
+      let sd_list = (determine_sd_list env sigma ty) in
+      codegen_specialization_define_arguments ctnt sd_list
+
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) =
   let ctnt = ctnt_of_qualid env func in
-  if Cmap.mem ctnt !specialize_config_map then
-    () (* already defined *)
-  else
-    let (ty, _) = Environ.constant_type env (Univ.in_punivs ctnt) in
-    let ty = EConstr.of_constr ty in
-    let sd_list = (determine_sd_list env sigma ty) in
-    codegen_specialization_define_arguments ctnt sd_list
+  ignore (codegen_specialization_auto_arguments_internal env sigma ctnt)
 
 let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) =
   let env = Global.env () in
@@ -146,7 +153,7 @@ let drop_trailing_d sd_list =
 
 let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (ctnt : Constant.t) (sd_list : s_or_d list)
-    (static_args : Constr.t list) =
+    (static_args : Constr.t list) : (Evd.evar_map * Constr.t) =
   let rec aux env f f_type sd_list static_args =
     match sd_list with
     | [] -> f
@@ -199,6 +206,49 @@ let interp_args (env : Environ.env) (sigma : Evd.evar_map)
   in
   CList.fold_left_map interp_arg sigma user_args
 
+let specialization_instance_internal env sigma ctnt static_args names_opt =
+  let sp_cfg = match Cmap.find_opt ctnt !specialize_config_map with
+    | None -> user_err (Pp.str "specialization arguments not configured")
+    | Some sp_cfg -> sp_cfg
+  in
+  let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
+  (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
+    user_err (Pp.str "specialization instance already configured"));
+  let specialized_id = (match names_opt with
+      | Some { spi_specialized_id = Some id } -> Some id | _ -> None) in
+  let cfunc_name = (match names_opt with
+      | Some { spi_cfunc_name = Some name } -> Some name | _ -> None) in
+  let sp_inst =
+    if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
+      {
+        sp_static_arguments = [];
+        sp_partapp_ctnt = ctnt; (* use original function for fully dynamic function *)
+        sp_specialized_id = specialized_id;
+        sp_specialized_ctnt = None;
+        sp_cfunc_name = cfunc_name;
+      }
+    else
+      let partapp_id = match names_opt with
+        | Some { spi_partapp_id = Some id } -> id | _ -> gensym_partapp () in
+      let univs = Evd.univ_entry ~poly:false sigma in
+      let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
+      let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
+      let declared_ctnt = Declare.declare_constant partapp_id (defent, kind) in
+      {
+        sp_static_arguments = static_args;
+        sp_partapp_ctnt = declared_ctnt;
+        sp_specialized_id = (match names_opt with
+          | Some { spi_specialized_id = Some id } -> Some id | _ -> None);
+        sp_specialized_ctnt = None;
+        sp_cfunc_name = (match names_opt with
+          | Some { spi_cfunc_name = Some name } -> Some name | _ -> None);
+      }
+  in
+  let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
+  specialize_config_map := !specialize_config_map |>
+    Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
+  sp_inst
+
 let codegen_specialization_instance
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr list)
@@ -207,31 +257,8 @@ let codegen_specialization_instance
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
   let ctnt = ctnt_of_qualid env func in
-  let sp_cfg = match Cmap.find_opt ctnt !specialize_config_map with
-    | None -> user_err (Pp.str "specialization arguments not configured")
-    | Some sp_cfg -> sp_cfg
-  in
-  let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list args in
-  let name =
-    match names.spi_partapp_id with
-    | Some id -> id
-    | None -> gensym_partapp ()
-  in
-  let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
-  let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
-  let declared_ctnt = Declare.declare_constant name (defent, kind) in
-  let sp_inst = {
-    sp_static_arguments = args;
-    sp_partapp_ctnt = declared_ctnt;
-    sp_specialized_id = None;
-    sp_specialized_ctnt = None }
-  in
-  let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
-  specialize_config_map := !specialize_config_map |>
-    Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Constant.print ctnt);
-  Feedback.msg_info (Pp.str "number of functions:" ++ spc () ++ Pp.str "generic:" ++ Pp.int (Cmap.cardinal !specialize_config_map) ++ spc () ++ Pp.str "specialized:" ++ Pp.int (ConstrMap.cardinal inst_map))
+  ignore (specialization_instance_internal env sigma ctnt args (Some names));
+  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Constant.print ctnt)
 
 let check_convertible phase env sigma t1 t2 =
   if Reductionops.is_conv env sigma t1 t2 then
@@ -321,9 +348,9 @@ and strict_safe_beta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
 
 let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term);
   let result = normalizeK1 env sigma term in
-  (* Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result);
   check_convertible "normalizeK" env sigma term result;
   result
 and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
@@ -389,7 +416,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
       let hoisted_exprs = if hoist_f then f :: hoisted_args else hoisted_args in
       let app =
 	let f' = if hoist_f then mkRel nlet else Vars.lift nlet f in
-        let (args', _) = CArray.fold_right_map
+        let (args', _) = array_fold_right_map
 	  (fun arg n -> match EConstr.kind sigma arg with
 			| Rel i -> (mkRel (i+nlet), n)
 			| _ -> (mkRel n, n+1))
@@ -451,35 +478,41 @@ let normalizeA env sigma term =
   linearize_lets env sigma (normalizeK env sigma term)
 
 let specialize_ctnt_app env sigma ctnt args =
-  match Cmap.find_opt ctnt !specialize_config_map with
-  | None -> None
-  | Some sp_cfg ->
-      let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
-      if Array.length args < List.length sd_list then
-        None
-      else
-        let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
-        let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
-        let static_args = CArray.filter_with static_flags args in
-        let static_args = Array.map (Reductionops.nf_all env sigma) static_args in
-        let (_, partapp) = build_partapp env sigma ctnt sd_list (CArray.map_to_list (EConstr.to_constr sigma) static_args) in
-        Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
-        match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-        | None ->
-            Feedback.msg_info (Pp.str "specialize partapp not found");
-            None
-        | Some sp_inst ->
-            Feedback.msg_info (Pp.str "specialize partapp found");
-            let sp_ctnt = sp_inst.sp_partapp_ctnt in
-            let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
-            Some (mkApp (mkConst sp_ctnt, CArray.filter_with dynamic_flags args))
+  let sp_cfg = codegen_specialization_auto_arguments_internal env sigma ctnt in
+  let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
+  if Array.length args < List.length sd_list then
+    None
+  else
+    let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
+    let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
+    let static_args = CArray.filter_with static_flags args in
+    let static_args = Array.map (Reductionops.nf_all env sigma) static_args in
+    (* xxx: check free variables of static args *)
+    let static_args = CArray.map_to_list (EConstr.to_constr sigma) static_args in
+    let (_, partapp) = build_partapp env sigma ctnt sd_list static_args in
+    Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
+    let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
+      | None -> specialization_instance_internal env sigma ctnt static_args None
+      | Some sp_inst -> sp_inst
+    in
+    let sp_ctnt = sp_inst.sp_partapp_ctnt in
+    let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
+    Some (mkApp (mkConst sp_ctnt, CArray.filter_with dynamic_flags args))
+
+let new_env_with_rels env =
+  let n = Environ.nb_rel env in
+  let r = ref (Global.env ()) in
+  for i = n downto 1 do
+    r := Environ.push_rel (Environ.lookup_rel i env) (!r)
+  done;
+  !r
 
 (* This function assumes A-normal form.  So this function doesn't traverse subterms of Proj, Cast and App. *)
 let rec specialize (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   Feedback.msg_info (Pp.str "specialize arg: " ++ Printer.pr_econstr_env env sigma term);
   let result = specialize1 env sigma term in
   Feedback.msg_info (Pp.str "specialize ret: " ++ Printer.pr_econstr_env env sigma result);
-  check_convertible "specialize" env sigma term result;
+  check_convertible "specialize" (new_env_with_rels env) sigma term result;
   result
 and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
@@ -548,10 +581,14 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
       let env2 = EConstr.push_rel decl env in
       let r = ref false in
       let refs2 = r :: refs in
-      let fe = delete_unused_let_rec env sigma refs e in
-      let ft = delete_unused_let_rec env sigma refs t in
       let fb = delete_unused_let_rec env2 sigma refs2 b in
-      fun () -> if !r then mkLetIn (x, fe (), ft (), fb ()) else fb ()
+      if !r then
+        let fe = delete_unused_let_rec env sigma refs e in
+        let ft = delete_unused_let_rec env sigma refs t in
+        fun () -> mkLetIn (x, fe (), ft (), fb ())
+      else
+        fb
+
   | Case (ci, p, item, branches) ->
       let fp = delete_unused_let_rec env sigma refs p in
       let fitem = delete_unused_let_rec env sigma refs item in
@@ -636,12 +673,8 @@ let codegen_specialization_specialize
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
   let term5 = delete_unused_let env sigma term4 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
-
-  let name =
-    match sp_inst.sp_specialized_id with
-    | Some id -> id
-    | None -> gensym_specialized ()
-  in
+  let name = match sp_inst.sp_specialized_id with
+    | Some id -> id | None -> gensym_specialized () in
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term5)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
@@ -650,7 +683,8 @@ let codegen_specialization_specialize
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
     sp_specialized_id = sp_inst.sp_specialized_id;
-    sp_specialized_ctnt = Some declared_ctnt }
+    sp_specialized_ctnt = Some declared_ctnt;
+    sp_cfunc_name = sp_inst.sp_cfunc_name }
   in
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
