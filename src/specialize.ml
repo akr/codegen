@@ -189,10 +189,16 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   (sigma, t)
 
 let gensym_partapp_num = Summary.ref 0 ~name:"CodegenPartAppNum"
-let gensym_partapp () =
+let gensym_partapp suffix =
   let n = !gensym_partapp_num in
   gensym_partapp_num := n + 1;
-  Id.of_string ("codegen_partapp_" ^ string_of_int n)
+  let s = "codegen_p" ^ string_of_int n in
+  let s = if suffix = "" then
+            s
+          else
+            s ^ "_" ^ suffix
+  in
+  Id.of_string s
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
     (user_args : Constrexpr.constr_expr list) : Evd.evar_map * Constr.t list =
@@ -229,7 +235,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       }
     else
       let partapp_id = match names_opt with
-        | Some { spi_partapp_id = Some id } -> id | _ -> gensym_partapp () in
+        | Some { spi_partapp_id = Some id } -> id | _ -> gensym_partapp (Label.to_string (Constant.label ctnt)) in
       let univs = Evd.univ_entry ~poly:false sigma in
       let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
       let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
@@ -632,10 +638,16 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   result
 
 let gensym_specialized_num = Summary.ref 0 ~name:"CodegenSpecializedNum"
-let gensym_specialized () =
+let gensym_specialized suffix =
   let n = !gensym_specialized_num in
   gensym_specialized_num := n + 1;
-  Id.of_string ("codegen_specialized_" ^ string_of_int n)
+  let s = "codegen_s" ^ string_of_int n in
+  let s = if suffix = "" then
+            s
+          else
+            s ^ "_" ^ suffix
+  in
+  Id.of_string s
 
 let codegen_specialization_specialize
     (func : Libnames.qualid)
@@ -674,7 +686,7 @@ let codegen_specialization_specialize
   let term5 = delete_unused_let env sigma term4 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
   let name = match sp_inst.sp_specialized_id with
-    | Some id -> id | None -> gensym_specialized () in
+    | Some id -> id | None -> gensym_specialized (Label.to_string (Constant.label ctnt)) in
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term5)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
