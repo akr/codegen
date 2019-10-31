@@ -30,11 +30,13 @@ open Cgenutil
 
 module ConstrMap = HMap.Make(Constr)
 
+type specialization_instance_name_status =
+  SpNoName | SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
+
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
   sp_partapp_ctnt : Constant.t;
-  sp_specialized_id : Id.t option;
-  sp_specialized_ctnt : Constant.t option;
+  sp_specialization_name : specialization_instance_name_status;
   sp_cfunc_name : string option;
 }
 
@@ -53,11 +55,10 @@ let codegen_print_specialization funcs =
     let pr_names =
       Pp.str "=>" ++ spc () ++
       Constant.print sp_inst.sp_partapp_ctnt ++ spc () ++
-      (match sp_inst.sp_specialized_ctnt with
-      | Some ctnt -> Constant.print ctnt
-      | None -> match sp_inst.sp_specialized_id with
-          | Some id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
-          | None -> Pp.str "_")
+      (match sp_inst.sp_specialization_name with
+      | SpNoName -> Pp.str "_"
+      | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
+      | SpDefinedCtnt ctnt -> Constant.print ctnt)
     in
     let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
                                 sp_inst.sp_static_arguments in
@@ -220,17 +221,16 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured"));
-  let specialized_id = (match names_opt with
-      | Some { spi_specialized_id = Some id } -> Some id | _ -> None) in
+  let specialization_name = (match names_opt with
+      | Some { spi_specialized_id = Some id } -> SpExpectedId id | _ -> SpNoName) in
   let cfunc_name = (match names_opt with
       | Some { spi_cfunc_name = Some name } -> Some name | _ -> None) in
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
       {
         sp_static_arguments = [];
-        sp_partapp_ctnt = ctnt; (* use original function for fully dynamic function *)
-        sp_specialized_id = specialized_id;
-        sp_specialized_ctnt = None;
+        sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
+        sp_specialization_name = specialization_name;
         sp_cfunc_name = cfunc_name;
       }
     else
@@ -243,9 +243,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       {
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
-        sp_specialized_id = (match names_opt with
-          | Some { spi_specialized_id = Some id } -> Some id | _ -> None);
-        sp_specialized_ctnt = None;
+        sp_specialization_name = specialization_name;
         sp_cfunc_name = (match names_opt with
           | Some { spi_cfunc_name = Some name } -> Some name | _ -> None);
       }
@@ -707,9 +705,11 @@ let codegen_specialization_specialize
     | None -> user_err (Pp.str "specialization instance not configured")
     | Some sp_inst -> sp_inst
   in
-  (match sp_inst.sp_specialized_ctnt with
-  | Some _ -> user_err (Pp.str "specialization already defined")
-  | None -> ());
+  let name = (match sp_inst.sp_specialization_name with
+    | SpNoName -> gensym_specialized (Label.to_string (Constant.label ctnt))
+    | SpExpectedId id -> id
+    | SpDefinedCtnt _ -> user_err (Pp.str "specialization already defined"))
+  in
   let epartapp = EConstr.of_constr partapp in
   let pred_func = Cpred.singleton ctnt in
   let global_pred = !specialize_global_inline in
@@ -727,8 +727,6 @@ let codegen_specialization_specialize
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
   let term5 = delete_unused_let env sigma term4 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
-  let name = match sp_inst.sp_specialized_id with
-    | Some id -> id | None -> gensym_specialized (Label.to_string (Constant.label ctnt)) in
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term5)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
@@ -736,8 +734,7 @@ let codegen_specialization_specialize
   let sp_inst2 = {
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
-    sp_specialized_id = sp_inst.sp_specialized_id;
-    sp_specialized_ctnt = Some declared_ctnt;
+    sp_specialization_name = SpDefinedCtnt declared_ctnt;
     sp_cfunc_name = sp_inst.sp_cfunc_name }
   in
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
