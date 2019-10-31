@@ -483,27 +483,70 @@ let linearize_lets env sigma term =
 let normalizeA env sigma term =
   linearize_lets env sigma (normalizeK env sigma term)
 
+let rec has_fv_rec sigma numrels term : bool =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Const _ | Construct _ -> false
+  | Rel i -> numrels < i
+  | Evar (ev, es) ->
+      Array.exists (has_fv_rec sigma numrels) es
+  | Proj (proj, e) ->
+      has_fv_rec sigma numrels e
+  | Cast (e,ck,t) ->
+      has_fv_rec sigma numrels e ||
+      has_fv_rec sigma numrels t
+  | App (f, args) ->
+      has_fv_rec sigma numrels f ||
+      Array.exists (has_fv_rec sigma numrels) args
+  | LetIn (x,e,t,b) ->
+      has_fv_rec sigma numrels e ||
+      has_fv_rec sigma numrels t ||
+      has_fv_rec sigma (numrels+1) b
+  | Case (ci, p, item, branches) ->
+      has_fv_rec sigma numrels p ||
+      has_fv_rec sigma numrels item ||
+      Array.exists (has_fv_rec sigma numrels) branches
+  | Prod (x,t,b) ->
+      has_fv_rec sigma numrels t ||
+      has_fv_rec sigma (numrels+1) b
+  | Lambda (x,t,b) ->
+      has_fv_rec sigma numrels t ||
+      has_fv_rec sigma (numrels+1) b
+  | Fix ((ia, i), (nameary, tyary, funary)) ->
+      let n = Array.length funary in
+      Array.exists (has_fv_rec sigma numrels) tyary ||
+      Array.exists (has_fv_rec sigma (numrels+n)) funary
+  | CoFix (i, (nameary, tyary, funary)) ->
+      let n = Array.length funary in
+      Array.exists (has_fv_rec sigma numrels) tyary ||
+      Array.exists (has_fv_rec sigma (numrels+n)) funary
+
+let has_fv sigma term : bool =
+  has_fv_rec sigma 0 term
+
 let specialize_ctnt_app env sigma ctnt args =
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma ctnt in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
-  if Array.length args < List.length sd_list then
-    None
-  else
-    let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
-    let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
-    let static_args = CArray.filter_with static_flags args in
-    let static_args = Array.map (Reductionops.nf_all env sigma) static_args in
-    (* xxx: check free variables of static args *)
-    let static_args = CArray.map_to_list (EConstr.to_constr sigma) static_args in
-    let (_, partapp) = build_partapp env sigma ctnt sd_list static_args in
-    Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
-    let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-      | None -> specialization_instance_internal env sigma ctnt static_args None
-      | Some sp_inst -> sp_inst
-    in
-    let sp_ctnt = sp_inst.sp_partapp_ctnt in
-    let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
-    Some (mkApp (mkConst sp_ctnt, CArray.filter_with dynamic_flags args))
+  (if Array.length args < List.length sd_list then
+    user_err (Pp.str "Not enough arguments for" ++ spc () ++ (Printer.pr_constant env ctnt)));
+  let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
+  let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
+  let static_args = CArray.filter_with static_flags args in
+  (Array.iter (fun arg ->
+    if has_fv sigma arg then
+      user_err (Pp.str "A free variable found in" ++ spc () ++ Printer.pr_econstr_env env sigma arg))
+    static_args);
+  let static_args = Array.map (Reductionops.nf_all env sigma) static_args in
+  let static_args = CArray.map_to_list (EConstr.to_constr sigma) static_args in
+  let (_, partapp) = build_partapp env sigma ctnt sd_list static_args in
+  Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
+  let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
+    | None -> specialization_instance_internal env sigma ctnt static_args None
+    | Some sp_inst -> sp_inst
+  in
+  let sp_ctnt = sp_inst.sp_partapp_ctnt in
+  let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
+  Some (mkApp (mkConst sp_ctnt, CArray.filter_with dynamic_flags args))
 
 let new_env_with_rels env =
   let n = Environ.nb_rel env in
@@ -594,7 +637,6 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
         fun () -> mkLetIn (x, fe (), ft (), fb ())
       else
         fb
-
   | Case (ci, p, item, branches) ->
       let fp = delete_unused_let_rec env sigma refs p in
       let fitem = delete_unused_let_rec env sigma refs item in
