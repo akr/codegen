@@ -62,7 +62,7 @@ let codegen_print_specialization funcs =
     in
     let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
                                 sp_inst.sp_static_arguments in
-    pp_join_list (spc ()) pr_inst_list ++ spc () ++
+    pp_prejoin_list (spc ()) pr_inst_list ++ spc () ++
     pr_names
   in
   let pr_cfg (func, sp_cfg) =
@@ -72,7 +72,7 @@ let codegen_print_specialization funcs =
       Pp.str ".");
     let feedback_instance sp_inst =
       Feedback.msg_info (Pp.str "Specialization Instance" ++ spc () ++
-        Printer.pr_constant env func ++ spc () ++
+        Printer.pr_constant env func ++
         pr_inst sp_inst ++ Pp.str ".")
     in
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
