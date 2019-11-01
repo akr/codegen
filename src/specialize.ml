@@ -601,6 +601,57 @@ let rec count_false_in_prefix n refs =
         else
           1 + count_false_in_prefix (n-1) rest
 
+let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Const _ | Construct _ -> term
+  | Evar (ev, es) ->
+      mkEvar (ev, Array.map (normalize_types env sigma) es)
+  | Proj (proj, e) ->
+      mkProj (proj, normalize_types env sigma e)
+  | Cast (e,ck,t) ->
+      let e' = normalize_types env sigma e in
+      let t' = Reductionops.nf_all env sigma t in
+      mkCast(e', ck, t')
+  | App (f, args) ->
+      let f' = normalize_types env sigma f in
+      let args' = Array.map (normalize_types env sigma) args in
+      mkApp (f', args')
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = normalize_types env sigma e in
+      let t' = Reductionops.nf_all env sigma t in
+      let b' = normalize_types env2 sigma b in
+      mkLetIn (x, e', t', b')
+  | Case (ci, p, item, branches) ->
+      let p' = Reductionops.nf_all env sigma p in
+      let item' = normalize_types env sigma item in
+      let branches' = Array.map (normalize_types env sigma) branches in
+      mkCase (ci, p', item', branches')
+  | Prod (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let t' = Reductionops.nf_all env sigma t in
+      let b' = normalize_types env2 sigma b in
+      mkProd (x, t', b')
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let t' = Reductionops.nf_all env sigma t in
+      let e' = normalize_types env2 sigma e in
+      mkLambda (x, t', e')
+  | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
+      let funary' = Array.map (normalize_types env2 sigma) funary in
+      mkFix ((ia, i), (nameary, tyary', funary'))
+  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
+      let funary' = Array.map (normalize_types env2 sigma) funary in
+      mkCoFix (i, (nameary, tyary', funary'))
+
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
   Feedback.msg_info (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term);
@@ -726,10 +777,12 @@ let codegen_specialization_specialize
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
   let term4 = specialize env sigma term3 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
-  let term5 = delete_unused_let env sigma term4 in
+  let term5 = normalize_types env sigma term4 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
+  let term6 = delete_unused_let env sigma term5 in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term6);*)
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term5)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term6)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
