@@ -89,7 +89,7 @@ let codegen_print_specialization funcs =
               in
               (ctnt, Cmap.get ctnt !specialize_config_map)
   in
-  Feedback.msg_info (Pp.str "Number of generic functions:" ++ spc () ++ Pp.int (Cmap.cardinal !specialize_config_map));
+  Feedback.msg_info (Pp.str "Number of source functions:" ++ spc () ++ Pp.int (Cmap.cardinal !specialize_config_map));
   List.iter pr_cfg l
 
 let ctnt_of_qualid env qualid =
@@ -98,9 +98,10 @@ let ctnt_of_qualid env qualid =
     | ConstRef ctnt -> ctnt
     | _ -> user_err (Pp.str "not a constant:" ++ spc () ++ Printer.pr_global gref)
 
-let codegen_specialization_define_arguments ctnt sd_list =
+let codegen_specialization_define_arguments env ctnt sd_list =
   let sp_cfg = { sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
+  Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
   sp_cfg
 
 let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) =
@@ -108,8 +109,7 @@ let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d 
   let ctnt = ctnt_of_qualid env func in
   (if Cmap.mem ctnt !specialize_config_map then
     user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constant env ctnt));
-  ignore (codegen_specialization_define_arguments ctnt sd_list);
-  Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt)
+  ignore (codegen_specialization_define_arguments env ctnt sd_list)
 
 let rec determine_sd_list env sigma ty =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
@@ -137,7 +137,7 @@ let codegen_specialization_auto_arguments_internal
       let (ty, _) = Environ.constant_type env (Univ.in_punivs ctnt) in
       let ty = EConstr.of_constr ty in
       let sd_list = (determine_sd_list env sigma ty) in
-      codegen_specialization_define_arguments ctnt sd_list
+      codegen_specialization_define_arguments env ctnt sd_list
 
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) =
@@ -227,6 +227,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         | _ -> let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
                SpExpectedId s_id
       in
+      Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constant env ctnt);
       {
         sp_static_arguments = [];
         sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
@@ -272,8 +273,7 @@ let codegen_specialization_instance
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
   let ctnt = ctnt_of_qualid env func in
-  ignore (specialization_instance_internal env sigma ctnt args (Some names));
-  Feedback.msg_info (Pp.str "Specialization instance defined:" ++ spc () ++ Printer.pr_constant env ctnt)
+  ignore (specialization_instance_internal env sigma ctnt args (Some names))
 
 let check_convertible phase env sigma t1 t2 =
   if Reductionops.is_conv env sigma t1 t2 then
@@ -363,9 +363,9 @@ and strict_safe_beta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
 
 let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
-  Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term);
+  (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
   let result = normalizeK1 env sigma term in
-  Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result);
+  (* Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "normalizeK" env sigma term result;
   result
 and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
@@ -581,9 +581,9 @@ let new_env_with_rels env =
 
 (* This function assumes A-normal form.  So this function doesn't traverse subterms of Proj, Cast and App. *)
 let rec specialize (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  Feedback.msg_info (Pp.str "specialize arg: " ++ Printer.pr_econstr_env env sigma term);
+  (* Feedback.msg_info (Pp.str "specialize arg: " ++ Printer.pr_econstr_env env sigma term); *)
   let result = specialize1 env sigma term in
-  Feedback.msg_info (Pp.str "specialize ret: " ++ Printer.pr_econstr_env env sigma result);
+  (* Feedback.msg_info (Pp.str "specialize ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "specialize" (new_env_with_rels env) sigma term result;
   result
 and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -678,7 +678,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
 
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
-  Feedback.msg_info (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term);
+  (* Feedback.msg_info (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term); *)
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _
   | Const _ | Construct _ -> fun () -> term
@@ -746,10 +746,10 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
       fun () -> mkCoFix (i, (nameary, Array.map (fun g -> g ()) ftyary, Array.map (fun g -> g ()) ffunary))
 
 let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  Feedback.msg_info (Pp.str "delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term);
+  (* Feedback.msg_info (Pp.str "delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term); *)
   let f = delete_unused_let_rec env sigma [] term in
   let result = f () in
-  Feedback.msg_info (Pp.str "delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result);
+  (* Feedback.msg_info (Pp.str "delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "specialize" env sigma term result;
   result
 
@@ -796,7 +796,6 @@ let codegen_specialization_specialize
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term6)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
-  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
   let sp_inst2 = {
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
@@ -806,4 +805,4 @@ let codegen_specialization_specialize
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  Feedback.msg_info (Pp.str "specialized defined:" ++ spc () ++ Printer.pr_constant env ctnt)
+  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
