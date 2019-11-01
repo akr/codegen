@@ -482,46 +482,49 @@ let linearize_lets env sigma term =
 let normalizeA env sigma term =
   linearize_lets env sigma (normalizeK env sigma term)
 
-let rec has_fv_rec sigma numrels term : bool =
+let rec first_fv_rec sigma numrels term : int option =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _
-  | Const _ | Construct _ -> false
-  | Rel i -> numrels < i
+  | Const _ | Construct _ -> None
+  | Rel i -> if numrels < i then Some i else None
   | Evar (ev, es) ->
-      Array.exists (has_fv_rec sigma numrels) es
+      array_option_exists (first_fv_rec sigma numrels) es
   | Proj (proj, e) ->
-      has_fv_rec sigma numrels e
+      first_fv_rec sigma numrels e
   | Cast (e,ck,t) ->
-      has_fv_rec sigma numrels e ||
-      has_fv_rec sigma numrels t
+      shortcut_option_or (first_fv_rec sigma numrels e)
+        (fun () -> first_fv_rec sigma numrels t)
   | App (f, args) ->
-      has_fv_rec sigma numrels f ||
-      Array.exists (has_fv_rec sigma numrels) args
+      shortcut_option_or (first_fv_rec sigma numrels f)
+        (fun () -> array_option_exists (first_fv_rec sigma numrels) args)
   | LetIn (x,e,t,b) ->
-      has_fv_rec sigma numrels e ||
-      has_fv_rec sigma numrels t ||
-      has_fv_rec sigma (numrels+1) b
+      shortcut_option_or (first_fv_rec sigma numrels e)
+        (fun () -> shortcut_option_or (first_fv_rec sigma numrels t)
+          (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b)))
   | Case (ci, p, item, branches) ->
-      has_fv_rec sigma numrels p ||
-      has_fv_rec sigma numrels item ||
-      Array.exists (has_fv_rec sigma numrels) branches
+      shortcut_option_or (first_fv_rec sigma numrels p)
+        (fun () -> shortcut_option_or (first_fv_rec sigma numrels item)
+          (fun () -> array_option_exists (first_fv_rec sigma numrels) branches))
   | Prod (x,t,b) ->
-      has_fv_rec sigma numrels t ||
-      has_fv_rec sigma (numrels+1) b
+      shortcut_option_or (first_fv_rec sigma numrels t)
+        (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
   | Lambda (x,t,b) ->
-      has_fv_rec sigma numrels t ||
-      has_fv_rec sigma (numrels+1) b
+      shortcut_option_or (first_fv_rec sigma numrels t)
+        (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
   | Fix ((ia, i), (nameary, tyary, funary)) ->
       let n = Array.length funary in
-      Array.exists (has_fv_rec sigma numrels) tyary ||
-      Array.exists (has_fv_rec sigma (numrels+n)) funary
+      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
+        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
   | CoFix (i, (nameary, tyary, funary)) ->
       let n = Array.length funary in
-      Array.exists (has_fv_rec sigma numrels) tyary ||
-      Array.exists (has_fv_rec sigma (numrels+n)) funary
+      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
+        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
+
+let first_fv sigma term : int option =
+  first_fv_rec sigma 0 term
 
 let has_fv sigma term : bool =
-  has_fv_rec sigma 0 term
+  Stdlib.Option.is_some (first_fv sigma term)
 
 let specialize_ctnt_app env sigma ctnt args =
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma ctnt in
@@ -531,16 +534,27 @@ let specialize_ctnt_app env sigma ctnt args =
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let static_args = CArray.filter_with static_flags args in
-  (Array.iter (fun arg ->
-    if has_fv sigma arg then
-      user_err (Pp.str "A free variable found in" ++ spc () ++ Printer.pr_econstr_env env sigma arg))
+  let nf_static_args = Array.map (Reductionops.nf_all env sigma) static_args in
+  (Array.iteri (fun i arg ->
+    let nf_arg = nf_static_args.(i) in
+    let fv_opt = first_fv sigma nf_arg in
+    match fv_opt with
+    | None -> ()
+    | Some k ->
+      user_err (Pp.str "Free variable found in a static argument:" ++ spc () ++
+        Printer.pr_constant env ctnt ++
+        Pp.str "'s" ++ spc () ++
+        Pp.str (CString.ordinal (i+1)) ++ spc () ++
+        Pp.str "static argument" ++ spc () ++
+        Printer.pr_econstr_env env sigma arg ++ spc () ++
+        Pp.str "refer" ++ spc () ++
+        Printer.pr_econstr_env env sigma (mkRel k)))
     static_args);
-  let static_args = Array.map (Reductionops.nf_all env sigma) static_args in
-  let static_args = CArray.map_to_list (EConstr.to_constr sigma) static_args in
-  let (_, partapp) = build_partapp env sigma ctnt sd_list static_args in
+  let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
+  let (_, partapp) = build_partapp env sigma ctnt sd_list nf_static_args in
   Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-    | None -> specialization_instance_internal env sigma ctnt static_args None
+    | None -> specialization_instance_internal env sigma ctnt nf_static_args None
     | Some sp_inst -> sp_inst
   in
   let sp_ctnt = sp_inst.sp_partapp_ctnt in

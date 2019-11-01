@@ -96,6 +96,26 @@ let iota_ary m n =
 let iota_list m n =
   Array.to_list (iota_ary m n)
 
+let rec array_option_exists_rec p a n i =
+  if n <= i then
+    None
+  else
+    let v = p a.(i) in
+    match v with
+    | None -> array_option_exists_rec p a n (i+1)
+    | Some _ -> v
+
+let shortcut_option_or o f =
+  match o with
+  | None -> f ()
+  | Some _ -> o
+
+let array_option_exists p a =
+  array_option_exists_rec p a (Array.length a) 0
+
+let int_pred i = i - 1
+let int_succ i = i + 1
+
 let pp_join_ary sep ary =
   if Array.length ary = 0 then
     mt ()
