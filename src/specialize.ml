@@ -54,11 +54,11 @@ let codegen_print_specialization funcs =
   let pr_inst sp_inst =
     let pr_names =
       Pp.str "=>" ++ spc () ++
-      Constant.print sp_inst.sp_partapp_ctnt ++ spc () ++
+      Printer.pr_constant env sp_inst.sp_partapp_ctnt ++ spc () ++
       (match sp_inst.sp_specialization_name with
       | SpNoName -> Pp.str "_"
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
-      | SpDefinedCtnt ctnt -> Constant.print ctnt)
+      | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
     in
     let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
                                 sp_inst.sp_static_arguments in
@@ -109,7 +109,8 @@ let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d 
   let ctnt = ctnt_of_qualid env func in
   (if Cmap.mem ctnt !specialize_config_map then
     user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constant env ctnt));
-  ignore (codegen_specialization_define_arguments ctnt sd_list)
+  ignore (codegen_specialization_define_arguments ctnt sd_list);
+  Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt)
 
 let rec determine_sd_list env sigma ty =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
@@ -262,7 +263,7 @@ let codegen_specialization_instance
   let (sigma, args) = interp_args env sigma user_args in
   let ctnt = ctnt_of_qualid env func in
   ignore (specialization_instance_internal env sigma ctnt args (Some names));
-  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Constant.print ctnt)
+  Feedback.msg_info (Pp.str "Specialization instance defined:" ++ spc () ++ Printer.pr_constant env ctnt)
 
 let check_convertible phase env sigma t1 t2 =
   if Reductionops.is_conv env sigma t1 t2 then
@@ -740,7 +741,7 @@ let codegen_specialization_specialize
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  Feedback.msg_info (Pp.str "specialized defined:" ++ spc () ++ Constant.print ctnt)
+  Feedback.msg_info (Pp.str "specialized defined:" ++ spc () ++ Printer.pr_constant env ctnt)
 
   (*
   let name =
@@ -762,5 +763,5 @@ let codegen_specialization_specialize
     Cmap.add ctnt { sp_cfg with
       sp_instance_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map
     };
-  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Constant.print ctnt)
+  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Printer.pr_constant env ctnt)
   *)
