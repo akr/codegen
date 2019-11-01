@@ -31,7 +31,7 @@ open Cgenutil
 module ConstrMap = HMap.Make(Constr)
 
 type specialization_instance_name_status =
-  SpNoName | SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
+  SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
 
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
@@ -56,7 +56,6 @@ let codegen_print_specialization funcs =
       Pp.str "=>" ++ spc () ++
       Printer.pr_constant env sp_inst.sp_partapp_ctnt ++ spc () ++
       (match sp_inst.sp_specialization_name with
-      | SpNoName -> Pp.str "_"
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
       | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
     in
@@ -190,17 +189,14 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   let t = Evarutil.flush_and_check_evars sigma t in
   (sigma, t)
 
-let gensym_partapp_num = Summary.ref 0 ~name:"CodegenPartAppNum"
-let gensym_partapp suffix =
-  let n = !gensym_partapp_num in
-  gensym_partapp_num := n + 1;
-  let s = "codegen_p" ^ string_of_int n in
-  let s = if suffix = "" then
-            s
-          else
-            s ^ "_" ^ suffix
-  in
-  Id.of_string s
+let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
+let gensym_ps suffix =
+  let n = !gensym_ps_num in
+  gensym_ps_num := n + 1;
+  let suffix2 = if suffix = "" then suffix else "_" ^ suffix in
+  let p = "codegen_p" ^ string_of_int n ^ suffix2 in
+  let s = "codegen_s" ^ string_of_int n ^ suffix2 in
+  (Id.of_string p, Id.of_string s)
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
     (user_args : Constrexpr.constr_expr list) : Evd.evar_map * Constr.t list =
@@ -222,12 +218,15 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured"));
-  let specialization_name = (match names_opt with
-      | Some { spi_specialized_id = Some id } -> SpExpectedId id | _ -> SpNoName) in
   let cfunc_name = (match names_opt with
       | Some { spi_cfunc_name = Some name } -> Some name | _ -> None) in
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
+      let specialization_name = match names_opt with
+        | Some { spi_specialized_id = Some id } -> SpExpectedId id
+        | _ -> let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
+               SpExpectedId s_id
+      in
       {
         sp_static_arguments = [];
         sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
@@ -235,17 +234,27 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         sp_cfunc_name = cfunc_name;
       }
     else
-      let partapp_id = match names_opt with
-        | Some { spi_partapp_id = Some id } -> id | _ -> gensym_partapp (Label.to_string (Constant.label ctnt)) in
+      let (p_id, s_id) = match names_opt with
+        | Some { spi_partapp_id = Some p_id;
+                 spi_specialized_id = Some s_id } -> (p_id, s_id)
+        | _ ->
+            let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
+            let p_id_opt = (match names_opt with | Some { spi_partapp_id = Some p_id } -> Some p_id | _ -> None) in
+            let s_id_opt = (match names_opt with | Some { spi_specialized_id = Some s_id } -> Some s_id | _ -> None) in
+            (
+              (Stdlib.Option.fold ~none:p_id ~some:(fun x -> x) p_id_opt),
+              (Stdlib.Option.fold ~none:s_id ~some:(fun x -> x) s_id_opt)
+            )
+      in
       let univs = Evd.univ_entry ~poly:false sigma in
       let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
       let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
-      let declared_ctnt = Declare.declare_constant partapp_id (defent, kind) in
+      let declared_ctnt = Declare.declare_constant p_id (defent, kind) in
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       {
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
-        sp_specialization_name = specialization_name;
+        sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = (match names_opt with
           | Some { spi_cfunc_name = Some name } -> Some name | _ -> None);
       }
@@ -744,18 +753,6 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let gensym_specialized_num = Summary.ref 0 ~name:"CodegenSpecializedNum"
-let gensym_specialized suffix =
-  let n = !gensym_specialized_num in
-  gensym_specialized_num := n + 1;
-  let s = "codegen_s" ^ string_of_int n in
-  let s = if suffix = "" then
-            s
-          else
-            s ^ "_" ^ suffix
-  in
-  Id.of_string s
-
 let codegen_specialization_specialize
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr list) =
@@ -773,7 +770,6 @@ let codegen_specialization_specialize
     | Some sp_inst -> sp_inst
   in
   let name = (match sp_inst.sp_specialization_name with
-    | SpNoName -> gensym_specialized (Label.to_string (Constant.label ctnt))
     | SpExpectedId id -> id
     | SpDefinedCtnt _ -> user_err (Pp.str "specialization already defined"))
   in
@@ -811,26 +807,3 @@ let codegen_specialization_specialize
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
   Feedback.msg_info (Pp.str "specialized defined:" ++ spc () ++ Printer.pr_constant env ctnt)
-
-  (*
-  let name =
-    match names.spi_partapp_id with
-    | Some id -> id
-    | None -> gensym_partapp ()
-  in
-  let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
-  let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
-  let ctnt = Declare.declare_constant name (defent, kind) in
-  let sp_inst = {
-    sp_static_arguments = args;
-    sp_partapp_ctnt = ctnt;
-    sp_specialized_id = None;
-    sp_specialized_ctnt = None }
-  in
-  specialize_config_map := !specialize_config_map |>
-    Cmap.add ctnt { sp_cfg with
-      sp_instance_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map
-    };
-  Feedback.msg_info (Pp.str "partapp defined:" ++ spc () ++ Printer.pr_constant env ctnt)
-  *)
