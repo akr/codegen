@@ -241,6 +241,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
       let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
       let declared_ctnt = Declare.declare_constant partapp_id (defent, kind) in
+      Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       {
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
@@ -799,6 +800,7 @@ let codegen_specialization_specialize
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term6)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
+  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
   let sp_inst2 = {
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
