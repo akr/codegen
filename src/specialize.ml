@@ -199,13 +199,12 @@ let gensym_ps suffix =
   (Id.of_string p, Id.of_string s)
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
-    (user_args : Constrexpr.constr_expr list) : Evd.evar_map * Constr.t list =
+    (user_args : Constrexpr.constr_expr list) : Evd.evar_map * EConstr.t list =
   let interp_arg sigma user_arg =
     let sigma0 = sigma in
     let (sigma, arg) = Constrintern.interp_constr_evars env sigma user_arg in
     (* Feedback.msg_info (Printer.pr_econstr_env env sigma arg); *)
     Pretyping.check_evars env sigma0 sigma arg;
-    let arg = Evarutil.flush_and_check_evars sigma arg in
     (sigma, arg)
   in
   CList.fold_left_map interp_arg sigma user_args
@@ -217,7 +216,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   in
   let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
-    user_err (Pp.str "specialization instance already configured"));
+    user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = (match names_opt with
       | Some { spi_cfunc_name = Some name } -> Some name | _ -> None) in
   let sp_inst =
@@ -272,6 +271,8 @@ let codegen_specialization_instance
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
+  let args = List.map (Reductionops.nf_all env sigma) args in
+  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let ctnt = ctnt_of_qualid env func in
   ignore (specialization_instance_internal env sigma ctnt args (Some names))
 
@@ -759,6 +760,8 @@ let codegen_specialization_specialize
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
+  let args = List.map (Reductionops.nf_all env sigma) args in
+  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let ctnt = ctnt_of_qualid env func in
   let sp_cfg = match Cmap.find_opt ctnt !specialize_config_map with
     | None -> user_err (Pp.str "specialization arguments not configured")
