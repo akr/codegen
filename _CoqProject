@@ -3,6 +3,7 @@
 -Q src codegen
 
 src/cgenutil.ml
+src/ind.ml
 src/g_codegen.mlg
 src/monomorph.ml
 src/specialize.ml

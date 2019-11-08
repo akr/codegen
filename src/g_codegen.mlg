@@ -29,6 +29,7 @@ open Specialize
 open Linear
 open Genc
 open Cgenutil
+open Ind
 
 open Stdarg (* for wit_string *)
 (*open Constrarg*) (* for wit_global *)
