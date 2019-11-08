@@ -70,6 +70,28 @@ let array_fold_right_map f a e =
   in
   (a', !eref)
 
+let array_find_index_opt (p : 'a -> bool) (ary : 'a array) : int option =
+  let len = Array.length ary in
+  let rec aux i =
+    if len <= i then
+      None
+    else if p (Array.get ary i) then
+      Some i
+    else
+      aux (i + 1)
+  in
+  aux 0
+
+let array_copy_set (ary : 'a array) (i : int) (v : 'a) : 'a array =
+  let ret = Array.copy ary in
+  Array.set ret i v;
+  ret
+
+let array_find_index (p : 'a -> bool) (ary : 'a array) : int =
+  match array_find_index_opt p ary with
+  | None -> raise Not_found
+  | Some i -> i
+
 let rec ncons n x s =
   if n = 0 then
     s
