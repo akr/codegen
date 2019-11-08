@@ -559,6 +559,27 @@ let array_map3 f a b c =
   if Array.length c <> n then raise (Invalid_argument "array_map3");
   Array.init n (fun i -> f a.(i) b.(i) c.(i))
 
+let constr_name term =
+  match Constr.kind term with
+  | Constr.Rel _ -> "Rel"
+  | Constr.Var _ -> "Var"
+  | Constr.Meta _ -> "Meta"
+  | Constr.Evar _ -> "Evar"
+  | Constr.Sort _ -> "Sort"
+  | Constr.Cast _ -> "Cast"
+  | Constr.Prod _ -> "Prod"
+  | Constr.Lambda _ -> "Lambda"
+  | Constr.LetIn _ -> "LetIn"
+  | Constr.App _ -> "App"
+  | Constr.Const _ -> "Const"
+  | Constr.Ind _ -> "Ind"
+  | Constr.Construct _ -> "Construct"
+  | Constr.Case _ -> "Case"
+  | Constr.Fix _ -> "Fix"
+  | Constr.CoFix _ -> "CoFix"
+  | Constr.Proj _ -> "Proj"
+  | Constr.Int _ -> "Int"
+
 let genc_case_branch_body env (sigma : Evd.evar_map) context (bodyfunc : Environ.env -> Evd.evar_map -> context_elt list -> Constr.constr -> Pp.t) exprty exprvar ndecls br cstr_index =
   let (decls, body) = strip_outer_lambdas ndecls br in
   let decls2 =
@@ -635,7 +656,7 @@ let rec genc_body_var env sigma context (namehint : Names.Name.t) term termty =
       varname)
   | Constr.Const ctntu ->
       genc_geninitvar termty namehint (genc_const env sigma context ctntu)
-  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env sigma term))
+  | _ -> (user_err (str "not impelemented (genc_body_var:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* not tail position. assign to the specified variable *)
 and genc_body_assign env sigma context retvar term =
@@ -658,7 +679,7 @@ and genc_body_assign env sigma context retvar term =
   | Constr.Const ctntu ->
       genc_assign (str retvar) (genc_const env sigma context ctntu)
 
-  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env sigma term))
+  | _ -> (user_err (str "not impelemented (genc_body_assign:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* tail position.  usual return. *)
 let rec genc_body_tail env sigma context term =
@@ -685,7 +706,7 @@ let rec genc_body_tail env sigma context term =
   | Constr.Const ctntu ->
       genc_return (genc_const env sigma context ctntu)
 
-  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env sigma term))
+  | _ -> (user_err (str "not impelemented (genc_body_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* tail position.  assign and return. *)
 let rec genc_body_void_tail env sigma retvar context term =
@@ -713,7 +734,7 @@ let rec genc_body_void_tail env sigma retvar context term =
   | Constr.Const ctntu ->
       genc_void_return retvar (genc_const env sigma context ctntu)
 
-  | _ -> (user_err (str "not impelemented: " ++ Printer.pr_constr_env env sigma term))
+  | _ -> (user_err (str "not impelemented (genc_body_void_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (*
 let rec copy_term term =
