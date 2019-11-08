@@ -475,9 +475,12 @@ let genc_app env sigma context f argsary =
       (*Feedback.msg_info (Printer.pr_constr_env env sigma ty);*)
       let fname_argn = c_cstrname ty cstru in
       let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
-      str fname_argn ++ str "(" ++
-      pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
-      str ")"
+      if Array.length argvars = 0 then
+        str fname_argn
+      else
+        str fname_argn ++ str "(" ++
+        pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
+        str ")"
   | _ -> assert false
 
 let genc_multi_assign assignments =
@@ -531,6 +534,9 @@ let genc_goto context ctxrec argsary =
 
 let genc_const env sigma context ctntu =
   genc_app env sigma context (Constr.mkConstU ctntu) [| |]
+
+let genc_construct env sigma context cstru =
+  genc_app env sigma context (Constr.mkConstructU cstru) [| |]
 
 let split_case_tyf tyf =
   match Constr.kind tyf with
@@ -656,6 +662,8 @@ let rec genc_body_var env sigma context (namehint : Names.Name.t) term termty =
       varname)
   | Constr.Const ctntu ->
       genc_geninitvar termty namehint (genc_const env sigma context ctntu)
+  | Constr.Construct cstru ->
+      genc_geninitvar termty namehint (genc_construct env sigma context cstru)
   | _ -> (user_err (str "not impelemented (genc_body_var:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* not tail position. assign to the specified variable *)
@@ -678,7 +686,8 @@ and genc_body_assign env sigma context retvar term =
         (fun envb sigma context2 body -> genc_body_assign envb sigma context2 retvar body)
   | Constr.Const ctntu ->
       genc_assign (str retvar) (genc_const env sigma context ctntu)
-
+  | Constr.Construct cstru ->
+      genc_assign (str retvar) (genc_construct env sigma context cstru)
   | _ -> (user_err (str "not impelemented (genc_body_assign:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* tail position.  usual return. *)
@@ -705,7 +714,8 @@ let rec genc_body_tail env sigma context term =
       genc_case_nobreak env sigma context ci tyf expr brs genc_body_tail
   | Constr.Const ctntu ->
       genc_return (genc_const env sigma context ctntu)
-
+  | Constr.Construct cstru ->
+      genc_return (genc_construct env sigma context cstru)
   | _ -> (user_err (str "not impelemented (genc_body_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* tail position.  assign and return. *)
@@ -733,7 +743,8 @@ let rec genc_body_void_tail env sigma retvar context term =
         (fun envb sigma -> genc_body_void_tail envb sigma retvar)
   | Constr.Const ctntu ->
       genc_void_return retvar (genc_const env sigma context ctntu)
-
+  | Constr.Construct cstru ->
+      genc_void_return retvar (genc_construct env sigma context cstru)
   | _ -> (user_err (str "not impelemented (genc_body_void_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (*
