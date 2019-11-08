@@ -719,7 +719,7 @@ let rec genc_body_tail env sigma context term =
   | _ -> (user_err (str "not impelemented (genc_body_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (* tail position.  assign and return. *)
-let rec genc_body_void_tail env sigma retvar context term =
+let rec genc_mufun_body_tail env sigma retvar context term =
   match Constr.kind term with
   | Constr.Rel i ->
       genc_void_return retvar (str (varname_of_rel context i))
@@ -730,7 +730,7 @@ let rec genc_body_void_tail env sigma retvar context term =
       let (exprbody, varname) = genc_body_var env sigma context name expr exprty in
       exprbody ++
       (if ismt exprbody then mt () else spc ()) ++
-      genc_body_void_tail env2 sigma retvar (CtxVar varname :: context) body
+      genc_mufun_body_tail env2 sigma retvar (CtxVar varname :: context) body
   | Constr.App (f, argsary) ->
       (match Constr.kind f with
       | Constr.Rel i ->
@@ -740,12 +740,12 @@ let rec genc_body_void_tail env sigma retvar context term =
       | _ -> genc_void_return retvar (genc_app env sigma context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
       genc_case_nobreak env sigma context ci tyf expr brs
-        (fun envb sigma -> genc_body_void_tail envb sigma retvar)
+        (fun envb sigma -> genc_mufun_body_tail envb sigma retvar)
   | Constr.Const ctntu ->
       genc_void_return retvar (genc_const env sigma context ctntu)
   | Constr.Construct cstru ->
       genc_void_return retvar (genc_construct env sigma context cstru)
-  | _ -> (user_err (str "not impelemented (genc_body_void_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
+  | _ -> (user_err (str "not impelemented (genc_mufun_body_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
 (*
 let rec copy_term term =
@@ -958,7 +958,7 @@ let genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary =
                       (fun (var, ty) -> hv 0 (str var ++ spc () ++ str "=" ++ spc () ++ str "((struct" ++ spc () ++ str nm ++ spc () ++ str "*)argsp)->" ++ str var ++ str ";"))
                       fargs) ++ spc () ++
                   (if tailcall then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
-                  genc_body_void_tail envb sigma ("(*(" ^ c_typename rety ^ " *)retp)") context body ++ spc () ++
+                  genc_mufun_body_tail envb sigma ("(*(" ^ c_typename rety ^ " *)retp)") context body ++ spc () ++
                   str "return;")))
             ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
     str "}")
