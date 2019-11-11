@@ -732,7 +732,8 @@ let terminate_mono env sigma term =
           let fty = constant_type env sigma (fctnt, EInstance.kind sigma u) in
           let num_type_args = count_type_args sigma fty in
           (if Array.length args <> num_type_args then
-            raise (CodeGenError "terminate_mono"));
+            user_err (Pp.str "unexpected number of arguments:" ++ spc () ++
+              Printer.pr_econstr_env env sigma term));
           terminate_mono_global_def env sigma (ConstRef fctnt) args
       | _ -> user_err (Pp.str "not constant application"))
   | _ -> user_err (Pp.str "must be constant application")
