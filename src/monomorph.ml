@@ -601,24 +601,22 @@ let rec mono_global_def env (sigma : Evd.evar_map) fctntu type_args =
   if List.mem_assoc (ConstRef fctnt, type_args) !mono_global_visited then
     List.assoc (ConstRef fctnt, type_args) !mono_global_visited
   else
-    let id_term (*unused?*)= mkApp (mkConst fctnt, type_args) in
-    Feedback.msg_info (str "monomorphization start:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+    (Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":start:" ++ pp_prejoin_ary (spc ()) (Array.map (Printer.pr_econstr_env env sigma) type_args));
     let value_and_type = Environ.constant_value_and_type env fctntu in
     match value_and_type with
     | (Some term, termty, uconstraints) ->
       let term = expand_type env sigma (EConstr.of_constr term) in
-      Feedback.msg_info (str "monomorphization 1:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":1");
       let term = beta_lambda_ary sigma term type_args in
-      Feedback.msg_info (str "monomorphization 2:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":2");
       let term = mono_local sigma term in
-      Feedback.msg_info (str "monomorphization 3:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
-      let term = mono_global env sigma term in
-      Feedback.msg_info (str "monomorphization 4:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":3");
+      let term = mono_global env sigma fctnt term in
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":4");
       let term = stmt term in
       let term = seq_let sigma term in
-      Feedback.msg_info (str "monomorphization 5:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":5");
       let term = deanonymize_term env sigma term in
-      (* Feedback.msg_info (Printer.pr_constr_env env sigma id_term ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr term);*)
       let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr sigma) type_args)) in
       let constant = Declare.declare_definition id
         (EConstr.to_constr sigma term,
@@ -626,9 +624,9 @@ let rec mono_global_def env (sigma : Evd.evar_map) fctntu type_args =
       Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
         Printer.pr_constr_env env sigma (EConstr.to_constr sigma (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
       mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
-      Feedback.msg_info (str "monomorphization end:" ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma id_term));
+      Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":end");
       constant
-    | _ -> user_err (Pp.str "constant value couldn't obtained:" ++ Printer.pr_constant env fctnt)
+    | _ -> user_err (Pp.str "constant value couldn't obtained:" ++ Printer.pr_constant env fctnt))
 
 and mono_global_const_app env sigma fctntu argsary =
   let fty = constant_type env sigma fctntu in
@@ -664,47 +662,47 @@ and mono_global_cstr_app env sigma fcstru argsary =
   let constant = mono_constr_def env sigma fcstr mutind i j param_args in
   mkApp (mkConst constant, rest_args);
 
-and mono_global env sigma term =
-Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma term));
+and mono_global env sigma gctnt term =
+  Feedback.msg_info (str "mono_global:" ++ Printer.pr_constant env gctnt ++ str ":" ++ spc () ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma term));
   match EConstr.kind sigma term with
   | Constr.Rel i -> mkRel i
   | Constr.Var name -> mkVar name
   | Constr.Meta i -> mkMeta i
-  | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env sigma) termary))
+  | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env sigma gctnt) termary))
   | Constr.Sort s -> mkSort (ESorts.kind sigma s)
-  | Constr.Cast (expr, kind, ty) -> mkCast (mono_global env sigma expr, kind, mono_global env sigma ty)
+  | Constr.Cast (expr, kind, ty) -> mkCast (mono_global env sigma gctnt expr, kind, mono_global env sigma gctnt ty)
   | Constr.Prod (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkProd (name, mono_global env sigma ty, mono_global env2 sigma body)
+      mkProd (name, mono_global env sigma gctnt ty, mono_global env2 sigma gctnt body)
   | Constr.Lambda (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (name, mono_global env sigma ty, mono_global env2 sigma body)
+      mkLambda (name, mono_global env sigma gctnt ty, mono_global env2 sigma gctnt body)
   | Constr.LetIn (name, expr, ty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLetIn (name, mono_global env sigma expr, mono_global env sigma ty, mono_global env2 sigma body)
+      mkLetIn (name, mono_global env sigma gctnt expr, mono_global env sigma gctnt ty, mono_global env2 sigma gctnt body)
   | Constr.App (f, argsary) ->
       (match kind sigma f with
-      | Constr.Const (fctnt,u) -> mono_global_const_app env sigma (fctnt,EInstance.kind sigma u) (Array.map (mono_global env sigma) argsary)
-      | Constr.Construct (fcstr,u) -> mono_global_cstr_app env sigma (fcstr,EInstance.kind sigma u) (Array.map (mono_global env sigma) argsary)
-      | _ -> mkApp (mono_global env sigma f, Array.map (mono_global env sigma) argsary))
+      | Constr.Const (fctnt,u) -> mono_global_const_app env sigma (fctnt,EInstance.kind sigma u) (Array.map (mono_global env sigma gctnt) argsary)
+      | Constr.Construct (fcstr,u) -> mono_global_cstr_app env sigma (fcstr,EInstance.kind sigma u) (Array.map (mono_global env sigma gctnt) argsary)
+      | _ -> mkApp (mono_global env sigma gctnt f, Array.map (mono_global env sigma gctnt) argsary))
   | Constr.Const (ctnt,u) -> mono_check_const env sigma (ctnt,EInstance.kind sigma u); mono_global_const_app env sigma (ctnt,EInstance.kind sigma u) [| |]
   | Constr.Ind iu -> mkIndU iu
   | Constr.Construct (cstr,u) -> mono_global_cstr_app env sigma (cstr,EInstance.kind sigma u) [| |]
-  | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, mono_global env sigma tyf, mono_global env sigma expr, Array.map (mono_global env sigma) brs)
+  | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, mono_global env sigma gctnt tyf, mono_global env sigma gctnt expr, Array.map (mono_global env sigma gctnt) brs)
   | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkFix ((ia, i), (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env2 sigma) funary))
+      mkFix ((ia, i), (nameary, Array.map (mono_global env sigma gctnt) tyary, Array.map (mono_global env2 sigma gctnt) funary))
   | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkCoFix (i, (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env2 sigma) funary))
+      mkCoFix (i, (nameary, Array.map (mono_global env sigma gctnt) tyary, Array.map (mono_global env2 sigma gctnt) funary))
   | Constr.Proj (proj, expr) ->
-      mkProj (proj, mono_global env sigma expr)
+      mkProj (proj, mono_global env sigma gctnt expr)
   | Constr.Int n -> mkInt n
 
-let mono env sigma term = mono_global env sigma (mono_local sigma term)
+let mono env sigma gctnt term = mono_global env sigma gctnt (mono_local sigma term)
 
 let monomorphization_single libref =
   let gref = Smartlocate.global_with_alias libref in
