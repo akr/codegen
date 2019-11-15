@@ -673,9 +673,18 @@ Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env sigma (
   | Constr.Evar (ekey, termary) -> mkEvar (ekey, (Array.map (mono_global env sigma) termary))
   | Constr.Sort s -> mkSort (ESorts.kind sigma s)
   | Constr.Cast (expr, kind, ty) -> mkCast (mono_global env sigma expr, kind, mono_global env sigma ty)
-  | Constr.Prod (name, ty, body) -> mkProd (name, mono_global env sigma ty, mono_global env sigma body)
-  | Constr.Lambda (name, ty, body) -> mkLambda (name, mono_global env sigma ty, mono_global env sigma body)
-  | Constr.LetIn (name, expr, ty, body) -> mkLetIn (name, mono_global env sigma expr, mono_global env sigma ty, mono_global env sigma body)
+  | Constr.Prod (name, ty, body) ->
+      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+      let env2 = EConstr.push_rel decl env in
+      mkProd (name, mono_global env sigma ty, mono_global env2 sigma body)
+  | Constr.Lambda (name, ty, body) ->
+      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (name, mono_global env sigma ty, mono_global env2 sigma body)
+  | Constr.LetIn (name, expr, ty, body) ->
+      let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
+      let env2 = EConstr.push_rel decl env in
+      mkLetIn (name, mono_global env sigma expr, mono_global env sigma ty, mono_global env2 sigma body)
   | Constr.App (f, argsary) ->
       (match kind sigma f with
       | Constr.Const (fctnt,u) -> mono_global_const_app env sigma (fctnt,EInstance.kind sigma u) (Array.map (mono_global env sigma) argsary)
@@ -685,10 +694,12 @@ Feedback.msg_info (str "mono_global:start " ++ Printer.pr_constr_env env sigma (
   | Constr.Ind iu -> mkIndU iu
   | Constr.Construct (cstr,u) -> mono_global_cstr_app env sigma (cstr,EInstance.kind sigma u) [| |]
   | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, mono_global env sigma tyf, mono_global env sigma expr, Array.map (mono_global env sigma) brs)
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
-      mkFix ((ia, i), (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env sigma) funary))
-  | Constr.CoFix (i, (nameary, tyary, funary)) ->
-      mkCoFix (i, (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env sigma) funary))
+  | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkFix ((ia, i), (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env2 sigma) funary))
+  | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkCoFix (i, (nameary, Array.map (mono_global env sigma) tyary, Array.map (mono_global env2 sigma) funary))
   | Constr.Proj (proj, expr) ->
       mkProj (proj, mono_global env sigma expr)
   | Constr.Int n -> mkInt n
