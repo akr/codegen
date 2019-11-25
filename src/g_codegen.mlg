@@ -132,6 +132,13 @@ VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
       { codegen_print_inductive coq_type_list }
     | [ "Print" "CodeGen" "Specialization" ref_list(funcs)] ->
       { codegen_print_specialization funcs }
+
+    (*
+    | [ "CodeGen" "ArgTest" constr(x) ] ->
+      { Feedback.msg_info (Pp.str (constr_expr_cstr_name x)) }
+    | [ "CodeGen" "ArgTest2" constr_or_underscore(x) ] ->
+      { Feedback.msg_info (Pp.str (match x with None -> "None" | Some _ -> "Some"))}
+    *)
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF

@@ -219,6 +219,30 @@ let mangle_type ty =
   mangle_type_buf buf ty;
   Buffer.contents buf
 
+let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
+  match CAst.with_val (fun x -> x) c with
+  | Constrexpr.CRef _ -> "CRef"
+  | Constrexpr.CFix _ -> "CFix"
+  | Constrexpr.CCoFix _ -> "CCoFix"
+  | Constrexpr.CProdN _ -> "CProdN"
+  | Constrexpr.CLambdaN _ -> "CLambdaN"
+  | Constrexpr.CLetIn _ -> "CLetIn"
+  | Constrexpr.CAppExpl _ -> "CAppExpl"
+  | Constrexpr.CApp _ -> "CApp"
+  | Constrexpr.CRecord _ -> "CRecord"
+  | Constrexpr.CCases _ -> "CCases"
+  | Constrexpr.CLetTuple _ -> "CLetTuple"
+  | Constrexpr.CIf _ -> "CIf"
+  | Constrexpr.CHole _ -> "CHole"
+  | Constrexpr.CPatVar _ -> "CPatVar"
+  | Constrexpr.CEvar _ -> "CEvar"
+  | Constrexpr.CSort _ -> "CSort"
+  | Constrexpr.CCast _ -> "CCast"
+  | Constrexpr.CNotation _ -> "CNotation"
+  | Constrexpr.CGeneralization _ -> "CGeneralization"
+  | Constrexpr.CPrim _ -> "CPrim"
+  | Constrexpr.CDelimiters _ -> "CDelimiters"
+
 type cstr_config = {
   coq_cstr : Id.t;
   c_cstr : string option;
