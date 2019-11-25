@@ -40,7 +40,7 @@ open Ltac_plugin
 open Extraargs
 
 open Pcoq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
-(* open Pcoq.Constr *) (* for global(id) in VERNAC ARGUMENT EXTEND *)
+open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 }
 
 (*
@@ -111,6 +111,15 @@ VERNAC ARGUMENT EXTEND id_or_underscore
 | [ "_" ] -> { None }
 END
 
+(*
+  The order of constr(term) and "_" is important to parse "_" as None,
+  since "_" is valid expression as a constr,
+*)
+VERNAC ARGUMENT EXTEND constr_or_underscore
+| [ constr(term) ] -> { Some term }
+| [ "_" ] -> { None }
+END
+
 VERNAC ARGUMENT EXTEND sp_instance_names
 | [ "=>" string_opt(cfunc) id_or_underscore(partapp_id) id_or_underscore(specialized_id) ] -> { { spi_cfunc_name = cfunc; spi_partapp_id = partapp_id; spi_specialized_id = specialized_id } }
 | [ "=>" string_opt(cfunc) id_or_underscore(partapp_id) ] -> { { spi_cfunc_name = cfunc; spi_partapp_id = partapp_id; spi_specialized_id = None } }
@@ -138,7 +147,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Specialization" "AutoArguments" ref_list(func_list) ] ->
       { codegen_specialization_auto_arguments func_list }
 
-    | [ "CodeGen" "Specialization" "Instance" ref(func) constr_list(args) sp_instance_names(names) ] ->
+    | [ "CodeGen" "Specialization" "Instance" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
       { codegen_specialization_instance func args names }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
@@ -146,7 +155,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
       { codegen_local_inline func funcs }
 
-    | [ "CodeGen" "Specialization" "Specialize" ref(func) constr_list(args) ] ->
+    | [ "CodeGen" "Specialization" "Specialize" ref(func) constr_or_underscore_list(args) ] ->
       { codegen_specialization_specialize func args }
 
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->

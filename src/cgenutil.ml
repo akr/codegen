@@ -242,7 +242,11 @@ let pr_s_or_d sd =
   | SorD_S -> Pp.str "s"
   | SorD_D -> Pp.str "d"
 
+let drop_trailing_d sd_list =
+  List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
+
 type id_or_underscore = Id.t option
+type constr_or_underscore = Constrexpr.constr_expr option
 
 type sp_instance_names = {
   spi_cfunc_name : string option;

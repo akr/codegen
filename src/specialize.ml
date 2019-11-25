@@ -104,6 +104,23 @@ let codegen_specialization_define_arguments env ctnt sd_list =
   Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
   sp_cfg
 
+let codegen_specialization_define_or_check_arguments env ctnt sd_list =
+  match Cmap.find_opt ctnt !specialize_config_map with
+  | None ->
+      let sp_cfg = { sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+      specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
+      Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
+      sp_cfg
+  | Some sp_cfg ->
+      let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
+      let sd_list_new = drop_trailing_d sd_list in
+      (if sd_list_old <> sd_list_new then
+        user_err (Pp.str "inconsistent specialization configuration for" ++ spc () ++
+        Printer.pr_constant env ctnt ++ Pp.str ":" ++
+        pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_old) ++ spc () ++ Pp.str "expected but" ++
+        pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_new)));
+      sp_cfg
+
 let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) =
   let env = Global.env () in
   let ctnt = ctnt_of_qualid env func in
@@ -148,9 +165,6 @@ let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
-
-let drop_trailing_d sd_list =
-  List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
 let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (ctnt : Constant.t) (sd_list : s_or_d list)
@@ -266,14 +280,23 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
 
 let codegen_specialization_instance
     (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr list)
+    (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) =
+  let sd_list = List.map
+    (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
+    user_args
+  in
+  let user_args = List.filter_map
+    (fun arg -> match arg with None -> None| Some a -> Some a)
+    user_args
+  in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let ctnt = ctnt_of_qualid env func in
+  ignore (codegen_specialization_define_or_check_arguments env ctnt sd_list);
   ignore (specialization_instance_internal env sigma ctnt args (Some names))
 
 let check_convertible phase env sigma t1 t2 =
@@ -756,17 +779,22 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
 
 let codegen_specialization_specialize
     (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr list) =
+    (user_args : Constrexpr.constr_expr option list) =
+  let sd_list = List.map
+    (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
+    user_args
+  in
+  let user_args = List.filter_map
+    (fun arg -> match arg with None -> None| Some a -> Some a)
+    user_args
+  in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, args) = interp_args env sigma user_args in
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let ctnt = ctnt_of_qualid env func in
-  let sp_cfg = match Cmap.find_opt ctnt !specialize_config_map with
-    | None -> user_err (Pp.str "specialization arguments not configured")
-    | Some sp_cfg -> sp_cfg
-  in
+  let sp_cfg = codegen_specialization_define_or_check_arguments env ctnt sd_list in
   let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list args in
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> user_err (Pp.str "specialization instance not configured")
