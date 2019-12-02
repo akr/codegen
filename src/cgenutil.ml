@@ -181,7 +181,9 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
-let rec mangle_type_buf_short buf ty =
+let rec mangle_type_buf_short (buf : Buffer.t) (ty : Constr.t) =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   match Constr.kind ty with
   | Constr.Ind iu ->
       let (mutind, i) = Univ.out_punivs iu in
@@ -195,26 +197,26 @@ let rec mangle_type_buf_short buf ty =
       mangle_type_buf_short buf ty;
       Buffer.add_string buf "_to_";
       mangle_type_buf_short buf body
-  | Constr.Rel i -> raise (CodeGenError "mangle_type_buf_short:rel")
-  | Constr.Var name -> raise (CodeGenError "mangle_type_buf_short:var")
-  | Constr.Meta i -> raise (CodeGenError "mangle_type_buf_short:meta")
-  | Constr.Evar (ekey, termary) -> raise (CodeGenError "mangle_type_buf_short:evar")
-  | Constr.Sort s -> raise (CodeGenError "mangle_type_buf_short:sort")
-  | Constr.Cast (expr, kind, ty) -> raise (CodeGenError "mangle_type_buf_short:cast")
-  | Constr.Lambda (name, ty, body) -> raise (CodeGenError "mangle_type_buf_short:lambda")
-  | Constr.LetIn (name, expr, ty, body) -> raise (CodeGenError "mangle_type_buf_short:letin")
-  | Constr.Const cu -> raise (CodeGenError "mangle_type_buf_short:const")
-  | Constr.Construct cu -> raise (CodeGenError "mangle_type_buf_short:construct")
-  | Constr.Case (ci, tyf, expr, brs) -> raise (CodeGenError "mangle_type_buf_short:case")
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> raise (CodeGenError "mangle_type_buf_short:fix")
-  | Constr.CoFix (i, (nameary, tyary, funary)) -> raise (CodeGenError "mangle_type_buf_short:cofix")
-  | Constr.Proj (proj, expr) -> raise (CodeGenError "mangle_type_buf_short:proj")
-  | Constr.Int n -> raise (CodeGenError "mangle_type_buf_short:int")
+  | Constr.Rel i -> user_err (Pp.str "mangle_type_buf_short:rel:")
+  | Constr.Var name -> user_err (Pp.str "mangle_type_buf_short:var:")
+  | Constr.Meta i -> user_err (Pp.str "mangle_type_buf_short:meta:")
+  | Constr.Evar (ekey, termary) -> user_err (Pp.str "mangle_type_buf_short:evar:")
+  | Constr.Sort s -> user_err (Pp.str "mangle_type_buf_short:sort:")
+  | Constr.Cast (expr, kind, ty) -> user_err (Pp.str "mangle_type_buf_short:cast:")
+  | Constr.Lambda (name, ty, body) -> user_err (Pp.str "mangle_type_buf_short:lambda:")
+  | Constr.LetIn (name, expr, ty, body) -> user_err (Pp.str "mangle_type_buf_short:letin:")
+  | Constr.Const cu -> user_err (Pp.str "mangle_type_buf_short:const:" ++ Pp.spc () ++ Printer.pr_constr_env env sigma ty)
+  | Constr.Construct cu -> user_err (Pp.str "mangle_type_buf_short:construct:")
+  | Constr.Case (ci, tyf, expr, brs) -> user_err (Pp.str "mangle_type_buf_short:case:")
+  | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf_short:fix:")
+  | Constr.CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf_short:cofix:")
+  | Constr.Proj (proj, expr) -> user_err (Pp.str "mangle_type_buf_short:proj:")
+  | Constr.Int n -> user_err (Pp.str "mangle_type_buf_short:int:")
 
-let mangle_type_buf buf ty =
+let mangle_type_buf (buf : Buffer.t) (ty : Constr.t) =
   mangle_type_buf_short buf ty
 
-let mangle_type ty =
+let mangle_type (ty : Constr.t) =
   let buf = Buffer.create 0 in
   mangle_type_buf buf ty;
   Buffer.contents buf
