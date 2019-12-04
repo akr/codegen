@@ -221,6 +221,117 @@ let mangle_type (ty : Constr.t) =
   mangle_type_buf buf ty;
   Buffer.contents buf
 
+let rec count_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
+  match EConstr.kind sigma term with
+  | Constr.Rel _ | Constr.Var _ | Constr.Meta _ | Constr.Sort _ | Constr.Ind _
+  | Constr.Int _ | Constr.Const _ | Constr.Construct _ -> 0
+  | Constr.Evar _ -> 1
+  | Constr.Proj (proj, e) -> count_evars env sigma e
+  | Constr.Cast (e,ck,t) -> count_evars env sigma e + count_evars env sigma t
+  | Constr.App (f, args) ->
+      count_evars env sigma f +
+      Array.fold_left (fun n arg -> n + count_evars env sigma arg) 0 args
+  | Constr.LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let ne = count_evars env sigma e in
+      let nt = count_evars env sigma t in
+      let nb = count_evars env2 sigma b in
+      ne + nt + nb
+  | Constr.Case (ci, p, item, branches) ->
+      let np = count_evars env sigma p in
+      let nitem = count_evars env sigma item in
+      let nbranches = Array.fold_left (fun n arg -> n + count_evars env sigma arg) 0 branches in
+      np + nitem + nbranches
+  | Constr.Prod (x,t,b) | Constr.Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let nt = count_evars env sigma t in
+      let nb = count_evars env2 sigma b in
+      nt + nb
+  | Constr.Fix ((_, _), ((nameary, tary, fary) as prec))
+  | Constr.CoFix (_, ((nameary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let ntary = Array.fold_left (fun n ty -> n + count_evars env sigma ty) 0 tary in
+      let nfary = Array.fold_left (fun n f -> n + count_evars env2 sigma f) 0 fary in
+      ntary + nfary
+
+let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  let nb_rel_env0 = Environ.nb_rel env in
+  let nevars = count_evars env sigma term in
+  let nextrel = ref 0 in
+  let etypes = ref [] in
+  let rec aux1 env term =
+    match EConstr.kind sigma term with
+    | Constr.Rel _ | Constr.Var _ | Constr.Meta _ | Constr.Sort _ | Constr.Ind _
+    | Constr.Int _ | Constr.Const _ | Constr.Construct _ -> term
+    | Constr.Evar _ ->
+        let ety = Retyping.get_type_of env sigma term in
+        let ety = Reductionops.nf_all env sigma ety in
+        (if not (EConstr.Vars.closed0 sigma ety) then
+          user_err (Pp.str "type is not a closed term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ety));
+        (if Evarutil.has_undefined_evars sigma ety then
+          user_err (Pp.str "type of a hole contains a existential variable:" ++ Pp.spc() ++
+            Printer.pr_econstr_env env sigma term ++
+            Pp.spc () ++ Pp.str ":" ++ Pp.spc () ++
+            Printer.pr_econstr_env env sigma ety));
+        let i = !nextrel in
+        nextrel := i + 1;
+        etypes := ety :: !etypes;
+        EConstr.mkRel (Environ.nb_rel env - nb_rel_env0 + nevars - i)
+    | Constr.Proj (proj, e) -> EConstr.mkProj (proj, aux1 env e)
+    | Constr.Cast (e,ck,t) -> EConstr.mkCast (aux1 env e, ck, aux1 env t)
+    | Constr.App (f, args) ->
+        let f' = aux1 env f in
+        let args' = Array.map (aux1 env) args in (* assume left-to-right *)
+        EConstr.mkApp (f', args')
+    | Constr.LetIn (x,e,t,b) ->
+        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let env2 = EConstr.push_rel decl env in
+        let e' = aux1 env e in
+        let t' = aux1 env t in
+        let b' = aux1 env2 b in
+        EConstr.mkLetIn (x,e',t',b')
+    | Constr.Case (ci, p, item, branches) ->
+        let p' = aux1 env p in
+        let item' = aux1 env item in
+        let branches' = Array.map (aux1 env) branches in
+        EConstr.mkCase (ci, p', item', branches')
+    | Constr.Prod (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        let t' = aux1 env t in
+        let b' = aux1 env2 b in
+        EConstr.mkProd (x,t',b')
+    | Constr.Lambda (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        let t' = aux1 env t in
+        let b' = aux1 env2 b in
+        EConstr.mkLambda (x,t',b')
+    | Constr.Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+        let env2 = EConstr.push_rec_types prec env in
+        let tary' = Array.map (aux1 env) tary in
+        let fary' = Array.map (aux1 env2) fary in
+        EConstr.mkFix ((ia, i), (nary, tary', fary'))
+    | Constr.CoFix (i, ((nary, tary, fary) as prec)) ->
+        let env2 = EConstr.push_rec_types prec env in
+        let tary' = Array.map (aux1 env) tary in
+        let fary' = Array.map (aux1 env2) fary in
+        EConstr.mkCoFix (i, (nary, tary', fary'))
+  in
+  let rec aux2 etypes term =
+    match etypes with
+    | [] -> term
+    | ety :: etypes' ->
+        let x = Context.annotR (Namegen.named_hd env sigma ety Name.Anonymous) in
+        aux2 etypes' (EConstr.mkLambda (x, ety, term))
+  in
+  let term = EConstr.Vars.lift nevars term in
+  let term = aux2 !etypes (aux1 env term) in
+  ignore (Typing.type_of env sigma term); (* (@eq_refl nat _ : @eq nat _ _) should be rejected *)
+  term
+
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
   | Constrexpr.CRef _ -> "CRef"
