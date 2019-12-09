@@ -126,9 +126,6 @@ let check_ind_coq_type env sigma coq_type =
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
        user_err (Pp.str "coinductive type not supported:" ++ Pp.spc () ++
                  Printer.pr_constr_env env sigma coq_type));
-  (if mutind_body.Declarations.mind_nparams <>
-     mutind_body.Declarations.mind_nparams_rec then
-       raise (CodeGenError "inductive type has a recursively non-uniform parameter"));
   ignore oneind_body
 
 let ind_coq_type_registered_p coq_type =
