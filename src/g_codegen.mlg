@@ -131,6 +131,10 @@ VERNAC ARGUMENT EXTEND sp_instance_names
 | [ ] -> { { spi_cfunc_name = None; spi_partapp_id = None; spi_specialized_id = None } }
 END
 
+VERNAC ARGUMENT EXTEND ind_constructor
+| [ "|" ident(coq_cstr) "=>" string(c_cstr) ] -> { { ic_coq_cstr = coq_cstr; ic_c_cstr = c_cstr } }
+END
+
 VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
     | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
       { codegen_print_inductive coq_type_list }
@@ -156,8 +160,8 @@ END
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Type" lconstr(coq_type) "=>" string(c_type) ] ->
       { register_ind_type coq_type c_type }
-    | [ "CodeGen" "Inductive" "Constructor" lconstr(coq_type) "|" ident(coq_cstr) "=>" string(c_cstr) ] ->
-      { register_ind_cstr coq_type coq_cstr c_cstr }
+    | [ "CodeGen" "Inductive" "Constructor" lconstr(coq_type) ind_constructor_list(cstr_namepair_list) ] ->
+      { register_ind_cstr coq_type cstr_namepair_list }
     | [ "CodeGen" "Inductive" "Match" constr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 

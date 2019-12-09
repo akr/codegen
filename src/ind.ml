@@ -158,7 +158,7 @@ let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string)
     cstr_configs=cstr_cfgs } in
   ind_config_map := ConstrMap.add coq_type ent !ind_config_map
 
-let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
+let register_ind_cstr1 (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
     (c_cstr : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -185,6 +185,9 @@ let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
     { ind_cfg with
       cstr_configs = array_copy_set ind_cfg.cstr_configs j { cstr_cfg with c_cstr = Some c_cstr } }
     !ind_config_map
+
+let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (cstr_namepair_list : ind_constructor list) =
+  List.iter (fun { ic_coq_cstr = coq_cstr; ic_c_cstr = c_cstr } -> register_ind_cstr1 user_coq_type coq_cstr c_cstr) cstr_namepair_list
 
 let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
     (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =

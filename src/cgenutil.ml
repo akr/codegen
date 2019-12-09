@@ -391,3 +391,7 @@ type sp_instance_names = {
   spi_specialized_id : Id.t option
 }
 
+type ind_constructor = {
+  ic_coq_cstr : Id.t;
+  ic_c_cstr : string;
+}
