@@ -44,38 +44,39 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 }
 
 (*
-  CodeGen Inductive Type COQ_TYPE "C_TYPE".
-  CodeGen Inductive Constructor COQ_TYPE CONSTRUCTOR "C_CONSTRUCTOR".
-  CodeGen Inductive Match COQ_TYPE "C_SWFUNC" (CONSTRUCTOR "C_CASELABEL" "C_ACCESSOR"* )*.
+  CodeGen Inductive Type COQ_TYPE => "C_TYPE".
+  CodeGen Inductive Constructor COQ_TYPE | CONSTRUCTOR => "C_CONSTRUCTOR".
+  CodeGen Inductive Match COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
 
   Print CodeGen Inductive.              show all inductive types for codegen.
   Print CodeGen Inductive COQ_TYPE*     show the specified inductive types for codegen.
 
   Example:
 
-  CodeGen Inductive Type bool "bool".
-  CodeGen Inductive Constructor bool true "true".
-  CodeGen Inductive Constructor bool false "false".
-  CodeGen Inductive Match bool "" true "default" false "case 0".
+  CodeGen Inductive Type bool => "bool".
+  CodeGen Inductive Constructor bool | true => "true".
+  CodeGen Inductive Constructor bool | false => "false".
+  CodeGen Inductive Match bool => "" | true => "default" | false => "case 0".
   Print CodeGen Inductive bool.
 
-  CodeGen Inductive Type nat "uint64_t".
-  CodeGen Inductive Constructor nat O "0".
-  CodeGen Inductive Constructor nat S "succ".
-  CodeGen Inductive Match nat "" O "case 0" S "default" "pred".
+  CodeGen Inductive Type nat => "uint64_t".
+  CodeGen Inductive Constructor nat | O "0".
+  CodeGen Inductive Constructor nat | S "succ".
+  CodeGen Inductive Match nat => "" | O "case 0" | S "default" "pred".
   Print CodeGen Inductive nat.
 
-  CodeGen Inductive Type (option bool) "int".
-  CodeGen Inductive Constructor (option bool) None "(-1)".
-  CodeGen Inductive Constructor (option bool) Some "(int)".
-  CodeGen Inductive Match (option bool) "" None "case -1" Some "default" "".
+  CodeGen Inductive Type option bool => "int".
+  CodeGen Inductive Constructor option bool | None => "(-1)".
+  CodeGen Inductive Constructor option bool | Some => "(int)".
+  CodeGen Inductive Match option bool => "" | None => "case -1" | Some => "default" "".
   Print CodeGen Inductive (option bool).
 
   Print CodeGen Inductive.
 *)
 
 (*
-  CodeGen Specialize FUNCTION SorD*
+  CodeGen Specialization Arguments FUNCTION SorD*.
+  CodeGen Specialization Instance FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
 
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
@@ -86,6 +87,9 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Specialization Instance id nat.
   CodeGen Specialization Instance id nat => id_nat.
   CodeGen Specialization Instance id nat => id_nat id_nat_specialized.
+  CodeGen Specialization Instance id nat => "id_nat".
+  CodeGen Specialization Instance id nat => "id_nat" id_nat.
+  CodeGen Specialization Instance id nat => "id_nat" id_nat id_nat_specialized.
 
   CodeGen Specialization Specialize id nat
 
