@@ -47,14 +47,19 @@ let c_typename ty =
   | None -> c_id (mangle_type ty)
 
 let c_cstrname ty cstru =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   let ((mutind, i), j) = Univ.out_punivs cstru in
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.cstr_configs.(j-1).c_cstr with
       | Some c_cstr -> c_cstr
-      | None -> raise (CodeGenError "inductive constructor configuration not registered"))
+      | None -> user_err (
+        Pp.str "inductive constructor not configured:" ++ Pp.spc () ++
+        Id.print ind_cfg.cstr_configs.(j-1).coq_cstr ++ Pp.spc () ++
+        Pp.str "for" ++ Pp.spc () ++
+        Printer.pr_constr_env env sigma ind_cfg.coq_type))
   | None ->
-      let env = Global.env () in
       let mind_body = Environ.lookup_mind mutind env in
       let oind_body = mind_body.Declarations.mind_packets.(i) in
       let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
@@ -64,11 +69,15 @@ let c_cstrname ty cstru =
       fname_argn
 
 let case_swfunc ty =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some c_swfunc -> c_swfunc
-      | None -> raise (CodeGenError "inductive match configuration not registered"))
+      | None -> user_err (
+        Pp.str "inductive match configuration not registered:" ++ Pp.spc () ++
+        Printer.pr_lconstr_env env sigma ind_cfg.coq_type))
   | None -> c_id ("sw_" ^ (mangle_type ty))
 
 let case_cstrlabel_short ty j =
@@ -76,7 +85,7 @@ let case_cstrlabel_short ty j =
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
-      | None -> raise (CodeGenError "inductive match configuration not registered"))
+      | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
   | None ->
       let env = Global.env () in
       let indty =
@@ -98,7 +107,7 @@ let case_cstrfield_short ty j k =
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
-      | None -> raise (CodeGenError "inductive match configuration not registered"))
+      | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
   | None ->
       let env = Global.env () in
       let indty =

@@ -98,8 +98,12 @@ let codegen_print_inductive coq_type_list =
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
 let get_ind_coq_type env coq_type =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   let (f, args) = Constr.decompose_app coq_type in
-  (if not (Constr.isInd f) then raise (CodeGenError "not an inductive type"));
+  (if not (Constr.isInd f) then
+    user_err (Pp.str "inductive type expected:" ++ Pp.spc () ++
+    Printer.pr_constr_env env sigma coq_type));
   let ind = Univ.out_punivs (Constr.destInd f) in
   let (mutind, i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
@@ -115,10 +119,13 @@ let get_ind_coq_type env coq_type =
  * - ...
  *)
 let check_ind_coq_type env sigma coq_type =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
-       raise (CodeGenError "coinductive type not supported"));
+       user_err (Pp.str "coinductive type not supported:" ++ Pp.spc () ++
+                 Printer.pr_constr_env env sigma coq_type));
   (if mutind_body.Declarations.mind_nparams <>
      mutind_body.Declarations.mind_nparams_rec then
        raise (CodeGenError "inductive type has a recursively non-uniform parameter"));
@@ -130,13 +137,20 @@ let ind_coq_type_registered_p coq_type =
   | None -> false
 
 let check_ind_coq_type_not_registered coq_type =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   if ind_coq_type_registered_p coq_type then
-    raise (CodeGenError "inductive type not registered")
+    user_err (Pp.str "inductive type already registered:" ++ Pp.spc () ++
+              Printer.pr_constr_env env sigma coq_type)
 
 let get_ind_config coq_type =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   match ConstrMap.find_opt coq_type !ind_config_map with
   | Some ind_cfg -> ind_cfg
-  | None -> raise (CodeGenError "inductive type already registered")
+  | None ->
+      user_err (Pp.str "inductive type not registered:" ++ Pp.spc () ++
+      Printer.pr_constr_env env sigma coq_type)
 
 let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
@@ -197,10 +211,16 @@ let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   let ind_cfg = get_ind_config coq_type in
   (match ind_cfg.c_swfunc with
-  | Some _ -> raise (CodeGenError "inductive match configuration already registered")
+  | Some _ -> user_err (
+      Pp.str "inductive match configuration already registered:" ++ Pp.spc () ++
+      Printer.pr_constr_env env sigma coq_type)
   | None -> ());
   (if List.length cstr_caselabel_accessors_list <> Array.length oneind_body.Declarations.mind_consnames then
-    raise (CodeGenError "inductive match: invalid number of constructors"));
+    user_err (Pp.str "inductive match: invalid number of constructors:" ++ Pp.spc () ++
+      Pp.str "needs" ++ Pp.spc () ++
+      Pp.int (Array.length oneind_body.Declarations.mind_consnames) ++ Pp.spc () ++
+      Pp.str "but" ++ Pp.spc () ++
+      Pp.int (List.length cstr_caselabel_accessors_list)));
   let f j cstr_cfg =
     let consname = Array.get oneind_body.Declarations.mind_consnames j in
     let p (cstr, caselabel, accessors) = Id.equal consname cstr in
@@ -211,7 +231,15 @@ let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string
         Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
     (if Array.get oneind_body.Declarations.mind_consnrealdecls j <> List.length accessors then
-      raise (CodeGenError "inductive match: invalid number of field accessors"));
+      user_err (Pp.str "inductive match: invalid number of field accessors:" ++
+      Pp.str "needs" ++ Pp.spc () ++
+      Pp.int (Array.get oneind_body.Declarations.mind_consnrealdecls j) ++ Pp.spc () ++
+      Pp.str "but" ++ Pp.spc () ++
+      Pp.int (List.length accessors) ++ Pp.spc () ++
+      Pp.str "for" ++ Pp.spc () ++
+      Id.print cstr_cfg.coq_cstr ++ Pp.spc () ++
+      Pp.str "of" ++ Pp.spc () ++
+      Printer.pr_constr_env env sigma coq_type));
     { cstr_cfg with c_caselabel = caselabel; c_accessors = Array.of_list accessors }
   in
   ind_config_map := ConstrMap.add coq_type
