@@ -101,7 +101,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 *)
 
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
-| [ ident(coq_cstr) string(caselabel) string_list(accessors) ] ->
+| [ "|" ident(coq_cstr) string(caselabel) string_list(accessors) ] ->
   { (coq_cstr, caselabel, accessors) }
 END
 
@@ -156,9 +156,9 @@ END
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Type" lconstr(coq_type) "=>" string(c_type) ] ->
       { register_ind_type coq_type c_type }
-    | [ "CodeGen" "Inductive" "Constructor" constr(coq_type) ident(coq_cstr) string(c_cstr) ] ->
+    | [ "CodeGen" "Inductive" "Constructor" lconstr(coq_type) "|" ident(coq_cstr) "=>" string(c_cstr) ] ->
       { register_ind_cstr coq_type coq_cstr c_cstr }
-    | [ "CodeGen" "Inductive" "Match" constr(coq_type) string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
+    | [ "CodeGen" "Inductive" "Match" constr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
     | [ "CodeGen" "Specialization" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
