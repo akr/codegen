@@ -206,7 +206,9 @@ let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string
     let p (cstr, caselabel, accessors) = Id.equal consname cstr in
     let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
     let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
-      | None -> raise (CodeGenError "inductive match: constructor not found");
+      | None -> user_err (
+        Pp.str "inductive match: constructor not found:" ++ Pp.spc () ++
+        Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
     (if Array.get oneind_body.Declarations.mind_consnrealdecls j <> List.length accessors then
       raise (CodeGenError "inductive match: invalid number of field accessors"));
