@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 open Names
 (*open Globnames*)
 open Pp
-(*open CErrors*)
+open CErrors
 
 open Cgenutil
 (*open Linear*)
@@ -93,7 +93,8 @@ let codegen_print_inductive coq_type_list =
     coq_type_list |> List.iter (fun user_coq_type ->
       let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
       match ConstrMap.find_opt coq_type !ind_config_map with
-      | None -> raise (CodeGenError "inductive type not registered")
+      | None -> user_err (Pp.str "inductive type not registered:" ++
+          Pp.spc () ++ Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
 let get_ind_coq_type env coq_type =
@@ -166,11 +167,19 @@ let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
   let ind_cfg = get_ind_config coq_type in
   let j = match array_find_index_opt (Id.equal coq_cstr) oneind_body.Declarations.mind_consnames with
     | Some j -> j
-    | None -> raise (CodeGenError "inductive type constructor not found")
+    | None -> user_err (
+        Pp.str "inductive type constructor not found:" ++ Pp.spc () ++
+        Id.print coq_cstr ++ Pp.spc () ++
+        Pp.str "for" ++ Pp.spc () ++
+        Id.print oneind_body.Declarations.mind_typename)
   in
   let cstr_cfg = Array.get ind_cfg.cstr_configs j in
   (match cstr_cfg.c_cstr with
-  | Some _ -> raise (CodeGenError "inductive type constructor already registered")
+  | Some _ -> user_err (
+      Pp.str "inductive type constructor already registered:" ++
+      Id.print coq_cstr ++ Pp.spc () ++
+      Pp.str "for" ++ Pp.spc () ++
+      Id.print oneind_body.Declarations.mind_typename)
   | None -> ());
   ind_config_map := ConstrMap.add coq_type
     { ind_cfg with
