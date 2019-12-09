@@ -38,6 +38,9 @@ let c_id str =
 let funcname_argnum fname n =
   "n" ^ string_of_int n ^ (c_id fname)
 
+let goto_label fname n =
+  "l" ^ funcname_argnum fname n
+
 let c_typename ty =
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg -> ind_cfg.c_type
@@ -319,7 +322,7 @@ let genc_goto context ctxrec argsary =
   let fname, argvars = ctxrec in
   (if Array.length argsary <> Array.length argvars then
     user_err (str "partial function invocation not supported yet");
-  let fname_argn = funcname_argnum fname (Array.length argvars) in
+  let fname_argn = goto_label fname (Array.length argvars) in
   let assignments =
     (array_map2
       (fun (var, ty) arg -> (var, (varname_of_rel context (Constr.destRel arg), ty)))
@@ -746,7 +749,7 @@ let genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary =
             (fun j (nm, ty, fargs, context, envb, body) ->
               let headcall, tailcall, partcall = callsites_ary.(j) in
               let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
-              let fname_argn = funcname_argnum nm (List.length argtys) in
+              let fname_argn = goto_label nm (List.length argtys) in
               hv 0 (
                 (if j == i then str "default:" else hv 0 (str "case" ++ spc () ++ int j ++ str ":")) ++ brk (1,2) ++
                 hv 0 (
@@ -764,6 +767,7 @@ let genc_mufun_single_func sigma mfnm i ntfcb_ary callsites_ary =
   let entry_nm, entry_ty, entry_fargs, entry_context, entry_envb, entry_body = ntfcb_ary.(i) in
   let (entry_argtys, entry_rety) = nargtys_and_rety_of_type (List.length entry_fargs) entry_ty in
   let entry_fname_argn = funcname_argnum entry_nm (List.length entry_argtys) in
+  let label_fname_argn = goto_label entry_nm (List.length entry_argtys) in
   hv 0 (
   str "static" ++ spc () ++
   str (c_typename entry_rety) ++ spc () ++
@@ -783,13 +787,13 @@ let genc_mufun_single_func sigma mfnm i ntfcb_ary callsites_ary =
                 (fun (var, ty) -> hv 0 (str (c_typename ty) ++ spc () ++ str var ++ str ";"))
                 fargs))
         ntfcb_ary) ++
-    (if i = 0 then mt () else hv 0 (str "goto" ++ spc () ++ str entry_fname_argn ++ str ";") ++ spc ()) ++
+    (if i = 0 then mt () else hv 0 (str "goto" ++ spc () ++ str label_fname_argn ++ str ";") ++ spc ()) ++
     pp_join_ary (spc ())
       (Array.mapi
         (fun j (nm, ty, fargs, context, envb, body) ->
           let headcall, tailcall, partcall = callsites_ary.(j) in
           let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
-          let fname_argn = funcname_argnum nm (List.length argtys) in
+          let fname_argn = goto_label nm (List.length argtys) in
           hv 0 (
             (if tailcall || (i <> 0 && i == j) then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
             genc_body_tail envb sigma context body))
