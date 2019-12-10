@@ -35,7 +35,7 @@ let c_id str =
     str;
   Buffer.contents buf
 
-let funcname_argnum fname =
+let c_funcname fname =
   c_id fname
 
 let goto_label fname =
@@ -64,8 +64,7 @@ let c_cstrname ty cstru =
       let oind_body = mind_body.Declarations.mind_packets.(i) in
       let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
       let fname = Id.to_string cons_id in
-      let fname_argn = funcname_argnum fname in
-      fname_argn
+      c_funcname fname
 
 let case_swfunc ty =
   let env = Global.env () in
@@ -267,15 +266,15 @@ let genc_app env sigma context f argsary =
       | CtxVar _ -> user_err (str "indirect call not implemented")
       | CtxRec (fname, _) ->
           let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
-          let fname_argn = funcname_argnum fname in
-          str fname_argn ++ str "(" ++
+          let c_fname = c_funcname fname in
+          str c_fname ++ str "(" ++
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
   | Constr.Const ctntu ->
       let fname = Label.to_string (KerName.label (Constant.canonical (Univ.out_punivs ctntu))) in
-      let fname_argn = funcname_argnum fname in
+      let c_fname = c_funcname fname in
       let argvars = Array.map (fun arg -> varname_of_rel context (Constr.destRel arg)) argsary in
-      str fname_argn ++ str "(" ++
+      str c_fname ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
   | Constr.Construct cstru ->
@@ -659,11 +658,11 @@ let genc_func_single env sigma fname ty fargs context body =
     user_err (str ("function value not supported yet: " ^
       string_of_int (List.length argtys) ^ " prods and " ^
       string_of_int (List.length fargs) ^ " lambdas")));
-  let fname_argn = funcname_argnum fname in
+  let c_fname = c_funcname fname in
   hv 0 (
   str "static" ++ spc () ++
   str (c_typename rety) ++ spc () ++
-  str fname_argn ++ str "(" ++
+  str c_fname ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
@@ -696,11 +695,11 @@ let genc_mufun_structs ntfcb_ary callsites_ary =
 let genc_mufun_entry mfnm i ntfcb =
   let nm, ty, fargs, context, envb, body = ntfcb in
   let (argtys, rety) = nargtys_and_rety_of_type (List.length fargs) ty in
-  let fname_argn = funcname_argnum nm in
+  let c_fname = c_funcname nm in
   hv 0 (
   str "static" ++ spc () ++
   str (c_typename rety) ++ spc () ++
-  str fname_argn ++ str "(" ++
+  str c_fname ++ str "(" ++
   hv 0 (genc_fargs fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
@@ -774,12 +773,12 @@ let genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary =
 let genc_mufun_single_func sigma mfnm i ntfcb_ary callsites_ary =
   let entry_nm, entry_ty, entry_fargs, entry_context, entry_envb, entry_body = ntfcb_ary.(i) in
   let (entry_argtys, entry_rety) = nargtys_and_rety_of_type (List.length entry_fargs) entry_ty in
-  let entry_fname_argn = funcname_argnum entry_nm in
+  let c_fname = c_funcname entry_nm in
   let label_fname_argn = goto_label entry_nm in
   hv 0 (
   str "static" ++ spc () ++
   str (c_typename entry_rety) ++ spc () ++
-  str entry_fname_argn ++ str "(" ++
+  str c_fname ++ str "(" ++
   hv 0 (genc_fargs entry_fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
