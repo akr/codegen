@@ -48,6 +48,9 @@ type specialization_config = {
 
 let specialize_config_map = Summary.ref (Cmap.empty : specialization_config Cmap.t) ~name:"CodegenSpecialize"
 
+let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
+  (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
+
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
 
@@ -284,6 +287,8 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
   in
+  gallina_instance_map := (ConstrMap.add (Constr.mkConst sp_inst.sp_partapp_ctnt) (sp_cfg, sp_inst) !gallina_instance_map);
+  gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
@@ -845,6 +850,11 @@ let codegen_specialization_specialize
     sp_specialization_name = SpDefinedCtnt declared_ctnt;
     sp_cfunc_name = sp_inst.sp_cfunc_name }
   in
+  (let m = !gallina_instance_map in
+    let m = ConstrMap.set (Constr.mkConst sp_inst.sp_partapp_ctnt) (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.add (Constr.mkConst declared_ctnt) (sp_cfg, sp_inst2) m in
+    gallina_instance_map := m);
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
