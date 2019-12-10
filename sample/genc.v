@@ -159,7 +159,7 @@ CodeGen Monomorphization add2.
 Print _add2.
 CodeGen GenC _add2.
 
-(* argument outside of fix is supported *)
+(* argument outside of fix is not supported yet *)
 (*
 Section Sec2.
 Variable a : nat.

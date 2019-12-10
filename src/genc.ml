@@ -203,8 +203,7 @@ let rec fargs_and_body env term =
       (fargs2, env1, body1)
   | _ -> ([], env, term)
 
-let fargs_and_body_ary env fname ty ia i nameary tyary funary =
-  let strnameary = Array.mapi (fun j nm -> if j = i then fname else gensym_with_name nm) nameary in
+let fargs_and_body_ary env strnameary ty ia i nameary tyary funary =
   let fb_ary = Array.map (fun term1 -> fargs_and_body env term1) funary in
   let ctxrec_ary = Array.map
     (fun j ->
@@ -816,13 +815,34 @@ let genc_func_mutual sigma mfnm i ntfcb_ary callsites_ary =
     genc_mufun_entries mfnm ntfcb_ary callsites_ary ++ spc () ++
     genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary
 
-let genc_func env sigma fname ty term =
+let genc_func env sigma ctnt ty term =
+  let kn = Constant.canonical ctnt in
+  let modpath = KerName.modpath kn in
+  let fname = Label.to_string (KerName.label kn) in
   local_gensym_with (fun () ->
   match Constr.kind term with
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
       let env2 = Environ.push_rec_types (nameary, tyary, funary) env in
-      let nameary = Array.map Context.binder_name nameary in
-      let ntfcb_ary = fargs_and_body_ary env2 fname ty ia i nameary tyary funary in
+      let nameary' = Array.map Context.binder_name nameary in
+      let strnameary = Array.mapi (fun j nm ->
+          if j = i then
+            fname
+          else
+            let nm = Context.binder_name nm in
+            match nm with
+            | Name.Anonymous -> gensym_with_name nm
+            | Name.Name id ->
+                let label = Label.of_id id in
+                let ctnt_j = Constant.make1 (KerName.make modpath label) in
+                let e1 = EConstr.of_constr (Constr.mkConst ctnt_j) in
+                let e2 = EConstr.of_constr (Constr.mkFix ((ia, j), (nameary, tyary, funary))) in
+                if Reductionops.is_conv env sigma e1 e2 then
+                  Id.to_string id
+                else
+                  gensym_with_name nm)
+        nameary
+      in
+      let ntfcb_ary = fargs_and_body_ary env2 strnameary ty ia i nameary' tyary funary in
       let callsites_ary = scan_callsites sigma i ntfcb_ary in
       let mfnm = gensym_with_str fname in
       genc_func_mutual sigma mfnm i ntfcb_ary callsites_ary
@@ -831,15 +851,15 @@ let genc_func env sigma fname ty term =
       let context = List.rev_map (fun (var, ty) -> CtxVar var) fargs in
       genc_func_single envb sigma fname ty fargs context body)
 
-let get_name_type_body env (name : Libnames.qualid) =
+let get_ctnt_type_body env (name : Libnames.qualid) =
   let reference = Smartlocate.global_with_alias name in
   match reference with
   | ConstRef ctnt ->
       begin match Global.body_of_constant ctnt with
       | Some (b,_) ->
-          let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in
+          (*let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in*)
           let (ty, _) = Typeops.type_of_global_in_context env reference in
-          (name, ty, b)
+          (ctnt, ty, b)
       | None -> user_err (Pp.str "can't genc axiom")
       end
   | VarRef _ -> user_err (Pp.str "can't genc VarRef")
@@ -851,9 +871,9 @@ let genc libref_list =
   let sigma = Evd.from_env env in
   List.iter
     (fun libref ->
-      let (name, ty, body) = get_name_type_body env libref in
+      let (ctnt, ty, body) = get_ctnt_type_body env libref in
       linear_type_check_term body;
-      let pp = genc_func env sigma name ty body in
+      let pp = genc_func env sigma ctnt ty body in
       Feedback.msg_info pp)
     libref_list
 
@@ -864,9 +884,9 @@ let genc_file fn libref_list =
   let fmt = Format.formatter_of_out_channel ch in
   List.iter
     (fun libref ->
-      let (name, ty, body) = get_name_type_body env libref in
+      let (ctnt, ty, body) = get_ctnt_type_body env libref in
       linear_type_check_term body;
-      let pp = (genc_func env sigma name ty body) ++ Pp.fnl () in
+      let pp = (genc_func env sigma ctnt ty body) ++ Pp.fnl () in
       Pp.pp_with fmt pp)
     libref_list;
   Format.pp_print_flush fmt ();
