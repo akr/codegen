@@ -238,6 +238,10 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       | Some { spi_cfunc_name = Some name } -> name
       | _ -> Label.to_string (Constant.label ctnt)) in
   check_c_id cfunc_name;
+  (if CString.Map.mem cfunc_name !cfunc_instance_map then
+    user_err
+      (Pp.str "C function name already used:" ++ Pp.spc () ++
+      Pp.str cfunc_name));
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
       let specialization_name = match names_opt with
@@ -245,13 +249,15 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         | _ -> let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
                SpExpectedId s_id
       in
-      Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constant env ctnt);
-      {
+      let sp_inst = {
         sp_static_arguments = [];
         sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
         sp_specialization_name = specialization_name;
-        sp_cfunc_name = cfunc_name;
-      }
+        sp_cfunc_name = cfunc_name; }
+      in
+      cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
+      Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constant env ctnt);
+      sp_inst
     else
       let (p_id, s_id) = match names_opt with
         | Some { spi_partapp_id = Some p_id;
@@ -269,13 +275,15 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
       let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
       let declared_ctnt = Declare.declare_constant p_id (defent, kind) in
-      Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
-      {
+      let sp_inst = {
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
-        sp_cfunc_name = cfunc_name;
-      }
+        sp_cfunc_name = cfunc_name; }
+      in
+      cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
+      Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+      sp_inst
   in
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
