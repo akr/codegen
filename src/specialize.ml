@@ -57,6 +57,7 @@ let codegen_print_specialization funcs =
   let pr_inst sp_inst =
     let pr_names =
       Pp.str "=>" ++ spc () ++
+      Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
       Printer.pr_constant env sp_inst.sp_partapp_ctnt ++ spc () ++
       (match sp_inst.sp_specialization_name with
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"

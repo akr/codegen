@@ -248,6 +248,18 @@ let check_c_id (str : string) : unit =
   else
     user_err (Pp.str "invalid C name:" ++ Pp.spc () ++ Pp.str str)
 
+let escape_as_coq_string str =
+  let buf = Buffer.create (String.length str + 2) in
+  Buffer.add_char buf '"';
+  String.iter
+    (fun ch ->
+      match ch with
+      |'"' -> Buffer.add_string buf "\"\""
+      |_ -> Buffer.add_char buf ch)
+    str;
+  Buffer.add_char buf '"';
+  Buffer.contents buf
+
 let mangle_type_buf (buf : Buffer.t) (ty : Constr.t) =
   mangle_type_buf_short buf ty
 
