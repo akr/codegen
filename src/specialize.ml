@@ -37,7 +37,7 @@ type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
   sp_partapp_ctnt : Constant.t;
   sp_specialization_name : specialization_instance_name_status;
-  sp_cfunc_name : string option;
+  sp_cfunc_name : string;
 }
 
 type specialization_config = {
@@ -47,6 +47,9 @@ type specialization_config = {
 }
 
 let specialize_config_map = Summary.ref (Cmap.empty : specialization_config Cmap.t) ~name:"CodegenSpecialize"
+
+let cfunc_instance_map = Summary.ref ~name:"CodegenInstance"
+  (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
 
 let codegen_print_specialization funcs =
   let env = Global.env () in
@@ -232,7 +235,9 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = (match names_opt with
-      | Some { spi_cfunc_name = Some name } -> Some name | _ -> None) in
+      | Some { spi_cfunc_name = Some name } -> name
+      | _ -> Label.to_string (Constant.label ctnt)) in
+  check_c_id cfunc_name;
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
       let specialization_name = match names_opt with
@@ -269,8 +274,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
-        sp_cfunc_name = (match names_opt with
-          | Some { spi_cfunc_name = Some name } -> Some name | _ -> None);
+        sp_cfunc_name = cfunc_name;
       }
   in
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in

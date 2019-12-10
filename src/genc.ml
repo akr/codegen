@@ -25,16 +25,6 @@ open Cgenutil
 open Ind
 open Linear
 
-let c_id str =
-  let buf = Buffer.create 0 in
-  String.iter
-    (fun ch ->
-      match ch with
-      |'_'|'0'..'9'|'A'..'Z'|'a'..'z' -> Buffer.add_char buf ch
-      | _ -> Buffer.add_char buf '_')
-    str;
-  Buffer.contents buf
-
 let c_funcname fname =
   c_id fname
 

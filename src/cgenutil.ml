@@ -213,6 +213,41 @@ let rec mangle_type_buf_short (buf : Buffer.t) (ty : Constr.t) =
   | Constr.Proj (proj, expr) -> user_err (Pp.str "mangle_type_buf_short:proj:")
   | Constr.Int n -> user_err (Pp.str "mangle_type_buf_short:int:")
 
+let c_id str =
+  let buf = Buffer.create 0 in
+  String.iter
+    (fun ch ->
+      match ch with
+      |'_'|'0'..'9'|'A'..'Z'|'a'..'z' -> Buffer.add_char buf ch
+      | _ -> Buffer.add_char buf '_')
+    str;
+  Buffer.contents buf
+
+exception Invalid_as_C_identifier
+
+let valid_c_id_p (str : string) : bool =
+  let n = String.length str in
+  if n = 0 then
+    false
+  else
+    match str.[0] with
+    |'_'|'A'..'Z'|'a'..'z' ->
+        (try
+          for i = 1 to n-1 do
+            match str.[i] with
+            |'_'|'0'..'9'|'A'..'Z'|'a'..'z' -> ()
+            |_ -> raise Invalid_as_C_identifier
+          done;
+          true
+        with Invalid_as_C_identifier -> false)
+    | _ -> false
+
+let check_c_id (str : string) : unit =
+  if valid_c_id_p str then
+    ()
+  else
+    user_err (Pp.str "invalid C name:" ++ Pp.spc () ++ Pp.str str)
+
 let mangle_type_buf (buf : Buffer.t) (ty : Constr.t) =
   mangle_type_buf_short buf ty
 
