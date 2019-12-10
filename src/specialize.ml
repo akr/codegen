@@ -48,7 +48,7 @@ type specialization_config = {
 
 let specialize_config_map = Summary.ref (Cmap.empty : specialization_config Cmap.t) ~name:"CodegenSpecialize"
 
-let cfunc_instance_map = Summary.ref ~name:"CodegenInstance"
+let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
 
 let codegen_print_specialization funcs =
@@ -256,7 +256,6 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         sp_specialization_name = specialization_name;
         sp_cfunc_name = cfunc_name; }
       in
-      cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
       Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constant env ctnt);
       sp_inst
     else
@@ -282,10 +281,10 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
         sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name; }
       in
-      cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
   in
+  cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
