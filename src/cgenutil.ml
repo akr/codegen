@@ -379,6 +379,46 @@ let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   ignore (Typing.type_of env sigma term); (* (@eq_refl nat _ : @eq nat _ _) should be rejected *)
   term
 
+let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option array) option =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let modpath = KerName.modpath (Constant.canonical ctnt_i) in
+  match Global.body_of_constant ctnt_i with
+  | None -> user_err (Pp.str "couldn't obtain the definition of" ++ Pp.spc () ++
+                      Printer.pr_constant env ctnt_i)
+  | Some (def_i,_) ->
+      let def_i = EConstr.of_constr def_i in
+      let (ctx_rel_i, body_i) = EConstr.decompose_lam_assum sigma def_i in
+      match EConstr.kind sigma body_i with
+      | Constr.Fix ((ia, i), (nary, tary, fary)) ->
+          let ctnt_ary =
+            Array.mapi (fun j nm ->
+              if j = i then
+                Some ctnt_i
+              else
+                let nm = Context.binder_name nm in
+                match nm with
+                | Name.Anonymous -> None
+                | Name.Name id ->
+                    let label = Label.of_id id in
+                    let ctnt_j = Constant.make1 (KerName.make modpath label) in
+                    try
+                      match Global.body_of_constant ctnt_j with
+                      | None -> None
+                      | Some (def_j,_) ->
+                          let def_j = EConstr.of_constr def_j in
+                          let body_j' = EConstr.mkFix ((ia, j), (nary, tary, fary)) in
+                          let def_j' = EConstr.it_mkLambda_or_LetIn body_j' ctx_rel_i in
+                          if EConstr.eq_constr sigma def_j def_j' then
+                            Some ctnt_j
+                          else
+                            None
+                    with Not_found -> None)
+            nary
+          in
+          Some (i, ctnt_ary)
+      | _ -> None
+
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
   | Constrexpr.CRef _ -> "CRef"
