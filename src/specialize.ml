@@ -37,11 +37,12 @@ type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
   sp_partapp_ctnt : Constant.t;
   sp_specialization_name : specialization_instance_name_status;
+  sp_partapp : Constr.t;
   sp_cfunc_name : string;
 }
 
 type specialization_config = {
-  (* sp_func : Constant.t; *)
+  sp_func : Constant.t;
   sp_sd_list : s_or_d list;
   sp_instance_map : specialization_instance ConstrMap.t;
 }
@@ -106,7 +107,7 @@ let ctnt_of_qualid env qualid =
     | _ -> user_err (Pp.str "not a constant:" ++ spc () ++ Printer.pr_global gref)
 
 let codegen_specialization_define_arguments env ctnt sd_list =
-  let sp_cfg = { sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+  let sp_cfg = { sp_func=ctnt; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
   Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
   sp_cfg
@@ -114,7 +115,7 @@ let codegen_specialization_define_arguments env ctnt sd_list =
 let codegen_specialization_define_or_check_arguments env ctnt sd_list =
   match Cmap.find_opt ctnt !specialize_config_map with
   | None ->
-      let sp_cfg = { sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+      let sp_cfg = { sp_func=ctnt; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
       specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
       Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
       sp_cfg
@@ -254,6 +255,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
                SpExpectedId s_id
       in
       let sp_inst = {
+        sp_partapp = partapp;
         sp_static_arguments = [];
         sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
         sp_specialization_name = specialization_name;
@@ -279,6 +281,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
       let declared_ctnt = Declare.declare_constant p_id (defent, kind) in
       let sp_inst = {
+        sp_partapp = partapp;
         sp_static_arguments = static_args;
         sp_partapp_ctnt = declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
@@ -794,41 +797,33 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let codegen_specialization_specialize
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr option list) =
-  let sd_list = List.map
-    (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
-    user_args
-  in
-  let user_args = List.filter_map
-    (fun arg -> match arg with None -> None| Some a -> Some a)
-    user_args
+let codegen_specialization_specialize1 (cfunc : string) : unit =
+  let (sp_cfg, sp_inst) =
+    match CString.Map.find_opt cfunc !cfunc_instance_map with
+    | None ->
+        user_err (Pp.str "specialization instance not defined:" ++
+                  Pp.spc () ++ Pp.str (escape_as_coq_string cfunc))
+    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, args) = interp_args env sigma user_args in
-  let args = List.map (Reductionops.nf_all env sigma) args in
-  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  let ctnt = ctnt_of_qualid env func in
-  let sp_cfg = codegen_specialization_define_or_check_arguments env ctnt sd_list in
-  let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list args in
-  let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-    | None -> user_err (Pp.str "specialization instance not configured")
-    | Some sp_inst -> sp_inst
-  in
+
   let name = (match sp_inst.sp_specialization_name with
     | SpExpectedId id -> id
     | SpDefinedCtnt _ -> user_err (Pp.str "specialization already defined"))
   in
+  let partapp = sp_inst.sp_partapp in
   let epartapp = EConstr.of_constr partapp in
-  let pred_func = Cpred.singleton ctnt in
-  let global_pred = !specialize_global_inline in
-  let local_pred = (match Cmap.find_opt ctnt !specialize_local_inline with
-                   | None -> Cpred.empty
-                   | Some pred -> pred) in
-  let pred = Cpred.union (Cpred.union pred_func global_pred) local_pred in
-  let term1 = inline env sigma pred epartapp in
+  let ctnt = sp_cfg.sp_func in
+  let inline_pred =
+    let pred_func = Cpred.singleton ctnt in
+    let global_pred = !specialize_global_inline in
+    let local_pred = (match Cmap.find_opt ctnt !specialize_local_inline with
+                     | None -> Cpred.empty
+                     | Some pred -> pred) in
+    Cpred.union (Cpred.union pred_func global_pred) local_pred
+  in
+  let term1 = inline env sigma inline_pred epartapp in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term1);*)
   let term2 = strict_safe_beta env sigma term1 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term2);*)
@@ -845,6 +840,7 @@ let codegen_specialization_specialize
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
+    sp_partapp = sp_inst.sp_partapp;
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
     sp_specialization_name = SpDefinedCtnt declared_ctnt;
@@ -858,4 +854,7 @@ let codegen_specialization_specialize
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt)
+
+let codegen_specialization_specialize (cfuncs : string list) : unit =
+  List.iter codegen_specialization_specialize1 cfuncs

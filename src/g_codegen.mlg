@@ -178,8 +178,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
       { codegen_local_inline func funcs }
 
-    | [ "CodeGen" "Specialization" "Specialize" ref(func) constr_or_underscore_list(args) ] ->
-      { codegen_specialization_specialize func args }
+    | [ "CodeGen" "Specialization" "Specialize" string_list(c_funcs) ] ->
+      { codegen_specialization_specialize c_funcs }
 
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
       { monomorphization libref_list }
