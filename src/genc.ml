@@ -832,7 +832,6 @@ let get_ctnt_type_body env (name : Libnames.qualid) =
   | ConstRef ctnt ->
       begin match Global.body_of_constant ctnt with
       | Some (b,_) ->
-          (*let name = Label.to_string (KerName.label (Constant.canonical ctnt)) in*)
           let (ty, _) = Typeops.type_of_global_in_context env reference in
           (ctnt, ty, b)
       | None -> user_err (Pp.str "can't genc axiom")
