@@ -805,9 +805,7 @@ let genc_func_mutual sigma mfnm i ntfcb_ary callsites_ary =
     genc_mufun_entries mfnm ntfcb_ary callsites_ary ++ spc () ++
     genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary
 
-let genc_func env sigma ctnt ty term =
-  let kn = Constant.canonical ctnt in
-  let fname = Label.to_string (KerName.label kn) in
+let genc_func env sigma fname ty term =
   local_gensym_with (fun () ->
   match Constr.kind term with
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
@@ -852,7 +850,8 @@ let genc libref_list =
     (fun libref ->
       let (ctnt, ty, body) = get_ctnt_type_body env libref in
       linear_type_check_term body;
-      let pp = genc_func env sigma ctnt ty body in
+      let fname = Label.to_string (KerName.label (Constant.canonical ctnt)) in
+      let pp = genc_func env sigma fname ty body in
       Feedback.msg_info pp)
     libref_list
 
@@ -865,8 +864,9 @@ let genc_file fn libref_list =
     (fun libref ->
       let (ctnt, ty, body) = get_ctnt_type_body env libref in
       linear_type_check_term body;
-      let pp = (genc_func env sigma ctnt ty body) ++ Pp.fnl () in
-      Pp.pp_with fmt pp)
+      let fname = Label.to_string (KerName.label (Constant.canonical ctnt)) in
+      let pp = genc_func env sigma fname ty body in
+      Pp.pp_with fmt (pp ++ Pp.fnl ()))
     libref_list;
   Format.pp_print_flush fmt ();
   close_out ch;
