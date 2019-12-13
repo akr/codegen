@@ -807,7 +807,6 @@ let genc_func_mutual sigma mfnm i ntfcb_ary callsites_ary =
 
 let genc_func env sigma ctnt ty term =
   let kn = Constant.canonical ctnt in
-  let modpath = KerName.modpath kn in
   let fname = Label.to_string (KerName.label kn) in
   local_gensym_with (fun () ->
   match Constr.kind term with
@@ -819,17 +818,7 @@ let genc_func env sigma ctnt ty term =
             fname
           else
             let nm = Context.binder_name nm in
-            match nm with
-            | Name.Anonymous -> gensym_with_name nm
-            | Name.Name id ->
-                let label = Label.of_id id in
-                let ctnt_j = Constant.make1 (KerName.make modpath label) in
-                let e1 = EConstr.of_constr (Constr.mkConst ctnt_j) in
-                let e2 = EConstr.of_constr (Constr.mkFix ((ia, j), (nameary, tyary, funary))) in
-                if Reductionops.is_conv env sigma e1 e2 then
-                  Id.to_string id
-                else
-                  gensym_with_name nm)
+            gensym_with_name nm)
         nameary
       in
       let ntfcb_ary = fargs_and_body_ary env2 strnameary ty ia i nameary' tyary funary in
