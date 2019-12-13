@@ -24,11 +24,12 @@ let () = Mltop.add_known_plugin (fun () ->
   Feedback.msg_info Pp.(str"codegen 0.1"))
   "codegen"
 
+open Cgenutil
+open State
 open Monomorph
 open Specialize
 open Linear
 open Genc
-open Cgenutil
 open Ind
 
 open Stdarg (* for wit_string *)

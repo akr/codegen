@@ -5,6 +5,7 @@ open Term
 open EConstr
 
 open Cgenutil
+open State
 
 let term_kind sigma term =
   match EConstr.kind sigma term with
@@ -31,12 +32,6 @@ let whd_all env sigma term = EConstr.of_constr (Reduction.whd_all env (EConstr.t
 let nf_all env sigma term = Reductionops.nf_all env sigma term
 
 let prod_appvect sigma c v = EConstr.of_constr (prod_appvect (EConstr.to_constr sigma c) (Array.map (EConstr.to_constr sigma) v))
-
-type type_linearity = Linear | Unrestricted | Investigating
-
-let type_linearity_list_empty : (t * type_linearity) list = []
-
-let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
 
 let rec is_concrete_inductive_type env sigma term =
   let termty = Retyping.get_type_of env sigma term in

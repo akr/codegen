@@ -22,6 +22,7 @@ open Pp
 open CErrors
 
 open Cgenutil
+open State
 (*open Linear*)
 
 let quote_coq_string s =
@@ -45,9 +46,6 @@ let nf_interp_constr env sigma t =
   let t = Reductionops.nf_all env sigma t in
   let t = EConstr.to_constr sigma t in
   (sigma, t)
-
-module ConstrMap = Map.Make(Constr)
-let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
 
 let codegen_print_inductive_type env sigma ind_cfg =
   Feedback.msg_info (str "CodeGen Inductive Type" ++ spc () ++

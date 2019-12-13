@@ -27,33 +27,15 @@ open EConstr
 open CErrors
 
 open Cgenutil
+open State
 
-module ConstrMap = HMap.Make(Constr)
+let pr_s_or_d sd =
+  match sd with
+  | SorD_S -> Pp.str "s"
+  | SorD_D -> Pp.str "d"
 
-type specialization_instance_name_status =
-  SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
-
-type specialization_instance = {
-  sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
-  sp_partapp_ctnt : Constant.t;
-  sp_specialization_name : specialization_instance_name_status;
-  sp_partapp : Constr.t;
-  sp_cfunc_name : string;
-}
-
-type specialization_config = {
-  sp_func : Constant.t;
-  sp_sd_list : s_or_d list;
-  sp_instance_map : specialization_instance ConstrMap.t;
-}
-
-let specialize_config_map = Summary.ref (Cmap.empty : specialization_config Cmap.t) ~name:"CodegenSpecialize"
-
-let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
-  (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
-
-let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
-  (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
+let drop_trailing_d sd_list =
+  List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
 let codegen_print_specialization funcs =
   let env = Global.env () in
@@ -211,7 +193,6 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   let t = Evarutil.flush_and_check_evars sigma t in
   (sigma, t)
 
-let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 let gensym_ps suffix =
   let n = !gensym_ps_num in
   gensym_ps_num := n + 1;
@@ -324,9 +305,6 @@ let check_convertible phase env sigma t1 t2 =
     ()
   else
     user_err (Pp.str "translation inconvertible:" ++ spc () ++ Pp.str phase)
-
-let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"
-let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"CodegenLocalInline"
 
 let codegen_global_inline (funcs : Libnames.qualid list) =
   let env = Global.env () in

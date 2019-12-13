@@ -20,10 +20,10 @@ open Names
 open Globnames
 open Pp
 open CErrors
+open EConstr
 
 open Cgenutil
-
-open EConstr
+open State
 
 let rec copy_term sigma term =
   match EConstr.kind sigma term with
@@ -572,10 +572,6 @@ let eq_monofunc ((c1, uc1), args1) ((c2, uc2), args2) =
       false
   in
   loop (Array.length args1)
-
-let mono_global_visited_empty : ((GlobRef.t * constr array) * Constant.t) list = []
-
-let mono_global_visited = Summary.ref mono_global_visited_empty ~name:"MonomorphizationVisited"
 
 let mono_check_const env sigma ctntu =
   let fty = constant_type env sigma ctntu in

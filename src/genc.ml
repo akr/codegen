@@ -22,7 +22,7 @@ open Pp
 open CErrors
 
 open Cgenutil
-open Ind
+open State
 open Linear
 
 let c_funcname fname =
@@ -111,8 +111,6 @@ let case_cstrfield_short ty j k =
 
 let case_cstrfield ty j k =
   case_cstrfield_short ty j k
-
-let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 let gensym () =
   let n = !gensym_id in
