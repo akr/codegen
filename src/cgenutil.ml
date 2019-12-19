@@ -19,6 +19,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 open Names
 open Pp
 open CErrors
+open Constr
+open EConstr
 
 exception CodeGenError of string
 
@@ -193,33 +195,33 @@ let rec mangle_type_buf (buf : Buffer.t) (ty : EConstr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   match EConstr.kind sigma ty with
-  | Constr.Ind iu ->
+  | Ind iu ->
       let (mutind, i) = out_punivs iu in
       let env = Global.env () in
       let mutind_body = Environ.lookup_mind mutind env in
       Buffer.add_string buf (Id.to_string mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename)
-  | Constr.App (f, argsary) ->
+  | App (f, argsary) ->
       mangle_type_buf buf f;
       Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_type_buf buf arg) argsary
-  | Constr.Prod (name, ty, body) ->
+  | Prod (name, ty, body) ->
       mangle_type_buf buf ty;
       Buffer.add_string buf "_to_";
       mangle_type_buf buf body
-  | Constr.Rel i -> user_err (Pp.str "mangle_type_buf:rel:")
-  | Constr.Var name -> user_err (Pp.str "mangle_type_buf:var:")
-  | Constr.Meta i -> user_err (Pp.str "mangle_type_buf:meta:")
-  | Constr.Evar (ekey, termary) -> user_err (Pp.str "mangle_type_buf:evar:")
-  | Constr.Sort s -> user_err (Pp.str "mangle_type_buf:sort:")
-  | Constr.Cast (expr, kind, ty) -> user_err (Pp.str "mangle_type_buf:cast:")
-  | Constr.Lambda (name, ty, body) -> user_err (Pp.str "mangle_type_buf:lambda:")
-  | Constr.LetIn (name, expr, ty, body) -> user_err (Pp.str "mangle_type_buf:letin:")
-  | Constr.Const cu -> user_err (Pp.str "mangle_type_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
-  | Constr.Construct cu -> user_err (Pp.str "mangle_type_buf:construct:")
-  | Constr.Case (ci, tyf, expr, brs) -> user_err (Pp.str "mangle_type_buf:case:")
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:fix:")
-  | Constr.CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:cofix:")
-  | Constr.Proj (proj, expr) -> user_err (Pp.str "mangle_type_buf:proj:")
-  | Constr.Int n -> user_err (Pp.str "mangle_type_buf:int:")
+  | Rel i -> user_err (Pp.str "mangle_type_buf:rel:")
+  | Var name -> user_err (Pp.str "mangle_type_buf:var:")
+  | Meta i -> user_err (Pp.str "mangle_type_buf:meta:")
+  | Evar (ekey, termary) -> user_err (Pp.str "mangle_type_buf:evar:")
+  | Sort s -> user_err (Pp.str "mangle_type_buf:sort:")
+  | Cast (expr, kind, ty) -> user_err (Pp.str "mangle_type_buf:cast:")
+  | Lambda (name, ty, body) -> user_err (Pp.str "mangle_type_buf:lambda:")
+  | LetIn (name, expr, ty, body) -> user_err (Pp.str "mangle_type_buf:letin:")
+  | Const cu -> user_err (Pp.str "mangle_type_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
+  | Construct cu -> user_err (Pp.str "mangle_type_buf:construct:")
+  | Case (ci, tyf, expr, brs) -> user_err (Pp.str "mangle_type_buf:case:")
+  | Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:fix:")
+  | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:cofix:")
+  | Proj (proj, expr) -> user_err (Pp.str "mangle_type_buf:proj:")
+  | Int n -> user_err (Pp.str "mangle_type_buf:int:")
 
 let c_id str =
   let buf = Buffer.create 0 in
@@ -285,7 +287,7 @@ let rec count_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t
       Array.fold_left (fun n arg -> n + count_evars env sigma arg) 0 args
   | Constr.LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = push_rel decl env in
       let ne = count_evars env sigma e in
       let nt = count_evars env sigma t in
       let nb = count_evars env2 sigma b in
@@ -297,13 +299,13 @@ let rec count_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t
       np + nitem + nbranches
   | Constr.Prod (x,t,b) | Constr.Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = push_rel decl env in
       let nt = count_evars env sigma t in
       let nb = count_evars env2 sigma b in
       nt + nb
   | Constr.Fix ((_, _), ((nameary, tary, fary) as prec))
   | Constr.CoFix (_, ((nameary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
+      let env2 = push_rec_types prec env in
       let ntary = Array.fold_left (fun n ty -> n + count_evars env sigma ty) 0 tary in
       let nfary = Array.fold_left (fun n f -> n + count_evars env2 sigma f) 0 fary in
       ntary + nfary
@@ -320,7 +322,7 @@ let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     | Constr.Evar _ ->
         let ety = Retyping.get_type_of env sigma term in
         let ety = Reductionops.nf_all env sigma ety in
-        (if not (EConstr.Vars.closed0 sigma ety) then
+        (if not (Vars.closed0 sigma ety) then
           user_err (Pp.str "type is not a closed term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ety));
         (if Evarutil.has_undefined_evars sigma ety then
           user_err (Pp.str "type of a hole contains a existential variable:" ++ Pp.spc() ++
@@ -330,56 +332,56 @@ let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
         let i = !nextrel in
         nextrel := i + 1;
         etypes := ety :: !etypes;
-        EConstr.mkRel (Environ.nb_rel env - nb_rel_env0 + nevars - i)
-    | Constr.Proj (proj, e) -> EConstr.mkProj (proj, aux1 env e)
-    | Constr.Cast (e,ck,t) -> EConstr.mkCast (aux1 env e, ck, aux1 env t)
+        mkRel (Environ.nb_rel env - nb_rel_env0 + nevars - i)
+    | Constr.Proj (proj, e) -> mkProj (proj, aux1 env e)
+    | Constr.Cast (e,ck,t) -> mkCast (aux1 env e, ck, aux1 env t)
     | Constr.App (f, args) ->
         let f' = aux1 env f in
         let args' = Array.map (aux1 env) args in (* assume left-to-right *)
-        EConstr.mkApp (f', args')
+        mkApp (f', args')
     | Constr.LetIn (x,e,t,b) ->
         let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = push_rel decl env in
         let e' = aux1 env e in
         let t' = aux1 env t in
         let b' = aux1 env2 b in
-        EConstr.mkLetIn (x,e',t',b')
+        mkLetIn (x,e',t',b')
     | Constr.Case (ci, p, item, branches) ->
         let p' = aux1 env p in
         let item' = aux1 env item in
         let branches' = Array.map (aux1 env) branches in
-        EConstr.mkCase (ci, p', item', branches')
+        mkCase (ci, p', item', branches')
     | Constr.Prod (x,t,b) ->
         let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = push_rel decl env in
         let t' = aux1 env t in
         let b' = aux1 env2 b in
-        EConstr.mkProd (x,t',b')
+        mkProd (x,t',b')
     | Constr.Lambda (x,t,b) ->
         let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = push_rel decl env in
         let t' = aux1 env t in
         let b' = aux1 env2 b in
-        EConstr.mkLambda (x,t',b')
+        mkLambda (x,t',b')
     | Constr.Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-        let env2 = EConstr.push_rec_types prec env in
+        let env2 = push_rec_types prec env in
         let tary' = Array.map (aux1 env) tary in
         let fary' = Array.map (aux1 env2) fary in
-        EConstr.mkFix ((ia, i), (nary, tary', fary'))
+        mkFix ((ia, i), (nary, tary', fary'))
     | Constr.CoFix (i, ((nary, tary, fary) as prec)) ->
-        let env2 = EConstr.push_rec_types prec env in
+        let env2 = push_rec_types prec env in
         let tary' = Array.map (aux1 env) tary in
         let fary' = Array.map (aux1 env2) fary in
-        EConstr.mkCoFix (i, (nary, tary', fary'))
+        mkCoFix (i, (nary, tary', fary'))
   in
   let rec aux2 etypes term =
     match etypes with
     | [] -> term
     | ety :: etypes' ->
         let x = Context.annotR (Namegen.named_hd env sigma ety Name.Anonymous) in
-        aux2 etypes' (EConstr.mkLambda (x, ety, term))
+        aux2 etypes' (mkLambda (x, ety, term))
   in
-  let term = EConstr.Vars.lift nevars term in
+  let term = Vars.lift nevars term in
   let term = aux2 !etypes (aux1 env term) in
   ignore (Typing.type_of env sigma term); (* (@eq_refl nat _ : @eq nat _ _) should be rejected *)
   term
@@ -393,7 +395,7 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
                       Printer.pr_constant env ctnt_i)
   | Some (def_i,_) ->
       let def_i = EConstr.of_constr def_i in
-      let (ctx_rel_i, body_i) = EConstr.decompose_lam_assum sigma def_i in
+      let (ctx_rel_i, body_i) = decompose_lam_assum sigma def_i in
       match EConstr.kind sigma body_i with
       | Constr.Fix ((ia, i), (nary, tary, fary)) ->
           let ctnt_ary =
@@ -412,8 +414,8 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
                       | None -> None
                       | Some (def_j,_) ->
                           let def_j = EConstr.of_constr def_j in
-                          let body_j' = EConstr.mkFix ((ia, j), (nary, tary, fary)) in
-                          let def_j' = EConstr.it_mkLambda_or_LetIn body_j' ctx_rel_i in
+                          let body_j' = mkFix ((ia, j), (nary, tary, fary)) in
+                          let def_j' = it_mkLambda_or_LetIn body_j' ctx_rel_i in
                           if EConstr.eq_constr sigma def_j def_j' then
                             Some ctnt_j
                           else
@@ -426,24 +428,24 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
 
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with
-  | Constr.Rel _ -> "Rel"
-  | Constr.Var _ -> "Var"
-  | Constr.Meta _ -> "Meta"
-  | Constr.Evar _ -> "Evar"
-  | Constr.Sort _ -> "Sort"
-  | Constr.Cast _ -> "Cast"
-  | Constr.Prod _ -> "Prod"
-  | Constr.Lambda _ -> "Lambda"
-  | Constr.LetIn _ -> "LetIn"
-  | Constr.App _ -> "App"
-  | Constr.Const _ -> "Const"
-  | Constr.Ind _ -> "Ind"
-  | Constr.Construct _ -> "Construct"
-  | Constr.Case _ -> "Case"
-  | Constr.Fix _ -> "Fix"
-  | Constr.CoFix _ -> "CoFix"
-  | Constr.Proj _ -> "Proj"
-  | Constr.Int _ -> "Int"
+  | Rel _ -> "Rel"
+  | Var _ -> "Var"
+  | Meta _ -> "Meta"
+  | Evar _ -> "Evar"
+  | Sort _ -> "Sort"
+  | Cast _ -> "Cast"
+  | Prod _ -> "Prod"
+  | Lambda _ -> "Lambda"
+  | LetIn _ -> "LetIn"
+  | App _ -> "App"
+  | Const _ -> "Const"
+  | Ind _ -> "Ind"
+  | Construct _ -> "Construct"
+  | Case _ -> "Case"
+  | Fix _ -> "Fix"
+  | CoFix _ -> "CoFix"
+  | Proj _ -> "Proj"
+  | Int _ -> "Int"
 
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
