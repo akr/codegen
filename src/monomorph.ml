@@ -534,18 +534,15 @@ let rec seq_let sigma term =
   | Constr.Proj (proj, expr) -> term
   | Constr.Int n -> term
 
-let mangle_function_short ctnt type_args =
+let mangle_function ctnt type_args =
   let label = Constant.label ctnt in
   let buf = Buffer.create 0 in
   Buffer.add_char buf '_';
   Buffer.add_string buf (Label.to_string label);
-  Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_type_buf_short buf arg) type_args;
+  Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_type_buf buf arg) type_args;
   Id.of_string (Buffer.contents buf)
 
-let mangle_function ctnt type_args =
-  mangle_function_short ctnt type_args
-
-let mangle_constructor_short cstr param_args =
+let mangle_constructor cstr param_args =
   let env = Global.env () in
   let ((mutind, i), j) = cstr in
   let mutind_body = Environ.lookup_mind mutind env in
@@ -553,11 +550,8 @@ let mangle_constructor_short cstr param_args =
   let buf = Buffer.create 0 in
   Buffer.add_char buf '_';
   Buffer.add_string buf (Id.to_string oneind_body.Declarations.mind_consnames.(j-1));
-  Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_type_buf_short buf arg) param_args;
+  Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_type_buf buf arg) param_args;
   Buffer.contents buf
-
-let mangle_constructor cstr param_args =
-  mangle_constructor_short cstr param_args
 
 let eq_monofunc ((c1, uc1), args1) ((c2, uc2), args2) =
   Names.Constant.CanOrd.equal c1 c2 &&
