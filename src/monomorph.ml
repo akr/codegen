@@ -160,12 +160,12 @@ let deanonymize_term env sigma term =
     | Constr.Ind (ind, u) -> term
     | Constr.Construct (cstr, u) -> term
     | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
-    | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
-        let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
+    | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+        let env2 = push_rec_types prec env in
         let nameary2 = array_map2 (fun ty -> Context.map_annot (Namegen.named_hd env sigma ty)) tyary nameary in
         mkFix ((ia, i), (nameary2, Array.map (r env) tyary, Array.map (r env2) funary))
-    | Constr.CoFix (i, (nameary, tyary, funary)) ->
-        let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
+    | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
+        let env2 = push_rec_types prec env in
         let nameary2 = array_map2 (fun ty -> Context.map_annot (Namegen.named_hd env sigma ty)) tyary nameary in
         mkCoFix (i, (nameary2, Array.map (r env) tyary, Array.map (r env2) funary))
     | Constr.Proj (proj, expr) ->
@@ -210,11 +210,11 @@ let expand_type env sigma term =
     | Constr.Ind (ind, u) -> term
     | Constr.Construct (cstr, u) -> term
     | Constr.Case (ci, tyf, expr, brs) -> mkCase (ci, r env tyf, r env expr, Array.map (r env) brs)
-    | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
-        let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
+    | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+        let env2 = push_rec_types prec env in
         mkFix ((ia, i), (nameary, Array.map (r env) tyary, Array.map (r env2) funary))
-    | Constr.CoFix (i, (nameary, tyary, funary)) ->
-        let env2 = Environ.push_rec_types (nameary, Array.map (EConstr.to_constr sigma) tyary, Array.map (EConstr.to_constr sigma) funary) env in
+    | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
+        let env2 = push_rec_types prec env in
         mkCoFix (i, (nameary, Array.map (r env) tyary, Array.map (r env2) funary))
     | Constr.Proj (proj, expr) ->
         mkProj (proj, r env expr)

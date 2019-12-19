@@ -205,10 +205,6 @@ let update_linear_refs_for_case linear_refs_ary dst_linear_refs =
     linear_refs_ary;
   update_linear_refs dst_linear_refs linear_refs_ary.(0)
 
-let push_rec_types env sigma (nameary,tyary,funary) =
-  let to_constr = EConstr.to_constr sigma in
-  Environ.push_rec_types (nameary, Array.map to_constr tyary, Array.map to_constr funary) env
-
 let rec ntimes n f v =
   if n = 0 then
     v
@@ -306,15 +302,15 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
       let f linear_refs cstr_nargs br = check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br in
       array_iter3 f linear_refs_ary ci.Constr.ci_cstr_nargs brs;
       update_linear_refs_for_case linear_refs_ary linear_refs)
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
+  | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
       (let n = Array.length funary in
-      let env2 = push_rec_types env sigma (nameary, tyary, funary) in
+      let env2 = push_rec_types prec env in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
       Array.iter (check_type_linearity env sigma) tyary;
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
-  | Constr.CoFix (i, (nameary, tyary, funary)) ->
+  | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
       (let n = Array.length funary in
-      let env2 = push_rec_types env sigma (nameary, tyary, funary) in
+      let env2 = push_rec_types prec env in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
       Array.iter (check_type_linearity env sigma) tyary;
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)

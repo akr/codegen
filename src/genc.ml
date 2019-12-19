@@ -787,8 +787,8 @@ let genc_func_mutual (sigma : Evd.evar_map) (mfnm : string) (i : int)
 let genc_func (env : Environ.env) (sigma : Evd.evar_map) (fname : string) (ty : EConstr.types) (term : EConstr.t) : Pp.t =
   local_gensym_with (fun () ->
   match EConstr.kind sigma term with
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) ->
-      let env2 = EConstr.push_rec_types (nameary, tyary, funary) env in
+  | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
       let nameary' = Array.map Context.binder_name nameary in
       let strnameary = Array.mapi (fun j nm ->
           if j = i then
