@@ -34,10 +34,9 @@ let goto_label (fname : string) : string =
   "entry_" ^ (c_id fname)
 
 let c_typename (sigma : Evd.evar_map) (t : EConstr.types) : string =
-  let ty = EConstr.to_constr sigma t in
-  match ConstrMap.find_opt ty !ind_config_map with
+  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg -> ind_cfg.c_type
-  | None -> c_id (mangle_type ty)
+  | None -> c_id (mangle_type t)
 
 let c_cstrname (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (cstr : Names.constructor) : string =
   let ((mutind, i), j) = cstr in
@@ -58,53 +57,50 @@ let c_cstrname (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (c
       c_funcname fname
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
-  let ty = EConstr.to_constr sigma t in
-  match ConstrMap.find_opt ty !ind_config_map with
+  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some c_swfunc -> c_swfunc
       | None -> user_err (
         Pp.str "inductive match configuration not registered:" ++ Pp.spc () ++
         Printer.pr_lconstr_env env sigma ind_cfg.coq_type))
-  | None -> c_id ("sw_" ^ (mangle_type ty))
+  | None -> c_id ("sw_" ^ (mangle_type t))
 
-let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) =
-  let ty = EConstr.to_constr sigma t in
-  match ConstrMap.find_opt ty !ind_config_map with
+let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string =
+  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
       | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
   | None ->
       let indty =
-        match Constr.kind ty with
+        match EConstr.kind sigma t with
         | Constr.App (f, argsary) -> f
-        | _ -> ty
+        | _ -> t
       in
-      let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
+      let (mutind, i) = out_punivs (EConstr.destInd sigma indty) in
       let mutind_body = Environ.lookup_mind mutind env in
       let oneind_body = mutind_body.Declarations.mind_packets.(i) in
       let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-      c_id ("case_" ^ consname ^ "_" ^ (mangle_type ty))
+      c_id ("case_" ^ consname ^ "_" ^ (mangle_type t))
 
 let case_cstrfield (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) (k : int) : string =
-  let ty = EConstr.to_constr sigma t in
-  match ConstrMap.find_opt ty !ind_config_map with
+  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
       | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
       | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
   | None ->
       let indty =
-        match Constr.kind ty with
+        match EConstr.kind sigma t with
         | Constr.App (f, argsary) -> f
-        | _ -> ty
+        | _ -> t
       in
-      let (mutind, i) = Univ.out_punivs (Constr.destInd indty) in
+      let (mutind, i) = out_punivs (EConstr.destInd sigma indty) in
       let mutind_body = Environ.lookup_mind mutind env in
       let oneind_body = mutind_body.Declarations.mind_packets.(i) in
       let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-      c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type ty))
+      c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type t))
 
 let gensym () : string =
   let n = !gensym_id in
@@ -250,8 +246,6 @@ let varname_of_rel (context : context_elt list) (i : int) : string =
   match List.nth context (i-1) with
   | CtxVar varname -> varname
   | _ -> raise (Invalid_argument "unexpected context element")
-
-let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
 let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (f : EConstr.t) (argsary : EConstr.t array) : Pp.t =
   match EConstr.kind sigma f with

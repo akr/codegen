@@ -187,12 +187,14 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
-let rec mangle_type_buf (buf : Buffer.t) (ty : Constr.t) =
+let out_punivs : 'a EConstr.puniverses -> 'a = fst
+
+let rec mangle_type_buf (buf : Buffer.t) (ty : EConstr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  match Constr.kind ty with
+  match EConstr.kind sigma ty with
   | Constr.Ind iu ->
-      let (mutind, i) = Univ.out_punivs iu in
+      let (mutind, i) = out_punivs iu in
       let env = Global.env () in
       let mutind_body = Environ.lookup_mind mutind env in
       Buffer.add_string buf (Id.to_string mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename)
@@ -211,7 +213,7 @@ let rec mangle_type_buf (buf : Buffer.t) (ty : Constr.t) =
   | Constr.Cast (expr, kind, ty) -> user_err (Pp.str "mangle_type_buf:cast:")
   | Constr.Lambda (name, ty, body) -> user_err (Pp.str "mangle_type_buf:lambda:")
   | Constr.LetIn (name, expr, ty, body) -> user_err (Pp.str "mangle_type_buf:letin:")
-  | Constr.Const cu -> user_err (Pp.str "mangle_type_buf:const:" ++ Pp.spc () ++ Printer.pr_constr_env env sigma ty)
+  | Constr.Const cu -> user_err (Pp.str "mangle_type_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
   | Constr.Construct cu -> user_err (Pp.str "mangle_type_buf:construct:")
   | Constr.Case (ci, tyf, expr, brs) -> user_err (Pp.str "mangle_type_buf:case:")
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:fix:")
@@ -266,7 +268,7 @@ let escape_as_coq_string str =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let mangle_type (ty : Constr.t) =
+let mangle_type (ty : EConstr.t) : string =
   let buf = Buffer.create 0 in
   mangle_type_buf buf ty;
   Buffer.contents buf

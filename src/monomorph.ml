@@ -607,7 +607,7 @@ let rec mono_global_def env (sigma : Evd.evar_map) fctntu type_args =
       let term = seq_let sigma term in
       Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":5");
       let term = deanonymize_term env sigma term in
-      let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr sigma) type_args)) in
+      let id = find_unused_name (mangle_function fctnt type_args) in
       let constant = Declare.declare_definition id
         (EConstr.to_constr sigma term,
          Entries.Monomorphic_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
@@ -634,7 +634,7 @@ and mono_constr_def env sigma fcstr mutind i j param_args =
   else
     let term = mkApp (mkConstruct fcstr, param_args) in
     let term = deanonymize_term env sigma term in
-    let id = find_unused_name (Id.of_string (mangle_constructor fcstr (Array.map (EConstr.to_constr sigma) param_args))) in
+    let id = find_unused_name (Id.of_string (mangle_constructor fcstr param_args)) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr sigma term,
        Entries.Monomorphic_entry Univ.ContextSet.empty) in
@@ -715,7 +715,7 @@ let terminate_mono_global_def env sigma gref type_args =
     let id_term = mkApp ((mkConst fctnt), type_args) in
     let term = id_term in
     let term = deanonymize_term env sigma term in
-    let id = find_unused_name (mangle_function fctnt (Array.map (EConstr.to_constr sigma) type_args)) in
+    let id = find_unused_name (mangle_function fctnt type_args) in
     let constant = Declare.declare_definition id
       (EConstr.to_constr sigma term,
        Entries.Monomorphic_entry Univ.ContextSet.empty) in
