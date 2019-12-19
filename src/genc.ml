@@ -68,7 +68,7 @@ let case_swfunc (ty : Constr.types) : string =
         Printer.pr_lconstr_env env sigma ind_cfg.coq_type))
   | None -> c_id ("sw_" ^ (mangle_type ty))
 
-let case_cstrlabel_short (ty : Constr.types) (j : int) =
+let case_cstrlabel (ty : Constr.types) (j : int) =
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
@@ -87,10 +87,7 @@ let case_cstrlabel_short (ty : Constr.types) (j : int) =
       let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
       c_id ("case_" ^ consname ^ "_" ^ (mangle_type ty))
 
-let case_cstrlabel (ty : Constr.types) (j : int) : string =
-  case_cstrlabel_short ty j
-
-let case_cstrfield_short (ty : Constr.types) (j : int) (k : int) : string =
+let case_cstrfield (ty : Constr.types) (j : int) (k : int) : string =
   match ConstrMap.find_opt ty !ind_config_map with
   | Some ind_cfg ->
       (match ind_cfg.c_swfunc with
@@ -108,9 +105,6 @@ let case_cstrfield_short (ty : Constr.types) (j : int) (k : int) : string =
       let oneind_body = mutind_body.Declarations.mind_packets.(i) in
       let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
       c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type ty))
-
-let case_cstrfield (ty : Constr.types) (j : int) (k : int) : string =
-  case_cstrfield_short ty j k
 
 let gensym () : string =
   let n = !gensym_id in
