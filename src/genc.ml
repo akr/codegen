@@ -533,31 +533,6 @@ let rec genc_mufun_body_tail (env : Environ.env) (sigma : Evd.evar_map) (retvar 
       genc_void_return retvar (genc_construct env sigma context cstru)
   | _ -> (user_err (str "not impelemented (genc_mufun_body_tail:" ++ str (constr_name term) ++ str "): " ++ Printer.pr_constr_env env sigma term))
 
-(*
-let rec copy_term term =
-  match Constr.kind term with
-x | Term.Rel i -> Term.mkRel i
-  | Term.Var name -> Term.mkVar name
-  | Term.Meta i -> Term.mkMeta i
-  | Term.Evar (ekey, termary) -> Term.mkEvar (ekey, (Array.map copy_term termary))
-  | Term.Sort s -> Term.mkSort s
-  | Term.Cast (expr, kind, ty) -> Term.mkCast (copy_term expr, kind, copy_term ty)
-  | Term.Prod (name, ty, body) -> Term.mkProd (name, copy_term ty, copy_term body)
-  | Term.Lambda (name, ty, body) -> Term.mkLambda (name, copy_term ty, copy_term body)
-x | Term.LetIn (name, expr, ty, body) -> Term.mkLetIn (name, copy_term expr, copy_term ty, copy_term body)
-x | Term.App (f, argsary) -> Term.mkApp (copy_term f, Array.map copy_term argsary)
-  | Term.Const ctntu -> Term.mkConstU ctntu
-  | Term.Ind iu -> Term.mkIndU iu
-  | Term.Construct cstru -> Term.mkConstructU cstru
-x | Term.Case (ci, tyf, expr, brs) -> Term.mkCase (ci, copy_term tyf, copy_term expr, Array.map copy_term brs)
-  | Term.Fix ((ia, i), (nameary, tyary, funary)) ->
-      Term.mkFix ((ia, i), (nameary, Array.map copy_term tyary, Array.map copy_term funary))
-  | Term.CoFix (i, (nameary, tyary, funary)) ->
-      Term.mkCoFix (i, (nameary, Array.map copy_term tyary, Array.map copy_term funary))
-  | Term.Proj (proj, expr) ->
-      Term.mkProj (proj, copy_term expr)
-*)
-
 let found_funref (context : (int * bool ref * bool ref * bool ref) option list) (i : int) =
   match List.nth context (i-1) with
   | None -> ()
