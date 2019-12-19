@@ -358,39 +358,6 @@ let rec strip_outer_lambdas (ndecls : int) (term : Constr.t) : (Names.Name.t Con
         ((name, ty) :: decls, innermostbody)
     | _ -> user_err (str "case body lambda nesting is not enough")
 
-let iota_ary (m : int) (n : int) : int array =
-  Array.init n (fun i -> m + i)
-
-let iota_list (m : int) (n : int) : int list =
-  Array.to_list (iota_ary m n)
-
-let array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : 'c array) : 'd array =
-  let n = Array.length a in
-  if Array.length b <> n then raise (Invalid_argument "array_map3");
-  if Array.length c <> n then raise (Invalid_argument "array_map3");
-  Array.init n (fun i -> f a.(i) b.(i) c.(i))
-
-let constr_name (term : Constr.t) : string =
-  match Constr.kind term with
-  | Constr.Rel _ -> "Rel"
-  | Constr.Var _ -> "Var"
-  | Constr.Meta _ -> "Meta"
-  | Constr.Evar _ -> "Evar"
-  | Constr.Sort _ -> "Sort"
-  | Constr.Cast _ -> "Cast"
-  | Constr.Prod _ -> "Prod"
-  | Constr.Lambda _ -> "Lambda"
-  | Constr.LetIn _ -> "LetIn"
-  | Constr.App _ -> "App"
-  | Constr.Const _ -> "Const"
-  | Constr.Ind _ -> "Ind"
-  | Constr.Construct _ -> "Construct"
-  | Constr.Case _ -> "Case"
-  | Constr.Fix _ -> "Fix"
-  | Constr.CoFix _ -> "CoFix"
-  | Constr.Proj _ -> "Proj"
-  | Constr.Int _ -> "Int"
-
 let genc_case_branch_body (env : Environ.env) (sigma : Evd.evar_map)
     (context : context_elt list)
     (bodyfunc : Environ.env -> Evd.evar_map -> context_elt list -> Constr.constr -> Pp.t)

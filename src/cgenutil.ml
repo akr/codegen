@@ -31,6 +31,12 @@ let array_map2 f a1 a2 =
     invalid_arg "Array.map2: arrays must have the same length";
   Array.mapi (fun i -> f a1.(i)) a2
 
+let array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : 'c array) : 'd array =
+  let n = Array.length a in
+  if Array.length b <> n then raise (Invalid_argument "array_map3");
+  if Array.length c <> n then raise (Invalid_argument "array_map3");
+  Array.init n (fun i -> f a.(i) b.(i) c.(i))
+
 let array_iter2 f a1 a2 =
   if Array.length a1 <> Array.length a2 then
     invalid_arg "Array.iter2: arrays must have the same length";
@@ -112,10 +118,10 @@ let string_of_name name =
   | Name.Name id -> Id.to_string id
   | Name.Anonymous -> "_"
 
-let iota_ary m n =
+let iota_ary (m : int) (n : int) : int array =
   Array.init n (fun i -> m + i)
 
-let iota_list m n =
+let iota_list (m : int) (n : int) : int list =
   Array.to_list (iota_ary m n)
 
 let rec array_option_exists_rec p a n i =
@@ -418,6 +424,27 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
           in
           Some (i, ctnt_ary)
       | _ -> None
+
+let constr_name (term : Constr.t) : string =
+  match Constr.kind term with
+  | Constr.Rel _ -> "Rel"
+  | Constr.Var _ -> "Var"
+  | Constr.Meta _ -> "Meta"
+  | Constr.Evar _ -> "Evar"
+  | Constr.Sort _ -> "Sort"
+  | Constr.Cast _ -> "Cast"
+  | Constr.Prod _ -> "Prod"
+  | Constr.Lambda _ -> "Lambda"
+  | Constr.LetIn _ -> "LetIn"
+  | Constr.App _ -> "App"
+  | Constr.Const _ -> "Const"
+  | Constr.Ind _ -> "Ind"
+  | Constr.Construct _ -> "Construct"
+  | Constr.Case _ -> "Case"
+  | Constr.Fix _ -> "Fix"
+  | Constr.CoFix _ -> "CoFix"
+  | Constr.Proj _ -> "Proj"
+  | Constr.Int _ -> "Int"
 
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
