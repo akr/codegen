@@ -635,6 +635,40 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (match specialize_ctnt_app env sigma ctnt args with None -> term | Some e -> e)
       | _ -> term
 
+let rec expand_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (* Feedback.msg_info (Pp.str "expand_eta arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  let result = expand_eta1 env sigma term in
+  (* Feedback.msg_info (Pp.str "expand_eta ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  check_convertible "expand_eta" (new_env_with_rels env) sigma term result;
+  result
+and expand_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
+  | Const _ | Ind _ | Int _ | Construct _
+  | Proj _ | Case _ | App _ ->
+      let term_type = Retyping.get_type_of env sigma term in
+      let term_type = Reductionops.nf_all env sigma term_type in
+      let (n, relc, body_type) = Termops.decompose_prod_letin sigma term_type in
+      let lifted_term = Vars.lift n term in
+      let args = Array.map (fun i -> mkRel i) (array_rev (iota_ary 1 n)) in
+      it_mkLambda_or_LetIn (mkApp (lifted_term, args)) relc
+  | Cast (e, ck, t) ->
+      mkCast (expand_eta env sigma e, ck, t)
+  | Lambda (x, t, e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, t, expand_eta env2 sigma e)
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkFix ((ia, i), (nary, tary, Array.map (expand_eta env2 sigma) fary))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkCoFix (i, (nary, tary, Array.map (expand_eta env2 sigma) fary))
+  | LetIn (x, e, t, b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLetIn (x, expand_eta env sigma e, t, expand_eta env2 sigma b)
+
 let rec count_false_in_prefix n refs =
   if n <= 0 then
     0
@@ -785,7 +819,6 @@ let codegen_specialization_specialize1 (cfunc : string) : unit =
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-
   let name = (match sp_inst.sp_specialization_name with
     | SpExpectedId id -> id
     | SpDefinedCtnt _ -> user_err (Pp.str "specialization already defined"))
@@ -808,13 +841,15 @@ let codegen_specialization_specialize1 (cfunc : string) : unit =
   let term3 = normalizeA env sigma term2 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
   let term4 = specialize env sigma term3 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
-  let term5 = normalize_types env sigma term4 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term5);*)
-  let term6 = delete_unused_let env sigma term5 in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term4); *)
+  let term5 = expand_eta env sigma term4 in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term5); *)
+  let term6 = normalize_types env sigma term5 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term6);*)
+  let term7 = delete_unused_let env sigma term6 in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term7);*)
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term6)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term7)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
