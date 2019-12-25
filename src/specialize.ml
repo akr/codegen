@@ -444,24 +444,20 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
         in
         wrap_lets [item] term
   | App (f,args) ->
-      let hoist_f = not (isConst sigma f || isConstruct sigma f || isRel sigma f) in
       let hoist_args = Array.map (fun arg -> not (isRel sigma arg)) args in
-      let nf = if hoist_f then 1 else 0 in
       let nargs = Array.fold_left (fun n b -> n + if b then 1 else 0) 0 hoist_args in
-      let nlet = nf + nargs in
       let hoisted_args = CList.filter_with (Array.to_list hoist_args) (Array.to_list args) in
-      let hoisted_exprs = if hoist_f then f :: hoisted_args else hoisted_args in
       let app =
-	let f' = if hoist_f then mkRel nlet else Vars.lift nlet f in
+	let f' = Vars.lift nargs f in
         let (args', _) = array_fold_right_map
 	  (fun arg n -> match EConstr.kind sigma arg with
-			| Rel i -> (mkRel (i+nlet), n)
+			| Rel i -> (mkRel (i+nargs), n)
 			| _ -> (mkRel n, n+1))
 	  args 1
         in
         mkApp (f', args')
       in
-      wrap_lets hoisted_exprs app
+      wrap_lets hoisted_args app
   | Cast (e,ck,ty) ->
       if isRel sigma e then term
       else wrap_lets [e] (mkCast (mkRel 1, ck, Vars.lift 1 ty))
