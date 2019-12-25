@@ -383,14 +383,14 @@ and strict_safe_beta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       mkCoFix (i, (nameary, tyary, Array.map (strict_safe_beta env2 sigma) funary))
   | Proj (proj, e) -> mkProj (proj, strict_safe_beta env sigma e)
 
-let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
+let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map) (recfuncs : bool list)
     (term : EConstr.t) : EConstr.t =
   (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
-  let result = normalizeK1 env sigma term in
-  (* Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  let result = normalizeK1 env sigma recfuncs term in
+  (*Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "normalizeK" env sigma term result;
   result
-and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
+and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map) (recfuncs : bool list)
     (term : EConstr.t) : EConstr.t =
   let wrap_lets hoisted_exprs lifted_term =
     let hoisted_types = List.map (Retyping.get_type_of env sigma) hoisted_exprs in
@@ -400,7 +400,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
       | [], [], [] -> acc_term
       | x :: names', e :: exprs', ty :: types' ->
           let ty' = Vars.lift i ty in
-          let e' = Vars.lift i (normalizeK env sigma e) in
+          let e' = Vars.lift i (normalizeK env sigma recfuncs e) in
           let acc_term' = aux (i+1) names' exprs' types' acc_term in
           mkLetIn (x, e', ty', acc_term')
       | _, _, _ -> user_err (Pp.str "inconsistent list length")
@@ -413,47 +413,57 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x,ty,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (x, ty, normalizeK env2 sigma b)
+      let recfuncs2 = false :: recfuncs in
+      mkLambda (x, ty, normalizeK env2 sigma recfuncs2 b)
   | Fix ((ia, i), (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeK env2 sigma) funary in
+      let recfuncs2 = ncons (Array.length funary) true recfuncs in
+      let funary' = Array.map (normalizeK env2 sigma recfuncs2) funary in
       mkFix ((ia, i), (nameary, tyary, funary'))
   | CoFix (i, (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeK env2 sigma) funary in
+      let recfuncs2 = ncons (Array.length funary) true recfuncs in
+      let funary' = Array.map (normalizeK env2 sigma recfuncs2) funary in
       mkCoFix (i, (nameary, tyary, funary'))
   | LetIn (x,e,ty,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
-      let e' = normalizeK env sigma e in
-      let b' = normalizeK env2 sigma b in
+      let recfuncs2 = false :: recfuncs in
+      let e' = normalizeK env sigma recfuncs e in
+      let b' = normalizeK env2 sigma recfuncs2 b in
       mkLetIn (x, e', ty, b')
   | Case (ci, p, item, branches) ->
       if isRel sigma item then
-        mkCase (ci, p, item, Array.map (normalizeK env sigma) branches)
+        mkCase (ci, p, item, Array.map (normalizeK env sigma recfuncs) branches)
       else
         let term =
           mkCase (ci,
                   Vars.lift 1 p,
                   mkRel 1,
                   Array.map
-                    (fun branch -> Vars.lift 1 (normalizeK env sigma branch))
+                    (fun branch -> Vars.lift 1 (normalizeK env sigma recfuncs branch))
                     branches)
         in
         wrap_lets [item] term
   | App (f,args) ->
-      let hoist_args = Array.map (fun arg -> not (isRel sigma arg)) args in
+      let hoist_args = Array.map
+        (fun arg ->
+          match EConstr.kind sigma arg with
+          | Rel i -> List.nth recfuncs (i-1)
+          | _ -> true)
+        args in
       let nargs = Array.fold_left (fun n b -> n + if b then 1 else 0) 0 hoist_args in
       let hoisted_args = CList.filter_with (Array.to_list hoist_args) (Array.to_list args) in
       let app =
 	let f' = Vars.lift nargs f in
         let (args', _) = array_fold_right_map
-	  (fun arg n -> match EConstr.kind sigma arg with
-			| Rel i -> (mkRel (i+nargs), n)
-			| _ -> (mkRel n, n+1))
-	  args 1
+	  (fun (arg, hoist) n -> if not hoist then
+                                   mkRel (destRel sigma arg + nargs), n
+                                 else
+                                   mkRel n, n+1)
+	  (array_combine args hoist_args) 1
         in
         mkApp (f', args')
       in
@@ -507,8 +517,8 @@ let linearize_lets env sigma term =
   check_convertible "linearize_lets" env sigma term result;
   result
 
-let normalizeA env sigma term =
-  linearize_lets env sigma (normalizeK env sigma term)
+let normalizeA env sigma recfuncs term =
+  linearize_lets env sigma (normalizeK env sigma recfuncs term)
 
 let rec first_fv_rec sigma numrels term : int option =
   match EConstr.kind sigma term with
@@ -834,7 +844,7 @@ let codegen_specialization_specialize1 (cfunc : string) : unit =
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term1);*)
   let term2 = strict_safe_beta env sigma term1 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term2);*)
-  let term3 = normalizeA env sigma term2 in
+  let term3 = normalizeA env sigma [] term2 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
   let term4 = specialize env sigma term3 in
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma term4); *)

@@ -100,6 +100,9 @@ let array_find_index (p : 'a -> bool) (ary : 'a array) : int =
   | None -> raise Not_found
   | Some i -> i
 
+let array_combine (a1 : 'a array) (a2 : 'b array) : ('a * 'b) array =
+  Array.map2 (fun x y -> (x,y)) a1 a2
+
 let rec ncons n x s =
   if n = 0 then
     s
