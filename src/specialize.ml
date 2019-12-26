@@ -641,39 +641,70 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (match specialize_ctnt_app env sigma ctnt args with None -> term | Some e -> e)
       | _ -> term
 
+(*
+ * expand_eta assumes term is A-normal form, "body" of following syntax:
+ *
+ *  body = let | exp
+ *
+ *  let = "let" var ":=" exp "in" body
+ *
+ *  exp = lambda | app | func
+ *
+ *  lambda = "fun" var "=>" body
+ *
+ *  app = func var+
+ *
+ *  func = var | rvar | ctnt | cstr | fix | match
+ *
+ *  fix = "fix" (rvar ":=" body)+ "for" rvar
+ *
+ *  match = "match" var "with" ( "|" cstr "=>" body )* "end"
+ *
+ * expand_eta apply eta expansion to "app" until the type
+ * of "app" is not a function type.
+ *)
 let rec expand_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (* Feedback.msg_info (Pp.str "expand_eta arg: " ++ Printer.pr_econstr_env env sigma term); *)
-  let result = expand_eta1 env sigma term in
+  let result = expand_eta_body env sigma term in
   (* Feedback.msg_info (Pp.str "expand_eta ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "expand_eta" (new_env_with_rels env) sigma term result;
   result
-and expand_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and expand_eta_body (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
-  | Const _ | Ind _ | Int _ | Construct _
-  | Proj _ | Case _ | App _ ->
-      let term_type = Retyping.get_type_of env sigma term in
-      let term_type = Reductionops.nf_all env sigma term_type in
-      let (n, relc, body_type) = Termops.decompose_prod_letin sigma term_type in
-      let lifted_term = Vars.lift n term in
-      let args = Array.map (fun i -> mkRel i) (array_rev (iota_ary 1 n)) in
-      it_mkLambda_or_LetIn (mkApp (lifted_term, args)) relc
-  | Cast (e, ck, t) ->
-      mkCast (expand_eta env sigma e, ck, t)
-  | Lambda (x, t, e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      mkLambda (x, t, expand_eta env2 sigma e)
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      mkFix ((ia, i), (nary, tary, Array.map (expand_eta env2 sigma) fary))
-  | CoFix (i, ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      mkCoFix (i, (nary, tary, Array.map (expand_eta env2 sigma) fary))
   | LetIn (x, e, t, b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      mkLetIn (x, expand_eta env sigma e, t, expand_eta env2 sigma b)
+      mkLetIn (x, expand_eta_exp env sigma e, t, expand_eta_body env2 sigma b)
+  | _ -> expand_eta_exp env sigma term
+and expand_eta_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Lambda (x, t, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, t, expand_eta_body env2 sigma b)
+  | App (func, args) ->
+      let func' = expand_eta_func env sigma func in
+      let term_type = Retyping.get_type_of env sigma term in
+      expand_eta_app env sigma func' args term_type
+  | _ -> expand_eta_func env sigma term
+and expand_eta_func (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkFix ((ia, i), (nary, tary, Array.map (expand_eta_body env2 sigma) fary))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkCoFix (i, (nary, tary, Array.map (expand_eta_body env2 sigma) fary))
+  | Case (ci, p, item, branches) ->
+      mkCase (ci, p, item, Array.map (expand_eta_body env sigma) branches)
+  | _ -> term
+and expand_eta_app (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (args : EConstr.t array) (term_type : EConstr.types) : EConstr.t =
+  let term_type = Reductionops.nf_all env sigma term_type in
+  let (n, relc, body_type) = Termops.decompose_prod_letin sigma term_type in
+  let term' = mkApp (func, args) in
+  let lifted_term = Vars.lift n term' in
+  let args = Array.map (fun i -> mkRel i) (array_rev (iota_ary 1 n)) in
+  it_mkLambda_or_LetIn (mkApp (lifted_term, args)) relc
 
 let rec count_false_in_prefix n refs =
   if n <= 0 then
