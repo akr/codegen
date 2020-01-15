@@ -220,10 +220,17 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
-  let cfunc_name = (match names_opt with
-      | Some { spi_cfunc_name = Some name } -> name
-      | _ -> Label.to_string (Constant.label ctnt)) in
-  check_c_id cfunc_name;
+  let cfunc_name = match names_opt with
+      | Some { spi_cfunc_name = Some name } ->
+          (if not (valid_c_id_p name) then
+            user_err (Pp.str "Invalid C function name specified:" ++ spc () ++ str name));
+          name
+      | _ ->
+          let name = Label.to_string (Constant.label ctnt) in
+          (if not (valid_c_id_p name) then
+            user_err (Pp.str "Gallina function name is invalid in C:" ++ spc () ++ str name));
+          name
+  in
   (if CString.Map.mem cfunc_name !cfunc_instance_map then
     user_err
       (Pp.str "C function name already used:" ++ Pp.spc () ++
