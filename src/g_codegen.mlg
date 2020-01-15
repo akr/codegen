@@ -76,23 +76,23 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 *)
 
 (*
-  CodeGen Specialization Arguments FUNCTION SorD*.
-  CodeGen Specialization Instance FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
+  CodeGen Arguments FUNCTION SorD*.
+  CodeGen Instance FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
 
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
   Example:
 
-  CodeGen Specialization Arguments id s d.
-  CodeGen Specialization Instance id nat.
-  CodeGen Specialization Instance id nat => id_nat.
-  CodeGen Specialization Instance id nat => id_nat id_nat_specialized.
-  CodeGen Specialization Instance id nat => "id_nat".
-  CodeGen Specialization Instance id nat => "id_nat" id_nat.
-  CodeGen Specialization Instance id nat => "id_nat" id_nat id_nat_specialized.
+  CodeGen Arguments id s d.
+  CodeGen Instance id nat.
+  CodeGen Instance id nat => id_nat.
+  CodeGen Instance id nat => id_nat id_nat_specialized.
+  CodeGen Instance id nat => "id_nat".
+  CodeGen Instance id nat => "id_nat" id_nat.
+  CodeGen Instance id nat => "id_nat" id_nat id_nat_specialized.
 
-  CodeGen Specialization Specialize id nat
+  CodeGen Specialize id nat
 
   Print CodeGen Specialization id.
 
@@ -166,12 +166,12 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Match" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
-    | [ "CodeGen" "Specialization" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
+    | [ "CodeGen" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
       { codegen_specialization_arguments func sd_list }
-    | [ "CodeGen" "Specialization" "AutoArguments" ref_list(func_list) ] ->
+    | [ "CodeGen" "AutoArguments" ref_list(func_list) ] ->
       { codegen_specialization_auto_arguments func_list }
 
-    | [ "CodeGen" "Specialization" "Instance" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
+    | [ "CodeGen" "Instance" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
       { codegen_specialization_instance func args names }
 
     | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
@@ -183,7 +183,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
       { codegen_local_inline func funcs }
 
-    | [ "CodeGen" "Specialization" "Specialize" string_list(cfuncs) ] ->
+    | [ "CodeGen" "Specialize" string_list(cfuncs) ] ->
       { codegen_specialization_specialize cfuncs }
 
     | [ "CodeGen" "Monomorphization" ne_global_list(libref_list) ] ->
