@@ -26,6 +26,7 @@ open EConstr
 open Cgenutil
 open State
 open Linear
+open Specialize
 
 let c_funcname (fname : string) : string =
   c_id fname
@@ -814,6 +815,62 @@ let get_ctnt_type_body (env : Environ.env) (name : Libnames.qualid) : Constant.t
   | VarRef _ -> user_err (Pp.str "can't genc VarRef")
   | IndRef _ -> user_err (Pp.str "can't genc IndRef")
   | ConstructRef _ -> user_err (Pp.str "can't genc ConstructRef")
+
+let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.types * Constr.t =
+  let (sp_cfg, sp_inst) =
+    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+    | None ->
+        user_err (Pp.str "C function name not found:" ++
+                  Pp.spc () ++ Pp.str cfunc_name)
+    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
+  in
+  let ctnt =
+    match sp_inst.sp_specialization_name with
+    | SpExpectedId id ->
+        codegen_specialization_specialize1 cfunc_name (* modify global env *)
+    | SpDefinedCtnt ctnt -> ctnt
+  in
+  let env = Global.env () in
+  let (ctnt, ty, body) =
+    let cdef = Environ.lookup_constant ctnt env in
+    let ty = cdef.Declarations.const_type in
+    match Global.body_of_constant_body cdef with
+    | None -> user_err (Pp.str "couldn't obtain the body:" ++ Pp.spc () ++
+                        Printer.pr_constant env ctnt)
+    | Some (body, _) -> (ctnt, ty, body)
+  in
+  (ctnt, ty, body)
+
+let gen (cfunc_list : string list) : unit =
+  List.iter
+    (fun cfunc_name ->
+      let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+      linear_type_check_term body;
+      let ty = EConstr.of_constr ty in
+      let body = EConstr.of_constr body in
+      let pp = genc_func env sigma cfunc_name ty body in
+      Feedback.msg_info pp)
+    cfunc_list
+
+let gen_file (fn : string) (cfunc_list : string list) : unit =
+  (let ch = open_out fn in
+  let fmt = Format.formatter_of_out_channel ch in
+  List.iter
+    (fun cfunc_name ->
+      let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+      linear_type_check_term body;
+      let ty = EConstr.of_constr ty in
+      let body = EConstr.of_constr body in
+      let pp = genc_func env sigma cfunc_name ty body in
+      Pp.pp_with fmt (pp ++ Pp.fnl ()))
+    cfunc_list;
+  Format.pp_print_flush fmt ();
+  close_out ch;
+  Feedback.msg_info (str ("file generated: " ^ fn)))
 
 let genc (libref_list : Libnames.qualid list) : unit =
   let env = Global.env () in

@@ -853,7 +853,7 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let codegen_specialization_specialize1 (cfunc : string) : unit =
+let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None ->
@@ -911,9 +911,14 @@ let codegen_specialization_specialize1 (cfunc : string) : unit =
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt)
+  declared_ctnt
 
 let codegen_specialization_specialize (cfuncs : string list) : unit =
-  List.iter codegen_specialization_specialize1 cfuncs
+  let env = Global.env () in
+  List.iter
+    (fun cfunc_name ->
+      let declared_ctnt = codegen_specialization_specialize1 cfunc_name in
+      Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
+    cfuncs
 
 
