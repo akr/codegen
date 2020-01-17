@@ -1,6 +1,5 @@
 -Q theories codegen
 -I src
--Q src codegen
 
 src/cgenutil.ml
 src/state.ml
