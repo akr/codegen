@@ -9,12 +9,19 @@ https://github.com/akr/codegen
 
 ## Requiements
 
+You need Coq and OCaml.
+
 - Coq 8.10 (Coq 8.9 doesn't work)
 - OCaml 4.09.0
 
-## How to build and install
+You also need OUnit to test codegen.
+
+- OUnit 2.2.1
+
+## How to build, test and install
 
     make
+    make check          # optional
     make install
 
 ## Examples

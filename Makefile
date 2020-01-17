@@ -7,6 +7,9 @@ plugin : Makefile.coq
 Makefile.coq : _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
 
+check:
+	cd test; $(MAKE) check
+
 clean :
 	rm -f \
 	  Makefile.coq \
