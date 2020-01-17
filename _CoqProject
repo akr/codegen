@@ -9,6 +9,6 @@ src/monomorph.ml
 src/specialize.ml
 src/linear.ml
 src/genc.ml
-src/codegen_plugin.mllib
+src/codegen_plugin.mlpack
 theories/codegen.v
 
