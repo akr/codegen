@@ -46,7 +46,7 @@ rank algorithm of succinct data structure:
 
 ## Acknowledgment
 
-This work is supported by JSPS KAKENHI Grant Number 15K12013.
+This work is supported by JSPS KAKENHI Grant Number 15K12013 (2015-04-01 to 2018-03-31).
 
 ## Copyright
 
