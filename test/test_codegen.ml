@@ -112,7 +112,7 @@ let write_file (fn : string) (content : string) : unit =
   output_string ch content;
   close_out ch
 
-let test_mono_id_bool _ =
+let test_mono_id_bool () =
   with_temp_dir "codegen-test" "" (fun d ->
     let src_fn = d ^ "/src.v" in
     let gen_fn = d ^ "/gen.c" in
