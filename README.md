@@ -14,8 +14,9 @@ You need Coq and OCaml.
 - Coq 8.10 (Coq 8.9 doesn't work)
 - OCaml 4.09.0
 
-You also need OUnit to test codegen.
+You also need following to test codegen.
 
+- ocamlfind 1.8.1
 - OUnit 2.2.1
 
 ## How to build, test and install
