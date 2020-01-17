@@ -24,4 +24,10 @@ clean :
 	  src/*.d \
 	  theories/*.glob \
 	  theories/*.vo \
-	  theories/*.d
+	  theories/*.d \
+	  test/*.cache \
+	  test/test_codegen \
+	  test/*.cmi \
+	  test/*.cmx \
+	  test/*.o
+
