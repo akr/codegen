@@ -97,15 +97,11 @@ let try_finally f x g =
   g ();
   y
 
-let with_temp_dir prefix suffix body =
+let with_temp_dir ?(remove=true) prefix suffix body =
   let d = make_temp_dir prefix suffix in
   try_finally
     (fun () -> body d) ()
-    (fun () -> remove_dir_rec d)
-
-let with_temp_dir_noremove prefix suffix body =
-  let d = make_temp_dir prefix suffix in
-  body d
+    (fun () -> if remove then remove_dir_rec d)
 
 let write_file (fn : string) (content : string) : unit =
   let ch = open_out fn in
@@ -127,7 +123,7 @@ let search_topdir () : string =
 let test_mono_id_bool () =
   let topdir = search_topdir () in
   let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"] in
-  with_temp_dir "codegen-test" "" (fun d ->
+  with_temp_dir (* ~remove:false *) "codegen-test" "" (fun d ->
     let src_fn = d ^ "/src.v" in
     let gen_fn = d ^ "/gen.c" in
     let main_fn = d ^ "/main.c" in
