@@ -112,7 +112,21 @@ let write_file (fn : string) (content : string) : unit =
   output_string ch content;
   close_out ch
 
+let search_topdir () : string =
+  let rec f d =
+    let fn = d ^ "/Makefile.coq.conf" in
+    if Sys.file_exists fn then
+      d
+    else if d = "/" then
+      failwith "Makefile.coq.conf not found"
+    else
+      f (Filename.dirname d)
+  in
+  f (Sys.getcwd ())
+
 let test_mono_id_bool () =
+  let topdir = search_topdir () in
+  let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"] in
   with_temp_dir "codegen-test" "" (fun d ->
     let src_fn = d ^ "/src.v" in
     let gen_fn = d ^ "/gen.c" in
@@ -131,7 +145,7 @@ let test_mono_id_bool () =
       "  if (mono_id_bool(true) != true) abort();\n" ^
       "  if (mono_id_bool(false) != false) abort();\n" ^
       "}\n");
-    assert_command "coqc" ["-Q"; "../theories"; "codegen"; "-I"; "../src"; src_fn];
+    assert_command "coqc" (List.append coq_opts [src_fn]);
     assert_command "gcc" ["-o"; exe_fn; main_fn];
     assert_command exe_fn [])
 
