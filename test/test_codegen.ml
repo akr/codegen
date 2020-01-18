@@ -1,15 +1,5 @@
 open OUnit2
 
-let cc =
-  match Sys.getenv_opt "CC" with
-  | Some v -> v
-  | None -> "gcc"
-
-let coqc =
-  match Sys.getenv_opt "COQC" with
-  | Some v -> v
-  | None -> "coqc"
-
 let escape_coq_str (str : string) : string =
   let buf = Buffer.create (String.length str + 2) in
   Buffer.add_char buf '"';
@@ -84,7 +74,18 @@ let search_topdir () : string =
   in
   f (Sys.getcwd ())
 
+let cc =
+  match Sys.getenv_opt "CC" with
+  | Some v -> v
+  | None -> "gcc"
+
+let coqc =
+  match Sys.getenv_opt "COQC" with
+  | Some v -> v
+  | None -> "coqc"
+
 let topdir = search_topdir ()
+
 let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
 
 let test_mono_id_bool test_ctxt =
