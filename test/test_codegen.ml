@@ -132,10 +132,26 @@ let test_mono_id_bool_omit_cfunc_name (test_ctxt : test_ctxt) =
     ["if (mono_id_bool(true) != true) abort();";
      "if (mono_id_bool(false) != false) abort();";]
 
+let test_nat_add (test_ctxt : test_ctxt) =
+  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+    ["CodeGen Inductive Type nat => \"unsigned int\".";
+     "CodeGen Inductive Constructor nat | O => \"0\".";
+     "CodeGen Inductive Constructor nat | S => \"succ\".";
+     "CodeGen Inductive Match nat => \"\"";
+     "| O => \"case 0\"";
+     "| S => \"default\" \"pred\".";
+     "CodeGen Instance Nat.add.";]
+    ["#include <stdlib.h>";
+     "#define succ(n) ((n)+1)";
+     "#define pred(n) ((n)-1)";
+    ]
+    ["if (add(2,3) != 5) abort();"]
+
 let suite =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
+    "test_nat_add" >:: test_nat_add;
   ]
 
 let () =
