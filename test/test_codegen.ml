@@ -57,46 +57,6 @@ let quote_C_header str =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let make_temp_dir (prefix : string) (suffix : string) : string =
-  let rec f () =
-    let fn = Filename.temp_file prefix suffix in
-    Unix.unlink fn; (* because Filename.temp_file generates a regular file *)
-    try
-      Unix.mkdir fn 0o700;
-      fn
-    with Unix.Unix_error (e,_,_) as exn ->
-      if e = Unix.EEXIST then
-        f ()
-      else
-        raise exn
-  in
-  Unix.handle_unix_error f ()
-
-(* As far as the given file name is not modifiable and not movable
- * by other users,
- * like one created with make_temp_dir under /tmp which has sticky bit,
- * simple recursive deletion is safe.  *)
-let remove_dir_rec (fn : string) : unit =
-  let rec f fn =
-    let s = Unix.lstat fn in
-    if s.st_kind <> Unix.S_DIR then
-      Unix.unlink fn
-    else
-      (let d = Unix.opendir fn in
-      let rec g () =
-        let n = Unix.readdir d in
-        (if n <> "." && n <> ".." then
-          f (fn ^ "/" ^ n));
-        g ()
-      in
-      (try
-        g ()
-      with End_of_file ->
-        ());
-      Unix.rmdir fn)
-  in
-  Unix.handle_unix_error f fn
-
 let try_finally f x g =
   let y =
     try
@@ -106,12 +66,6 @@ let try_finally f x g =
   in
   g ();
   y
-
-let with_temp_dir ?(remove=true) prefix suffix body =
-  let d = make_temp_dir prefix suffix in
-  try_finally
-    (fun () -> body d) ()
-    (fun () -> if remove then remove_dir_rec d)
 
 let write_file (fn : string) (content : string) : unit =
   let ch = open_out fn in
@@ -133,27 +87,27 @@ let search_topdir () : string =
 let test_mono_id_bool test_ctxt =
   let topdir = search_topdir () in
   let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"] in
-  with_temp_dir (* ~remove:false *) "codegen-test" "" (fun d ->
-    let src_fn = d ^ "/src.v" in
-    let gen_fn = d ^ "/gen.c" in
-    let main_fn = d ^ "/main.c" in
-    let exe_fn = d ^ "/exe" in
-    write_file src_fn
-      ("From codegen Require codegen.\n" ^
-      "Definition mono_id_bool (b : bool) := b.\n" ^
-      "CodeGen Instance mono_id_bool => " ^ (escape_coq_str "mono_id_bool") ^ ".\n" ^
-      "CodeGen GenFile " ^ (escape_coq_str gen_fn) ^ " " ^ (escape_coq_str "mono_id_bool") ^ ".\n");
-    write_file main_fn
-      ("#include <stdlib.h>\n" ^
-      "#include <stdbool.h>\n" ^
-      "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
-      "int main(int argc, char *argv[]) {\n" ^
-      "  if (mono_id_bool(true) != true) abort();\n" ^
-      "  if (mono_id_bool(false) != false) abort();\n" ^
-      "}\n");
-    assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
-    assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
-    assert_command test_ctxt exe_fn [])
+  let d = bracket_tmpdir ~prefix:"codegen-test" test_ctxt in
+  let src_fn = d ^ "/src.v" in
+  let gen_fn = d ^ "/gen.c" in
+  let main_fn = d ^ "/main.c" in
+  let exe_fn = d ^ "/exe" in
+  write_file src_fn
+    ("From codegen Require codegen.\n" ^
+    "Definition mono_id_bool (b : bool) := b.\n" ^
+    "CodeGen Instance mono_id_bool => " ^ (escape_coq_str "mono_id_bool") ^ ".\n" ^
+    "CodeGen GenFile " ^ (escape_coq_str gen_fn) ^ " " ^ (escape_coq_str "mono_id_bool") ^ ".\n");
+  write_file main_fn
+    ("#include <stdlib.h>\n" ^
+    "#include <stdbool.h>\n" ^
+    "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
+    "int main(int argc, char *argv[]) {\n" ^
+    "  if (mono_id_bool(true) != true) abort();\n" ^
+    "  if (mono_id_bool(false) != false) abort();\n" ^
+    "}\n");
+  assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
+  assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
+  assert_command test_ctxt exe_fn []
 
 let suite =
   "TestCodeGen" >::: [
