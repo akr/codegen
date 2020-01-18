@@ -119,13 +119,23 @@ let test_mono_id_bool (test_ctxt : test_ctxt) =
     ["Definition mono_id_bool (b : bool) := b.";
      "CodeGen Instance mono_id_bool => \"mono_id_bool\".";]
     ["#include <stdlib.h>";
-     "#include <stdbool.h>"]
+     "#include <stdbool.h>";]
     ["if (mono_id_bool(true) != true) abort();";
-     "if (mono_id_bool(false) != false) abort();"]
+     "if (mono_id_bool(false) != false) abort();";]
+
+let test_mono_id_bool_omit_cfunc_name (test_ctxt : test_ctxt) =
+  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+    ["Definition mono_id_bool (b : bool) := b.";
+     "CodeGen Instance mono_id_bool.";]
+    ["#include <stdlib.h>";
+     "#include <stdbool.h>";]
+    ["if (mono_id_bool(true) != true) abort();";
+     "if (mono_id_bool(false) != false) abort();";]
 
 let suite =
   "TestCodeGen" >::: [
-    "test_mono_id_bool" >:: test_mono_id_bool
+    "test_mono_id_bool" >:: test_mono_id_bool;
+    "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
   ]
 
 let () =
