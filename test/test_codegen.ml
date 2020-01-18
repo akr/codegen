@@ -81,29 +81,38 @@ let coq_opts : string list =
   | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
   | None -> []
 
-let test_mono_id_bool (test_ctxt : test_ctxt) =
-  let d = bracket_tmpdir ~prefix:"codegen-test" test_ctxt in
-  (* let d = "/tmp/z" in Unix.mkdir d 0o700; *)
+let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt) (coq_commands : string) (c_preamble : string) (c_body : string) : unit =
+  let d =
+    match dir with
+    | Some d -> Unix.mkdir d 0o700; d
+    | None -> bracket_tmpdir ~prefix:"codegen-test" test_ctxt
+  in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
   let main_fn = d ^ "/main.c" in
   let exe_fn = d ^ "/exe" in
   write_file src_fn
     ("From codegen Require codegen.\n" ^
-    "Definition mono_id_bool (b : bool) := b.\n" ^
-    "CodeGen Instance mono_id_bool => \"mono_id_bool\".\n" ^
+    coq_commands ^
     "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
-    ("#include <stdlib.h>\n" ^
-    "#include <stdbool.h>\n" ^
+    (c_preamble ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
-    "  if (mono_id_bool(true) != true) abort();\n" ^
-    "  if (mono_id_bool(false) != false) abort();\n" ^
+    c_body ^
     "}\n");
   assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
   assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
   assert_command test_ctxt exe_fn []
+
+let test_mono_id_bool (test_ctxt : test_ctxt) =
+  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+    ("Definition mono_id_bool (b : bool) := b.\n" ^
+     "CodeGen Instance mono_id_bool => \"mono_id_bool\".\n")
+    ("#include <stdlib.h>\n" ^
+     "#include <stdbool.h>\n")
+    ("if (mono_id_bool(true) != true) abort();\n" ^
+     "if (mono_id_bool(false) != false) abort();\n")
 
 let suite =
   "TestCodeGen" >::: [
