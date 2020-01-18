@@ -1,4 +1,4 @@
-open OUnit
+open OUnit2
 
 let cc =
   match Sys.getenv_opt "CC" with
@@ -130,7 +130,7 @@ let search_topdir () : string =
   in
   f (Sys.getcwd ())
 
-let test_mono_id_bool () =
+let test_mono_id_bool test_ctxt =
   let topdir = search_topdir () in
   let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"] in
   with_temp_dir (* ~remove:false *) "codegen-test" "" (fun d ->
@@ -151,9 +151,9 @@ let test_mono_id_bool () =
       "  if (mono_id_bool(true) != true) abort();\n" ^
       "  if (mono_id_bool(false) != false) abort();\n" ^
       "}\n");
-    assert_command coqc (List.append coq_opts [src_fn]);
-    assert_command cc ["-o"; exe_fn; main_fn];
-    assert_command exe_fn [])
+    assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
+    assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
+    assert_command test_ctxt exe_fn [])
 
 let suite =
   "TestCodeGen" >::: [
