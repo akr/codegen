@@ -81,7 +81,16 @@ let coq_opts : string list =
   | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
   | None -> []
 
-let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt) (coq_commands : string) (c_preamble : string) (c_body : string) : unit =
+let concat_lines (lines : string list) : string =
+  if lines = [] then
+    ""
+  else
+    String.concat "\n" lines ^ "\n"
+
+let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt)
+    (coq_commands : string list)
+    (c_preamble : string list)
+    (c_body : string list) : unit =
   let d =
     match dir with
     | Some d -> Unix.mkdir d 0o700; d
@@ -93,13 +102,13 @@ let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt) (coq_co
   let exe_fn = d ^ "/exe" in
   write_file src_fn
     ("From codegen Require codegen.\n" ^
-    coq_commands ^
+    concat_lines coq_commands ^
     "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
-    (c_preamble ^
+    (concat_lines c_preamble ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
-    c_body ^
+    concat_lines c_body ^
     "}\n");
   assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
   assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
@@ -107,12 +116,12 @@ let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt) (coq_co
 
 let test_mono_id_bool (test_ctxt : test_ctxt) =
   codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
-    ("Definition mono_id_bool (b : bool) := b.\n" ^
-     "CodeGen Instance mono_id_bool => \"mono_id_bool\".\n")
-    ("#include <stdlib.h>\n" ^
-     "#include <stdbool.h>\n")
-    ("if (mono_id_bool(true) != true) abort();\n" ^
-     "if (mono_id_bool(false) != false) abort();\n")
+    ["Definition mono_id_bool (b : bool) := b.";
+     "CodeGen Instance mono_id_bool => \"mono_id_bool\".";]
+    ["#include <stdlib.h>";
+     "#include <stdbool.h>"]
+    ["if (mono_id_bool(true) != true) abort();";
+     "if (mono_id_bool(false) != false) abort();"]
 
 let suite =
   "TestCodeGen" >::: [
