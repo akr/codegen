@@ -87,7 +87,15 @@ let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
 
-
+(*
+ * list of cfunc_name in reverse order.
+ * CodeGen EndFile consumes this list.
+ *
+ * This list will be extended to support non-cfunc-element such as
+ * inductive type definition, code snippet specified by user, etc.
+ *)
+let generation_list = Summary.ref ~name:"CodegenGeneration"
+  ([] : string list)
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"

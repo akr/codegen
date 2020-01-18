@@ -284,6 +284,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
+  generation_list := cfunc_name :: !generation_list;
   sp_inst
 
 let codegen_specialization_instance

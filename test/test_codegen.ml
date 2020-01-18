@@ -92,7 +92,7 @@ let test_mono_id_bool (test_ctxt : test_ctxt) =
     ("From codegen Require codegen.\n" ^
     "Definition mono_id_bool (b : bool) := b.\n" ^
     "CodeGen Instance mono_id_bool => \"mono_id_bool\".\n" ^
-    "CodeGen GenFile " ^ (escape_coq_str gen_fn) ^ " \"mono_id_bool\".\n");
+    "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
     ("#include <stdlib.h>\n" ^
     "#include <stdbool.h>\n" ^

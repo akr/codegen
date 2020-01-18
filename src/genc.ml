@@ -872,6 +872,10 @@ let gen_file (fn : string) (cfunc_list : string list) : unit =
   close_out ch;
   Feedback.msg_info (str ("file generated: " ^ fn)))
 
+let gen_endfile (fn : string) =
+  gen_file fn !generation_list;
+  generation_list := []
+
 let genc (libref_list : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
