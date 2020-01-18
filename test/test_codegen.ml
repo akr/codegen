@@ -34,7 +34,7 @@ let escape_C_str (str : string) : string =
   Buffer.contents buf
 
 (* "q-char-sequence" *)
-let quote_C_header str =
+let quote_C_header (str : string) =
   let buf = Buffer.create (String.length str + 2) in
   Buffer.add_char buf '"';
   String.iter
@@ -47,7 +47,7 @@ let quote_C_header str =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let try_finally f x g =
+let try_finally (f : 'a -> 'b) (x : 'a) (g : unit -> unit) : 'b =
   let y =
     try
       f x
@@ -74,21 +74,21 @@ let search_topdir () : string =
   in
   f (Sys.getcwd ())
 
-let cc =
+let cc : string =
   match Sys.getenv_opt "CC" with
   | Some v -> v
   | None -> "gcc"
 
-let coqc =
+let coqc : string =
   match Sys.getenv_opt "COQC" with
   | Some v -> v
   | None -> "coqc"
 
-let topdir = search_topdir ()
+let topdir : string = search_topdir ()
 
-let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
+let coq_opts : string list = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
 
-let test_mono_id_bool test_ctxt =
+let test_mono_id_bool (test_ctxt : test_ctxt) =
   let d = bracket_tmpdir ~prefix:"codegen-test" test_ctxt in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
@@ -117,4 +117,4 @@ let suite =
   ]
 
 let () =
-  ignore (run_test_tt_main suite)
+  run_test_tt_main suite
