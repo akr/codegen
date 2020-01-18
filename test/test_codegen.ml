@@ -114,7 +114,7 @@ let search_topdir () : string =
     if Sys.file_exists fn then
       d
     else if d = "/" then
-      failwith "Makefile.coq.conf not found"
+      failwith "Makefile.coq.conf not found in ancestor directories"
     else
       f (Filename.dirname d)
   in
