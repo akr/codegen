@@ -84,9 +84,10 @@ let search_topdir () : string =
   in
   f (Sys.getcwd ())
 
+let topdir = search_topdir ()
+let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
+
 let test_mono_id_bool test_ctxt =
-  let topdir = search_topdir () in
-  let coq_opts = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"] in
   let d = bracket_tmpdir ~prefix:"codegen-test" test_ctxt in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
