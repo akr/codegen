@@ -47,16 +47,6 @@ let quote_C_header (str : string) =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let try_finally (f : 'a -> 'b) (x : 'a) (g : unit -> unit) : 'b =
-  let y =
-    try
-      f x
-    with exn ->
-      (g (); raise exn)
-  in
-  g ();
-  y
-
 let write_file (fn : string) (content : string) : unit =
   let ch = open_out fn in
   output_string ch content;
