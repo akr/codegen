@@ -1,5 +1,15 @@
 open OUnit
 
+let cc =
+  match Sys.getenv_opt "CC" with
+  | Some v -> v
+  | None -> "gcc"
+
+let coqc =
+  match Sys.getenv_opt "COQC" with
+  | Some v -> v
+  | None -> "coqc"
+
 let escape_coq_str (str : string) : string =
   let buf = Buffer.create (String.length str + 2) in
   Buffer.add_char buf '"';
@@ -141,8 +151,8 @@ let test_mono_id_bool () =
       "  if (mono_id_bool(true) != true) abort();\n" ^
       "  if (mono_id_bool(false) != false) abort();\n" ^
       "}\n");
-    assert_command "coqc" (List.append coq_opts [src_fn]);
-    assert_command "gcc" ["-o"; exe_fn; main_fn];
+    assert_command coqc (List.append coq_opts [src_fn]);
+    assert_command cc ["-o"; exe_fn; main_fn];
     assert_command exe_fn [])
 
 let suite =
