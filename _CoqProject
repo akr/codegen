@@ -1,5 +1,7 @@
 -Q theories codegen
 -I src
+
+# required to install *.{cmi,cmx,cmxs,cmxa} when make install
 -Q src codegen
 
 src/cgenutil.ml
