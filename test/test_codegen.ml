@@ -52,13 +52,13 @@ let write_file (fn : string) (content : string) : unit =
   output_string ch content;
   close_out ch
 
-let search_topdir () : string =
+let search_topdir () : string option =
   let rec f d =
     let fn = d ^ "/Makefile.coq.conf" in
     if Sys.file_exists fn then
-      d
+      Some d
     else if d = "/" then
-      failwith "Makefile.coq.conf not found in ancestor directories"
+      None
     else
       f (Filename.dirname d)
   in
@@ -74,12 +74,16 @@ let coqc : string =
   | Some v -> v
   | None -> "coqc"
 
-let topdir : string = search_topdir ()
+let topdir_opt : string option = search_topdir ()
 
-let coq_opts : string list = ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
+let coq_opts : string list =
+  match topdir_opt with
+  | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
+  | None -> []
 
 let test_mono_id_bool (test_ctxt : test_ctxt) =
   let d = bracket_tmpdir ~prefix:"codegen-test" test_ctxt in
+  (* let d = "/tmp/z" in Unix.mkdir d 0o700; *)
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
   let main_fn = d ^ "/main.c" in
