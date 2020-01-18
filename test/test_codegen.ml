@@ -81,16 +81,22 @@ let coq_opts : string list =
   | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
   | None -> []
 
-let concat_lines (lines : string list) : string =
-  if lines = [] then
-    ""
-  else
-    String.concat "\n" lines ^ "\n"
+let delete_indent (str : string) : string =
+  let buf = Buffer.create (String.length str + 2) in
+  let line_head = ref true in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> Buffer.add_char buf ch; line_head := true
+      | ' ' | '\t' -> if not !line_head then Buffer.add_char buf ch
+      | _ -> Buffer.add_char buf ch; line_head := false)
+    str;
+  Buffer.contents buf
 
 let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
-    (coq_commands : string list)
-    (c_preamble : string list)
-    (c_body : string list) : unit =
+    (coq_commands : string)
+    (c_preamble : string)
+    (c_body : string) : unit =
   let d =
     match dir with
     | Some d -> Unix.mkdir d 0o700; d
@@ -102,13 +108,13 @@ let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
   let exe_fn = d ^ "/exe" in
   write_file src_fn
     ("From codegen Require codegen.\n" ^
-    concat_lines coq_commands ^
+    delete_indent coq_commands ^ "\n" ^
     "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
-    (concat_lines c_preamble ^
+    (delete_indent c_preamble ^ "\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
-    concat_lines c_body ^
+    delete_indent c_body ^ "\n" ^
     "}\n");
   assert_command ctx coqc (List.append coq_opts [src_fn]);
   assert_command ctx cc ["-o"; exe_fn; main_fn];
@@ -116,36 +122,53 @@ let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
 
 let test_mono_id_bool (ctx : test_ctxt) =
   codegen_test_template ctx (* ~dir:"/tmp/debug" *)
-    ["Definition mono_id_bool (b : bool) := b.";
-     "CodeGen Instance mono_id_bool => \"mono_id_bool\".";]
-    ["#include <stdlib.h>";
-     "#include <stdbool.h>";]
-    ["if (mono_id_bool(true) != true) abort();";
-     "if (mono_id_bool(false) != false) abort();";]
+    {|
+      Definition mono_id_bool (b : bool) := b.
+      CodeGen Instance mono_id_bool => "mono_id_bool".
+    |}
+    {|
+      #include <stdlib.h>
+      #include <stdbool.h>|}
+    {|
+      if (mono_id_bool(true) != true) abort();
+      if (mono_id_bool(false) != false) abort();
+    |}
 
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
   codegen_test_template ctx (* ~dir:"/tmp/debug" *)
-    ["Definition mono_id_bool (b : bool) := b.";
-     "CodeGen Instance mono_id_bool.";]
-    ["#include <stdlib.h>";
-     "#include <stdbool.h>";]
-    ["if (mono_id_bool(true) != true) abort();";
-     "if (mono_id_bool(false) != false) abort();";]
+    {|
+      Definition mono_id_bool (b : bool) := b.
+      CodeGen Instance mono_id_bool.
+    |}
+    {|
+      #include <stdlib.h>
+      #include <stdbool.h>
+    |}
+    {|
+      if (mono_id_bool(true) != true) abort();
+      if (mono_id_bool(false) != false) abort();
+    |}
 
 let test_nat_add (ctx : test_ctxt) =
-  codegen_test_template ctx ~dir:"/tmp/debug"
-    ["CodeGen Inductive Type nat => \"unsigned int\".";
-     "CodeGen Inductive Constructor nat";
-     "| O => \"0\"";
-     "| S => \"succ\".";
-     "CodeGen Inductive Match nat => \"\"";
-     "| O => \"case 0\"";
-     "| S => \"default\" \"pred\".";
-     "CodeGen Instance Nat.add.";]
-    ["#include <stdlib.h>";
-     "#define succ(n) ((n)+1)";
-     "#define pred(n) ((n)-1)";]
-    ["if (add(2,3) != 5) abort();"]
+  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
+    {|
+      CodeGen Inductive Type nat => "unsigned int".
+      CodeGen Inductive Constructor nat
+      | O => "0"
+      | S => "succ".
+      CodeGen Inductive Match nat => ""
+      | O => "case 0"
+      | S => "default" "pred".
+      CodeGen Instance Nat.add.
+    |}
+    {|
+      #include <stdlib.h>
+      #define succ(n) ((n)+1)
+      #define pred(n) ((n)-1)
+    |}
+    {|
+      if (add(2,3) != 5) abort();
+    |}
 
 let suite =
   "TestCodeGen" >::: [
