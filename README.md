@@ -17,7 +17,7 @@ You need Coq and OCaml.
 You also need following to test codegen.
 
 - ocamlfind 1.8.1
-- OUnit 2.2.1
+- ounit2 2.2.1
 
 ## How to build, test and install
 
