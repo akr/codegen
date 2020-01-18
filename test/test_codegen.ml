@@ -112,6 +112,7 @@ let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
     "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
     (delete_indent c_preamble ^ "\n" ^
+    "#include <assert.h>\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     delete_indent c_body ^ "\n" ^
@@ -130,8 +131,8 @@ let test_mono_id_bool (ctx : test_ctxt) =
       #include <stdlib.h>
       #include <stdbool.h>|}
     {|
-      if (mono_id_bool(true) != true) abort();
-      if (mono_id_bool(false) != false) abort();
+      assert(mono_id_bool(true) == true);
+      assert(mono_id_bool(false) == false);
     |}
 
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
@@ -145,8 +146,8 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
       #include <stdbool.h>
     |}
     {|
-      if (mono_id_bool(true) != true) abort();
-      if (mono_id_bool(false) != false) abort();
+      assert(mono_id_bool(true) == true);
+      assert(mono_id_bool(false) == false);
     |}
 
 let test_nat_add (ctx : test_ctxt) =
@@ -167,7 +168,7 @@ let test_nat_add (ctx : test_ctxt) =
       #define pred(n) ((n)-1)
     |}
     {|
-      if (add(2,3) != 5) abort();
+      assert(add(2,3) == 5);
     |}
 
 let suite =
