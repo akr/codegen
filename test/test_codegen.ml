@@ -87,14 +87,14 @@ let concat_lines (lines : string list) : string =
   else
     String.concat "\n" lines ^ "\n"
 
-let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt)
+let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
     (coq_commands : string list)
     (c_preamble : string list)
     (c_body : string list) : unit =
   let d =
     match dir with
     | Some d -> Unix.mkdir d 0o700; d
-    | None -> bracket_tmpdir ~prefix:"codegen-test" test_ctxt
+    | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
   in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
@@ -110,12 +110,12 @@ let codegen_test_template ?(dir : string option) (test_ctxt : test_ctxt)
     "int main(int argc, char *argv[]) {\n" ^
     concat_lines c_body ^
     "}\n");
-  assert_command test_ctxt coqc (List.append coq_opts [src_fn]);
-  assert_command test_ctxt cc ["-o"; exe_fn; main_fn];
-  assert_command test_ctxt exe_fn []
+  assert_command ctx coqc (List.append coq_opts [src_fn]);
+  assert_command ctx cc ["-o"; exe_fn; main_fn];
+  assert_command ctx exe_fn []
 
-let test_mono_id_bool (test_ctxt : test_ctxt) =
-  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+let test_mono_id_bool (ctx : test_ctxt) =
+  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
     ["Definition mono_id_bool (b : bool) := b.";
      "CodeGen Instance mono_id_bool => \"mono_id_bool\".";]
     ["#include <stdlib.h>";
@@ -123,8 +123,8 @@ let test_mono_id_bool (test_ctxt : test_ctxt) =
     ["if (mono_id_bool(true) != true) abort();";
      "if (mono_id_bool(false) != false) abort();";]
 
-let test_mono_id_bool_omit_cfunc_name (test_ctxt : test_ctxt) =
-  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
+  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
     ["Definition mono_id_bool (b : bool) := b.";
      "CodeGen Instance mono_id_bool.";]
     ["#include <stdlib.h>";
@@ -132,8 +132,8 @@ let test_mono_id_bool_omit_cfunc_name (test_ctxt : test_ctxt) =
     ["if (mono_id_bool(true) != true) abort();";
      "if (mono_id_bool(false) != false) abort();";]
 
-let test_nat_add (test_ctxt : test_ctxt) =
-  codegen_test_template test_ctxt (* ~dir:"/tmp/debug" *)
+let test_nat_add (ctx : test_ctxt) =
+  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
     ["CodeGen Inductive Type nat => \"unsigned int\".";
      "CodeGen Inductive Constructor nat | O => \"0\".";
      "CodeGen Inductive Constructor nat | S => \"succ\".";
