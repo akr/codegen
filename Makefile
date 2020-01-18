@@ -31,5 +31,6 @@ clean :
 	  test/test_codegen \
 	  test/*.cmi \
 	  test/*.cmx \
-	  test/*.o
+	  test/*.o \
+	  test/oUnit-*
 
