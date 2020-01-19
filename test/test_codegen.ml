@@ -141,11 +141,10 @@ let test_mono_id_bool (ctx : test_ctxt) =
     {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Instance mono_id_bool => "mono_id_bool".
-    |}
-    {|
+    |} {|
       #include <stdlib.h>
-      #include <stdbool.h>|}
-    {|
+      #include <stdbool.h>
+    |} {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
@@ -155,12 +154,10 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
     {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Instance mono_id_bool.
-    |}
-    {|
+    |} {|
       #include <stdlib.h>
       #include <stdbool.h>
-    |}
-    {|
+    |} {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
@@ -176,13 +173,11 @@ let test_nat_add (ctx : test_ctxt) =
       | O => "case 0"
       | S => "default" "pred".
       CodeGen Instance Nat.add.
-    |}
-    {|
+    |} {|
       #include <stdlib.h>
       #define succ(n) ((n)+1)
       #define pred(n) ((n)-1)
-    |}
-    {|
+    |} {|
       assert(add(2,3) == 5);
     |}
 
