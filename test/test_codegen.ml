@@ -165,7 +165,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
 let test_nat_add (ctx : test_ctxt) =
   codegen_test_template ctx
     {|
-      CodeGen Inductive Type nat => "unsigned int".
+      CodeGen Inductive Type nat => "uint64_t".
       CodeGen Inductive Constructor nat
       | O => "0"
       | S => "succ".
@@ -175,6 +175,7 @@ let test_nat_add (ctx : test_ctxt) =
       CodeGen Instance Nat.add.
     |} {|
       #include <stdlib.h>
+      #include <stdint.h>
       #define succ(n) ((n)+1)
       #define pred(n) ((n)-1)
     |} {|
