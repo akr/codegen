@@ -93,13 +93,28 @@ let delete_indent (str : string) : string =
     str;
   Buffer.contents buf
 
-let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
+let make_temp_dir (prefix : string) (suffix : string) : string =
+  let rec f () =
+    let fn = Filename.temp_file prefix suffix in
+    Unix.unlink fn; (* because Filename.temp_file generates a regular file *)
+    try
+      Unix.mkdir fn 0o700;
+      fn
+    with Unix.Unix_error (e,_,_) as exn ->
+      if e = Unix.EEXIST then
+        f ()
+      else
+        raise exn
+  in
+  Unix.handle_unix_error f ()
+
+let codegen_test_template (ctx : test_ctxt)
     (coq_commands : string)
     (c_preamble : string)
     (c_body : string) : unit =
   let d =
-    match dir with
-    | Some d -> Unix.mkdir d 0o700; d
+    match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
+    | Some _ -> make_temp_dir "codegen-test" ""
     | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
   in
   let src_fn = d ^ "/src.v" in
@@ -122,7 +137,7 @@ let codegen_test_template ?(dir : string option) (ctx : test_ctxt)
   assert_command ctx exe_fn []
 
 let test_mono_id_bool (ctx : test_ctxt) =
-  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
+  codegen_test_template ctx
     {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Instance mono_id_bool => "mono_id_bool".
@@ -136,7 +151,7 @@ let test_mono_id_bool (ctx : test_ctxt) =
     |}
 
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
-  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
+  codegen_test_template ctx
     {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Instance mono_id_bool.
@@ -151,7 +166,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
     |}
 
 let test_nat_add (ctx : test_ctxt) =
-  codegen_test_template ctx (* ~dir:"/tmp/debug" *)
+  codegen_test_template ctx
     {|
       CodeGen Inductive Type nat => "unsigned int".
       CodeGen Inductive Constructor nat
