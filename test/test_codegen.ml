@@ -182,11 +182,63 @@ let test_nat_add (ctx : test_ctxt) =
       assert(add(2,3) == 5);
     |}
 
+let test_list_bool (ctx : test_ctxt) =
+  codegen_test_template ctx
+    {|
+      Definition is_nil (s : list bool) :=
+        match s with
+        | nil => true
+        | cons _ _ => false
+        end.
+
+      CodeGen Inductive Type bool => "bool".
+      CodeGen Inductive Constructor bool
+      | true => "true"
+      | false => "false".
+
+
+      CodeGen Inductive Type list bool => "list_bool".
+      CodeGen Inductive Constructor list bool
+      | nil => "NULL"
+      | cons => "cons".
+      CodeGen Inductive Match list bool => "is_NULL"
+      | nil => "default"
+      | cons => "case 0" "head" "tail".
+
+      CodeGen Instance is_nil.
+    |} {|
+      #include <stdlib.h>
+      #include <stdbool.h>
+
+      struct list_bool_struct;
+      typedef struct list_bool_struct *list_bool;
+      struct list_bool_struct {
+        bool head;
+        list_bool tail;
+      };
+
+      #define is_NULL(p) ((p) == NULL)
+
+      static inline bool head(list_bool s) { return s->head; }
+      static inline list_bool tail(list_bool s) { return s->tail; }
+      static inline list_bool cons(bool v, list_bool s) {
+        list_bool ret = malloc(sizeof(struct list_bool_struct));
+        if (ret == NULL) abort();
+        ret->head = v;
+        ret->tail = s;
+        return ret;
+      }
+    |} {|
+      assert(is_nil(NULL));
+      assert(!is_nil(cons(true, NULL)));
+    |}
+
 let suite =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_nat_add" >:: test_nat_add;
+    "test_list_bool" >:: test_list_bool;
   ]
 
 let () =
