@@ -854,26 +854,40 @@ let gen (cfunc_list : string list) : unit =
       Feedback.msg_info pp)
     cfunc_list
 
-let gen_file (fn : string) (cfunc_list : string list) : unit =
+let codegen_snippet (str : string) : unit =
+  let len = String.length str in
+  let str' =
+    if 0 < len && str.[len - 1] <> '\n' then
+      str ^ "\n"
+    else
+      str
+  in
+  generation_list := GenSnippet str' :: !generation_list
+
+let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (let ch = open_out fn in
   let fmt = Format.formatter_of_out_channel ch in
   List.iter
-    (fun cfunc_name ->
-      let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
-      let env = Global.env () in
-      let sigma = Evd.from_env env in
-      linear_type_check_term body;
-      let ty = EConstr.of_constr ty in
-      let body = EConstr.of_constr body in
-      let pp = genc_func env sigma cfunc_name ty body in
-      Pp.pp_with fmt (pp ++ Pp.fnl ()))
-    cfunc_list;
+    (fun gen ->
+      match gen with
+      | GenFunc cfunc_name ->
+          let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+          let env = Global.env () in
+          let sigma = Evd.from_env env in
+          linear_type_check_term body;
+          let ty = EConstr.of_constr ty in
+          let body = EConstr.of_constr body in
+          let pp = genc_func env sigma cfunc_name ty body in
+          Pp.pp_with fmt (pp ++ Pp.fnl ())
+      | GenSnippet str ->
+          Pp.pp_with fmt (Pp.str str))
+    gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
   Feedback.msg_info (str ("file generated: " ^ fn)))
 
 let gen_endfile (fn : string) =
-  gen_file fn !generation_list;
+  gen_file fn (List.rev !generation_list);
   generation_list := []
 
 let genc (libref_list : Libnames.qualid list) : unit =

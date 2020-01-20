@@ -294,6 +294,22 @@ let test_sum (ctx : test_ctxt) =
       | O => "case 0"
       | S => "default" "pred".
 
+      CodeGen Snippet "
+      #include <stdint.h>
+      typedef uint64_t nat;
+      #define succ(n) ((n)+1)
+      #define pred(n) ((n)-1)
+      ".
+
+      CodeGen Primitive Nat.add.
+      CodeGen Primitive Nat.sub.
+      CodeGen Primitive Nat.mul.
+      CodeGen Snippet "
+      #define add(x,y) ((x)+(y))
+      #define sub(x,y) ((x)-(y))
+      #define mul(x,y) ((x)*(y))
+      ".
+
       CodeGen Inductive Type list nat => "list_nat".
       CodeGen Inductive Constructor list nat
       | nil => "NULL"
@@ -302,28 +318,14 @@ let test_sum (ctx : test_ctxt) =
       | nil => "default"
       | cons => "case 0" "head" "tail".
 
-      Fixpoint sum (s : list nat) : nat :=
-        match s with
-        | nil => 0
-        | cons x s' => x + sum s'
-        end.
-
-      CodeGen Primitive Nat.add.
-      CodeGen Function sum.
-    |} {|
-      #include <stdint.h>
-      typedef uint64_t nat;
-      #define succ(n) ((n)+1)
-      #define pred(n) ((n)-1)
+      CodeGen Snippet "
+      #include <stdlib.h> /* for NULL, abort(), malloc() */
       struct list_nat_struct;
       typedef struct list_nat_struct *list_nat;
       struct list_nat_struct {
         nat head;
         list_nat tail;
       };
-      #define add(x,y) ((x)+(y))
-
-      #include <stdlib.h>
       #define is_NULL(p) ((p) == NULL)
       static inline nat head(list_nat s) { return s->head; }
       static inline list_nat tail(list_nat s) { return s->tail; }
@@ -334,6 +336,17 @@ let test_sum (ctx : test_ctxt) =
         ret->tail = s;
         return ret;
       }
+      ".
+
+      Fixpoint sum (s : list nat) : nat :=
+        match s with
+        | nil => 0
+        | cons x s' => x + sum s'
+        end.
+
+      CodeGen Function sum.
+    |} {|
+
     |} {|
       assert(sum(NULL) == 0);
       assert(sum(cons(1, NULL)) == 1);

@@ -185,9 +185,10 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
       { codegen_primitive func args names }
 
+    | [ "CodeGen" "Snippet" string(str) ] ->
+      { codegen_snippet str }
+
     | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
-    | [ "CodeGen" "GenFile" string(fn) ne_string_list(cfunc_list) ] ->
-      { gen_file fn cfunc_list }
 
     | [ "CodeGen" "EndFile" string(fn) ] ->
       { gen_endfile fn }

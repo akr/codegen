@@ -312,7 +312,7 @@ let codegen_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) =
   let sp_inst = codegen_function_internal func user_args names in
-  generation_list := sp_inst.sp_cfunc_name :: !generation_list
+  generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
 let codegen_primitive
     (func : Libnames.qualid)
