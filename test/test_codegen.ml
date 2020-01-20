@@ -348,6 +348,23 @@ let test_list_bool (ctx : test_ctxt) =
       assert(!is_nil(cons(true, NULL)));
     |}
 
+let test_list_bool_length (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (nat_src ^ list_bool_src ^
+    {|
+      Fixpoint length (s : list bool) : nat :=
+        match s with
+        | nil => 0
+        | cons x s' => S (length s')
+        end.
+      CodeGen Function length.
+    |}) {|
+      #define cons(h,t) list_bool_cons(h,t)
+      assert(length(NULL) == 0);
+      assert(length(cons(1, NULL)) == 1);
+      assert(length(cons(1, cons(2, NULL))) == 2);
+    |}
+
 let test_sum (ctx : test_ctxt) =
   codegen_test_template ctx
     (nat_src ^ list_nat_src ^
