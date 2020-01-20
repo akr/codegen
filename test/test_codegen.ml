@@ -187,105 +187,18 @@ let codegen_test_template (ctx : test_ctxt)
   assert_command ctx cc ["-o"; exe_fn; main_fn];
   assert_command ctx exe_fn []
 
-let test_mono_id_bool (ctx : test_ctxt) =
-  codegen_test_template ctx
-    {|
-      Definition mono_id_bool (b : bool) := b.
-      CodeGen Function mono_id_bool => "mono_id_bool".
-    |} {|
-      #include <stdlib.h>
-      #include <stdbool.h>
-    |} {|
-      assert(mono_id_bool(true) == true);
-      assert(mono_id_bool(false) == false);
-    |}
-
-let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
-  codegen_test_template ctx
-    {|
-      Definition mono_id_bool (b : bool) := b.
-      CodeGen Function mono_id_bool.
-    |} {|
-      #include <stdlib.h>
-      #include <stdbool.h>
-    |} {|
-      assert(mono_id_bool(true) == true);
-      assert(mono_id_bool(false) == false);
-    |}
-
-let test_nat_add (ctx : test_ctxt) =
-  codegen_test_template ctx
-    {|
-      CodeGen Inductive Type nat => "uint64_t".
-      CodeGen Inductive Constructor nat
-      | O => "0"
-      | S => "succ".
-      CodeGen Inductive Match nat => ""
-      | O => "case 0"
-      | S => "default" "pred".
-      CodeGen Function Nat.add.
-    |} {|
-      #include <stdlib.h>
-      #include <stdint.h>
-      #define succ(n) ((n)+1)
-      #define pred(n) ((n)-1)
-    |} {|
-      assert(add(2,3) == 5);
-    |}
-
-let test_list_bool (ctx : test_ctxt) =
-  codegen_test_template ctx
-    {|
-      Definition is_nil (s : list bool) :=
-        match s with
-        | nil => true
-        | cons _ _ => false
-        end.
-
+let bool_src = {|
       CodeGen Inductive Type bool => "bool".
       CodeGen Inductive Constructor bool
       | true => "true"
       | false => "false".
 
-      CodeGen Inductive Type list bool => "list_bool".
-      CodeGen Inductive Constructor list bool
-      | nil => "NULL"
-      | cons => "cons".
-      CodeGen Inductive Match list bool => "is_NULL"
-      | nil => "default"
-      | cons => "case 0" "head" "tail".
+      CodeGen Snippet "
+      #include <stdbool.h> /* for bool, true and false */
+      ".
+|}
 
-      CodeGen Function is_nil.
-    |} {|
-      #include <stdlib.h>
-      #include <stdbool.h>
-
-      struct list_bool_struct;
-      typedef struct list_bool_struct *list_bool;
-      struct list_bool_struct {
-        bool head;
-        list_bool tail;
-      };
-
-      #define is_NULL(p) ((p) == NULL)
-
-      static inline bool head(list_bool s) { return s->head; }
-      static inline list_bool tail(list_bool s) { return s->tail; }
-      static inline list_bool cons(bool v, list_bool s) {
-        list_bool ret = malloc(sizeof(struct list_bool_struct));
-        if (ret == NULL) abort();
-        ret->head = v;
-        ret->tail = s;
-        return ret;
-      }
-    |} {|
-      assert(is_nil(NULL));
-      assert(!is_nil(cons(true, NULL)));
-    |}
-
-let test_sum (ctx : test_ctxt) =
-  codegen_test_template ctx
-    {|
+let nat_src = {|
       CodeGen Inductive Type nat => "nat".
       CodeGen Inductive Constructor nat
       | O => "0"
@@ -311,27 +224,62 @@ let test_sum (ctx : test_ctxt) =
       #define nat_mul(x,y) ((x)*(y))
       #define nat_div(x,y) ((x)/(y))
       ".
+|}
 
+let list_bool_src = {|
+      CodeGen Inductive Type list bool => "list_bool".
+      CodeGen Inductive Constructor list bool
+      | nil => "NULL"
+      | cons => "list_bool_cons".
+      CodeGen Inductive Match list bool => "list_bool_is_NULL"
+      | nil => "default"
+      | cons => "case 0" "list_bool_head" "list_bool_tail".
+
+      CodeGen Snippet "
+      #include <stdlib.h> /* for NULL, malloc(), abort() */
+
+      struct list_bool_struct;
+      typedef struct list_bool_struct *list_bool;
+      struct list_bool_struct {
+        bool head;
+        list_bool tail;
+      };
+
+      static inline bool list_bool_is_NULL(list_bool s) { return s == NULL; }
+      static inline bool list_bool_head(list_bool s) { return s->head; }
+      static inline list_bool list_bool_tail(list_bool s) { return s->tail; }
+      static inline list_bool list_bool_cons(bool v, list_bool s) {
+        list_bool ret = malloc(sizeof(struct list_bool_struct));
+        if (ret == NULL) abort();
+        ret->head = v;
+        ret->tail = s;
+        return ret;
+      }
+      ".
+|}
+
+let list_nat_src = {|
       CodeGen Inductive Type list nat => "list_nat".
       CodeGen Inductive Constructor list nat
       | nil => "NULL"
-      | cons => "cons".
-      CodeGen Inductive Match list nat => "is_NULL"
+      | cons => "list_nat_cons".
+      CodeGen Inductive Match list nat => "list_nat_is_NULL"
       | nil => "default"
-      | cons => "case 0" "head" "tail".
+      | cons => "case 0" "list_nat_head" "list_nat_tail".
 
       CodeGen Snippet "
-      #include <stdlib.h> /* for NULL, abort(), malloc() */
+      #include <stdlib.h> /* for NULL, malloc(), abort() */
+      #include <stdbool.h> /* for bool */
       struct list_nat_struct;
       typedef struct list_nat_struct *list_nat;
       struct list_nat_struct {
         nat head;
         list_nat tail;
       };
-      #define is_NULL(p) ((p) == NULL)
-      static inline nat head(list_nat s) { return s->head; }
-      static inline list_nat tail(list_nat s) { return s->tail; }
-      static inline list_nat cons(nat v, list_nat s) {
+      static inline bool list_nat_is_NULL(list_nat s) { return s == NULL; }
+      static inline nat list_nat_head(list_nat s) { return s->head; }
+      static inline list_nat list_nat_tail(list_nat s) { return s->tail; }
+      static inline list_nat list_nat_cons(nat v, list_nat s) {
         list_nat ret = malloc(sizeof(struct list_nat_struct));
         if (ret == NULL) abort();
         ret->head = v;
@@ -339,17 +287,68 @@ let test_sum (ctx : test_ctxt) =
         return ret;
       }
       ".
+|}
 
+let test_mono_id_bool (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Definition mono_id_bool (b : bool) := b.
+      CodeGen Function mono_id_bool => "mono_id_bool".
+    |}) "" {|
+      assert(mono_id_bool(true) == true);
+      assert(mono_id_bool(false) == false);
+    |}
+
+let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Definition mono_id_bool (b : bool) := b.
+      CodeGen Function mono_id_bool.
+    |}) "" {|
+      assert(mono_id_bool(true) == true);
+      assert(mono_id_bool(false) == false);
+    |}
+
+let test_nat_add (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Fixpoint my_add (m n : nat) : nat :=
+        match m with
+        | O => n
+        | S m' => S (my_add m' n)
+        end.
+      CodeGen Function my_add.
+    |}) "" {|
+      assert(my_add(2,3) == 5);
+    |}
+
+let test_list_bool (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (bool_src ^ list_bool_src ^ {|
+      Definition is_nil (s : list bool) :=
+        match s with
+        | nil => true
+        | cons _ _ => false
+        end.
+      CodeGen Function is_nil.
+    |}) "" {|
+      #define cons(h,t) list_bool_cons(h,t)
+      assert(is_nil(NULL));
+      assert(!is_nil(cons(true, NULL)));
+    |}
+
+let test_sum (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (nat_src ^ list_nat_src ^
+    {|
       Fixpoint sum (s : list nat) : nat :=
         match s with
         | nil => 0
         | cons x s' => x + sum s'
         end.
-
       CodeGen Function sum.
-    |} {|
-
-    |} {|
+    |}) "" {|
+      #define cons(h,t) list_nat_cons(h,t)
       assert(sum(NULL) == 0);
       assert(sum(cons(1, NULL)) == 1);
       assert(sum(cons(1, cons(2, NULL))) == 3);
