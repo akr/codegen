@@ -307,17 +307,30 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
       assert(mono_id_bool(false) == false);
     |}
 
-let test_nat_add (ctx : test_ctxt) =
+let test_nat_add_rec (ctx : test_ctxt) =
   codegen_test_template ctx
     (nat_src ^ {|
-      Fixpoint my_add (m n : nat) : nat :=
+      Fixpoint my_add_rec (m n : nat) : nat :=
         match m with
         | O => n
-        | S m' => S (my_add m' n)
+        | S m' => S (my_add_rec m' n)
         end.
-      CodeGen Function my_add.
+      CodeGen Function my_add_rec.
     |}) {|
-      assert(my_add(2,3) == 5);
+      assert(my_add_rec(2,3) == 5);
+    |}
+
+let test_nat_add_iter (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Fixpoint my_add_iter (m n : nat) : nat :=
+        match m with
+        | O => n
+        | S m' => my_add_iter m' (S n)
+        end.
+      CodeGen Function my_add_iter.
+    |}) {|
+      assert(my_add_iter(2,3) == 5);
     |}
 
 let test_list_bool (ctx : test_ctxt) =
@@ -356,7 +369,8 @@ let suite =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
-    "test_nat_add" >:: test_nat_add;
+    "test_nat_add_rec" >:: test_nat_add_rec;
+    "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
   ]
