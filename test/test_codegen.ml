@@ -161,7 +161,6 @@ let make_temp_dir (prefix : string) (suffix : string) : string =
 
 let codegen_test_template (ctx : test_ctxt)
     (coq_commands : string)
-    (c_preamble : string)
     (c_body : string) : unit =
   let d =
     match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
@@ -177,8 +176,7 @@ let codegen_test_template (ctx : test_ctxt)
     delete_indent coq_commands ^ "\n" ^
     "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
-    (delete_indent c_preamble ^ "\n" ^
-    "#include <assert.h>\n" ^
+    ("#include <assert.h>\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     add_n_indent 2 (delete_indent c_body) ^ "\n" ^
@@ -294,7 +292,7 @@ let test_mono_id_bool (ctx : test_ctxt) =
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Function mono_id_bool => "mono_id_bool".
-    |}) "" {|
+    |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
@@ -304,7 +302,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
       CodeGen Function mono_id_bool.
-    |}) "" {|
+    |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
@@ -318,7 +316,7 @@ let test_nat_add (ctx : test_ctxt) =
         | S m' => S (my_add m' n)
         end.
       CodeGen Function my_add.
-    |}) "" {|
+    |}) {|
       assert(my_add(2,3) == 5);
     |}
 
@@ -331,7 +329,7 @@ let test_list_bool (ctx : test_ctxt) =
         | cons _ _ => false
         end.
       CodeGen Function is_nil.
-    |}) "" {|
+    |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       assert(is_nil(NULL));
       assert(!is_nil(cons(true, NULL)));
@@ -347,7 +345,7 @@ let test_sum (ctx : test_ctxt) =
         | cons x s' => x + sum s'
         end.
       CodeGen Function sum.
-    |}) "" {|
+    |}) {|
       #define cons(h,t) list_nat_cons(h,t)
       assert(sum(NULL) == 0);
       assert(sum(cons(1, NULL)) == 1);
