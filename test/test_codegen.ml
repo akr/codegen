@@ -230,11 +230,11 @@ let nat_src = {|
       CodeGen Primitive Nat.ldiff => "nat_ldiff".
       CodeGen Primitive Nat.lxor => "nat_lxor".
       CodeGen Snippet "
-      #define nat_add(x,y) ((x)+(y))
-      #define nat_sub(x,y) ((x)-(y))
-      #define nat_mul(x,y) ((x)*(y))
-      #define nat_div(x,y) ((x)/(y))
-      #define nat_mod(x,y) ((x)%(y))
+      #define nat_add(x,y) ((x) + (y))
+      #define nat_sub(x,y) ((x) - (y))
+      #define nat_mul(x,y) ((x) * (y))
+      #define nat_div(x,y) ((x) / (y))
+      #define nat_mod(x,y) ((x) % (y))
       #define nat_double(x) ((x) << 1)
       #define nat_div2(x) ((x) >> 1)
       #define nat_testbit(x,y) (((x) >> (y)) & 1)
