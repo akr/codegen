@@ -252,7 +252,7 @@ let list_bool_src = {|
       CodeGen Inductive Constructor list bool
       | nil => "NULL"
       | cons => "list_bool_cons".
-      CodeGen Inductive Match list bool => "list_bool_is_NULL"
+      CodeGen Inductive Match list bool => "list_bool_is_nil"
       | nil => "default"
       | cons => "case 0" "list_bool_head" "list_bool_tail".
 
@@ -266,7 +266,7 @@ let list_bool_src = {|
         list_bool tail;
       };
 
-      static inline bool list_bool_is_NULL(list_bool s) { return s == NULL; }
+      static inline bool list_bool_is_nil(list_bool s) { return s == NULL; }
       static inline bool list_bool_head(list_bool s) { return s->head; }
       static inline list_bool list_bool_tail(list_bool s) { return s->tail; }
       static inline list_bool list_bool_cons(bool v, list_bool s) {
@@ -284,7 +284,7 @@ let list_nat_src = {|
       CodeGen Inductive Constructor list nat
       | nil => "NULL"
       | cons => "list_nat_cons".
-      CodeGen Inductive Match list nat => "list_nat_is_NULL"
+      CodeGen Inductive Match list nat => "list_nat_is_nil"
       | nil => "default"
       | cons => "case 0" "list_nat_head" "list_nat_tail".
 
@@ -297,7 +297,7 @@ let list_nat_src = {|
         nat head;
         list_nat tail;
       };
-      static inline bool list_nat_is_NULL(list_nat s) { return s == NULL; }
+      static inline bool list_nat_is_nil(list_nat s) { return s == NULL; }
       static inline nat list_nat_head(list_nat s) { return s->head; }
       static inline list_nat list_nat_tail(list_nat s) { return s->tail; }
       static inline list_nat list_nat_cons(nat v, list_nat s) {
