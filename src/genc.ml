@@ -260,8 +260,14 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
   | Constr.Const ctntu ->
-      let fname = Label.to_string (KerName.label (Constant.canonical (out_punivs ctntu))) in
-      let c_fname = c_funcname fname in
+      let ctnt = out_punivs ctntu in
+      let c_fname =
+        match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
+        | None ->
+            c_funcname (Label.to_string (KerName.label (Constant.canonical ctnt)))
+        | Some (sp_cfg, sp_inst) ->
+            sp_inst.sp_cfunc_name
+      in
       let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
       str c_fname ++ str "(" ++
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++

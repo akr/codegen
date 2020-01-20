@@ -301,13 +301,15 @@ let test_sum (ctx : test_ctxt) =
       #define pred(n) ((n)-1)
       ".
 
-      CodeGen Primitive Nat.add.
-      CodeGen Primitive Nat.sub.
-      CodeGen Primitive Nat.mul.
+      CodeGen Primitive Nat.add => "nat_add".
+      CodeGen Primitive Nat.sub => "nat_sub".
+      CodeGen Primitive Nat.mul => "nat_mul".
+      CodeGen Primitive Nat.div => "nat_div".
       CodeGen Snippet "
-      #define add(x,y) ((x)+(y))
-      #define sub(x,y) ((x)-(y))
-      #define mul(x,y) ((x)*(y))
+      #define nat_add(x,y) ((x)+(y))
+      #define nat_sub(x,y) ((x)-(y))
+      #define nat_mul(x,y) ((x)*(y))
+      #define nat_div(x,y) ((x)/(y))
       ".
 
       CodeGen Inductive Type list nat => "list_nat".
