@@ -311,24 +311,20 @@ let test_sum (ctx : test_ctxt) =
       CodeGen Primitive Nat.add.
       CodeGen Function sum.
     |} {|
-      #include <stdlib.h>
-      #include <stdbool.h>
       #include <stdint.h>
-
       typedef uint64_t nat;
       #define succ(n) ((n)+1)
       #define pred(n) ((n)-1)
-      #define add(x,y) ((x)+(y))
-
       struct list_nat_struct;
       typedef struct list_nat_struct *list_nat;
       struct list_nat_struct {
         nat head;
         list_nat tail;
       };
+      #define add(x,y) ((x)+(y))
 
+      #include <stdlib.h>
       #define is_NULL(p) ((p) == NULL)
-
       static inline nat head(list_nat s) { return s->head; }
       static inline list_nat tail(list_nat s) { return s->tail; }
       static inline list_nat cons(nat v, list_nat s) {
