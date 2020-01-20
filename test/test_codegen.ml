@@ -82,7 +82,7 @@ let coq_opts : string list =
   | None -> []
 
 let min_indent (str : string) : int =
-  let min = ref None in
+  let min = ref (String.length str + 1) in
   let indent = ref (Some 0) in
   String.iter
     (fun ch ->
@@ -97,13 +97,12 @@ let min_indent (str : string) : int =
           | None -> ()
           | Some n ->
               (indent := None;
-              match !min with
-              | None -> min := Some n
-              | Some m -> if n < m then min := Some n)))
+              if n < !min then min := n)))
     str;
-  match !min with
-  | None -> 0
-  | Some n -> n
+  if String.length str < !min then
+    0
+  else
+    !min
 
 let delete_n_indent (n : int) (str : string) : string =
   let buf = Buffer.create (String.length str) in
