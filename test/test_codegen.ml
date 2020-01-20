@@ -190,6 +190,9 @@ let bool_src = {|
       CodeGen Inductive Constructor bool
       | true => "true"
       | false => "false".
+      CodeGen Inductive Match bool => ""
+      | true => "default"
+      | false => "case 0".
 
       CodeGen Snippet "
       #include <stdbool.h> /* for bool, true and false */
@@ -200,27 +203,47 @@ let nat_src = {|
       CodeGen Inductive Type nat => "nat".
       CodeGen Inductive Constructor nat
       | O => "0"
-      | S => "succ".
+      | S => "nat_succ".
       CodeGen Inductive Match nat => ""
       | O => "case 0"
-      | S => "default" "pred".
+      | S => "default" "nat_pred".
 
       CodeGen Snippet "
       #include <stdint.h>
       typedef uint64_t nat;
-      #define succ(n) ((n)+1)
-      #define pred(n) ((n)-1)
+      #define nat_succ(n) ((n)+1)
+      #define nat_pred(n) ((n)-1)
       ".
 
       CodeGen Primitive Nat.add => "nat_add".
       CodeGen Primitive Nat.sub => "nat_sub".
       CodeGen Primitive Nat.mul => "nat_mul".
       CodeGen Primitive Nat.div => "nat_div".
+      CodeGen Primitive Nat.modulo => "nat_mod".
+      CodeGen Primitive Nat.double => "nat_double".
+      CodeGen Primitive Nat.div2 => "nat_div2".
+      CodeGen Primitive Nat.testbit => "nat_testbit".
+      CodeGen Primitive Nat.shiftl => "nat_shiftl".
+      CodeGen Primitive Nat.shiftr => "nat_shiftr".
+      CodeGen Primitive Nat.land => "nat_land".
+      CodeGen Primitive Nat.lor => "nat_lor".
+      CodeGen Primitive Nat.ldiff => "nat_ldiff".
+      CodeGen Primitive Nat.lxor => "nat_lxor".
       CodeGen Snippet "
       #define nat_add(x,y) ((x)+(y))
       #define nat_sub(x,y) ((x)-(y))
       #define nat_mul(x,y) ((x)*(y))
       #define nat_div(x,y) ((x)/(y))
+      #define nat_mod(x,y) ((x)%(y))
+      #define nat_double(x) ((x) << 1)
+      #define nat_div2(x) ((x) >> 1)
+      #define nat_testbit(x,y) (((x) >> (y)) & 1)
+      #define nat_shiftl(x,y) ((x) << (y))
+      #define nat_shiftr(x,y) ((x) >> (y))
+      #define nat_land(x,y) ((x) & (y))
+      #define nat_lor(x,y) ((x) | (y))
+      #define nat_ldiff(x,y) ((x) & ~(y))
+      #define nat_lxor(x,y) ((x) ^ (y))
       ".
 |}
 
