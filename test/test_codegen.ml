@@ -81,15 +81,66 @@ let coq_opts : string list =
   | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
   | None -> []
 
+let min_indent (str : string) : int =
+  let min = ref None in
+  let indent = ref (Some 0) in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> indent := Some 0
+      | ' ' ->
+          (match !indent with
+          | None -> ()
+          | Some n -> indent := Some (n+1))
+      | _ ->
+          (match !indent with
+          | None -> ()
+          | Some n ->
+              (indent := None;
+              match !min with
+              | None -> min := Some n
+              | Some m -> if n < m then min := Some n)))
+    str;
+  match !min with
+  | None -> 0
+  | Some n -> n
+
+let delete_n_indent (n : int) (str : string) : string =
+  let buf = Buffer.create (String.length str) in
+  let indent = ref (Some 0) in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> Buffer.add_char buf ch; indent := Some 0
+      | ' ' ->
+          (match !indent with
+          | Some i ->
+              if i < n then
+                indent := Some (i + 1)
+              else
+                (Buffer.add_char buf ch; indent := None)
+          | None -> Buffer.add_char buf ch)
+      | _ ->
+          (Buffer.add_char buf ch; indent := None))
+    str;
+  Buffer.contents buf
+
 let delete_indent (str : string) : string =
-  let buf = Buffer.create (String.length str + 2) in
+  delete_n_indent (min_indent str) str
+
+let add_n_indent (n : int) (str : string) : string =
+  let buf = Buffer.create (String.length str) in
   let line_head = ref true in
+  let indent = String.make n ' ' in
   String.iter
     (fun ch ->
       match ch with
       | '\n' -> Buffer.add_char buf ch; line_head := true
-      | ' ' | '\t' -> if not !line_head then Buffer.add_char buf ch
-      | _ -> Buffer.add_char buf ch; line_head := false)
+      | _ ->
+          (if !line_head then
+            Buffer.add_string buf indent;
+            line_head := false);
+          Buffer.add_char buf ch)
     str;
   Buffer.contents buf
 
@@ -130,7 +181,7 @@ let codegen_test_template (ctx : test_ctxt)
     "#include <assert.h>\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
-    delete_indent c_body ^ "\n" ^
+    add_n_indent 2 (delete_indent c_body) ^ "\n" ^
     "}\n");
   assert_command ctx coqc (List.append coq_opts [src_fn]);
   assert_command ctx cc ["-o"; exe_fn; main_fn];
