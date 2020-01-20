@@ -77,20 +77,29 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
 (*
   CodeGen Arguments FUNCTION SorD*.
-  CodeGen Instance FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
+  CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
+  CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
+
+  CodeGen EndFile "FILENAME"
 
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
+  "CodeGen Function" and "CodeGen Primitive" declares C function name for
+  a Gallina function.
+  "CodeGen EndFile" generates function declared by "CodeGen Function".
+  The actual C definition of functions declared by "CodeGen Primitive"
+  should be provided by a user.
+
   Example:
 
   CodeGen Arguments id s d.
-  CodeGen Instance id nat.
-  CodeGen Instance id nat => id_nat.
-  CodeGen Instance id nat => id_nat id_nat_specialized.
-  CodeGen Instance id nat => "id_nat".
-  CodeGen Instance id nat => "id_nat" id_nat.
-  CodeGen Instance id nat => "id_nat" id_nat id_nat_specialized.
+  CodeGen Function id nat.
+  CodeGen Function id nat => id_nat.
+  CodeGen Function id nat => id_nat id_nat_specialized.
+  CodeGen Function id nat => "id_nat".
+  CodeGen Function id nat => "id_nat" id_nat.
+  CodeGen Function id nat => "id_nat" id_nat id_nat_specialized.
 
   CodeGen Specialize id nat
 
@@ -171,8 +180,10 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "AutoArguments" ref_list(func_list) ] ->
       { codegen_specialization_auto_arguments func_list }
 
-    | [ "CodeGen" "Instance" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
-      { codegen_specialization_instance func args names }
+    | [ "CodeGen" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
+      { codegen_function func args names }
+    | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
+      { codegen_primitive func args names }
 
     | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
     | [ "CodeGen" "GenFile" string(fn) ne_string_list(cfunc_list) ] ->

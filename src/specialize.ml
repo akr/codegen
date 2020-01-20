@@ -284,10 +284,9 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
     Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
-  generation_list := cfunc_name :: !generation_list;
   sp_inst
 
-let codegen_specialization_instance
+let codegen_function_internal
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) =
@@ -306,7 +305,20 @@ let codegen_specialization_instance
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let ctnt = ctnt_of_qualid env func in
   ignore (codegen_specialization_define_or_check_arguments env ctnt sd_list);
-  ignore (specialization_instance_internal env sigma ctnt args (Some names))
+  specialization_instance_internal env sigma ctnt args (Some names)
+
+let codegen_function
+    (func : Libnames.qualid)
+    (user_args : Constrexpr.constr_expr option list)
+    (names : sp_instance_names) =
+  let sp_inst = codegen_function_internal func user_args names in
+  generation_list := sp_inst.sp_cfunc_name :: !generation_list
+
+let codegen_primitive
+    (func : Libnames.qualid)
+    (user_args : Constrexpr.constr_expr option list)
+    (names : sp_instance_names) =
+  ignore (codegen_function_internal func user_args names)
 
 let check_convertible phase env sigma t1 t2 =
   if Reductionops.is_conv env sigma t1 t2 then
