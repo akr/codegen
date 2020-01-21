@@ -871,7 +871,9 @@ let codegen_snippet (str : string) : unit =
   generation_list := GenSnippet str' :: !generation_list
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
-  (let ch = open_out fn in
+  (* open in the standard permission, 0o666, which will be masked by umask. *)
+  (let (temp_fn, ch) = Filename.open_temp_file
+    ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
   let fmt = Format.formatter_of_out_channel ch in
   List.iter
     (fun gen ->
@@ -890,6 +892,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
     gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
+  Sys.rename temp_fn fn;
   Feedback.msg_info (str ("file generated: " ^ fn)))
 
 let gen_endfile (fn : string) =
@@ -913,7 +916,8 @@ let genc (libref_list : Libnames.qualid list) : unit =
 let genc_file (fn : string) (libref_list : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  (let ch = open_out fn in
+  (let (temp_fn, ch) = Filename.open_temp_file
+    ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
   let fmt = Format.formatter_of_out_channel ch in
   List.iter
     (fun libref ->
@@ -927,4 +931,5 @@ let genc_file (fn : string) (libref_list : Libnames.qualid list) : unit =
     libref_list;
   Format.pp_print_flush fmt ();
   close_out ch;
+  Sys.rename temp_fn fn;
   Feedback.msg_info (str ("file generated: " ^ fn)))
