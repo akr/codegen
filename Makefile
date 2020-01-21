@@ -1,3 +1,5 @@
+.PHONY: all install plugin check checker clean
+
 all install : Makefile.coq
 	$(MAKE) -f Makefile.coq $@
 
@@ -8,8 +10,8 @@ plugin : Makefile.coq
 Makefile.coq : _CoqProject
 	coq_makefile -f _CoqProject -o Makefile.coq
 
-check:
-	cd test; $(MAKE) check
+check checker:
+	cd test; $(MAKE) $@
 
 clean :
 	rm -f \
