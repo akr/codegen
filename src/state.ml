@@ -77,12 +77,17 @@ type specialization_instance = {
 type specialization_config = {
   sp_func : Constr.t; (* constant or constructor *)
   sp_sd_list : s_or_d list;
-  sp_instance_map : specialization_instance ConstrMap.t;
+  sp_instance_map : specialization_instance ConstrMap.t; (* key is partapp *)
 }
 
-(* key is constant or constructor *)
+(* key is constant or constructor which is the target of specialization *)
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
 
+(*
+  key is a constant to refer a partapp,
+  the partapp itself and
+  a constant to refer the specialized definition.
+*)
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 
