@@ -227,7 +227,9 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
     | None -> user_err (Pp.str "specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
-  let (sigma, partapp) = build_partapp env sigma (EConstr.of_constr func) (Retyping.get_type_of env sigma (EConstr.of_constr func)) sp_cfg.sp_sd_list static_args in
+  let efunc = EConstr.of_constr func in
+  let efunc_type = Retyping.get_type_of env sigma efunc in
+  let (sigma, partapp) = build_partapp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = match names_opt with
@@ -627,7 +629,9 @@ let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Const
         Printer.pr_econstr_env env sigma (mkRel k)))
     static_args);
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
-  let (_, partapp) = build_partapp env sigma (EConstr.of_constr func) (Retyping.get_type_of env sigma (EConstr.of_constr func)) sd_list nf_static_args in
+  let efunc = EConstr.of_constr func in
+  let efunc_type = Retyping.get_type_of env sigma efunc in
+  let (_, partapp) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
   Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal env sigma func nf_static_args None
