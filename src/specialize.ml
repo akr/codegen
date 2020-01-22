@@ -29,15 +29,15 @@ open CErrors
 open Cgenutil
 open State
 
-let pr_s_or_d sd =
+let pr_s_or_d (sd : s_or_d) : Pp.t =
   match sd with
   | SorD_S -> Pp.str "s"
   | SorD_D -> Pp.str "d"
 
-let drop_trailing_d sd_list =
+let drop_trailing_d (sd_list : s_or_d list) : s_or_d list =
   List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
-let codegen_print_specialization funcs =
+let codegen_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let pr_inst sp_inst =
@@ -83,20 +83,20 @@ let codegen_print_specialization funcs =
   Feedback.msg_info (Pp.str "Number of source functions:" ++ spc () ++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
 
-let func_of_qualid env qualid =
+let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
   let gref = Smartlocate.global_with_alias qualid in
   match gref with
     | ConstRef ctnt -> Constr.mkConst ctnt
     | ConstructRef cstr -> Constr.mkConstruct cstr
     | _ -> user_err (Pp.str "constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
 
-let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) =
+let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
   Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
   sp_cfg
 
-let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) =
+let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   match ConstrMap.find_opt func !specialize_config_map with
   | None ->
       let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
@@ -113,7 +113,7 @@ let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma 
         pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_new)));
       sp_cfg
 
-let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) =
+let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let func = func_of_qualid env func in
@@ -121,7 +121,7 @@ let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d 
     user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constr_env env sigma func));
   ignore (codegen_specialization_define_arguments env sigma func sd_list)
 
-let rec determine_sd_list env sigma ty =
+let rec determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : s_or_d list =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
   let ty = Reductionops.whd_all env sigma ty in
   match EConstr.kind sigma ty with
@@ -149,11 +149,11 @@ let codegen_specialization_auto_arguments_internal
       codegen_specialization_define_arguments env sigma func sd_list
 
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
-    (func : Libnames.qualid) =
+    (func : Libnames.qualid) : unit =
   let func = func_of_qualid env func in
   ignore (codegen_specialization_auto_arguments_internal env sigma func)
 
-let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) =
+let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
@@ -192,7 +192,7 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   let t = Evarutil.flush_and_check_evars sigma t in
   (sigma, t)
 
-let gensym_ps suffix =
+let gensym_ps (suffix : string) : Names.Id.t * Names.Id.t =
   let n = !gensym_ps_num in
   gensym_ps_num := n + 1;
   let suffix2 = if suffix = "" then suffix else "_" ^ suffix in
@@ -222,7 +222,7 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
       Id.to_string cons_id
   | _ -> user_err (Pp.str "expect constant or constructor")
 
-let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) static_args names_opt =
+let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (static_args : Constr.t list) (names_opt : sp_instance_names option) : specialization_instance =
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
@@ -299,7 +299,7 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
 let codegen_function_internal
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) =
+    (names : sp_instance_names) : specialization_instance =
   let sd_list = List.map
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     user_args
@@ -320,30 +320,30 @@ let codegen_function_internal
 let codegen_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) =
+    (names : sp_instance_names) : unit =
   let sp_inst = codegen_function_internal func user_args names in
   generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
 let codegen_primitive
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) =
+    (names : sp_instance_names) : unit =
   ignore (codegen_function_internal func user_args names)
 
-let check_convertible phase env sigma t1 t2 =
+let check_convertible phase (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
   if Reductionops.is_conv env sigma t1 t2 then
     ()
   else
     user_err (Pp.str "translation inconvertible:" ++ spc () ++ Pp.str phase)
 
-let codegen_global_inline (func_qualids : Libnames.qualid list) =
+let codegen_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let funcs = List.map (func_of_qualid env) func_qualids in
   let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
   let f pred ctnt = Cpred.add ctnt pred in
   specialize_global_inline := List.fold_left f !specialize_global_inline ctnts
 
-let codegen_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) =
+let codegen_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let func = func_of_qualid env func_qualid in
@@ -362,7 +362,7 @@ let codegen_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
   let pred' = List.fold_left f pred ctnts in
   specialize_local_inline := Cmap.add ctnt pred' local_inline
 
-let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) =
+let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
   let trans = {
     TransparentState.tr_var = Id.Pred.empty;
     TransparentState.tr_cst = pred
@@ -371,7 +371,7 @@ let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : 
   let term = Reductionops.clos_norm_flags reds env sigma term in
   term
 
-let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) =
+let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
   let result = inline1 env sigma pred term in
   check_convertible "inline" env sigma term result;
   result
@@ -513,26 +513,26 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map) (recfuncs : bool list
       if isRel sigma e then term
       else wrap_lets [e] (mkProj (proj, mkRel 1))
 
-let rec decompose_lets sigma term =
+let rec decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
   match EConstr.kind sigma term with
   | LetIn (x, e, ty, b) ->
       let (defs, body) = decompose_lets sigma b in
       ((x, e, ty) :: defs, body)
   | _ -> ([], term)
 
-let rec compose_lets defs body =
+let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
   match defs with
   | [] -> body
   | (x,e,ty) :: rest ->
       mkLetIn (x, e, ty, compose_lets rest body)
 
-let linearize_top_let sigma x e ty b =
+let linearize_top_let (sigma : Evd.evar_map) (x : Name.t Context.binder_annot) (e : EConstr.t) (ty : EConstr.types) (b : EConstr.t) : EConstr.t =
   let (defs, body) = decompose_lets sigma e in
   let n = List.length defs in
   compose_lets defs
     (mkLetIn (x, body, Vars.lift n ty, Vars.liftn n 2 b))
 
-let rec linearize_lets_rec sigma term =
+let rec linearize_lets_rec (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Cast _ | Prod _ | App _
   | Const _ | Ind _ | Construct _ | Proj _ | Int _ -> term
@@ -550,15 +550,15 @@ let rec linearize_lets_rec sigma term =
       else
         mkLetIn (x, linearize_lets_rec sigma e, ty, linearize_lets_rec sigma b)
 
-let linearize_lets env sigma term =
+let linearize_lets (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let result = linearize_lets_rec sigma term in
   check_convertible "linearize_lets" env sigma term result;
   result
 
-let normalizeA env sigma recfuncs term =
+let normalizeA (env : Environ.env) (sigma : Evd.evar_map) (recfuncs : bool list) (term : EConstr.t) : EConstr.t =
   linearize_lets env sigma (normalizeK env sigma recfuncs term)
 
-let rec first_fv_rec sigma numrels term : int option =
+let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _
   | Const _ | Construct _ -> None
@@ -596,13 +596,13 @@ let rec first_fv_rec sigma numrels term : int option =
       shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
         (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
 
-let first_fv sigma term : int option =
+let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
   first_fv_rec sigma 0 term
 
 let has_fv sigma term : bool =
   Stdlib.Option.is_some (first_fv sigma term)
 
-let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) args =
+let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
@@ -637,7 +637,7 @@ let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Const
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
   Some (mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args))
 
-let new_env_with_rels env =
+let new_env_with_rels (env : Environ.env) : Environ.env =
   let n = Environ.nb_rel env in
   let r = ref (Global.env ()) in
   for i = n downto 1 do
@@ -744,7 +744,7 @@ and expand_eta_app (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t)
   let args = Array.map (fun i -> mkRel i) (array_rev (iota_ary 1 n)) in
   it_mkLambda_or_LetIn (mkApp (lifted_term, args)) relc
 
-let rec count_false_in_prefix n refs =
+let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
   if n <= 0 then
     0
   else
