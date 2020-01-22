@@ -67,20 +67,22 @@ type specialization_instance_name_status =
   SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
 
 type specialization_instance = {
-  sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" *)
-  sp_partapp_ctnt : Constant.t;
+  sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
+  sp_partapp_constr : Constr.t; (* constant or constructor *)
   sp_specialization_name : specialization_instance_name_status;
   sp_partapp : Constr.t;
   sp_cfunc_name : string;
 }
 
 type specialization_config = {
-  sp_func : Constant.t;
+  sp_func : Constr.t; (* constant or constructor *)
   sp_sd_list : s_or_d list;
   sp_instance_map : specialization_instance ConstrMap.t;
 }
 
-let specialize_config_map = Summary.ref (Cmap.empty : specialization_config Cmap.t) ~name:"CodegenSpecialize"
+(* key is constant or constructor *)
+let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
+
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 

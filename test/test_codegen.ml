@@ -404,6 +404,41 @@ let test_sum (ctx : test_ctxt) =
       assert(sum(cons(1, cons(2, NULL))) == 3);
     |}
 
+let test_list_one (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Definition list_n (n : nat) : list nat := cons n nil.
+      CodeGen Function list_n.
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      list_nat s = list_n(42);
+      assert(!is_nil(s));
+      assert(head(s) == 1);
+      assert(is_nil(tail(s)));
+    |}
+
+let test_map_succ (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Require Import List.
+      Definition map_succ (s : list nat) : list nat :=
+        map S s.
+      CodeGen Global Inline map.
+      CodeGen Function map_succ.
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      assert(is_nil(map_succ(NULL)));
+      assert(head(map_succ(cons(1, NULL))) == 2);
+    |}
+
 let suite =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
@@ -412,6 +447,8 @@ let suite =
     "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
+    "test_list_one" >:: test_list_one;
+    (*"test_map_succ" >:: test_map_succ;*)
   ]
 
 let () =

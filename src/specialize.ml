@@ -44,7 +44,7 @@ let codegen_print_specialization funcs =
     let pr_names =
       Pp.str "=>" ++ spc () ++
       Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
-      Printer.pr_constant env sp_inst.sp_partapp_ctnt ++ spc () ++
+      Printer.pr_constr_env env sigma sp_inst.sp_partapp_constr ++ spc () ++
       (match sp_inst.sp_specialization_name with
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
       | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
@@ -56,67 +56,70 @@ let codegen_print_specialization funcs =
   in
   let pr_cfg (func, sp_cfg) =
     Feedback.msg_info (Pp.str "Arguments" ++ spc () ++
-      Printer.pr_constant env func ++
+      Printer.pr_constr_env env sigma func ++
       pp_prejoin_list (spc ()) (List.map pr_s_or_d sp_cfg.sp_sd_list) ++
       Pp.str ".");
     let feedback_instance sp_inst =
       Feedback.msg_info (Pp.str "Instance" ++ spc () ++
-        Printer.pr_constant env func ++
+        Printer.pr_constr_env env sigma func ++
         pr_inst sp_inst ++ Pp.str ".")
     in
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
   in
   let l = if funcs = [] then
-            Cmap.bindings !specialize_config_map |>
-            (List.sort @@ fun (x,_) (y,_) -> Constant.CanOrd.compare x y)
+            ConstrMap.bindings !specialize_config_map |>
+            (List.sort @@ fun (x,_) (y,_) -> Constr.compare x y)
           else
             funcs |> List.map @@ fun func ->
               let gref = Smartlocate.global_with_alias func in
-              let ctnt = match gref with
-                | ConstRef ctnt -> ctnt
-                | _ -> user_err (Pp.str "not a constant:" ++ spc () ++
+              let func = match gref with
+                | ConstRef ctnt -> Constr.mkConst ctnt
+                | ConstructRef cstr -> Constr.mkConstruct cstr
+                | _ -> user_err (Pp.str "constant or constructor expected:" ++ spc () ++
                                  Printer.pr_global gref)
               in
-              (ctnt, Cmap.get ctnt !specialize_config_map)
+              (func, ConstrMap.get func !specialize_config_map)
   in
-  Feedback.msg_info (Pp.str "Number of source functions:" ++ spc () ++ Pp.int (Cmap.cardinal !specialize_config_map));
+  Feedback.msg_info (Pp.str "Number of source functions:" ++ spc () ++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
 
-let ctnt_of_qualid env qualid =
+let func_of_qualid env qualid =
   let gref = Smartlocate.global_with_alias qualid in
   match gref with
-    | ConstRef ctnt -> ctnt
-    | _ -> user_err (Pp.str "not a constant:" ++ spc () ++ Printer.pr_global gref)
+    | ConstRef ctnt -> Constr.mkConst ctnt
+    | ConstructRef cstr -> Constr.mkConstruct cstr
+    | _ -> user_err (Pp.str "constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
 
-let codegen_specialization_define_arguments env ctnt sd_list =
-  let sp_cfg = { sp_func=ctnt; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
-  specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
-  Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
+let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) =
+  let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+  specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
+  Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
   sp_cfg
 
-let codegen_specialization_define_or_check_arguments env ctnt sd_list =
-  match Cmap.find_opt ctnt !specialize_config_map with
+let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) =
+  match ConstrMap.find_opt func !specialize_config_map with
   | None ->
-      let sp_cfg = { sp_func=ctnt; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
-      specialize_config_map := Cmap.add ctnt sp_cfg !specialize_config_map;
-      Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constant env ctnt);
+      let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+      specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
+      Feedback.msg_info (Pp.str "Specialization arguments defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       sp_cfg
   | Some sp_cfg ->
       let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
       let sd_list_new = drop_trailing_d sd_list in
       (if sd_list_old <> sd_list_new then
         user_err (Pp.str "inconsistent specialization configuration for" ++ spc () ++
-        Printer.pr_constant env ctnt ++ Pp.str ":" ++
+        Printer.pr_constr_env env sigma func ++ Pp.str ":" ++
         pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_old) ++ spc () ++ Pp.str "expected but" ++
         pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_new)));
       sp_cfg
 
 let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) =
   let env = Global.env () in
-  let ctnt = ctnt_of_qualid env func in
-  (if Cmap.mem ctnt !specialize_config_map then
-    user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constant env ctnt));
-  ignore (codegen_specialization_define_arguments env ctnt sd_list)
+  let sigma = Evd.from_env env in
+  let func = func_of_qualid env func in
+  (if ConstrMap.mem func !specialize_config_map then
+    user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constr_env env sigma func));
+  ignore (codegen_specialization_define_arguments env sigma func sd_list)
 
 let rec determine_sd_list env sigma ty =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
@@ -137,19 +140,18 @@ let rec determine_sd_list env sigma ty =
 
 let codegen_specialization_auto_arguments_internal
     (env : Environ.env) (sigma : Evd.evar_map)
-    (ctnt : Constant.t) : specialization_config =
-  match Cmap.find_opt ctnt !specialize_config_map with
+    (func : Constr.t) : specialization_config =
+  match ConstrMap.find_opt func !specialize_config_map with
   | Some sp_cfg -> sp_cfg (* already defined *)
   | None ->
-      let (ty, _) = Environ.constant_type env (Univ.in_punivs ctnt) in
-      let ty = EConstr.of_constr ty in
+      let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       let sd_list = (determine_sd_list env sigma ty) in
-      codegen_specialization_define_arguments env ctnt sd_list
+      codegen_specialization_define_arguments env sigma func sd_list
 
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) =
-  let ctnt = ctnt_of_qualid env func in
-  ignore (codegen_specialization_auto_arguments_internal env sigma ctnt)
+  let func = func_of_qualid env func in
+  ignore (codegen_specialization_auto_arguments_internal env sigma func)
 
 let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) =
   let env = Global.env () in
@@ -157,7 +159,7 @@ let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) =
   List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
 
 let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
-    (ctnt : Constant.t) (sd_list : s_or_d list)
+    (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t) =
   let rec aux env f f_type sd_list static_args =
     match sd_list with
@@ -184,9 +186,6 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   in
   let sigma0 = sigma in
   let sd_list = drop_trailing_d sd_list in
-  let (f_type, _) = Environ.constant_type env (Univ.in_punivs ctnt) in
-  let f_type = EConstr.of_constr f_type in
-  let f = mkConst ctnt in
   let t = aux env f f_type sd_list (List.map EConstr.of_constr static_args) in
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env sigma0 sigma t;
@@ -212,12 +211,23 @@ let interp_args (env : Environ.env) (sigma : Evd.evar_map)
   in
   CList.fold_left_map interp_arg sigma user_args
 
-let specialization_instance_internal env sigma ctnt static_args names_opt =
-  let sp_cfg = match Cmap.find_opt ctnt !specialize_config_map with
+let label_name_of_constant_or_constructor (func : Constr.t) : string =
+  match Constr.kind func with
+  | Const (ctnt, _) -> Label.to_string (Constant.label ctnt)
+  | Construct (((mutind, i), j), _) ->
+      let env = Global.env () in
+      let mind_body = Environ.lookup_mind mutind env in
+      let oind_body = mind_body.Declarations.mind_packets.(i) in
+      let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
+      Id.to_string cons_id
+  | _ -> user_err (Pp.str "expect constant or constructor")
+
+let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) static_args names_opt =
+  let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
-  let (sigma, partapp) = build_partapp env sigma ctnt sp_cfg.sp_sd_list static_args in
+  let (sigma, partapp) = build_partapp env sigma (EConstr.of_constr func) (Retyping.get_type_of env sigma (EConstr.of_constr func)) sp_cfg.sp_sd_list static_args in
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = match names_opt with
@@ -226,7 +236,7 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
             user_err (Pp.str "Invalid C function name specified:" ++ spc () ++ str name));
           name
       | _ ->
-          let name = Label.to_string (Constant.label ctnt) in
+          let name = label_name_of_constant_or_constructor func in
           (if not (valid_c_id_p name) then
             user_err (Pp.str "Gallina function name is invalid in C:" ++ spc () ++ str name));
           name
@@ -239,24 +249,24 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
       let specialization_name = match names_opt with
         | Some { spi_specialized_id = Some id } -> SpExpectedId id
-        | _ -> let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
+        | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
                SpExpectedId s_id
       in
       let sp_inst = {
         sp_partapp = partapp;
         sp_static_arguments = [];
-        sp_partapp_ctnt = ctnt; (* use the original function for fully dynamic function *)
+        sp_partapp_constr = func; (* use the original function for fully dynamic function *)
         sp_specialization_name = specialization_name;
         sp_cfunc_name = cfunc_name; }
       in
-      Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constant env ctnt);
+      Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       sp_inst
     else
       let (p_id, s_id) = match names_opt with
         | Some { spi_partapp_id = Some p_id;
                  spi_specialized_id = Some s_id } -> (p_id, s_id)
         | _ ->
-            let (p_id, s_id) = gensym_ps (Label.to_string (Constant.label ctnt)) in
+            let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
             let p_id_opt = (match names_opt with | Some { spi_partapp_id = Some p_id } -> Some p_id | _ -> None) in
             let s_id_opt = (match names_opt with | Some { spi_specialized_id = Some s_id } -> Some s_id | _ -> None) in
             (
@@ -271,19 +281,19 @@ let specialization_instance_internal env sigma ctnt static_args names_opt =
       let sp_inst = {
         sp_partapp = partapp;
         sp_static_arguments = static_args;
-        sp_partapp_ctnt = declared_ctnt;
+        sp_partapp_constr = Constr.mkConst declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name; }
       in
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
   in
-  gallina_instance_map := (ConstrMap.add (Constr.mkConst sp_inst.sp_partapp_ctnt) (sp_cfg, sp_inst) !gallina_instance_map);
+  gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
-    Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
+    ConstrMap.add func { sp_cfg with sp_instance_map = inst_map };
   sp_inst
 
 let codegen_function_internal
@@ -303,9 +313,9 @@ let codegen_function_internal
   let (sigma, args) = interp_args env sigma user_args in
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  let ctnt = ctnt_of_qualid env func in
-  ignore (codegen_specialization_define_or_check_arguments env ctnt sd_list);
-  specialization_instance_internal env sigma ctnt args (Some names)
+  let func = func_of_qualid env func in
+  ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
+  specialization_instance_internal env sigma func args (Some names)
 
 let codegen_function
     (func : Libnames.qualid)
@@ -326,16 +336,24 @@ let check_convertible phase env sigma t1 t2 =
   else
     user_err (Pp.str "translation inconvertible:" ++ spc () ++ Pp.str phase)
 
-let codegen_global_inline (funcs : Libnames.qualid list) =
+let codegen_global_inline (func_qualids : Libnames.qualid list) =
   let env = Global.env () in
-  let ctnts = List.map (ctnt_of_qualid env) funcs in
+  let funcs = List.map (func_of_qualid env) func_qualids in
+  let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
   let f pred ctnt = Cpred.add ctnt pred in
   specialize_global_inline := List.fold_left f !specialize_global_inline ctnts
 
-let codegen_local_inline (func : Libnames.qualid) (funcs : Libnames.qualid list) =
+let codegen_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) =
   let env = Global.env () in
-  let ctnt = ctnt_of_qualid env func in
-  let ctnts = List.map (ctnt_of_qualid env) funcs in
+  let sigma = Evd.from_env env in
+  let func = func_of_qualid env func_qualid in
+  let ctnt =
+    match Constr.kind func with
+    | Const (ctnt, _) -> ctnt
+    | _ -> user_err (Pp.str "constant expected:" ++ Pp.spc () ++ Printer.pr_constr_env env sigma func)
+  in
+  let funcs = List.map (func_of_qualid env) func_qualids in
+  let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
   let local_inline = !specialize_local_inline in
   let pred = match Cmap.find_opt ctnt local_inline with
              | None -> Cpred.empty
@@ -584,11 +602,11 @@ let first_fv sigma term : int option =
 let has_fv sigma term : bool =
   Stdlib.Option.is_some (first_fv sigma term)
 
-let specialize_ctnt_app env sigma ctnt args =
-  let sp_cfg = codegen_specialization_auto_arguments_internal env sigma ctnt in
+let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) args =
+  let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
-    user_err (Pp.str "Not enough arguments for" ++ spc () ++ (Printer.pr_constant env ctnt)));
+    user_err (Pp.str "Not enough arguments for" ++ spc () ++ (Printer.pr_constr_env env sigma func)));
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let static_args = CArray.filter_with static_flags args in
@@ -600,7 +618,7 @@ let specialize_ctnt_app env sigma ctnt args =
     | None -> ()
     | Some k ->
       user_err (Pp.str "Free variable found in a static argument:" ++ spc () ++
-        Printer.pr_constant env ctnt ++
+        Printer.pr_constr_env env sigma func ++
         Pp.str "'s" ++ spc () ++
         Pp.str (CString.ordinal (i+1)) ++ spc () ++
         Pp.str "static argument" ++ spc () ++
@@ -609,15 +627,15 @@ let specialize_ctnt_app env sigma ctnt args =
         Printer.pr_econstr_env env sigma (mkRel k)))
     static_args);
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
-  let (_, partapp) = build_partapp env sigma ctnt sd_list nf_static_args in
+  let (_, partapp) = build_partapp env sigma (EConstr.of_constr func) (Retyping.get_type_of env sigma (EConstr.of_constr func)) sd_list nf_static_args in
   Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-    | None -> specialization_instance_internal env sigma ctnt nf_static_args None
+    | None -> specialization_instance_internal env sigma func nf_static_args None
     | Some sp_inst -> sp_inst
   in
-  let sp_ctnt = sp_inst.sp_partapp_ctnt in
+  let sp_ctnt = sp_inst.sp_partapp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
-  Some (mkApp (mkConst sp_ctnt, CArray.filter_with dynamic_flags args))
+  Some (mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args))
 
 let new_env_with_rels env =
   let n = Environ.nb_rel env in
@@ -658,7 +676,7 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | App (f, args) ->
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
-          (match specialize_ctnt_app env sigma ctnt args with None -> term | Some e -> e)
+          (match specialize_ctnt_app env sigma (Constr.mkConst ctnt) args with None -> term | Some e -> e)
       | _ -> term
 
 (*
@@ -882,7 +900,12 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   in
   let partapp = sp_inst.sp_partapp in
   let epartapp = EConstr.of_constr partapp in
-  let ctnt = sp_cfg.sp_func in
+  let ctnt =
+    match Constr.kind sp_cfg.sp_func with
+    | Const (ctnt,_) -> ctnt
+    | Construct _ -> user_err (Pp.str "constructor is not specializable")
+    | _ -> user_err (Pp.str "non-constant and non-constructor specialization")
+  in
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
     let global_pred = !specialize_global_inline in
@@ -902,9 +925,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let term5 = expand_eta env sigma term4 in
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma term5); *)
   let term6 = normalize_types env sigma term5 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term6);*)
+  Feedback.msg_info (Printer.pr_econstr_env env sigma term6);
   let term7 = delete_unused_let env sigma term6 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term7);*)
+  Feedback.msg_info (Printer.pr_econstr_env env sigma term7);
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term7)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
@@ -912,18 +935,18 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let sp_inst2 = {
     sp_partapp = sp_inst.sp_partapp;
     sp_static_arguments = sp_inst.sp_static_arguments;
-    sp_partapp_ctnt = sp_inst.sp_partapp_ctnt;
+    sp_partapp_constr = sp_inst.sp_partapp_constr;
     sp_specialization_name = SpDefinedCtnt declared_ctnt;
     sp_cfunc_name = sp_inst.sp_cfunc_name }
   in
   (let m = !gallina_instance_map in
-    let m = ConstrMap.set (Constr.mkConst sp_inst.sp_partapp_ctnt) (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
     let m = ConstrMap.add (Constr.mkConst declared_ctnt) (sp_cfg, sp_inst2) m in
     gallina_instance_map := m);
   let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
   specialize_config_map := !specialize_config_map |>
-    Cmap.add ctnt { sp_cfg with sp_instance_map = inst_map };
+    ConstrMap.add (Constr.mkConst ctnt) { sp_cfg with sp_instance_map = inst_map };
   declared_ctnt
 
 let codegen_specialization_specialize (cfuncs : string list) : unit =
