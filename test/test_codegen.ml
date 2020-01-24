@@ -248,12 +248,11 @@ let nat_src = {|
 
 let list_bool_src = {|
       CodeGen Inductive Type list bool => "list_bool".
-      CodeGen Inductive Constructor list bool
-      | nil => "NULL"
-      | cons => "list_bool_cons".
       CodeGen Inductive Match list bool => "list_bool_is_nil"
       | nil => "default"
       | cons => "case 0" "list_bool_head" "list_bool_tail".
+      CodeGen Primitive nil bool => "list_bool_nil".
+      CodeGen Primitive cons bool => "list_bool_cons".
 
       CodeGen Snippet "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -275,17 +274,17 @@ let list_bool_src = {|
         ret->tail = s;
         return ret;
       }
+      #define list_bool_nil() ((list_bool)NULL)
       ".
 |}
 
 let list_nat_src = {|
       CodeGen Inductive Type list nat => "list_nat".
-      CodeGen Inductive Constructor list nat
-      | nil => "NULL"
-      | cons => "list_nat_cons".
       CodeGen Inductive Match list nat => "list_nat_is_nil"
       | nil => "default"
       | cons => "case 0" "list_nat_head" "list_nat_tail".
+      CodeGen Primitive nil nat => "list_nat_nil".
+      CodeGen Primitive cons nat => "list_nat_cons".
 
       CodeGen Snippet "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -306,6 +305,7 @@ let list_nat_src = {|
         ret->tail = s;
         return ret;
       }
+      #define list_nat_nil() ((list_nat)NULL)
       ".
 |}
 
@@ -404,6 +404,17 @@ let test_sum (ctx : test_ctxt) =
       assert(sum(cons(1, cons(2, NULL))) == 3);
     |}
 
+let test_nil_nat (ctx : test_ctxt) =
+  codegen_test_template ctx
+    (nat_src ^ list_nat_src ^
+    {|
+      Definition nil_nat := @nil nat.
+      CodeGen Function nil_nat.
+    |}) {|
+      list_nat s = nil_nat();
+      assert(s == NULL);
+    |}
+
 let test_list_one (ctx : test_ctxt) =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -447,7 +458,8 @@ let suite =
     "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
-    "test_list_one" >:: test_list_one;
+    "test_nil_nat" >:: test_nil_nat;
+    (*"test_list_one" >:: test_list_one;*)
     (*"test_map_succ" >:: test_map_succ;*)
   ]
 

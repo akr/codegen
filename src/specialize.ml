@@ -680,7 +680,15 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | App (f, args) ->
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
-          (match specialize_ctnt_app env sigma (Constr.mkConst ctnt) args with None -> term | Some e -> e)
+          let f' = Constr.mkConst ctnt in
+          (match specialize_ctnt_app env sigma f' args with
+          | None -> term
+          | Some e -> e)
+      | Construct (cstr, u) ->
+          let f' = Constr.mkConstruct cstr in
+          (match specialize_ctnt_app env sigma f' args with
+          | None -> term
+          | Some e -> e)
       | _ -> term
 
 (*
