@@ -24,7 +24,6 @@ let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 type cstr_config = {
   coq_cstr : Id.t;
-  c_cstr : string option;
   c_caselabel : string; (* meaningful if c_swfnc is not None *)
   c_accessors : string array (* meaningful if c_swfnc is not None *)
 }

@@ -52,15 +52,6 @@ let codegen_print_inductive_type env sigma ind_cfg =
     Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
     str (quote_coq_string ind_cfg.c_type) ++ str ".")
 
-let codegen_print_inductive_constructor env sigma ind_cfg cstr_cfg =
-  match cstr_cfg.c_cstr with
-  | Some c_cstr ->
-    Feedback.msg_info (str "CodeGen Inductive Constructor" ++ spc () ++
-      Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
-      Ppconstr.pr_id cstr_cfg.coq_cstr ++ spc () ++
-      str (quote_coq_string c_cstr) ++ str ".")
-  | None -> ()
-
 let codegen_print_inductive_match env sigma ind_cfg =
   let f cstr_cfg =
      Ppconstr.pr_id cstr_cfg.coq_cstr ++ spc () ++
@@ -78,8 +69,6 @@ let codegen_print_inductive_match env sigma ind_cfg =
 
 let codegen_print_inductive1 env sigma ind_cfg =
   codegen_print_inductive_type env sigma ind_cfg;
-  Array.iter (codegen_print_inductive_constructor env sigma ind_cfg)
-    ind_cfg.cstr_configs;
   codegen_print_inductive_match env sigma ind_cfg
 
 let codegen_print_inductive coq_type_list =
@@ -157,7 +146,6 @@ let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string)
   let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
     Array.map (fun cstrname -> {
       coq_cstr = cstrname;
-      c_cstr = None;
       c_caselabel = "";
       c_accessors = [||] }) in
   let ent = {
@@ -166,37 +154,6 @@ let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string)
     c_swfunc=None;
     cstr_configs=cstr_cfgs } in
   ind_config_map := ConstrMap.add coq_type ent !ind_config_map
-
-let register_ind_cstr1 (user_coq_type : Constrexpr.constr_expr) (coq_cstr : Id.t)
-    (c_cstr : string) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
-  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
-  let ind_cfg = get_ind_config coq_type in
-  let j = match array_find_index_opt (Id.equal coq_cstr) oneind_body.Declarations.mind_consnames with
-    | Some j -> j
-    | None -> user_err (
-        Pp.str "inductive type constructor not found:" ++ Pp.spc () ++
-        Id.print coq_cstr ++ Pp.spc () ++
-        Pp.str "for" ++ Pp.spc () ++
-        Id.print oneind_body.Declarations.mind_typename)
-  in
-  let cstr_cfg = Array.get ind_cfg.cstr_configs j in
-  (match cstr_cfg.c_cstr with
-  | Some _ -> user_err (
-      Pp.str "inductive type constructor already registered:" ++
-      Id.print coq_cstr ++ Pp.spc () ++
-      Pp.str "for" ++ Pp.spc () ++
-      Id.print oneind_body.Declarations.mind_typename)
-  | None -> ());
-  ind_config_map := ConstrMap.add coq_type
-    { ind_cfg with
-      cstr_configs = array_copy_set ind_cfg.cstr_configs j { cstr_cfg with c_cstr = Some c_cstr } }
-    !ind_config_map
-
-let register_ind_cstr (user_coq_type : Constrexpr.constr_expr) (cstr_namepair_list : ind_constructor list) =
-  List.iter (fun { ic_coq_cstr = coq_cstr; ic_c_cstr = c_cstr } -> register_ind_cstr1 user_coq_type coq_cstr c_cstr) cstr_namepair_list
 
 let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
     (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =

@@ -46,8 +46,8 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
 (*
   CodeGen Inductive Type COQ_TYPE => "C_TYPE".
-  CodeGen Inductive Constructor COQ_TYPE | CONSTRUCTOR => "C_CONSTRUCTOR".
   CodeGen Inductive Match COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
+  CodeGen Primitive CONSTRUCTOR => "C_CONSTRUCTOR".
 
   Print CodeGen Inductive.              show all inductive types for codegen.
   Print CodeGen Inductive COQ_TYPE*     show the specified inductive types for codegen.
@@ -55,21 +55,21 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Example:
 
   CodeGen Inductive Type bool => "bool".
-  CodeGen Inductive Constructor bool | true => "true".
-  CodeGen Inductive Constructor bool | false => "false".
   CodeGen Inductive Match bool => "" | true => "default" | false => "case 0".
+  CodeGen Primitive true => "true".
+  CodeGen Primitive false => "false".
   Print CodeGen Inductive bool.
 
   CodeGen Inductive Type nat => "uint64_t".
-  CodeGen Inductive Constructor nat | O "0".
-  CodeGen Inductive Constructor nat | S "succ".
   CodeGen Inductive Match nat => "" | O "case 0" | S "default" "pred".
+  CodeGen Primitive O => "0".
+  CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
   CodeGen Inductive Type option bool => "int".
-  CodeGen Inductive Constructor option bool | None => "(-1)".
-  CodeGen Inductive Constructor option bool | Some => "(int)".
   CodeGen Inductive Match option bool => "" | None => "case -1" | Some => "default" "".
+  CodeGen Primitive None bool => "(-1)".
+  CodeGen Primitive Some bool => "(int)".
   Print CodeGen Inductive (option bool).
 
   Print CodeGen Inductive.
@@ -170,8 +170,6 @@ END
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Type" lconstr(coq_type) "=>" string(c_type) ] ->
       { register_ind_type coq_type c_type }
-    | [ "CodeGen" "Inductive" "Constructor" lconstr(coq_type) ind_constructor_list(cstr_namepair_list) ] ->
-      { register_ind_cstr coq_type cstr_namepair_list }
     | [ "CodeGen" "Inductive" "Match" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
