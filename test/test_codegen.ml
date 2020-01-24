@@ -470,7 +470,7 @@ let test_list_one (ctx : test_ctxt) =
       #define cons(h,t) list_nat_cons(h,t)
       list_nat s = list_n(42);
       assert(!is_nil(s));
-      assert(head(s) == 1);
+      assert(head(s) == 42);
       assert(is_nil(tail(s)));
     |}
 
@@ -503,7 +503,7 @@ let suite =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_nil_nat" >:: test_nil_nat;
-    (*"test_list_one" >:: test_list_one;*)
+    "test_list_one" >:: test_list_one;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
 
