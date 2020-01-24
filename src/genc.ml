@@ -34,56 +34,33 @@ let c_funcname (fname : string) : string =
 let goto_label (fname : string) : string =
   "entry_" ^ (c_id fname)
 
-let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
+let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg -> ind_cfg.c_type
-  | None -> user_err (Pp.str "C type name not configured:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma t)
+  | Some ind_cfg -> ind_cfg
+  | None -> user_err (Pp.str "C type not configured:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma t)
+
+let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
+  (get_ind_config env sigma t).c_type
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg ->
-      (match ind_cfg.c_swfunc with
-      | Some c_swfunc -> c_swfunc
-      | None -> user_err (
-        Pp.str "inductive match configuration not registered:" ++ Pp.spc () ++
-        Printer.pr_lconstr_env env sigma ind_cfg.coq_type))
-  | None -> c_id ("sw_" ^ (mangle_type t))
+  let ind_cfg = get_ind_config env sigma t in
+  match ind_cfg.c_swfunc with
+  | Some c_swfunc -> c_swfunc
+  | None -> user_err (
+    Pp.str "inductive match configuration not registered:" ++ Pp.spc () ++
+    Printer.pr_lconstr_env env sigma ind_cfg.coq_type)
 
 let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string =
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg ->
-      (match ind_cfg.c_swfunc with
-      | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
-      | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
-  | None ->
-      let indty =
-        match EConstr.kind sigma t with
-        | Constr.App (f, argsary) -> f
-        | _ -> t
-      in
-      let (mutind, i) = out_punivs (EConstr.destInd sigma indty) in
-      let mutind_body = Environ.lookup_mind mutind env in
-      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-      let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-      c_id ("case_" ^ consname ^ "_" ^ (mangle_type t))
+  let ind_cfg = get_ind_config env sigma t in
+  match ind_cfg.c_swfunc with
+  | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
+  | None -> raise (CodeGenError "[bug] inductive match configuration not registered") (* should be called after case_swfunc *)
 
 let case_cstrfield (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) (k : int) : string =
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg ->
-      (match ind_cfg.c_swfunc with
-      | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
-      | None -> raise (CodeGenError "inductive match configuration not registered")) (* should be called after case_swfunc *)
-  | None ->
-      let indty =
-        match EConstr.kind sigma t with
-        | Constr.App (f, argsary) -> f
-        | _ -> t
-      in
-      let (mutind, i) = out_punivs (EConstr.destInd sigma indty) in
-      let mutind_body = Environ.lookup_mind mutind env in
-      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-      let consname = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
-      c_id ("field" ^ string_of_int k ^ "_" ^ consname ^ "_" ^ (mangle_type t))
+  let ind_cfg = get_ind_config env sigma t in
+  match ind_cfg.c_swfunc with
+  | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
+  | None -> raise (CodeGenError "[bug] inductive match configuration not registered") (* should be called after case_swfunc *)
 
 let gensym () : string =
   let n = !gensym_id in
