@@ -39,24 +39,6 @@ let c_typename (sigma : Evd.evar_map) (t : EConstr.types) : string =
   | Some ind_cfg -> ind_cfg.c_type
   | None -> c_id (mangle_type t)
 
-let c_cstrname (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (cstr : Names.constructor) : string =
-  let ((mutind, i), j) = cstr in
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg ->
-      (match ind_cfg.cstr_configs.(j-1).c_cstr with
-      | Some c_cstr -> c_cstr
-      | None -> user_err (
-        Pp.str "inductive constructor not configured:" ++ Pp.spc () ++
-        Id.print ind_cfg.cstr_configs.(j-1).coq_cstr ++ Pp.spc () ++
-        Pp.str "for" ++ Pp.spc () ++
-        Printer.pr_constr_env env sigma ind_cfg.coq_type))
-  | None ->
-      let mind_body = Environ.lookup_mind mutind env in
-      let oind_body = mind_body.Declarations.mind_packets.(i) in
-      let cons_id = oind_body.Declarations.mind_consnames.(j-1) in
-      let fname = Id.to_string cons_id in
-      c_funcname fname
-
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg ->
@@ -264,7 +246,7 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
       let c_fname =
         match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
         | None ->
-            c_funcname (Label.to_string (KerName.label (Constant.canonical ctnt)))
+            user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
         | Some (sp_cfg, sp_inst) ->
             sp_inst.sp_cfunc_name
       in
@@ -273,14 +255,19 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
       pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
       str ")"
   | Constr.Construct cstru ->
-      let ty = Reductionops.nf_all env sigma (Retyping.get_type_of env sigma (mkApp (f, argsary))) in
-      (*Feedback.msg_info (Printer.pr_constr_env env sigma ty);*)
-      let fname_argn = c_cstrname env sigma ty (out_punivs cstru) in
-      let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
-      if Array.length argvars = 0 then
-        str fname_argn
+      let cstr = out_punivs cstru in
+      let c_fname =
+        match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
+        | None ->
+            user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
+        | Some (sp_cfg, sp_inst) ->
+            sp_inst.sp_cfunc_name
+      in
+      if Array.length argsary = 0 then
+        str c_fname (* no "()" here *)
       else
-        str fname_argn ++ str "(" ++
+        let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
+        str c_fname ++ str "(" ++
         pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
         str ")"
   | _ -> assert false

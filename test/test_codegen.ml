@@ -186,12 +186,11 @@ let codegen_test_template (ctx : test_ctxt)
 
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
-      CodeGen Inductive Constructor bool
-      | true => "true"
-      | false => "false".
       CodeGen Inductive Match bool => ""
       | true => "default"
       | false => "case 0".
+      CodeGen Primitive true => "true".
+      CodeGen Primitive false => "false".
 
       CodeGen Snippet "
       #include <stdbool.h> /* for bool, true and false */
@@ -200,12 +199,11 @@ let bool_src = {|
 
 let nat_src = {|
       CodeGen Inductive Type nat => "nat".
-      CodeGen Inductive Constructor nat
-      | O => "0"
-      | S => "nat_succ".
       CodeGen Inductive Match nat => ""
       | O => "case 0"
       | S => "default" "nat_pred".
+      CodeGen Primitive O => "0".
+      CodeGen Primitive S => "nat_succ".
 
       CodeGen Snippet "
       #include <stdint.h>
@@ -317,6 +315,50 @@ let test_mono_id_bool (ctx : test_ctxt) =
     |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
+    |}
+
+let test_mono_id_mybool (ctx : test_ctxt) =
+  codegen_test_template ctx
+    ({|
+      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
+      CodeGen Inductive Type mybool => "mybool".
+      CodeGen Inductive Match mybool => ""
+      | mytrue => "default"
+      | myfalse => "case 0".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen Snippet "
+      typedef int mybool;
+      #define mytrue 1
+      #define myfalse 0
+      ".
+      Definition mono_id_mybool (b : mybool) := b.
+      CodeGen Function mono_id_mybool => "mono_id_mybool".
+    |}) {|
+      assert(mono_id_mybool(mytrue) == mytrue);
+      assert(mono_id_mybool(myfalse) == myfalse);
+    |}
+
+let test_mybool_true (ctx : test_ctxt) =
+  codegen_test_template ctx
+    ({|
+      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
+      CodeGen Inductive Type mybool => "mybool".
+      CodeGen Inductive Match mybool => ""
+      | mytrue => "default"
+      | myfalse => "case 0".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen Snippet "
+      typedef int mybool;
+      #define mytrue 1
+      #define myfalse 0
+      ".
+      Definition mybool_true (b : mybool) := mytrue.
+      CodeGen Function mybool_true => "mybool_true".
+    |}) {|
+      assert(mybool_true(mytrue) == mytrue);
+      assert(mybool_true(myfalse) == mytrue);
     |}
 
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
@@ -454,6 +496,8 @@ let suite =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
+    "test_mono_id_mybool" >:: test_mono_id_mybool;
+    "test_mybool_true" >:: test_mybool_true;
     "test_nat_add_rec" >:: test_nat_add_rec;
     "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;

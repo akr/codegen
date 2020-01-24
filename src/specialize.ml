@@ -234,8 +234,11 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = match names_opt with
       | Some { spi_cfunc_name = Some name } ->
+          (* valid_c_id_p is too restrictive to specify "0". *)
+          (*
           (if not (valid_c_id_p name) then
             user_err (Pp.str "Invalid C function name specified:" ++ spc () ++ str name));
+          *)
           name
       | _ ->
           let name = label_name_of_constant_or_constructor func in
