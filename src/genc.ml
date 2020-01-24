@@ -241,30 +241,27 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
           str c_fname ++ str "(" ++
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
-  | Constr.Const ctntu ->
-      let ctnt = out_punivs ctntu in
+  | Constr.Const _ | Constr.Construct _ ->
       let c_fname =
         match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
         | None ->
-            user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
+            (match EConstr.kind sigma f with
+            | Constr.Const (ctnt, _) ->
+                user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
+            | Constr.Construct (cstr, _) ->
+                user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
+            | _ -> assert false)
         | Some (sp_cfg, sp_inst) ->
             sp_inst.sp_cfunc_name
       in
-      let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
-      str c_fname ++ str "(" ++
-      pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
-      str ")"
-  | Constr.Construct cstru ->
-      let cstr = out_punivs cstru in
-      let c_fname =
-        match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
-        | None ->
-            user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
-        | Some (sp_cfg, sp_inst) ->
-            sp_inst.sp_cfunc_name
+      let no_arguments = Array.length argsary = 0 &&
+        match EConstr.kind sigma f with
+        | Constr.Const _ -> false
+        | Constr.Construct _ -> true
+        | _ -> assert false
       in
-      if Array.length argsary = 0 then
-        str c_fname (* no "()" here *)
+      if no_arguments then
+        str c_fname
       else
         let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
         str c_fname ++ str "(" ++
