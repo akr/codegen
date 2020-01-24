@@ -34,10 +34,10 @@ let c_funcname (fname : string) : string =
 let goto_label (fname : string) : string =
   "entry_" ^ (c_id fname)
 
-let c_typename (sigma : Evd.evar_map) (t : EConstr.types) : string =
+let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg -> ind_cfg.c_type
-  | None -> c_id (mangle_type t)
+  | None -> user_err (Pp.str "C type name not configured:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma t)
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
@@ -197,24 +197,24 @@ let fargs_and_body_ary (env : Environ.env) (sigma : Evd.evar_map)
       (nm, ty, fargs, context, envb, body))
     strnameary fb_ary2
 
-let genc_farg (sigma : Evd.evar_map) (farg : string * EConstr.types) : Pp.t =
+let genc_farg (env : Environ.env) (sigma : Evd.evar_map) (farg : string * EConstr.types) : Pp.t =
   let (var, ty) = farg in
-  hv 2 (str (c_typename sigma ty) ++ spc () ++ str var)
+  hv 2 (str (c_typename env sigma ty) ++ spc () ++ str var)
 
-let genc_fargs (sigma : Evd.evar_map) (fargs : (string * EConstr.types) list) : Pp.t =
+let genc_fargs (env : Environ.env) (sigma : Evd.evar_map) (fargs : (string * EConstr.types) list) : Pp.t =
   match fargs with
   | [] -> str "void"
   | farg1 :: rest ->
       List.fold_left
-        (fun pp farg -> pp ++ str "," ++ spc () ++ genc_farg sigma farg)
-        (genc_farg sigma farg1)
+        (fun pp farg -> pp ++ str "," ++ spc () ++ genc_farg env sigma farg)
+        (genc_farg env sigma farg1)
         rest
 
-let genc_vardecl (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) : Pp.t =
-  hv 0 (str (c_typename sigma ty) ++ spc () ++ str varname ++ str ";")
+let genc_vardecl (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) : Pp.t =
+  hv 0 (str (c_typename env sigma ty) ++ spc () ++ str varname ++ str ";")
 
-let genc_varinit (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) (init : Pp.t) : Pp.t =
-  hv 0 (str (c_typename sigma ty) ++ spc () ++ str varname ++ spc () ++ str "=" ++ spc () ++ init ++ str ";")
+let genc_varinit (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) (init : Pp.t) : Pp.t =
+  hv 0 (str (c_typename env sigma ty) ++ spc () ++ str varname ++ spc () ++ str "=" ++ spc () ++ init ++ str ";")
 
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   hv 0 (lhs ++ spc () ++ str "=" ++ spc () ++ rhs ++ str ";")
@@ -269,7 +269,7 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
         str ")"
   | _ -> assert false
 
-let genc_multi_assign (sigma : Evd.evar_map) (assignments : (string * (string * EConstr.types)) array) : Pp.t =
+let genc_multi_assign (env : Environ.env) (sigma : Evd.evar_map) (assignments : (string * (string * EConstr.types)) array) : Pp.t =
   let ass = Array.to_list assignments in
   let ass = List.filter (fun (lhs, (rhs, ty)) -> lhs <> rhs) ass in
   let rpp = ref (mt ()) in
@@ -292,7 +292,7 @@ let genc_multi_assign (sigma : Evd.evar_map) (assignments : (string * (string * 
         else
           (let a_lhs, (a_rhs, a_ty) = a in
           let tmp = local_gensym () in
-          let pp = genc_varinit sigma a_ty tmp (str a_lhs) in
+          let pp = genc_varinit env sigma a_ty tmp (str a_lhs) in
           (if Pp.ismt !rpp then rpp := pp else rpp := !rpp ++ spc () ++ pp);
           let ass2 = List.map
             (fun (lhs, (rhs, ty)) ->
@@ -304,7 +304,7 @@ let genc_multi_assign (sigma : Evd.evar_map) (assignments : (string * (string * 
   loop ass;
   !rpp
 
-let genc_goto (sigma : Evd.evar_map) (context : context_elt list) (ctxrec : string * (string * EConstr.types) array) (argsary : EConstr.t array) : Pp.t =
+let genc_goto (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (ctxrec : string * (string * EConstr.types) array) (argsary : EConstr.t array) : Pp.t =
   let fname, argvars = ctxrec in
   (if Array.length argsary <> Array.length argvars then
     user_err (str "partial function invocation not supported yet");
@@ -314,7 +314,7 @@ let genc_goto (sigma : Evd.evar_map) (context : context_elt list) (ctxrec : stri
       (fun (var, ty) arg -> (var, (varname_of_rel context (destRel sigma arg), ty)))
       argvars argsary)
   in
-  let pp_assigns = genc_multi_assign sigma assignments in
+  let pp_assigns = genc_multi_assign env sigma assignments in
   let pp_goto = (hv 0 (str "goto" ++ spc () ++ str fname_argn ++ str ";")) in
   if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto)
 
@@ -351,7 +351,7 @@ let genc_case_branch_body (env : Environ.env) (sigma : Evd.evar_map)
         let name = Context.binder_name name in
         let varname = local_gensym_with_name name in
         let cstr_field = case_cstrfield env sigma exprty cstr_index field_index in
-        (CtxVar varname, genc_varinit sigma ty varname (str cstr_field ++ str "(" ++ str exprvar ++ str ")")))
+        (CtxVar varname, genc_varinit env sigma ty varname (str cstr_field ++ str "(" ++ str exprvar ++ str ")")))
        decls
       (iota_list 0 (List.length decls))
   in
@@ -403,9 +403,9 @@ let genc_case_break (env : Environ.env) (sigma : Evd.evar_map)
   genc_case_nobreak env sigma context ci tyf expr brs
     (fun envb sigma context2 body -> bodyfunc envb sigma context2 body ++ spc () ++ str "break;")
 
-let genc_geninitvar (sigma : Evd.evar_map) (ty : EConstr.types) (namehint : Names.Name.t) (init : Pp.t) : Pp.t * string =
+let genc_geninitvar (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (namehint : Names.Name.t) (init : Pp.t) : Pp.t * string =
   let varname = local_gensym_with_name namehint in
-  (genc_varinit sigma ty varname init, varname)
+  (genc_varinit env sigma ty varname init, varname)
 
 (* not tail position. return a variable *)
 let rec genc_body_var (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (namehint : Names.Name.t) (term : EConstr.t) (termty : EConstr.types) : Pp.t * string =
@@ -420,17 +420,17 @@ let rec genc_body_var (env : Environ.env) (sigma : Evd.evar_map) (context : cont
       let (bodybody, bodyvarname) = genc_body_var env2 sigma (CtxVar exprvarname :: context) namehint body termty in
       (exprbody ++ (if ismt exprbody then mt () else spc ()) ++ bodybody, bodyvarname)
   | Constr.App (f, argsary) ->
-      genc_geninitvar sigma termty namehint (genc_app env sigma context f argsary)
+      genc_geninitvar env sigma termty namehint (genc_app env sigma context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
       let varname = local_gensym_with_name namehint in
-      (genc_vardecl sigma termty varname ++ spc () ++
+      (genc_vardecl env sigma termty varname ++ spc () ++
        genc_case_break env sigma context ci tyf expr brs
         (fun envb sigma context2 body -> genc_body_assign envb sigma context2 varname body),
       varname)
   | Constr.Const ctntu ->
-      genc_geninitvar sigma termty namehint (genc_const env sigma context (out_punivs ctntu))
+      genc_geninitvar env sigma termty namehint (genc_const env sigma context (out_punivs ctntu))
   | Constr.Construct cstru ->
-      genc_geninitvar sigma termty namehint (genc_construct env sigma context (out_punivs cstru))
+      genc_geninitvar env sigma termty namehint (genc_construct env sigma context (out_punivs cstru))
   | _ -> (user_err (str "not impelemented (genc_body_var:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term))
 
 (* not tail position. assign to the specified variable *)
@@ -474,7 +474,7 @@ let rec genc_body_tail (env : Environ.env) (sigma : Evd.evar_map) (context : con
       (match EConstr.kind sigma f with
       | Constr.Rel i ->
           (match List.nth context (i-1) with
-          | CtxRec (fname, argvars) -> genc_goto sigma context (fname, argvars) argsary
+          | CtxRec (fname, argvars) -> genc_goto env sigma context (fname, argvars) argsary
           | _ -> genc_return (genc_app env sigma context f argsary))
       | _ -> genc_return (genc_app env sigma context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
@@ -502,7 +502,7 @@ let rec genc_mufun_body_tail (env : Environ.env) (sigma : Evd.evar_map) (retvar 
       (match EConstr.kind sigma f with
       | Constr.Rel i ->
           (match List.nth context (i-1) with
-          | CtxRec (fname, argvars) -> genc_goto sigma context (fname, argvars) argsary
+          | CtxRec (fname, argvars) -> genc_goto env sigma context (fname, argvars) argsary
           | _ -> genc_void_return retvar (genc_app env sigma context f argsary))
       | _ -> genc_void_return retvar (genc_app env sigma context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
@@ -601,9 +601,9 @@ let genc_func_single (env : Environ.env) (sigma : Evd.evar_map)
   let c_fname = c_funcname fname in
   hv 0 (
   str "static" ++ spc () ++
-  str (c_typename sigma rety) ++ spc () ++
+  str (c_typename env sigma rety) ++ spc () ++
   str c_fname ++ str "(" ++
-  hv 0 (genc_fargs sigma fargs) ++
+  hv 0 (genc_fargs env sigma fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
   hv 0 (
@@ -621,31 +621,31 @@ let find_headcalls
           if headcall then [| ntfcb |] else [| |])
         ntfcb_ary callsites_ary))
 
-let genc_mufun_struct_one (sigma : Evd.evar_map) (ntfcb : string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) : Pp.t =
+let genc_mufun_struct_one (env : Environ.env) (sigma : Evd.evar_map) (ntfcb : string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) : Pp.t =
   let nm, ty, fargs, context, envb, body = ntfcb in
   hv 0 (
   str "struct" ++ spc () ++
   str nm ++ spc () ++
   str "{" ++ spc () ++
-  pp_postjoin_list (str ";" ++ spc ()) (List.map (genc_farg sigma) fargs) ++
+  pp_postjoin_list (str ";" ++ spc ()) (List.map (genc_farg env sigma) fargs) ++
   str "};")
 
-let genc_mufun_structs (sigma : Evd.evar_map)
+let genc_mufun_structs (env : Environ.env) (sigma : Evd.evar_map)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   let ntfcb_ary2 = find_headcalls ntfcb_ary callsites_ary in
   pp_join_ary (spc ())
-    (Array.map (genc_mufun_struct_one sigma) ntfcb_ary2)
+    (Array.map (genc_mufun_struct_one env sigma) ntfcb_ary2)
 
-let genc_mufun_entry (sigma : Evd.evar_map) (mfnm : string) (i : int) (ntfcb : string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) : Pp.t =
+let genc_mufun_entry (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) (i : int) (ntfcb : string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) : Pp.t =
   let nm, ty, fargs, context, envb, body = ntfcb in
   let (argtys, rety) = nargtys_and_rety_of_type sigma (List.length fargs) ty in
   let c_fname = c_funcname nm in
   hv 0 (
   str "static" ++ spc () ++
-  str (c_typename sigma rety) ++ spc () ++
+  str (c_typename env sigma rety) ++ spc () ++
   str c_fname ++ str "(" ++
-  hv 0 (genc_fargs sigma fargs) ++
+  hv 0 (genc_fargs env sigma fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
   hv 0 (
@@ -655,17 +655,17 @@ let genc_mufun_entry (sigma : Evd.evar_map) (mfnm : string) (i : int) (ntfcb : s
         (List.map
           (fun (var, ty) -> hv 0 (str var))
         fargs) ++ spc () ++ str "};") ++ spc () ++
-    hv 0 (str (c_typename sigma rety) ++ spc () ++ str "ret;") ++ spc () ++
+    hv 0 (str (c_typename env sigma rety) ++ spc () ++ str "ret;") ++ spc () ++
     hv 0 (str mfnm ++ str "(" ++ int i ++ str "," ++ spc () ++ str "&args," ++ spc () ++ str "&ret);") ++ spc () ++
     hv 0 (str "return" ++ spc () ++ str "ret;")) ++
   spc () ++ str "}")
 
-let genc_mufun_entries (sigma : Evd.evar_map) (mfnm : string)
+let genc_mufun_entries (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   let ntfcb_ary2 = find_headcalls ntfcb_ary callsites_ary in
   pp_join_ary (spc ())
-    (Array.mapi (genc_mufun_entry sigma mfnm) ntfcb_ary2)
+    (Array.mapi (genc_mufun_entry env sigma mfnm) ntfcb_ary2)
 
 let genc_mufun_forward_decl (mfnm : string) : Pp.t =
   hv 0 (
@@ -677,7 +677,7 @@ let genc_mufun_forward_decl (mfnm : string) : Pp.t =
     hv 0 (str "void*" ++ spc () ++ str "argsp") ++ str "," ++ spc () ++
     hv 0 (str "void*" ++ spc () ++ str "retp")) ++ str ");")
 
-let genc_mufun_bodies_func (sigma :Evd.evar_map) (mfnm : string) (i : int)
+let genc_mufun_bodies_func (env : Environ.env) (sigma :Evd.evar_map) (mfnm : string) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   hv 0 (
@@ -695,7 +695,7 @@ let genc_mufun_bodies_func (sigma :Evd.evar_map) (mfnm : string) (i : int)
         (fun (nm, ty, fargs, context, envb, body) ->
            pp_join_list (spc ())
              (List.map
-               (fun (var, ty) -> hv 0 (str (c_typename sigma ty) ++ spc () ++ str var ++ str ";"))
+               (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) ++ spc () ++ str var ++ str ";"))
                fargs))
         ntfcb_ary) ++ spc () ++
     hv 0 (str "switch" ++ spc () ++ str "(i)") ++ spc () ++ str "{" ++ brk (1,2) ++
@@ -714,12 +714,12 @@ let genc_mufun_bodies_func (sigma :Evd.evar_map) (mfnm : string) (i : int)
                       (fun (var, ty) -> hv 0 (str var ++ spc () ++ str "=" ++ spc () ++ str "((struct" ++ spc () ++ str nm ++ spc () ++ str "*)argsp)->" ++ str var ++ str ";"))
                       fargs) ++ spc () ++
                   (if tailcall then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
-                  genc_mufun_body_tail envb sigma ("(*(" ^ c_typename sigma rety ^ " *)retp)") context body ++ spc () ++
+                  genc_mufun_body_tail envb sigma ("(*(" ^ c_typename env sigma rety ^ " *)retp)") context body ++ spc () ++
                   str "return;")))
             ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
     str "}")
 
-let genc_mufun_single_func (sigma : Evd.evar_map) (mfnm : string) (i : int)
+let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   let entry_nm, entry_ty, entry_fargs, entry_context, entry_envb, entry_body = ntfcb_ary.(i) in
@@ -728,9 +728,9 @@ let genc_mufun_single_func (sigma : Evd.evar_map) (mfnm : string) (i : int)
   let label_fname_argn = goto_label entry_nm in
   hv 0 (
   str "static" ++ spc () ++
-  str (c_typename sigma entry_rety) ++ spc () ++
+  str (c_typename env sigma entry_rety) ++ spc () ++
   str c_fname ++ str "(" ++
-  hv 0 (genc_fargs sigma entry_fargs) ++
+  hv 0 (genc_fargs env sigma entry_fargs) ++
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
   hv 0 (
@@ -742,7 +742,7 @@ let genc_mufun_single_func (sigma : Evd.evar_map) (mfnm : string) (i : int)
           else
             pp_join_list (spc ())
               (List.map
-                (fun (var, ty) -> hv 0 (str (c_typename sigma ty) ++ spc () ++ str var ++ str ";"))
+                (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) ++ spc () ++ str var ++ str ";"))
                 fargs))
         ntfcb_ary) ++
     (if i = 0 then mt () else hv 0 (str "goto" ++ spc () ++ str label_fname_argn ++ str ";") ++ spc ()) ++
@@ -757,17 +757,17 @@ let genc_mufun_single_func (sigma : Evd.evar_map) (mfnm : string) (i : int)
         ntfcb_ary)) ++
   spc () ++ str "}")
 
-let genc_func_mutual (sigma : Evd.evar_map) (mfnm : string) (i : int)
+let genc_func_mutual (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   let num_entry_funcs = Array.fold_left (+) 0 (Array.map (fun (headcall, tailcall, partcall) -> if headcall then 1 else 0) callsites_ary) in
   if num_entry_funcs = 1 then
-    genc_mufun_single_func sigma mfnm i ntfcb_ary callsites_ary
+    genc_mufun_single_func env sigma mfnm i ntfcb_ary callsites_ary
   else
-    genc_mufun_structs sigma ntfcb_ary callsites_ary ++ spc () ++
+    genc_mufun_structs env sigma ntfcb_ary callsites_ary ++ spc () ++
     genc_mufun_forward_decl mfnm ++ spc () ++
-    genc_mufun_entries sigma mfnm ntfcb_ary callsites_ary ++ spc () ++
-    genc_mufun_bodies_func sigma mfnm i ntfcb_ary callsites_ary
+    genc_mufun_entries env sigma mfnm ntfcb_ary callsites_ary ++ spc () ++
+    genc_mufun_bodies_func env sigma mfnm i ntfcb_ary callsites_ary
 
 let genc_func (env : Environ.env) (sigma : Evd.evar_map) (fname : string) (ty : EConstr.types) (term : EConstr.t) : Pp.t =
   local_gensym_with (fun () ->
@@ -786,7 +786,7 @@ let genc_func (env : Environ.env) (sigma : Evd.evar_map) (fname : string) (ty : 
       let ntfcb_ary = fargs_and_body_ary env2 sigma strnameary ty ia i nameary' tyary funary in
       let callsites_ary = scan_callsites sigma i ntfcb_ary in
       let mfnm = gensym_with_str fname in
-      genc_func_mutual sigma mfnm i ntfcb_ary callsites_ary
+      genc_func_mutual env sigma mfnm i ntfcb_ary callsites_ary
   | _ ->
       let fargs, envb, body = fargs_and_body env sigma term in
       let context = List.rev_map (fun (var, ty) -> CtxVar var) fargs in
