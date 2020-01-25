@@ -88,9 +88,9 @@ type specialization_config = {
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
 
 (*
-  key is a constant to refer a partapp,
-  the partapp itself and
-  a constant to refer the specialized definition.
+  key is a constant to refer a partapp (codegen_pN_foo),
+  the partapp itself (@cons bool) and
+  a constant to refer the specialized definition (codegen_sN_foo).
 *)
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
