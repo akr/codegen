@@ -305,7 +305,7 @@ let list_nat_src = {|
       ".
 |}
 
-let test_mono_id_bool (ctx : test_ctxt) =
+let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
@@ -315,7 +315,7 @@ let test_mono_id_bool (ctx : test_ctxt) =
       assert(mono_id_bool(false) == false);
     |}
 
-let test_mono_id_mybool (ctx : test_ctxt) =
+let test_mono_id_mybool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
@@ -337,7 +337,7 @@ let test_mono_id_mybool (ctx : test_ctxt) =
       assert(mono_id_mybool(myfalse) == myfalse);
     |}
 
-let test_mybool_true (ctx : test_ctxt) =
+let test_mybool_true (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
@@ -359,7 +359,7 @@ let test_mybool_true (ctx : test_ctxt) =
       assert(mybool_true(myfalse) == mytrue);
     |}
 
-let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
+let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
@@ -369,7 +369,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) =
       assert(mono_id_bool(false) == false);
     |}
 
-let test_nat_add_rec (ctx : test_ctxt) =
+let test_nat_add_rec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
       Fixpoint my_add_rec (m n : nat) : nat :=
@@ -382,7 +382,7 @@ let test_nat_add_rec (ctx : test_ctxt) =
       assert(my_add_rec(2,3) == 5);
     |}
 
-let test_nat_add_iter (ctx : test_ctxt) =
+let test_nat_add_iter (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
       Fixpoint my_add_iter (m n : nat) : nat :=
@@ -395,7 +395,7 @@ let test_nat_add_iter (ctx : test_ctxt) =
       assert(my_add_iter(2,3) == 5);
     |}
 
-let test_list_bool (ctx : test_ctxt) =
+let test_list_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ list_bool_src ^ {|
       Definition is_nil (s : list bool) :=
@@ -410,7 +410,7 @@ let test_list_bool (ctx : test_ctxt) =
       assert(!is_nil(cons(true, NULL)));
     |}
 
-let test_list_bool_length (ctx : test_ctxt) =
+let test_list_bool_length (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ list_bool_src ^
     {|
@@ -427,7 +427,7 @@ let test_list_bool_length (ctx : test_ctxt) =
       assert(length(cons(1, cons(2, NULL))) == 2);
     |}
 
-let test_sum (ctx : test_ctxt) =
+let test_sum (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ list_nat_src ^
     {|
@@ -444,7 +444,7 @@ let test_sum (ctx : test_ctxt) =
       assert(sum(cons(1, cons(2, NULL))) == 3);
     |}
 
-let test_nil_nat (ctx : test_ctxt) =
+let test_nil_nat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ list_nat_src ^
     {|
@@ -455,7 +455,7 @@ let test_nil_nat (ctx : test_ctxt) =
       assert(s == NULL);
     |}
 
-let test_singleton_list (ctx : test_ctxt) =
+let test_singleton_list (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
@@ -472,7 +472,7 @@ let test_singleton_list (ctx : test_ctxt) =
       assert(is_nil(tail(s)));
     |}
 
-let test_map_succ (ctx : test_ctxt) =
+let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
@@ -490,7 +490,7 @@ let test_map_succ (ctx : test_ctxt) =
       assert(head(map_succ(cons(1, NULL))) == 2);
     |}
 
-let suite =
+let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
