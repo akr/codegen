@@ -457,18 +457,18 @@ let test_nil_nat (ctx : test_ctxt) =
       assert(s == NULL);
     |}
 
-let test_list_one (ctx : test_ctxt) =
+let test_singleton_list (ctx : test_ctxt) =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
-      Definition list_n (n : nat) : list nat := cons n nil.
-      CodeGen Function list_n.
+      Definition singleton_list (n : nat) : list nat := cons n nil.
+      CodeGen Function singleton_list.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
       #define tail(s) list_nat_tail(s)
       #define cons(h,t) list_nat_cons(h,t)
-      list_nat s = list_n(42);
+      list_nat s = singleton_list(42);
       assert(!is_nil(s));
       assert(head(s) == 42);
       assert(is_nil(tail(s)));
@@ -503,7 +503,7 @@ let suite =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_nil_nat" >:: test_nil_nat;
-    "test_list_one" >:: test_list_one;
+    "test_singleton_list" >:: test_singleton_list;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
 
