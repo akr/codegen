@@ -625,8 +625,8 @@ let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
 let has_fv sigma term : bool =
   Stdlib.Option.is_some (first_fv sigma term)
 
-let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
-  (* Feedback.msg_info (Pp.str "specialize_ctnt_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
+let specialize_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
+  (* Feedback.msg_info (Pp.str "specialize_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
@@ -704,12 +704,12 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
-          (match specialize_ctnt_app env sigma f' args with
+          (match specialize_app env sigma f' args with
           | None -> term
           | Some e -> e)
       | Construct (cstr, u) ->
           let f' = Constr.mkConstruct cstr in
-          (match specialize_ctnt_app env sigma f' args with
+          (match specialize_app env sigma f' args with
           | None -> term
           | Some e -> e)
       | _ -> mkApp (f, args)
