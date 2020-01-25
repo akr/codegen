@@ -47,7 +47,8 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen Inductive Type COQ_TYPE => "C_TYPE".
   CodeGen Inductive Match COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
-  CodeGen Primitive CONSTRUCTOR => "C_CONSTRUCTOR".
+  CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
+  CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
   Print CodeGen Inductive.              show all inductive types for codegen.
   Print CodeGen Inductive COQ_TYPE*     show the specified inductive types for codegen.
@@ -79,6 +80,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Arguments FUNCTION SorD*.
   CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
+  CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PARTAPP_NAME SPECIALIZED_NAME..
 
   CodeGen EndFile "FILENAME"
 
