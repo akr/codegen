@@ -626,6 +626,7 @@ let has_fv sigma term : bool =
   Stdlib.Option.is_some (first_fv sigma term)
 
 let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
+  (* Feedback.msg_info (Pp.str "specialize_ctnt_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
@@ -648,7 +649,7 @@ let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Const
         Printer.pr_econstr_env env sigma arg ++ spc () ++
         Pp.str "refer" ++ spc () ++
         Printer.pr_econstr_env env sigma (mkRel k)))
-    static_args);
+    nf_static_args);
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
@@ -699,6 +700,7 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Case (ci, p, item, branches) ->
       mkCase (ci, p, specialize env sigma item, Array.map (specialize env sigma) branches)
   | App (f, args) ->
+      let f = specialize env sigma f in
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
@@ -710,7 +712,7 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (match specialize_ctnt_app env sigma f' args with
           | None -> term
           | Some e -> e)
-      | _ -> term
+      | _ -> mkApp (f, args)
 
 (*
  * expand_eta assumes term is A-normal form, "body" of following syntax:
