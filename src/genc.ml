@@ -219,7 +219,7 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
   | Constr.Const _ | Constr.Construct _ ->
-      let c_fname =
+      let sp_inst =
         match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
         | None ->
             (match EConstr.kind sigma f with
@@ -229,15 +229,12 @@ let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt l
                 user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
             | _ -> assert false)
         | Some (sp_cfg, sp_inst) ->
-            sp_inst.sp_cfunc_name
+            sp_inst
       in
-      let no_arguments = Array.length argsary = 0 &&
-        match EConstr.kind sigma f with
-        | Constr.Const _ -> false
-        | Constr.Construct _ -> true
-        | _ -> assert false
+      let c_fname = sp_inst.sp_cfunc_name in
+      let gen_constant = Array.length argsary = 0 && sp_inst.sp_gen_constant
       in
-      if no_arguments then
+      if gen_constant then
         str c_fname
       else
         let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in

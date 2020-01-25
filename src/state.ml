@@ -71,6 +71,11 @@ type specialization_instance = {
   sp_specialization_name : specialization_instance_name_status;
   sp_partapp : Constr.t;
   sp_cfunc_name : string;
+  sp_gen_constant : bool; (* Generate C constant "foo",
+                             instead of function call "foo()".
+                             true for CodeGen Constant.
+                             false for CodeGen Function and Primitive.
+                            *)
 }
 
 type specialization_config = {

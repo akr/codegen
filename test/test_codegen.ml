@@ -189,8 +189,8 @@ let bool_src = {|
       CodeGen Inductive Match bool => ""
       | true => "default"
       | false => "case 0".
-      CodeGen Primitive true => "true".
-      CodeGen Primitive false => "false".
+      CodeGen Constant true => "true".
+      CodeGen Constant false => "false".
 
       CodeGen Snippet "
       #include <stdbool.h> /* for bool, true and false */
@@ -202,7 +202,7 @@ let nat_src = {|
       CodeGen Inductive Match nat => ""
       | O => "case 0"
       | S => "default" "nat_pred".
-      CodeGen Primitive O => "0".
+      CodeGen Constant O => "0".
       CodeGen Primitive S => "nat_succ".
 
       CodeGen Snippet "
@@ -249,7 +249,7 @@ let list_bool_src = {|
       CodeGen Inductive Match list bool => "list_bool_is_nil"
       | nil => "default"
       | cons => "case 0" "list_bool_head" "list_bool_tail".
-      CodeGen Primitive nil bool => "list_bool_nil".
+      CodeGen Constant nil bool => "((list_bool)NULL)".
       CodeGen Primitive cons bool => "list_bool_cons".
 
       CodeGen Snippet "
@@ -272,7 +272,6 @@ let list_bool_src = {|
         ret->tail = s;
         return ret;
       }
-      #define list_bool_nil() ((list_bool)NULL)
       ".
 |}
 
@@ -281,7 +280,7 @@ let list_nat_src = {|
       CodeGen Inductive Match list nat => "list_nat_is_nil"
       | nil => "default"
       | cons => "case 0" "list_nat_head" "list_nat_tail".
-      CodeGen Primitive nil nat => "list_nat_nil".
+      CodeGen Constant nil nat => "((list_nat)NULL)".
       CodeGen Primitive cons nat => "list_nat_cons".
 
       CodeGen Snippet "
@@ -303,7 +302,6 @@ let list_nat_src = {|
         ret->tail = s;
         return ret;
       }
-      #define list_nat_nil() ((list_nat)NULL)
       ".
 |}
 
@@ -325,8 +323,8 @@ let test_mono_id_mybool (ctx : test_ctxt) =
       CodeGen Inductive Match mybool => ""
       | mytrue => "default"
       | myfalse => "case 0".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      CodeGen Constant mytrue => "mytrue".
+      CodeGen Constant myfalse => "myfalse".
       CodeGen Snippet "
       typedef int mybool;
       #define mytrue 1
@@ -347,8 +345,8 @@ let test_mybool_true (ctx : test_ctxt) =
       CodeGen Inductive Match mybool => ""
       | mytrue => "default"
       | myfalse => "case 0".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      CodeGen Constant mytrue => "mytrue".
+      CodeGen Constant myfalse => "myfalse".
       CodeGen Snippet "
       typedef int mybool;
       #define mytrue 1

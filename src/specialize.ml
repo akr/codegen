@@ -160,7 +160,7 @@ let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) : u
 
 let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
-    (static_args : Constr.t list) : (Evd.evar_map * Constr.t) =
+    (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type sd_list static_args =
     match sd_list with
     | [] -> f
@@ -190,7 +190,7 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env sigma0 sigma t;
   let t = Evarutil.flush_and_check_evars sigma t in
-  (sigma, t)
+  (sigma, t, ty)
 
 let gensym_ps (suffix : string) : Names.Id.t * Names.Id.t =
   let n = !gensym_ps_num in
@@ -222,14 +222,22 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
       Id.to_string cons_id
   | _ -> user_err (Pp.str "expect constant or constructor")
 
-let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (static_args : Constr.t list) (names_opt : sp_instance_names option) : specialization_instance =
+let specialization_instance_internal
+    ?(gen_constant=false)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (func : Constr.t) (static_args : Constr.t list)
+    (names_opt : sp_instance_names option) : specialization_instance =
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (sigma, partapp) = build_partapp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
+  let (sigma, partapp, partapp_type) = build_partapp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
+  (if gen_constant && not (isInd sigma (fst (decompose_app sigma partapp_type))) then
+    user_err (Pp.str "CodeGen Constant needs a constant:" ++ spc () ++
+      Printer.pr_constr_env env sigma partapp ++ spc () ++ str ":" ++ spc () ++
+      Printer.pr_econstr_env env sigma partapp_type));
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
   let cfunc_name = match names_opt with
@@ -262,7 +270,8 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
         sp_static_arguments = [];
         sp_partapp_constr = func; (* use the original function for fully dynamic function *)
         sp_specialization_name = specialization_name;
-        sp_cfunc_name = cfunc_name; }
+        sp_cfunc_name = cfunc_name;
+        sp_gen_constant = gen_constant; }
       in
       Feedback.msg_info (Pp.str "Used:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       sp_inst
@@ -288,7 +297,8 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
         sp_static_arguments = static_args;
         sp_partapp_constr = Constr.mkConst declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
-        sp_cfunc_name = cfunc_name; }
+        sp_cfunc_name = cfunc_name;
+        sp_gen_constant = gen_constant; }
       in
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
@@ -302,6 +312,7 @@ let specialization_instance_internal (env : Environ.env) (sigma : Evd.evar_map) 
   sp_inst
 
 let codegen_function_internal
+    ?(gen_constant=false)
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : specialization_instance =
@@ -320,7 +331,7 @@ let codegen_function_internal
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let func = func_of_qualid env func in
   ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
-  specialization_instance_internal env sigma func args (Some names)
+  specialization_instance_internal ~gen_constant:gen_constant env sigma func args (Some names)
 
 let codegen_function
     (func : Libnames.qualid)
@@ -334,6 +345,13 @@ let codegen_primitive
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   ignore (codegen_function_internal func user_args names)
+
+let codegen_constant
+    (func : Libnames.qualid)
+    (user_args : Constrexpr.constr_expr list)
+    (names : sp_instance_names) : unit =
+  let user_args = List.map (fun arg -> Some arg) user_args in
+  ignore (codegen_function_internal ~gen_constant:true func user_args names)
 
 let check_convertible phase (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
   if Reductionops.is_conv env sigma t1 t2 then
@@ -634,7 +652,7 @@ let specialize_ctnt_app (env : Environ.env) (sigma : Evd.evar_map) (func : Const
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (_, partapp) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
+  let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
   Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal env sigma func nf_static_args None
@@ -952,7 +970,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_partapp_constr = sp_inst.sp_partapp_constr;
     sp_specialization_name = SpDefinedCtnt declared_ctnt;
-    sp_cfunc_name = sp_inst.sp_cfunc_name }
+    sp_cfunc_name = sp_inst.sp_cfunc_name;
+    sp_gen_constant = sp_inst.sp_gen_constant; }
   in
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in

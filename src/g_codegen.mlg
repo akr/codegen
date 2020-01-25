@@ -182,6 +182,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { codegen_function func args names }
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
       { codegen_primitive func args names }
+    | [ "CodeGen" "Constant" ref(func) constr_list(args) sp_instance_names(names) ] ->
+      { codegen_constant func args names }
 
     | [ "CodeGen" "Snippet" string(str) ] ->
       { codegen_snippet str }
