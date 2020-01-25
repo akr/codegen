@@ -307,8 +307,8 @@ let specialization_instance_internal
   gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
-  specialize_config_map := !specialize_config_map |>
-    ConstrMap.add func { sp_cfg with sp_instance_map = inst_map };
+  let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
+  specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
   sp_inst
 
 let codegen_function_internal
@@ -983,9 +983,10 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   (let m = !cfunc_instance_map in
     let m = CString.Map.set sp_inst.sp_cfunc_name (sp_cfg, sp_inst2) m in
     cfunc_instance_map := m);
-  let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
-  specialize_config_map := !specialize_config_map |>
-    ConstrMap.add (Constr.mkConst ctnt) { sp_cfg with sp_instance_map = inst_map };
+  (let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
+   let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
+   let m = !specialize_config_map in
+   specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
   declared_ctnt
 
 let codegen_specialization_specialize (cfuncs : string list) : unit =
