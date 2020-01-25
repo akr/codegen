@@ -846,7 +846,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
           let pp = genc_func env sigma cfunc_name ty body in
           Pp.pp_with fmt (pp ++ Pp.fnl ())
       | GenSnippet str ->
-          Pp.pp_with fmt (Pp.str str))
+          Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
     gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
