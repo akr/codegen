@@ -109,6 +109,14 @@ let rec ncons n x s =
   else
     x :: (ncons (n-1) x s)
 
+let rec list_drop (n : int) (s : 'a list) : 'a list =
+  if n <= 0 then
+    s
+  else
+    match s with
+    | [] -> s
+    | v :: s' -> list_drop (n-1) s'
+
 let rec list_find_index pred l =
   match l with
   | [] -> raise Not_found

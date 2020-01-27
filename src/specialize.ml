@@ -652,7 +652,8 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let args = Array.map (reduce_arg env sigma) args in
       match EConstr.kind sigma f with
       | Lambda (x,t,e) ->
-          Reductionops.beta_applist sigma (f, (Array.to_list args))
+          let term' = Reductionops.beta_applist sigma (f, (Array.to_list args)) in
+          reduce_exp env sigma term'
       (* | Fix ((ia,i), ((nary, tary, fary) as prec)) -> ... *)
       | _ -> mkApp (f, args)
 
