@@ -643,16 +643,29 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let args = Array.map (Vars.lift i) args in
               reduce_exp env sigma (mkApp (branch, args))
           | _ -> default ()))
+  | Proj (pr,item) ->
+      let item' = reduce_arg env sigma item in
+      let default () = mkProj (pr, item') in
+      let i = destRel sigma item' in
+      (match EConstr.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum _ -> default ()
+      | Context.Rel.Declaration.LocalDef (x,e,t) ->
+          (* Feedback.msg_info (Pp.str "reduce_exp(Proj): lookup = " ++ Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e);
+          Feedback.msg_info (Pp.str "reduce_exp(Proj): Projection.npars = " ++ int (Projection.npars pr));
+          Feedback.msg_info (Pp.str "reduce_exp(Proj): Projection.arg = " ++ int (Projection.arg pr)); *)
+          let (f, args) = decompose_app sigma e in
+          (match EConstr.kind sigma f with
+          | Construct _ ->
+              let v = List.nth args (Projection.npars pr + Projection.arg pr) in
+              let v = Vars.lift i v in
+              reduce_exp env sigma v
+          | _ -> default ()))
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       mkFix ((ia, i), (nary, tary, Array.map (reduce_exp env2 sigma) fary))
   | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
-  | Proj (pr,e) ->
-      let e' = reduce_exp env sigma e in
-      (* reducible if e' is a rel which is defined as (constructor ...) *)
-      e'
   | App (f,args) ->
       let f = reduce_exp env sigma f in
       let args = Array.map (reduce_arg env sigma) args in

@@ -483,6 +483,21 @@ let test_add3 (ctx : test_ctxt) : unit =
       assert(add3(4) == 7);
     |}
 
+let test_reduce_proj (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Set Primitive Projections.
+      Record TestRecord (par:nat) : Set := mk { f0 : nat; f1 : nat }.
+      Definition f0_mk a b : nat := f0 10 (mk 10 a b).
+      Definition f1_mk a b : nat := f1 10 (mk 10 a b).
+      CodeGen Function f0_mk.
+      CodeGen Function f1_mk.
+    |}) {|
+      assert(f0_mk(7, 8) == 7);
+      assert(f1_mk(7, 8) == 8);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -512,6 +527,7 @@ let suite : OUnit2.test =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_add3" >:: test_add3;
+    "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     (*"test_map_succ" >:: test_map_succ;*)
