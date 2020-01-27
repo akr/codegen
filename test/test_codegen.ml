@@ -483,6 +483,35 @@ let test_add3 (ctx : test_ctxt) : unit =
       assert(add3(4) == 7);
     |}
 
+let test_even_odd (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Fixpoint even (n : nat) : bool :=
+        match n with
+        | O => true
+        | S n' => odd n'
+        end
+      with odd (n : nat) : bool :=
+        match n with
+        | O => false
+        | S n' => even n'
+        end.
+      CodeGen Function even.
+      CodeGen Function odd.
+    |}) {|
+      assert(even(0) == true);
+      assert(even(1) == false);
+      assert(even(2) == true);
+      assert(even(3) == false);
+      assert(even(4) == true);
+      assert(odd(0) == false);
+      assert(odd(1) == true);
+      assert(odd(2) == false);
+      assert(odd(3) == true);
+      assert(odd(4) == false);
+    |}
+
 let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -539,6 +568,7 @@ let suite : OUnit2.test =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_add3" >:: test_add3;
+    "test_even_odd" >:: test_even_odd;
     "test_cast" >:: test_cast;
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
