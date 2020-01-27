@@ -505,6 +505,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
         in
         wrap_lets [item] term
   | App (f,args) ->
+      let f = normalizeK env sigma f in
       let hoist_args = Array.map (fun arg -> not (isRel sigma arg)) args in
       let nargs = Array.fold_left (fun n b -> n + if b then 1 else 0) 0 hoist_args in
       let hoisted_args = CList.filter_with (Array.to_list hoist_args) (Array.to_list args) in
@@ -571,6 +572,89 @@ let linearize_lets (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
 
 let normalizeA (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   linearize_lets env sigma (normalizeK env sigma term)
+
+let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      (match Environ.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum _ -> term
+      | Context.Rel.Declaration.LocalDef (n,e,t) ->
+          (match Constr.kind e with
+          | Rel j -> mkRel (i + j)
+          | _ -> term))
+  | _ -> assert false
+
+let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (* Feedback.msg_info (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  let result = reduce_exp1 env sigma term in
+  (* Feedback.msg_info (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  check_convertible "reduce_exp" env sigma term result;
+  result
+and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      (match EConstr.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum _ -> term
+      | Context.Rel.Declaration.LocalDef (x,e,t) ->
+          reduce_exp env sigma (Vars.lift i e))
+  | Var _ | Meta _ | Evar _ | Sort _ | Prod _
+  | Const _ | Ind _ | Construct _ | Int _ -> term
+  | Cast (e,ck,t) -> reduce_exp env sigma e
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, t, reduce_exp env2 sigma e)
+  | LetIn (x,e,t,b) ->
+      let e' = reduce_exp env sigma e in
+      if isLetIn sigma e' then
+        let (defs, body) = decompose_lets sigma e' in
+        let n = List.length defs in
+        let t' = Vars.lift n t in
+        let b' = Vars.liftn n 2 b in
+        let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
+        let env2 = EConstr.push_rel_context ctx env in
+        let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
+        let env3 = EConstr.push_rel decl env2 in
+        let b'' = reduce_exp env3 sigma b' in
+        compose_lets defs
+          (mkLetIn (x, body, t', b''))
+      else
+        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let env2 = EConstr.push_rel decl env in
+        mkLetIn (x, reduce_exp env sigma e, t, reduce_exp env2 sigma b)
+  | Case (ci,p,item,branches) ->
+      let item' = reduce_arg env sigma item in
+      let default () =
+        mkCase (ci, p, item', Array.map (reduce_exp env sigma) branches)
+      in
+      (match EConstr.lookup_rel (destRel sigma item') env with
+      | Context.Rel.Declaration.LocalAssum _ -> default ()
+      | Context.Rel.Declaration.LocalDef (x,e,t) ->
+          let (f, args) = decompose_app sigma e in
+          (match EConstr.kind sigma f with
+          | Construct ((ind, j), _) ->
+              let branch = branches.(j-1) in
+              let args' = Array.of_list (list_drop ci.ci_npar args) in
+              reduce_exp env sigma (mkApp (branch, args'))
+          | _ -> default ()))
+  | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkFix ((ia, i), (nary, tary, Array.map (reduce_exp env2 sigma) fary))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
+  | Proj (pr,e) ->
+      let e' = reduce_exp env sigma e in
+      (* reducible if e' is a rel which is defined as (constructor ...) *)
+      e'
+  | App (f,args) ->
+      let f = reduce_exp env sigma f in
+      let args = Array.map (reduce_arg env sigma) args in
+      match EConstr.kind sigma f with
+      | Lambda (x,t,e) ->
+          Reductionops.beta_applist sigma (f, (Array.to_list args))
+      (* | Fix ((ia,i), ((nary, tary, fary) as prec)) -> ... *)
+      | _ -> mkApp (f, args)
 
 let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
@@ -946,16 +1030,18 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term2);*)
   let term3 = normalizeA env sigma term2 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
-  let term4 = specialize env sigma term3 in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term4); *)
-  let term5 = expand_eta env sigma term4 in
+  let term4 = reduce_exp env sigma term3 in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
+  let term5 = specialize env sigma term4 in
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma term5); *)
-  let term6 = normalize_types env sigma term5 in
-  Feedback.msg_info (Printer.pr_econstr_env env sigma term6);
-  let term7 = delete_unused_let env sigma term6 in
+  let term6 = expand_eta env sigma term5 in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term6); *)
+  let term7 = normalize_types env sigma term6 in
   Feedback.msg_info (Printer.pr_econstr_env env sigma term7);
+  let term8 = delete_unused_let env sigma term7 in
+  Feedback.msg_info (Printer.pr_econstr_env env sigma term8);
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term7)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term8)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
