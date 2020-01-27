@@ -483,6 +483,16 @@ let test_add3 (ctx : test_ctxt) : unit =
       assert(add3(4) == 7);
     |}
 
+let test_cast (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition nat_id (n : nat) : nat := (n : nat) + 0.
+      CodeGen Function nat_id.
+    |}) {|
+      assert(nat_id(4) == 4);
+    |}
+
 (* codegen removes TestRecord type completely at reduction.
    So, no inductive type cofiguration required for TestRecord. *)
 let test_reduce_proj (ctx : test_ctxt) : unit =
@@ -529,6 +539,7 @@ let suite : OUnit2.test =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_add3" >:: test_add3;
+    "test_cast" >:: test_cast;
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;

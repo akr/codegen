@@ -403,6 +403,49 @@ let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : E
   check_convertible "inline" env sigma term result;
   result
 
+(* useless ?
+let rec strip_cast (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (* Feedback.msg_info (Pp.str "strip_cast arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  let result = strip_cast1 env sigma term in
+  (* Feedback.msg_info (Pp.str "strip_cast ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  check_convertible "strip_cast" env sigma term result;
+  result
+and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Ind _
+  | Const _ | Construct _ | Int _ | Prod _ -> term
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, t, strip_cast env2 sigma b)
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (strip_cast env2 sigma) fary in
+      mkFix ((ia, i), (nary, tary, fary'))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (strip_cast env2 sigma) fary in
+      mkCoFix (i, (nary, tary, fary'))
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = strip_cast env sigma e in
+      let b' = strip_cast env2 sigma b in
+      mkLetIn (x, e', t, b')
+  | Case (ci, p, item, branches) ->
+      let item' = strip_cast env sigma item in
+      let branches' = Array.map (strip_cast env sigma) branches in
+      mkCase (ci, p, item', branches')
+  | App (f,args) ->
+      let f = strip_cast env sigma f in
+      let args = Array.map (strip_cast env sigma) args in
+      mkApp (f, args)
+  | Cast (e,ck,ty) -> strip_cast env sigma e
+  | Proj (proj, e) ->
+      let e = strip_cast env sigma e in
+      mkProj (proj, e)
+*)
+
 let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
@@ -1020,6 +1063,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma epartapp);*)
   let term = inline env sigma inline_pred epartapp in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  (*let term = strip_cast env sigma term in*)
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
   let term = normalizeA env sigma term in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
