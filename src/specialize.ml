@@ -589,9 +589,9 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
   | _ -> assert false
 
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  Feedback.msg_info (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term);
+  (* Feedback.msg_info (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term); *)
   let result = reduce_exp1 env sigma term in
-  Feedback.msg_info (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result);
+  (* Feedback.msg_info (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "reduce_exp" env sigma term result;
   result
 and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
