@@ -403,51 +403,6 @@ let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : E
   check_convertible "inline" env sigma term result;
   result
 
-let rec strict_safe_beta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "strict_safe_beta arg: " ++ Printer.pr_econstr_env env sigma term); *)
-  let result = strict_safe_beta1 env sigma term in
-  (* Feedback.msg_info (Pp.str "strict_safe_beta ret: " ++ Printer.pr_econstr_env env sigma result); *)
-  check_convertible "strict_safe_beta" env sigma term result;
-  result
-and strict_safe_beta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
-  | Const _ | Ind _ | Int _ | Construct _ -> term
-  | Cast (e, ck, ty) -> mkCast (strict_safe_beta env sigma e, ck, ty)
-  | Lambda (n, ty, e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (n, ty) in
-      let env2 = EConstr.push_rel decl env in
-      mkLambda (n, ty, strict_safe_beta env2 sigma e)
-  | LetIn (n, e, ty, b) ->
-      let decl = Context.Rel.Declaration.LocalDef (n, e, ty) in
-      let env2 = EConstr.push_rel decl env in
-      mkLetIn (n, strict_safe_beta env sigma e, ty, strict_safe_beta env2 sigma b)
-  | App (f, args) ->
-      let f = strict_safe_beta env sigma f in
-      let args = Array.map (strict_safe_beta env sigma) args in
-      let rec aux f i =
-        match EConstr.kind sigma f with
-        | Lambda (n, ty, e) when i < Array.length args ->
-            let arg' = Vars.lift i args.(i) in
-            mkLetIn (n, arg', ty, aux e (i+1))
-        | _ ->
-            let args' = Array.map (Vars.lift i)
-                          (Array.sub args i (Array.length args - i)) in
-            mkApp (f, args')
-      in
-      aux f 0
-  | Case (ci, p, item, branches) ->
-      mkCase (ci, p, strict_safe_beta env sigma item, Array.map (strict_safe_beta env sigma) branches)
-  | Fix ((ia, i), ((nameary, tyary, funary))) ->
-      let prec = (nameary, tyary, funary) in
-      let env2 = push_rec_types prec env in
-      mkFix ((ia, i), (nameary, tyary, Array.map (strict_safe_beta env2 sigma) funary))
-  | CoFix (i, ((nameary, tyary, funary))) ->
-      let prec = (nameary, tyary, funary) in
-      let env2 = push_rec_types prec env in
-      mkCoFix (i, (nameary, tyary, Array.map (strict_safe_beta env2 sigma) funary))
-  | Proj (proj, e) -> mkProj (proj, strict_safe_beta env sigma e)
-
 let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
@@ -1065,22 +1020,20 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   in
   let term1 = inline env sigma inline_pred epartapp in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term1);*)
-  let term2 = strict_safe_beta env sigma term1 in
+  let term2 = normalizeA env sigma term1 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term2);*)
-  let term3 = normalizeA env sigma term2 in
+  let term3 = reduce_exp env sigma term2 in
   (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
-  let term4 = reduce_exp env sigma term3 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term4);*)
-  let term5 = specialize env sigma term4 in
+  let term4 = specialize env sigma term3 in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term4); *)
+  let term5 = expand_eta env sigma term4 in
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma term5); *)
-  let term6 = expand_eta env sigma term5 in
+  let term6 = normalize_types env sigma term5 in
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma term6); *)
-  let term7 = normalize_types env sigma term6 in
-  Feedback.msg_info (Printer.pr_econstr_env env sigma term7);
-  let term8 = delete_unused_let env sigma term7 in
-  Feedback.msg_info (Printer.pr_econstr_env env sigma term8);
+  let term7 = delete_unused_let env sigma term6 in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term7); *)
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term8)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term7)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
