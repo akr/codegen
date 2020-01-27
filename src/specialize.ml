@@ -1018,22 +1018,23 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
   in
-  let term1 = inline env sigma inline_pred epartapp in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term1);*)
-  let term2 = normalizeA env sigma term1 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term2);*)
-  let term3 = reduce_exp env sigma term2 in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term3);*)
-  let term4 = specialize env sigma term3 in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term4); *)
-  let term5 = expand_eta env sigma term4 in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term5); *)
-  let term6 = normalize_types env sigma term5 in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term6); *)
-  let term7 = delete_unused_let env sigma term6 in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term7); *)
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma epartapp);*)
+  let term = inline env sigma inline_pred epartapp in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  let term = normalizeA env sigma term in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  let term = reduce_exp env sigma term in
+  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  let term = specialize env sigma term in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  let term = expand_eta env sigma term in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  let term = normalize_types env sigma term in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  let term = delete_unused_let env sigma term in
+  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term7)) in
+  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
   let declared_ctnt = Declare.declare_constant name (defent, kind) in
   let sp_inst2 = {
