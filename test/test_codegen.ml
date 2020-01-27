@@ -472,6 +472,17 @@ let test_singleton_list (ctx : test_ctxt) : unit =
       assert(is_nil(tail(s)));
     |}
 
+let test_add3 (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition add3 (n : nat) : nat := 3 + n.
+      CodeGen Global Inline Nat.add.
+      CodeGen Function add3.
+    |}) {|
+      assert(add3(4) == 7);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -500,6 +511,7 @@ let suite : OUnit2.test =
     "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
+    "test_add3" >:: test_add3;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     (*"test_map_succ" >:: test_map_succ;*)
