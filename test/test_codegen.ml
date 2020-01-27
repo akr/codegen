@@ -483,7 +483,7 @@ let test_add3 (ctx : test_ctxt) : unit =
       assert(add3(4) == 7);
     |}
 
-(* codegen TestRecord type completely at reduction.
+(* codegen removes TestRecord type completely at reduction.
    So, no inductive type cofiguration required for TestRecord. *)
 let test_reduce_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
