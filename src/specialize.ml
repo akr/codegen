@@ -639,8 +639,9 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (match EConstr.kind sigma f with
           | Construct ((ind, j), _) ->
               let branch = branches.(j-1) in
-              let args' = Array.map (Vars.lift i) (Array.of_list (list_drop ci.ci_npar args)) in
-              reduce_exp env sigma (mkApp (branch, args'))
+              let args = (Array.of_list (list_drop ci.ci_npar args)) in
+              let args = Array.map (Vars.lift i) args in
+              reduce_exp env sigma (mkApp (branch, args))
           | _ -> default ()))
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
