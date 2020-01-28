@@ -810,8 +810,8 @@ let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
 let has_fv sigma term : bool =
   Stdlib.Option.is_some (first_fv sigma term)
 
-let specialize_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
-  (* Feedback.msg_info (Pp.str "specialize_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
+let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
+  (* Feedback.msg_info (Pp.str "replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
@@ -839,7 +839,7 @@ let specialize_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) 
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
-  (*Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
+  (*Feedback.msg_info (Pp.str "replace partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal env sigma func nf_static_args None
     | Some sp_inst -> sp_inst
@@ -857,15 +857,15 @@ let new_env_with_rels (env : Environ.env) : Environ.env =
   !r
 
 (* This function assumes A-normal form.  So this function doesn't traverse subterms of Proj, Cast and App. *)
-let rec specialize (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+let rec replace (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "replace arg: " ++ Printer.pr_econstr_env env sigma term));
-  let result = specialize1 env sigma term in
+  let result = replace1 env sigma term in
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "replace ret: " ++ Printer.pr_econstr_env env sigma result));
-  check_convertible "specialize" (new_env_with_rels env) sigma term result;
+  check_convertible "replace" (new_env_with_rels env) sigma term result;
   result
-and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Int _ | Construct _
@@ -873,30 +873,30 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Lambda (x, ty, e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (x, ty, specialize env2 sigma e)
+      mkLambda (x, ty, replace env2 sigma e)
   | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkFix ((ia, i), (nameary, tyary, Array.map (specialize env2 sigma) funary))
+      mkFix ((ia, i), (nameary, tyary, Array.map (replace env2 sigma) funary))
   | CoFix (i, ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkCoFix (i, (nameary, tyary, Array.map (specialize env2 sigma) funary))
+      mkCoFix (i, (nameary, tyary, Array.map (replace env2 sigma) funary))
   | LetIn (x, e, ty, b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLetIn (x, specialize env sigma e, ty, specialize env2 sigma b)
+      mkLetIn (x, replace env sigma e, ty, replace env2 sigma b)
   | Case (ci, p, item, branches) ->
-      mkCase (ci, p, specialize env sigma item, Array.map (specialize env sigma) branches)
+      mkCase (ci, p, replace env sigma item, Array.map (replace env sigma) branches)
   | App (f, args) ->
-      let f = specialize env sigma f in
+      let f = replace env sigma f in
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
-          (match specialize_app env sigma f' args with
+          (match replace_app env sigma f' args with
           | None -> term
           | Some e -> e)
       | Construct (cstr, u) ->
           let f' = Constr.mkConstruct cstr in
-          (match specialize_app env sigma f' args with
+          (match replace_app env sigma f' args with
           | None -> term
           | Some e -> e)
       | _ -> mkApp (f, args)
@@ -1153,8 +1153,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "normalizeA" term;
   let term = reduce_exp env sigma term in
   debug_specialization env sigma "reduce_exp" term;
-  let term = specialize env sigma term in
-  debug_specialization env sigma "specialize" term;
+  let term = replace env sigma term in
+  debug_specialization env sigma "replace" term;
   let term = expand_eta env sigma term in
   debug_specialization env sigma "expand_eta" term;
   let term = normalize_types env sigma term in
