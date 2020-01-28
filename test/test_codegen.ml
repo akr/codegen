@@ -497,8 +497,12 @@ let test_even_odd (ctx : test_ctxt) : unit =
         | O => false
         | S n' => even n'
         end.
+
+      CodeGen Global Inline even.
+      Definition even3 := even 3.
       CodeGen Function even.
       CodeGen Function odd.
+      CodeGen Function even3.
     |}) {|
       assert(even(0) == true);
       assert(even(1) == false);
@@ -510,6 +514,7 @@ let test_even_odd (ctx : test_ctxt) : unit =
       assert(odd(2) == false);
       assert(odd(3) == true);
       assert(odd(4) == false);
+      assert(even3() == false);
     |}
 
 let test_cast (ctx : test_ctxt) : unit =
