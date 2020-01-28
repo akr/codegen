@@ -20,6 +20,69 @@ open Names
 
 module ConstrMap = HMap.Make(Constr)
 
+(* Set/Unset Debug CodeGen Specialization. *)
+let opt_debug_specialization = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of specialization";
+          optkey   = ["Debug";"CodeGen";"Specialization"];
+          optread  = (fun () -> !opt_debug_specialization);
+          optwrite = (:=) opt_debug_specialization }
+
+(* Set/Unset Debug CodeGen NormalizeK. *)
+let opt_debug_normalizeK = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of normarizeK";
+          optkey   = ["Debug";"CodeGen";"NormalizeK"];
+          optread  = (fun () -> !opt_debug_normalizeK);
+          optwrite = (:=) opt_debug_normalizeK }
+
+(* Set/Unset Debug CodeGen Reduction. *)
+let opt_debug_reduction = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of reduction steps";
+          optkey   = ["Debug";"CodeGen";"Reduction"];
+          optread  = (fun () -> !opt_debug_reduction);
+          optwrite = (:=) opt_debug_reduction }
+
+(* Set/Unset Debug CodeGen ReduceExp. *)
+let opt_debug_reduce_exp = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of reduce_exp";
+          optkey   = ["Debug";"CodeGen";"ReduceExp"];
+          optread  = (fun () -> !opt_debug_reduce_exp);
+          optwrite = (:=) opt_debug_reduce_exp }
+
+(* Set/Unset Debug CodeGen Replace. *)
+let opt_debug_replace = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of replacement of general function by specialized function";
+          optkey   = ["Debug";"CodeGen";"Replace"];
+          optread  = (fun () -> !opt_debug_replace);
+          optwrite = (:=) opt_debug_replace }
+
+(* Set/Unset Debug CodeGen ExpandEta. *)
+let opt_debug_expand_eta = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of expand_eta";
+          optkey   = ["Debug";"CodeGen";"ExpandEta"];
+          optread  = (fun () -> !opt_debug_expand_eta);
+          optwrite = (:=) opt_debug_expand_eta }
+
+(* Set/Unset Debug CodeGen DeleteLet. *)
+let opt_debug_delete_let = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optname  = "Enables printing trace of delete_let";
+          optkey   = ["Debug";"CodeGen";"DeleteLet"];
+          optread  = (fun () -> !opt_debug_delete_let);
+          optwrite = (:=) opt_debug_delete_let }
+
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 type cstr_config = {

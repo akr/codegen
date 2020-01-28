@@ -448,9 +448,11 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
 
 let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (if !opt_debug_normalizeK then
+    Feedback.msg_debug (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = normalizeK1 env sigma term in
-  (* Feedback.msg_info (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  (if !opt_debug_normalizeK then
+    Feedback.msg_debug (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "normalizeK" env sigma term result;
   result
 and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
@@ -602,10 +604,16 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
           | _ -> term))
   | _ -> assert false
 
+let debug_reduction (rule : string) (msg : Pp.t) : unit =
+  if !opt_debug_reduction then
+    Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg)
+
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  Feedback.msg_info (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term);
+  (if !opt_debug_reduce_exp then
+    Feedback.msg_debug (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = reduce_exp1 env sigma term in
-  Feedback.msg_info (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result);
+  (if !opt_debug_reduce_exp then
+    Feedback.msg_debug (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_exp" env sigma term result;
   result
 and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -615,11 +623,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (x,e,t) ->
           let term2 = Vars.lift i e in
-          Feedback.msg_info (Pp.str "reduction rel: " ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          debug_reduction "rel"
+            (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
             Pp.str "->" ++ Pp.fnl () ++
             Printer.pr_econstr_env env sigma term2);
-          check_convertible "reduction_rel" env sigma term term2;
+          check_convertible "reduction(rel)" env sigma term term2;
           reduce_exp env sigma term2)
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Construct _ | Int _ -> term
@@ -636,11 +644,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let t' = Vars.lift n t in
         let b' = Vars.liftn n 2 b in
         let term2 = compose_lets defs (mkLetIn (x, body, t', b')) in
-        Feedback.msg_info (Pp.str "reduction letin: " ++ Pp.fnl () ++
-          Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+        debug_reduction "letin"
+          (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
-        check_convertible "reduction_letin" env sigma term term2;
+        check_convertible "reduction(letin)" env sigma term term2;
         let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
         let env2 = EConstr.push_rel_context ctx env in
         let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
@@ -668,14 +676,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let args = (Array.of_list (list_drop ci.ci_npar args)) in
               let args = Array.map (Vars.lift i) args in
               let term2 = mkApp (branch, args) in
-              Feedback.msg_info (Pp.str "reduction match: " ++ Pp.fnl () ++
-                Pp.str "match-item = " ++
+              debug_reduction "match"
+                (Pp.str "match-item = " ++
                   Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                   Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma branch);
-              check_convertible "reduction_match" env sigma term term2;
+              check_convertible "reduction(match)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
   | Proj (pr,item) ->
@@ -693,14 +701,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           | Construct _ ->
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
-              Feedback.msg_info (Pp.str "reduction proj: " ++ Pp.fnl () ++
-                Pp.str "match-item = " ++
+              debug_reduction "proj"
+                (Pp.str "match-item = " ++
                   Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                   Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
-              check_convertible "reduction_proj" env sigma term term2;
+              check_convertible "reduction(proj)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
@@ -716,11 +724,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       match EConstr.kind sigma f with
       | Lambda (x,t,e) ->
           let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args)) in
-          Feedback.msg_info (Pp.str "reduction beta: " ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          debug_reduction "beta"
+            (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
             Pp.str "->" ++ Pp.fnl () ++
             Printer.pr_econstr_env env sigma term2);
-          check_convertible "reduction_beta" env sigma term term2;
+          check_convertible "reduction(beta)" env sigma term term2;
           reduce_exp env sigma term2
       | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
           if ia.(i) < Array.length args then
@@ -740,14 +748,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                   let f = fary.(i) in
                   let args = Array.map (Vars.lift n) args in
                   let term2 = compose_lets defs (mkApp (f, args)) in
-                  Feedback.msg_info (Pp.str "reduction fix: " ++ Pp.fnl () ++
-                    Pp.str "decreasing-argument = " ++
+                  debug_reduction "fix"
+                    (Pp.str "decreasing-argument = " ++
                       Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
                       Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
-                  check_convertible "reduction_fix" env sigma term term2;
+                  check_convertible "reduction(fix)" env sigma term term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
                   let b = reduce_exp env2 sigma (mkApp (f, args)) in
@@ -831,7 +839,7 @@ let specialize_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) 
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
-  Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);
+  (*Feedback.msg_info (Pp.str "specialize partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
   let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal env sigma func nf_static_args None
     | Some sp_inst -> sp_inst
@@ -850,9 +858,11 @@ let new_env_with_rels (env : Environ.env) : Environ.env =
 
 (* This function assumes A-normal form.  So this function doesn't traverse subterms of Proj, Cast and App. *)
 let rec specialize (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "specialize arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (if !opt_debug_replace then
+    Feedback.msg_debug (Pp.str "replace arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = specialize1 env sigma term in
-  (* Feedback.msg_info (Pp.str "specialize ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  (if !opt_debug_replace then
+    Feedback.msg_debug (Pp.str "replace ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "specialize" (new_env_with_rels env) sigma term result;
   result
 and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -914,9 +924,11 @@ and specialize1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
  * of "app" is not a function type.
  *)
 let rec expand_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "expand_eta arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (if !opt_debug_expand_eta then
+    Feedback.msg_debug (Pp.str "expand_eta arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = expand_eta_body env sigma term in
-  (* Feedback.msg_info (Pp.str "expand_eta ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  (if !opt_debug_expand_eta then
+    Feedback.msg_debug (Pp.str "expand_eta ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "expand_eta" (new_env_with_rels env) sigma term result;
   result
 and expand_eta_body (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -1021,7 +1033,8 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
 
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
-  (* Feedback.msg_info (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (if !opt_debug_delete_let then
+    Feedback.msg_debug (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _
   | Const _ | Construct _ -> fun () -> term
@@ -1089,12 +1102,18 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
       fun () -> mkCoFix (i, (nameary, Array.map (fun g -> g ()) ftyary, Array.map (fun g -> g ()) ffunary))
 
 let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (* Feedback.msg_info (Pp.str "delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (if !opt_debug_delete_let then
+    Feedback.msg_debug (Pp.str "delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term));
   let f = delete_unused_let_rec env sigma [] term in
   let result = f () in
-  (* Feedback.msg_info (Pp.str "delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  (if !opt_debug_delete_let then
+    Feedback.msg_debug (Pp.str "delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "specialize" env sigma term result;
   result
+
+let debug_specialization (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
+  if !opt_debug_specialization then
+    Feedback.msg_debug (Pp.str ("--" ^ step ^ "-->") ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term))
 
 let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let (sp_cfg, sp_inst) =
@@ -1126,23 +1145,22 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
   in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma epartapp);*)
+  debug_specialization env sigma "partial-application" epartapp;
   let term = inline env sigma inline_pred epartapp in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  debug_specialization env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
   let term = normalizeA env sigma term in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  debug_specialization env sigma "normalizeA" term;
   let term = reduce_exp env sigma term in
-  (*Feedback.msg_info (Printer.pr_econstr_env env sigma term);*)
+  debug_specialization env sigma "reduce_exp" term;
   let term = specialize env sigma term in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  debug_specialization env sigma "specialize" term;
   let term = expand_eta env sigma term in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  debug_specialization env sigma "expand_eta" term;
   let term = normalize_types env sigma term in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  debug_specialization env sigma "normalize_types" term;
   let term = delete_unused_let env sigma term in
-  (* Feedback.msg_info (Printer.pr_econstr_env env sigma term); *)
+  debug_specialization env sigma "delete_unused_let" term;
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
   let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
