@@ -604,9 +604,9 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
           | _ -> term))
   | _ -> assert false
 
-let debug_reduction (rule : string) (msg : Pp.t) : unit =
+let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
-    Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg)
+    Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_reduce_exp then
@@ -623,8 +623,8 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (x,e,t) ->
           let term2 = Vars.lift i e in
-          debug_reduction "rel"
-            (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          debug_reduction "rel" (fun () ->
+            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
             Pp.str "->" ++ Pp.fnl () ++
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(rel)" env sigma term term2;
@@ -644,8 +644,8 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let t' = Vars.lift n t in
         let b' = Vars.liftn n 2 b in
         let term2 = compose_lets defs (mkLetIn (x, body, t', b')) in
-        debug_reduction "letin"
-          (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+        debug_reduction "letin" (fun () ->
+          Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
         check_convertible "reduction(letin)" env sigma term term2;
@@ -676,10 +676,10 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let args = (Array.of_list (list_drop ci.ci_npar args)) in
               let args = Array.map (Vars.lift i) args in
               let term2 = mkApp (branch, args) in
-              debug_reduction "match"
-                (Pp.str "match-item = " ++
-                  Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
-                  Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
+              debug_reduction "match" (fun () ->
+                Pp.str "match-item = " ++
+                Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
+                Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma branch);
@@ -701,10 +701,10 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           | Construct _ ->
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
-              debug_reduction "proj"
-                (Pp.str "match-item = " ++
-                  Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
-                  Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
+              debug_reduction "proj" (fun () ->
+                Pp.str "match-item = " ++
+                Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
+                Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
@@ -724,8 +724,8 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       match EConstr.kind sigma f with
       | Lambda (x,t,e) ->
           let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args)) in
-          debug_reduction "beta"
-            (Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          debug_reduction "beta" (fun () ->
+            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
             Pp.str "->" ++ Pp.fnl () ++
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(beta)" env sigma term term2;
@@ -748,10 +748,10 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                   let f = fary.(i) in
                   let args = Array.map (Vars.lift n) args in
                   let term2 = compose_lets defs (mkApp (f, args)) in
-                  debug_reduction "fix"
-                    (Pp.str "decreasing-argument = " ++
-                      Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
-                      Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
+                  debug_reduction "fix" (fun () ->
+                    Pp.str "decreasing-argument = " ++
+                    Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
+                    Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
