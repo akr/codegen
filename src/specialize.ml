@@ -530,18 +530,34 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
       if isRel sigma e then term
       else wrap_lets [e] (mkProj (proj, mkRel 1))
 
-let rec decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
-  match EConstr.kind sigma term with
-  | LetIn (x, e, ty, b) ->
-      let (defs, body) = decompose_lets sigma b in
-      ((x, e, ty) :: defs, body)
-  | _ -> ([], term)
+(* The innermost let binding is appeared first in the result:
+
+  decompose_lets
+    [let x : nat := 0 in
+     let y : nat := 1 in
+     let z : nat := 2 in
+    body]
+
+  returns
+
+  ([(z,2,nat), (y,1,nat), (x,0,nat)], body)
+
+  This order of bindings is same as Constr.rel_context used by Environ.push_rel_context.
+*)
+let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
+  let rec aux term defs =
+    match EConstr.kind sigma term with
+    | LetIn (x, e, ty, b) ->
+        aux b ((x, e, ty) :: defs)
+    | _ -> (defs, term)
+  in
+  aux term []
 
 let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
   match defs with
   | [] -> body
   | (x,e,ty) :: rest ->
-      mkLetIn (x, e, ty, compose_lets rest body)
+      compose_lets rest (mkLetIn (x, e, ty, body))
 
 let linearize_top_let (sigma : Evd.evar_map) (x : Name.t Context.binder_annot) (e : EConstr.t) (ty : EConstr.types) (b : EConstr.t) : EConstr.t =
   let (defs, body) = decompose_lets sigma e in
@@ -626,7 +642,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           Printer.pr_econstr_env env sigma term2);
         check_convertible "reduction_letin" env sigma term term2;
         let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
-        let env2 = EConstr.push_rel_context (List.rev ctx) env in
+        let env2 = EConstr.push_rel_context ctx env in
         let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
         let env3 = EConstr.push_rel decl env2 in
         let b'' = reduce_exp env3 sigma b' in
@@ -720,7 +736,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                     (fun j x t -> (j+1, (x, Vars.lift j (mkFix ((ia,j), prec)), Vars.lift j t)))
                     0 nary tary
                   in
-                  let defs = Array.to_list defs in
+                  let defs = Array.to_list (array_rev defs) in
                   let f = fary.(i) in
                   let args = Array.map (Vars.lift n) args in
                   let term2 = compose_lets defs (mkApp (f, args)) in
@@ -732,7 +748,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
                   check_convertible "reduction_fix" env sigma term term2;
-                  let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) (List.rev defs) in
+                  let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
                   let b = reduce_exp env2 sigma (mkApp (f, args)) in
                   compose_lets defs b
