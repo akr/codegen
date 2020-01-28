@@ -483,6 +483,17 @@ let test_add3 (ctx : test_ctxt) : unit =
       assert(add3(4) == 7);
     |}
 
+let test_mul3 (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition mul3 (n : nat) : nat := 3 * n.
+      CodeGen Global Inline Nat.mul.
+      CodeGen Function mul3.
+    |}) {|
+      assert(mul3(4) == 12);
+    |}
+
 let test_even_odd (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -573,6 +584,7 @@ let suite : OUnit2.test =
     "test_list_bool" >:: test_list_bool;
     "test_sum" >:: test_sum;
     "test_add3" >:: test_add3;
+    "test_mul3" >:: test_mul3;
     "test_even_odd" >:: test_even_odd;
     "test_cast" >:: test_cast;
     "test_reduce_proj" >:: test_reduce_proj;
