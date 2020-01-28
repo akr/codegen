@@ -540,7 +540,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
 
   returns
 
-  ([(z,2,nat), (y,1,nat), (x,0,nat)], body)
+  ([(z,2,nat); (y,1,nat); (x,0,nat)], body)
 
   This order of bindings is same as Constr.rel_context used by Environ.push_rel_context.
 *)
