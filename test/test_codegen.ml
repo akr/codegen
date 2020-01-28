@@ -528,6 +528,16 @@ let test_even_odd (ctx : test_ctxt) : unit =
       assert(even3() == false);
     |}
 
+let test_app_let (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition foo := (let x := 1 in Nat.add x) 2.
+      CodeGen Function foo.
+    |}) {|
+      assert(foo() == 3);
+    |}
+
 let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -586,6 +596,7 @@ let suite : OUnit2.test =
     "test_add3" >:: test_add3;
     "test_mul3" >:: test_mul3;
     "test_even_odd" >:: test_even_odd;
+    "test_app_let" >:: test_app_let;
     "test_cast" >:: test_cast;
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;

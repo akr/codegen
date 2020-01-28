@@ -737,6 +737,17 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(beta)" env sigma term term2;
           reduce_exp env sigma term2
+      | LetIn (x,e,t,b) ->
+          let args' = Array.map (Vars.lift 1) args in
+          let term2 = mkLetIn (x,e,t, mkApp (b, args')) in
+          debug_reduction "app-let" (fun () ->
+            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+            Pp.str "->" ++ Pp.fnl () ++
+            Printer.pr_econstr_env env sigma term2);
+          check_convertible "reduction(app-let)" env sigma term term2;
+          let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+          let env2 = EConstr.push_rel decl env in
+          mkLetIn (x,e,t, reduce_exp env2 sigma (mkApp (b, args')))
       | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
           if ia.(i) < Array.length args then
             let decarg_var = args.(ia.(i)) in
