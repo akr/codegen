@@ -602,12 +602,13 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
           (match Constr.kind e with
           | Rel j -> mkRel (i + j)
           | _ -> term))
-  | _ -> assert false
+  | _ -> term
 
 let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
+(* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_reduce_exp then
     Feedback.msg_debug (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term));
@@ -628,7 +629,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             Pp.str "->" ++ Pp.fnl () ++
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(rel)" env sigma term term2;
-          reduce_exp env sigma term2)
+          term2)
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Construct _ | Int _ -> term
   | Cast (e,ck,t) -> reduce_exp env sigma e
@@ -653,13 +654,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let env2 = EConstr.push_rel_context ctx env in
         let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
         let env3 = EConstr.push_rel decl env2 in
-        let b'' = reduce_exp env3 sigma b' in
-        compose_lets defs
-          (mkLetIn (x, body, t', b''))
+        compose_lets defs (mkLetIn (x, body, t', reduce_exp env3 sigma b'))
       else
-        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
         let env2 = EConstr.push_rel decl env in
-        mkLetIn (x, reduce_exp env sigma e, t, reduce_exp env2 sigma b)
+        mkLetIn (x, e', t, reduce_exp env2 sigma b)
   | Case (ci,p,item,branches) ->
       let item' = reduce_arg env sigma item in
       let default () =
@@ -682,7 +681,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
-                Printer.pr_econstr_env env sigma branch);
+                Printer.pr_econstr_env env sigma term2);
               check_convertible "reduction(match)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
@@ -702,7 +701,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
               debug_reduction "proj" (fun () ->
-                Pp.str "match-item = " ++
+                Pp.str "proj-item = " ++
                 Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
@@ -718,7 +717,15 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let env2 = push_rec_types prec env in
       mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
   | App (f,args) ->
-      let f = reduce_exp env sigma f in
+      let f =
+        if isRel sigma f then
+          let m = destRel sigma f in
+          match EConstr.lookup_rel m env with
+          | Context.Rel.Declaration.LocalAssum _ -> f
+          | Context.Rel.Declaration.LocalDef (x,e,t) -> Vars.lift m e
+        else
+          reduce_exp env sigma f
+      in
       let args = Array.map (reduce_arg env sigma) args in
       let default () = mkApp (f, args) in
       match EConstr.kind sigma f with
@@ -745,9 +752,9 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                     0 nary tary
                   in
                   let defs = Array.to_list (array_rev defs) in
-                  let f = fary.(i) in
+                  let g = fary.(i) in
                   let args = Array.map (Vars.lift n) args in
-                  let term2 = compose_lets defs (mkApp (f, args)) in
+                  let term2 = compose_lets defs (mkApp (g, args)) in
                   debug_reduction "fix" (fun () ->
                     Pp.str "decreasing-argument = " ++
                     Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
@@ -758,7 +765,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                   check_convertible "reduction(fix)" env sigma term term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
-                  let b = reduce_exp env2 sigma (mkApp (f, args)) in
+                  let b = reduce_exp env2 sigma (mkApp (g, args)) in
                   compose_lets defs b
                 else
                   default ())
