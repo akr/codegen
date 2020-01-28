@@ -533,18 +533,20 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
       else wrap_lets [e] (mkProj (proj, mkRel 1))
 
 (* The innermost let binding is appeared first in the result:
+  Here, "exp" means AST of exp, not string.
 
-  decompose_lets
-    [let x : nat := 0 in
-     let y : nat := 1 in
-     let z : nat := 2 in
-    body]
+    decompose_lets
+      "let x : nat := 0 in
+       let y : nat := 1 in
+       let z : nat := 2 in
+      body"
 
   returns
 
-  ([(z,2,nat); (y,1,nat); (x,0,nat)], body)
+    ([("z","2","nat"); ("y","1","nat"); ("x","0","nat")], "body")
 
-  This order of bindings is same as Constr.rel_context used by Environ.push_rel_context.
+  This order of bindings is same as Constr.rel_context used by
+  Environ.push_rel_context.
 *)
 let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
   let rec aux term defs =
