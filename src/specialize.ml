@@ -1055,6 +1055,42 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let funary' = Array.map (normalize_types env2 sigma) funary in
       mkCoFix (i, (nameary, tyary', funary'))
 
+let rec reduce_function (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      (match EConstr.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum _ -> term
+      | Context.Rel.Declaration.LocalDef (n,e,t) ->
+          Vars.lift i e)
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
+  | Cast (e,ck,t) -> reduce_function env sigma e
+  | App (f, args) ->
+      let f' = reduce_function env sigma f in
+      mkApp (f', args)
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = reduce_function env sigma e in
+      let b' = reduce_function env2 sigma b in
+      mkLetIn (x, e', t, b')
+  | Case (ci, p, item, branches) ->
+      let branches' = Array.map (reduce_function env sigma) branches in
+      mkCase (ci, p, item, branches')
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = reduce_function env2 sigma e in
+      mkLambda (x, t, e')
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (reduce_function env2 sigma) fary in
+      mkFix ((ia, i), (nary, tary, fary'))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (reduce_function env2 sigma) fary in
+      mkCoFix (i, (nary, tary, fary'))
+
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
   (if !opt_debug_delete_let then
@@ -1183,6 +1219,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "expand_eta" term;
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
+  let term = reduce_function env sigma term in
+  debug_specialization env sigma "reduce_function" term;
   let term = delete_unused_let env sigma term in
   debug_specialization env sigma "delete_unused_let" term;
   let univs = Evd.univ_entry ~poly:false sigma in
