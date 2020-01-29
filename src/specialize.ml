@@ -610,6 +610,123 @@ let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
+(*
+let decompose_lam_upto_n (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Names.Name.t Context.binder_annot * EConstr.types) list * EConstr.t =
+  let rec f n term assums =
+    if n <= 0 then
+      (assums, term)
+    else
+      match EConstr.kind sigma term with
+      | Lambda (x,t,b) -> f (n-1) b ((x,t) :: assums)
+      | _ -> (assums, term)
+  in
+  f n term []
+*)
+
+(*
+let my_substnl (sigma : Evd.evar_map) (subst : Vars.substl) (k : int) (term : EConstr.t) : EConstr.t =
+  let m = List.length subst in
+  let rec aux j term =
+    match EConstr.kind sigma term with
+    | Rel i ->
+        if i <= j + k then
+          term
+        else if i <= j + k + m then
+          Vars.lift j (List.nth subst (i-j-k-1))
+        else
+          mkRel (i-m)
+    | Var _ | Meta _ | Sort _ | Ind _ | Int _
+    | Const _ | Construct _ -> term
+    | Evar (ev, es) -> mkEvar (ev, Array.map (aux j) es)
+    | Proj (proj, e) -> mkProj (proj, aux j e)
+    | Cast (e,ck,t) -> mkCast (aux j e, ck, aux j t)
+    | App (f, args) -> mkApp (aux j f, Array.map (aux j) args)
+    | LetIn (x,e,t,b) -> mkLetIn (x, aux j e, aux j t, aux (j+1) b)
+    | Case (ci, p, item, branches) ->
+        mkCase (ci, aux j p, aux j item, Array.map (aux j) branches)
+    | Prod (x,t,b) ->
+        mkProd (x, aux j t, aux (j+1) b)
+    | Lambda (x,t,b) ->
+        mkLambda (x, aux j t, aux (j+1) b)
+    | Fix ((ia, i), (nary, tary, fary)) ->
+        mkFix ((ia, i), (nary, Array.map (aux j) tary,
+                               Array.map (aux (j + Array.length fary)) fary))
+    | CoFix (i, (nary, tary, fary)) ->
+        mkCoFix (i, (nary, Array.map (aux j) tary,
+                           Array.map (aux (j + Array.length fary)) fary))
+  in
+  aux 0 term
+*)
+
+(*
+let my_substnl (env : Environ.env) (sigma : Evd.evar_map) (subst : Vars.substl) (k : int) (term : EConstr.t) : EConstr.t =
+  let env0 = env in
+  let m = List.length subst in
+  let rec aux env j term =
+    match EConstr.kind sigma term with
+    | Rel i ->
+        if i <= j + k then
+          (Feedback.msg_info (Pp.str "my_substnl(rel:inner): " ++
+            Printer.pr_econstr_env env sigma term);
+          term)
+        else if i <= j + k + m then
+          let term2 = List.nth subst (i-j-k-1) in
+          (Feedback.msg_info (Pp.str "my_substnl(rel:target): " ++
+            Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
+            Pp.str "->" ++ Pp.spc () ++
+            Printer.pr_econstr_env env0 sigma term2);
+          let term2 = Vars.lift j term2 in
+          term2)
+        else
+          (Feedback.msg_info (Pp.str "my_substnl(rel:outer): " ++
+            Printer.pr_econstr_env env sigma term);
+          mkRel (i-m))
+    | Var _ | Meta _ | Sort _ | Ind _ | Int _
+    | Const _ | Construct _ -> term
+    | Evar (ev, es) -> mkEvar (ev, Array.map (aux env j) es)
+    | Proj (proj, e) -> mkProj (proj, aux env j e)
+    | Cast (e,ck,t) -> mkCast (aux env j e, ck, aux env j t)
+    | App (f, args) -> mkApp (aux env j f, Array.map (aux env j) args)
+    | LetIn (x,e,t,b) ->
+        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let env2 = EConstr.push_rel decl env in
+        mkLetIn (x, aux env j e, aux env j t, aux env2 (j+1) b)
+    | Case (ci, p, item, branches) ->
+        mkCase (ci, aux env j p, aux env j item, Array.map (aux env j) branches)
+    | Prod (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        mkProd (x, aux env j t, aux env2 (j+1) b)
+    | Lambda (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        mkLambda (x, aux env j t, aux env2 (j+1) b)
+    | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+        let env2 = push_rec_types prec env in
+        mkFix ((ia, i), (nary, Array.map (aux env j) tary,
+                               Array.map (aux env2 (j + Array.length fary)) fary))
+    | CoFix (i, ((nary, tary, fary) as prec)) ->
+        let env2 = push_rec_types prec env in
+        mkCoFix (i, (nary, Array.map (aux env j) tary,
+                           Array.map (aux env2 (j + Array.length fary)) fary))
+  in
+  (
+    List.iteri
+      (fun i e ->
+        Feedback.msg_info (Pp.str "my_substnl subst[" ++ Pp.int i ++ Pp.str "]:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma e))
+      subst;
+    Feedback.msg_info (Pp.str "my_substnl k:" ++ Pp.spc () ++ Pp.int k);
+    Feedback.msg_info (Pp.str "my_substnl term:" ++ Pp.spc () ++
+    Printer.pr_econstr_env env sigma term);
+  aux env 0 term)
+
+let lambda_applist (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args : EConstr.t list) : EConstr.t =
+  let n = List.length args in
+  let (assums, body) = decompose_lam_upto_n sigma n f in
+  let m = List.length assums in
+  my_substnl env sigma (List.rev (CList.firstn m args)) 0 body
+*)
+
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_reduce_exp then
@@ -622,16 +739,16 @@ let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
 and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
-      (match EConstr.lookup_rel i env with
-      | Context.Rel.Declaration.LocalAssum _ -> term
-      | Context.Rel.Declaration.LocalDef (x,e,t) ->
-          let term2 = Vars.lift i e in
-          debug_reduction "rel" (fun () ->
-            Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
-            Pp.str "->" ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term2);
-          check_convertible "reduction(rel)" env sigma term term2;
-          term2)
+      let term2 = reduce_arg env sigma term in
+      if destRel sigma term2 <> i then
+        (debug_reduction "rel" (fun () ->
+          Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          Pp.str "->" ++ Pp.fnl () ++
+          Printer.pr_econstr_env env sigma term2);
+        check_convertible "reduction(rel)" env sigma term term2;
+        term2)
+      else
+        term
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Construct _ | Int _ -> term
   | Cast (e,ck,t) -> reduce_exp env sigma e
@@ -719,20 +836,25 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let env2 = push_rec_types prec env in
       mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
   | App (f,args) ->
-      let f =
+      (*Feedback.msg_info (Pp.str "reduce_exp App f1:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f);*)
+      let f = reduce_exp env sigma f in
+      (*Feedback.msg_info (Pp.str "reduce_exp App f2:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f);*)
+      let f' =
         if isRel sigma f then
           let m = destRel sigma f in
           match EConstr.lookup_rel m env with
           | Context.Rel.Declaration.LocalAssum _ -> f
           | Context.Rel.Declaration.LocalDef (x,e,t) -> Vars.lift m e
         else
-          reduce_exp env sigma f
+          f
       in
+      (*Feedback.msg_info (Pp.str "reduce_exp App f':" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f');*)
       let args = Array.map (reduce_arg env sigma) args in
       let default () = mkApp (f, args) in
-      match EConstr.kind sigma f with
+      match EConstr.kind sigma f' with
       | Lambda (x,t,e) ->
-          let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args)) in
+          (* let term2 = lambda_applist env sigma f (Array.to_list args) in *)
+          let term2 = Reductionops.beta_applist sigma (f', (Array.to_list args)) in
           debug_reduction "beta" (fun () ->
             Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
             Pp.str "->" ++ Pp.fnl () ++
