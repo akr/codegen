@@ -782,7 +782,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                   check_convertible "reduction(fix)" env sigma term term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
-                  let b = reduce_exp env2 sigma (mkApp (g, args)) in
+                  let b = reduce_exp env2 sigma (Reductionops.beta_applist sigma (g, Array.to_list args)) in
                   compose_lets defs b
                 else
                   default ())
