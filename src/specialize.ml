@@ -610,6 +610,138 @@ let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     Feedback.msg_debug (Pp.str ("reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
+let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) : (int*int) option =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Const _ | Construct _ -> None
+  | Rel i ->
+      if numlocal < i then
+        Some (i-numlocal,i-numlocal)
+      else
+        None
+  | Evar (ev, es) ->
+      fv_range_array sigma numlocal es
+  | Proj (proj, e) ->
+      fv_range_rec sigma numlocal e
+  | Cast (e,ck,t) ->
+      merge_range
+        (fv_range_rec sigma numlocal e)
+        (fv_range_rec sigma numlocal t)
+  | App (f, args) ->
+      merge_range
+        (fv_range_rec sigma numlocal f)
+        (fv_range_array sigma numlocal args)
+  | LetIn (x,e,t,b) ->
+      merge_range3
+        (fv_range_rec sigma numlocal e)
+        (fv_range_rec sigma numlocal t)
+        (fv_range_rec sigma (numlocal+1) b)
+  | Case (ci, p, item, branches) ->
+      merge_range3
+        (fv_range_rec sigma numlocal p)
+        (fv_range_rec sigma numlocal item)
+        (fv_range_array sigma numlocal branches)
+  | Prod (x,t,b) ->
+      merge_range
+        (fv_range_rec sigma numlocal t)
+        (fv_range_rec sigma (numlocal+1) b)
+  | Lambda (x,t,b) ->
+      merge_range
+        (fv_range_rec sigma numlocal t)
+        (fv_range_rec sigma (numlocal+1) b)
+  | Fix ((ia, i), (nary, tary, fary)) ->
+      merge_range
+        (fv_range_array sigma numlocal tary)
+        (fv_range_array sigma (numlocal + Array.length fary) fary)
+  | CoFix (i, (nary, tary, fary)) ->
+      merge_range
+        (fv_range_array sigma numlocal tary)
+        (fv_range_array sigma (numlocal + Array.length fary) fary)
+and fv_range_array (sigma : Evd.evar_map) (numlocal : int) (terms : EConstr.t array) : (int*int) option =
+  Array.fold_left
+    (fun acc term -> merge_range acc (fv_range_rec sigma numlocal term))
+    None terms
+
+let fv_range (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
+  fv_range_rec sigma 0 term
+
+let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
+    (lift : int -> EConstr.t -> EConstr.t) (ia : int array)
+    (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) =
+  (*Feedback.msg_info (Pp.str "test_bounded_fix: k=" ++ Pp.int k ++ Pp.spc () ++
+    Printer.pr_econstr_env env sigma (mkFix ((ia,0),prec)));*)
+  let n = Array.length ia in
+  let vals_opt =
+    let rec loop j acc =
+      if n <= j then
+        Some acc
+      else
+        match EConstr.lookup_rel (k + j) env with
+        | Context.Rel.Declaration.LocalAssum _ -> None
+        | Context.Rel.Declaration.LocalDef (_,e,_) ->
+            match EConstr.kind sigma e with
+            | Fix ((ia', i'), prec') ->
+                if i' = n - j - 1 then
+                  loop (j+1) (e :: acc)
+                else
+                  None
+            | _ -> None
+
+    in
+    loop 0 []
+  in
+  match vals_opt with
+  | None -> false
+  | Some vals ->
+      CList.for_all_i
+        (fun i e -> EConstr.eq_constr sigma e
+          (lift (-(k+n-1-i)) (mkFix ((ia, i), prec))))
+        0 vals
+
+(* This function returns (Some i) where i is the de Bruijn index that
+    env[i] is (mkFix ((ia,0),prec)),
+    env[i-1] is (mkFix ((ia,1),prec)), ...
+    env[i-n+1] is (mkFix ((ia,n-1),prec))
+  where n is the nubmer of the mutually recursive functions (i.e. the length of ia).
+
+  None is returned otherwise.
+  *)
+let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ia : int array)
+    (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) :
+    int option =
+  (*Feedback.msg_info (Pp.str "find_bounded_fix:" ++ Pp.spc () ++
+    Printer.pr_econstr_env env sigma (mkFix ((ia,0),prec)));*)
+  let (nary, tary, fary) = prec in
+  let n = Array.length fary in
+  let nb_rel = Environ.nb_rel env in
+  match fv_range sigma (mkFix ((ia,0),prec)) with
+  | None ->
+      (*Feedback.msg_info (Pp.str "find_bounded_fix: fv_range=None");*)
+      let lift _ term = term in
+      let rec loop k =
+        if nb_rel < k + n - 1 then
+          None
+        else
+          if test_bounded_fix env sigma k lift ia prec then
+            Some (k + n - 1)
+          else
+            loop (k+1)
+      in
+      loop 1
+  | Some (fv_min, fv_max) ->
+      (*Feedback.msg_info (Pp.str "find_bounded_fix: fv_range=Some (" ++ Pp.int fv_min ++ Pp.str "," ++ Pp.int fv_max ++ Pp.str ")");*)
+      let lift = Vars.lift in
+      let rec loop k =
+        if fv_min <= k + n - 1 then
+          None
+        else
+          if test_bounded_fix env sigma k lift ia prec then
+            Some (k + n - 1)
+          else
+            loop (k+1)
+      in
+      loop 1
+
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_reduce_exp then
@@ -769,26 +901,43 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f_nf : EConstr.t) (ar
             let (decarg_f, decarg_args) = decompose_app sigma decarg_val in
             if isConstruct sigma decarg_f then
               let n = Array.length fary_nf in
-              let (_, defs) = CArray.fold_left2_map
-                (fun j x t -> (j+1, (x, Vars.lift j (mkFix ((ia,j), prec)), Vars.lift j t)))
-                0 nary tary
-              in
-              let defs = Array.to_list (array_rev defs) in
               let fi_nf = fary_nf.(i) in
-              let args_nf_lifted = Array.map (Vars.lift n) args_nf in
-              let term2 = compose_lets defs (mkApp (fi_nf, args_nf_lifted)) in
-              debug_reduction "fix" (fun () ->
-                Pp.str "decreasing-argument = " ++
-                Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
-                Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
-                Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
-                Pp.str "->" ++ Pp.fnl () ++
-                Printer.pr_econstr_env env sigma term2);
-              check_convertible "reduction(fix)" env sigma term1 term2;
-              let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
-              let env2 = EConstr.push_rel_context ctx env in
-              let b = reduce_app env2 sigma fi_nf args_nf_lifted in
-              compose_lets defs b
+              match find_bounded_fix env sigma ia prec with
+              | Some bounded_fix ->
+                  (*Feedback.msg_info (Pp.str "bounded_fix: " ++ Printer.pr_rel_decl (Environ.pop_rel_context bounded_fix env) sigma (Environ.lookup_rel bounded_fix env));*)
+                  let fi_nf_subst = Vars.substl (List.map (fun j -> mkRel j) (iota_list (bounded_fix-n+1) n)) fi_nf in
+                  let term2 = mkApp (fi_nf_subst, args_nf) in
+                  debug_reduction "fix-reuse-let" (fun () ->
+                    Pp.str "decreasing-argument = " ++
+                    Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
+                    Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
+                    Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
+                    Pp.str "->" ++ Pp.fnl () ++
+                    Printer.pr_econstr_env env sigma term2);
+                  check_convertible "reduction(fix-reuse-let)" env sigma term1 term2;
+                  reduce_app env sigma fi_nf_subst args_nf
+              | None ->
+                  let args_nf_lifted = Array.map (Vars.lift n) args_nf in
+                  let (_, defs) = CArray.fold_left2_map
+                    (fun j x t -> (j+1, (x, Vars.lift j (mkFix ((ia,j), prec)), Vars.lift j t)))
+                    0 nary tary
+                  in
+                  let defs = Array.to_list (array_rev defs) in
+
+                  let term2 = compose_lets defs (mkApp (fi_nf, args_nf_lifted)) in
+                  debug_reduction "fix-new-let" (fun () ->
+                    Pp.str "decreasing-argument = " ++
+                    Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
+                    Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
+                    Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
+                    Pp.str "->" ++ Pp.fnl () ++
+                    Printer.pr_econstr_env env sigma term2);
+                  check_convertible "reduction(fix-new-let)" env sigma term1 term2;
+                  let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
+                  let env2 = EConstr.push_rel_context ctx env in
+                  let b = reduce_app env2 sigma fi_nf args_nf_lifted in
+                  compose_lets defs b
+
             else
               default ())
       else

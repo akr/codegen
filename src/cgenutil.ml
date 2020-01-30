@@ -149,6 +149,18 @@ let array_option_exists p a =
 let int_pred i = i - 1
 let int_succ i = i + 1
 
+let merge_range (r1 : (int*int) option) (r2 : (int*int) option) : (int*int) option =
+  match r1 with
+  | None -> r2
+  | Some (min1,max1) ->
+      match r2 with
+      | None -> r1
+      | Some (min2,max2) ->
+          Some ((min min1 min2), (max max1 max2))
+
+let merge_range3 (r1 : (int*int) option) (r2 : (int*int) option) (r3 : (int*int) option) : (int*int) option =
+  merge_range (merge_range r1 r2) r3
+
 let pp_join_ary sep ary =
   if Array.length ary = 0 then
     mt ()
