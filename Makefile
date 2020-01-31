@@ -17,6 +17,7 @@ clean :
 	rm -f \
 	  Makefile.coq \
 	  Makefile.coq.conf \
+	  src/g_codegen.ml \
 	  src/*.o \ \
 	  src/*.cmi \
 	  src/*.cmo \
