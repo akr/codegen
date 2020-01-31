@@ -586,9 +586,8 @@ let mono_check_const env sigma ctntu =
 let exists_name id =
   try
     Declare.check_exists id;
-    true
-  with Declare.AlreadyDeclared _ -> false
-
+    false
+  with Declare.AlreadyDeclared _ -> true
 
 let find_unused_name id =
   if not (exists_name id) then
