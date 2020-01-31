@@ -17,7 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open Names
-open Globnames
+open GlobRef
 open Pp
 open CErrors
 open EConstr
@@ -49,6 +49,8 @@ let rec copy_term sigma term =
       mkProj (proj, copy_term sigma expr)
   | Constr.Int n ->
       mkInt n
+  | Constr.Float n ->
+      mkFloat n
 
 let rec subst_term sigma context term =
   match EConstr.kind sigma term with
@@ -81,6 +83,7 @@ let rec subst_term sigma context term =
   | Constr.Proj (proj, expr) ->
       mkProj (proj, subst_term sigma context expr)
   | Constr.Int n -> mkInt n
+  | Constr.Float n -> mkFloat n
 
 (*let rec has_rel term =
   match Term.kind_of_term term with
@@ -133,6 +136,7 @@ let rec has_sort sigma term =
   | Constr.Proj (proj, expr) ->
       has_sort sigma expr
   | Constr.Int n -> false
+  | Constr.Float n -> false
 
 let deanonymize_term env sigma term =
   let rec r env term =
@@ -171,6 +175,7 @@ let deanonymize_term env sigma term =
     | Constr.Proj (proj, expr) ->
         mkProj (proj, r env expr)
     | Constr.Int n -> term
+    | Constr.Float n -> term
   in
   r env term
 
@@ -219,6 +224,7 @@ let expand_type env sigma term =
     | Constr.Proj (proj, expr) ->
         mkProj (proj, r env expr)
     | Constr.Int n -> term
+    | Constr.Float n -> term
   in
   r env term
 
@@ -407,6 +413,7 @@ let rec mono_local_rec sigma context term =
       fun acc ->
       mkProj (proj, expr' acc)
   | Constr.Int n -> fun acc -> mkInt n
+  | Constr.Float n -> fun acc -> mkFloat n
 
 let mono_local sigma term = mono_local_rec sigma [] term [0]
 
@@ -496,6 +503,7 @@ and stmt_rec env sigma term =
       hoist_term1 env sigma (simple_arg_p sigma) expr
         (fun env' expr' shifter -> mkProj (proj, expr'))
   | Constr.Int n -> term
+  | Constr.Float n -> term
 
 let stmt term =
   let env = Global.env () in
@@ -533,6 +541,7 @@ let rec seq_let sigma term =
       mkCoFix (i, (nameary, tyary, Array.map (seq_let sigma) funary))
   | Constr.Proj (proj, expr) -> term
   | Constr.Int n -> term
+  | Constr.Float n -> term
 
 let mangle_function ctnt type_args =
   let label = Constant.label ctnt in
@@ -574,13 +583,20 @@ let mono_check_const env sigma ctntu =
   else
     ()
 
+let exists_name id =
+  try
+    Declare.check_exists id;
+    true
+  with Declare.AlreadyDeclared _ -> false
+
+
 let find_unused_name id =
-  if not (Declare.exists_name id) then
+  if not (exists_name id) then
     id
   else
     let rec loop i =
       let id' = (Id.of_string (Id.to_string id ^ "_" ^ string_of_int i)) in
-      if not (Declare.exists_name id') then
+      if not (exists_name id') then
         id'
       else loop (i+1)
     in
@@ -608,9 +624,10 @@ let rec mono_global_def env (sigma : Evd.evar_map) fctntu type_args =
       Feedback.msg_info (str "mono_global_def:" ++ Printer.pr_constant env fctnt ++ str ":5");
       let term = deanonymize_term env sigma term in
       let id = find_unused_name (mangle_function fctnt type_args) in
-      let constant = Declare.declare_definition id
-        (EConstr.to_constr sigma term,
-         Entries.Monomorphic_entry (Univ.ContextSet.add_constraints uconstraints Univ.ContextSet.empty)) in
+      let univs = Evd.univ_entry ~poly:false sigma in
+      let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
+      let kind = Decls.IsDefinition Decls.Definition in
+      let constant = Declare.declare_constant ~name:id ~kind:kind defent in
       Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++
         Printer.pr_constr_env env sigma (EConstr.to_constr sigma (mkApp ((mkConstU ((fun (a, b) -> (a, EInstance.make b)) fctntu)), type_args))));
       mono_global_visited := ((ConstRef fctnt, type_args), constant) :: !mono_global_visited;
@@ -635,9 +652,10 @@ and mono_constr_def env sigma fcstr mutind i j param_args =
     let term = mkApp (mkConstruct fcstr, param_args) in
     let term = deanonymize_term env sigma term in
     let id = find_unused_name (Id.of_string (mangle_constructor fcstr param_args)) in
-    let constant = Declare.declare_definition id
-      (EConstr.to_constr sigma term,
-       Entries.Monomorphic_entry Univ.ContextSet.empty) in
+    let univs = Evd.univ_entry ~poly:false sigma in
+    let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
+    let kind = Decls.IsDefinition Decls.Definition in
+    let constant = Declare.declare_constant ~name:id ~kind:kind defent in
     mono_global_visited := ((ConstructRef fcstr, param_args), constant) :: !mono_global_visited;
     constant
 
@@ -691,6 +709,7 @@ and mono_global env sigma gctnt term =
   | Constr.Proj (proj, expr) ->
       mkProj (proj, mono_global env sigma gctnt expr)
   | Constr.Int n -> mkInt n
+  | Constr.Float n -> mkFloat n
 
 let mono env sigma gctnt term = mono_global env sigma gctnt (mono_local sigma term)
 
@@ -711,14 +730,15 @@ let terminate_mono_global_def env sigma gref type_args =
   if List.mem_assoc (gref, type_args) !mono_global_visited then
     user_err (Pp.str "already defined")
   else
-    let fctnt = destConstRef gref in
+    let fctnt = Globnames.destConstRef gref in
     let id_term = mkApp ((mkConst fctnt), type_args) in
     let term = id_term in
     let term = deanonymize_term env sigma term in
     let id = find_unused_name (mangle_function fctnt type_args) in
-    let constant = Declare.declare_definition id
-      (EConstr.to_constr sigma term,
-       Entries.Monomorphic_entry Univ.ContextSet.empty) in
+    let univs = Evd.univ_entry ~poly:false sigma in
+    let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
+    let kind = Decls.IsDefinition Decls.Definition in
+    let constant = Declare.declare_constant ~name:id ~kind:kind defent in
     Feedback.msg_info (Id.print id ++ spc () ++ str ":=" ++ spc() ++ Printer.pr_constr_env env sigma (EConstr.to_constr sigma term));
     mono_global_visited := ((gref, type_args), constant) :: !mono_global_visited
 

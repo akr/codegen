@@ -17,7 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open Names
-open Globnames
+open GlobRef
 open Pp
 
 (* open Term *)
@@ -289,9 +289,9 @@ let specialization_instance_internal
             )
       in
       let univs = Evd.univ_entry ~poly:false sigma in
-      let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
-      let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
-      let declared_ctnt = Declare.declare_constant p_id (defent, kind) in
+      let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
+      let kind = Decls.IsDefinition Decls.Definition in
+      let declared_ctnt = Declare.declare_constant ~name:p_id ~kind:kind defent in
       let sp_inst = {
         sp_partapp = partapp;
         sp_static_arguments = static_args;
@@ -474,7 +474,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
   in
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Ind _
-  | Const _ | Construct _ | Int _ | Prod _ -> term
+  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> term
   | Lambda (x,ty,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
@@ -572,7 +572,7 @@ let linearize_top_let (sigma : Evd.evar_map) (x : Name.t Context.binder_annot) (
 let rec linearize_lets_rec (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Cast _ | Prod _ | App _
-  | Const _ | Ind _ | Construct _ | Proj _ | Int _ -> term
+  | Const _ | Ind _ | Float _ | Construct _ | Proj _ | Int _ -> term
   | Lambda (x, ty, b) ->
       mkLambda (x, ty, linearize_lets_rec sigma b)
   | Fix ((ia, i), (nameary, tyary, funary)) ->
@@ -612,7 +612,7 @@ let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
 
 let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) : (int*int) option =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ -> None
   | Rel i ->
       if numlocal < i then
@@ -765,7 +765,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       else
         term
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
-  | Const _ | Ind _ | Construct _ | Int _ -> term
+  | Const _ | Ind _ | Construct _ | Int _ | Float _ -> term
   | Cast (e,ck,t) -> reduce_exp env sigma e
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
@@ -946,7 +946,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f_nf : EConstr.t) (ar
 
 let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ -> None
   | Rel i -> if numrels < i then Some i else None
   | Evar (ev, es) ->
@@ -1046,7 +1046,7 @@ let rec replace (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
 and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
-  | Const _ | Ind _ | Int _ | Construct _
+  | Const _ | Ind _ | Int _ | Float _ | Construct _
   | Proj _ | Cast _ -> term
   | Lambda (x, ty, e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
@@ -1160,7 +1160,7 @@ let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
 
 let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ -> term
   | Evar (ev, es) ->
       mkEvar (ev, Array.map (normalize_types env sigma) es)
@@ -1216,7 +1216,7 @@ let rec reduce_function (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           Vars.lift i e)
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
   | Cast (e,ck,t) -> reduce_function env sigma e
   | App (f, args) ->
@@ -1250,7 +1250,7 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
   (if !opt_debug_delete_let then
     Feedback.msg_debug (Pp.str "delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ -> fun () -> term
   | Rel i ->
       (List.nth refs (i-1)) := true;
@@ -1378,9 +1378,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let term = delete_unused_let env sigma term in
   debug_specialization env sigma "delete_unused_let" term;
   let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Entries.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
-  let kind = Decl_kinds.IsDefinition Decl_kinds.Definition in
-  let declared_ctnt = Declare.declare_constant name (defent, kind) in
+  let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
+  let kind = Decls.IsDefinition Decls.Definition in
+  let declared_ctnt = Declare.declare_constant ~name:name ~kind:kind defent in
   let sp_inst2 = {
     sp_partapp = sp_inst.sp_partapp;
     sp_static_arguments = sp_inst.sp_static_arguments;

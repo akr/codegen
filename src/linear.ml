@@ -1,4 +1,5 @@
-open Globnames
+open Names
+open GlobRef
 open Pp
 open CErrors
 open Term
@@ -27,6 +28,7 @@ let term_kind sigma term =
   | Constr.CoFix _ -> "CoFix"
   | Constr.Proj _ -> "Proj"
   | Constr.Int _ -> "Int"
+  | Constr.Float _ -> "Float"
 
 let whd_all env sigma term = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
 let nf_all env sigma term = Reductionops.nf_all env sigma term
@@ -92,6 +94,7 @@ let rec hasRel sigma term =
   | Constr.CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
   | Constr.Proj (proj, expr) -> hasRel sigma expr
   | Constr.Int n -> false
+  | Constr.Float n -> false
 
 let rec destProdX_rec sigma term =
   match EConstr.kind sigma term with
@@ -316,7 +319,8 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
   | Constr.Proj (proj, expr) ->
       check_linear_valexp env sigma linear_refs num_innermost_locals expr
-  | Constr.Int n -> ())
+  | Constr.Int n -> ()
+  | Constr.Float n -> ())
 and check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br =
   if cstr_nargs = 0 then
     check_linear_valexp env sigma linear_refs num_innermost_locals br

@@ -237,6 +237,7 @@ let rec mangle_type_buf (buf : Buffer.t) (ty : EConstr.t) : unit =
   | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "mangle_type_buf:cofix:")
   | Proj (proj, expr) -> user_err (Pp.str "mangle_type_buf:proj:")
   | Int n -> user_err (Pp.str "mangle_type_buf:int:")
+  | Float n -> user_err (Pp.str "mangle_type_buf:float:")
 
 let c_id str =
   let buf = Buffer.create 0 in
@@ -293,7 +294,7 @@ let mangle_type (ty : EConstr.t) : string =
 let rec count_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
   match EConstr.kind sigma term with
   | Constr.Rel _ | Constr.Var _ | Constr.Meta _ | Constr.Sort _ | Constr.Ind _
-  | Constr.Int _ | Constr.Const _ | Constr.Construct _ -> 0
+  | Constr.Int _ | Constr.Float _ | Constr.Const _ | Constr.Construct _ -> 0
   | Constr.Evar _ -> 1
   | Constr.Proj (proj, e) -> count_evars env sigma e
   | Constr.Cast (e,ck,t) -> count_evars env sigma e + count_evars env sigma t
@@ -333,7 +334,7 @@ let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   let rec aux1 env term =
     match EConstr.kind sigma term with
     | Constr.Rel _ | Constr.Var _ | Constr.Meta _ | Constr.Sort _ | Constr.Ind _
-    | Constr.Int _ | Constr.Const _ | Constr.Construct _ -> term
+    | Constr.Int _ | Constr.Float _ | Constr.Const _ | Constr.Construct _ -> term
     | Constr.Evar _ ->
         let ety = Retyping.get_type_of env sigma term in
         let ety = Reductionops.nf_all env sigma ety in
@@ -405,10 +406,10 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let modpath = KerName.modpath (Constant.canonical ctnt_i) in
-  match Global.body_of_constant ctnt_i with
+  match Global.body_of_constant Library.indirect_accessor ctnt_i with
   | None -> user_err (Pp.str "couldn't obtain the definition of" ++ Pp.spc () ++
                       Printer.pr_constant env ctnt_i)
-  | Some (def_i,_) ->
+  | Some (def_i,_,_) ->
       let def_i = EConstr.of_constr def_i in
       let (ctx_rel_i, body_i) = decompose_lam_assum sigma def_i in
       match EConstr.kind sigma body_i with
@@ -425,9 +426,9 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
                     let label = Label.of_id id in
                     let ctnt_j = Constant.make1 (KerName.make modpath label) in
                     try
-                      match Global.body_of_constant ctnt_j with
+                      match Global.body_of_constant Library.indirect_accessor ctnt_j with
                       | None -> None
-                      | Some (def_j,_) ->
+                      | Some (def_j,_,_) ->
                           let def_j = EConstr.of_constr def_j in
                           let body_j' = mkFix ((ia, j), (nary, tary, fary)) in
                           let def_j' = it_mkLambda_or_LetIn body_j' ctx_rel_i in
@@ -461,6 +462,7 @@ let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   | CoFix _ -> "CoFix"
   | Proj _ -> "Proj"
   | Int _ -> "Int"
+  | Float _ -> "Float"
 
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with

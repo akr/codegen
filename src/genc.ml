@@ -17,7 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open Names
-open Globnames
+open GlobRef
 open Pp
 open CErrors
 open Constr
@@ -770,8 +770,8 @@ let get_ctnt_type_body (env : Environ.env) (name : Libnames.qualid) : Constant.t
   let reference = Smartlocate.global_with_alias name in
   match reference with
   | ConstRef ctnt ->
-      begin match Global.body_of_constant ctnt with
-      | Some (b,_) ->
+      begin match Global.body_of_constant Library.indirect_accessor ctnt with
+      | Some (b,_,_) ->
           let (ty, _) = Typeops.type_of_global_in_context env reference in
           (ctnt, ty, b)
       | None -> user_err (Pp.str "can't genc axiom")
@@ -798,10 +798,10 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   let (ctnt, ty, body) =
     let cdef = Environ.lookup_constant ctnt env in
     let ty = cdef.Declarations.const_type in
-    match Global.body_of_constant_body cdef with
+    match Global.body_of_constant_body Library.indirect_accessor cdef with
     | None -> user_err (Pp.str "couldn't obtain the body:" ++ Pp.spc () ++
                         Printer.pr_constant env ctnt)
-    | Some (body, _) -> (ctnt, ty, body)
+    | Some (body,_, _) -> (ctnt, ty, body)
   in
   (ctnt, ty, body)
 
