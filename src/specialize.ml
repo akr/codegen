@@ -1047,7 +1047,8 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECo
       | _ -> mkApp (f, args)
 
 (*
- * expand_eta assumes term is A-normal form, "body" of following syntax:
+ * expand_eta assumes term is already reduced by reduce_exp,
+ * "body" of following syntax:
  *
  *  body = let | exp
  *
