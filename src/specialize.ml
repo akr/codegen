@@ -1051,9 +1051,9 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECo
  *
  *  body = let | exp
  *
- *  exp = lambda | app | func                           # body - let
+ *  exp = lambda | app | func                   # body - let
  *
- *  func = var | rvar | ctnt | cstr | fix | match       # body - let - lambda - app
+ *  func = var | ctnt | cstr | fix | match      # body - let - lambda - app
  *
  *  let = "let" var ":=" exp "in" body          # no (let x := (let ...) in body) because "letin" reduction
  *
@@ -1063,7 +1063,7 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECo
  *                      # no ((fun ...) args) because "beta" reduction
  *                      # no ((f args) args) because mkApp generates single application.
  *
- *  fix = "fix" (rvar ":=" body)+ "for" rvar
+ *  fix = "fix" (var ":=" body)+ "for" var
  *
  *  match = "match" var "with" ( "|" cstr "=>" body )* "end"
  *
