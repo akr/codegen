@@ -563,38 +563,6 @@ let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.
   | (x,e,ty) :: rest ->
       compose_lets rest (mkLetIn (x, e, ty, body))
 
-let linearize_top_let (sigma : Evd.evar_map) (x : Name.t Context.binder_annot) (e : EConstr.t) (ty : EConstr.types) (b : EConstr.t) : EConstr.t =
-  let (defs, body) = decompose_lets sigma e in
-  let n = List.length defs in
-  compose_lets defs
-    (mkLetIn (x, body, Vars.lift n ty, Vars.liftn n 2 b))
-
-let rec linearize_lets_rec (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Cast _ | Prod _ | App _
-  | Const _ | Ind _ | Float _ | Construct _ | Proj _ | Int _ -> term
-  | Lambda (x, ty, b) ->
-      mkLambda (x, ty, linearize_lets_rec sigma b)
-  | Fix ((ia, i), (nameary, tyary, funary)) ->
-      mkFix ((ia, i), (nameary, tyary, Array.map (linearize_lets_rec sigma) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
-      mkCoFix (i, (nameary, tyary, Array.map (linearize_lets_rec sigma) funary))
-  | Case (ci, p, item, branches) ->
-      mkCase (ci, p, item, Array.map (linearize_lets_rec sigma) branches)
-  | LetIn (x, e, ty, b) ->
-      if isLetIn sigma e then
-        linearize_lets_rec sigma (linearize_top_let sigma x e ty b)
-      else
-        mkLetIn (x, linearize_lets_rec sigma e, ty, linearize_lets_rec sigma b)
-
-let linearize_lets (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  let result = linearize_lets_rec sigma term in
-  check_convertible "linearize_lets" env sigma term result;
-  result
-
-let normalizeA (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  linearize_lets env sigma (normalizeK env sigma term)
-
 let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
@@ -1363,8 +1331,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let term = inline env sigma inline_pred epartapp in
   debug_specialization env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
-  let term = normalizeA env sigma term in
-  debug_specialization env sigma "normalizeA" term;
+  let term = normalizeK env sigma term in
+  debug_specialization env sigma "normalizeK" term;
   let term = reduce_exp env sigma term in
   debug_specialization env sigma "reduce_exp" term;
   let term = replace env sigma term in
