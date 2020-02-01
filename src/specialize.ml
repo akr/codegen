@@ -1337,8 +1337,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "reduce_exp" term;
   let term = replace env sigma term in
   debug_specialization env sigma "replace" term;
-  let term = expand_eta env sigma term in
-  debug_specialization env sigma "expand_eta" term;
+  (*let term = expand_eta env sigma term in
+  debug_specialization env sigma "expand_eta" term;*)
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
   let term = reduce_function env sigma term in
