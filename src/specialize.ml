@@ -891,7 +891,6 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f_nf : EConstr.t) (ar
                     0 nary tary
                   in
                   let defs = Array.to_list (array_rev defs) in
-
                   let term2 = compose_lets defs (mkApp (fi_nf, args_nf_lifted)) in
                   debug_reduction "fix-new-let" (fun () ->
                     Pp.str "decreasing-argument = " ++
@@ -1052,15 +1051,17 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECo
  *
  *  body = let | exp
  *
- *  let = "let" var ":=" exp "in" body
+ *  exp = lambda | app | func                           # body - let
  *
- *  exp = lambda | app | func
+ *  func = var | rvar | ctnt | cstr | fix | match       # body - let - lambda - app
+ *
+ *  let = "let" var ":=" exp "in" body          # no (let x := (let ...) in body) because "letin" reduction
  *
  *  lambda = "fun" var "=>" body
  *
- *  app = func var+
- *
- *  func = var | rvar | ctnt | cstr | fix | match
+ *  app = func var+     # no ((let ...) args) because "app-let" reduction
+ *                      # no ((fun ...) args) because "beta" reduction
+ *                      # no ((f args) args) because mkApp generates single application.
  *
  *  fix = "fix" (rvar ":=" body)+ "for" rvar
  *
