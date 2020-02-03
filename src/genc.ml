@@ -431,11 +431,11 @@ and genc_body_assign (env : Environ.env) (sigma : Evd.evar_map) (context : conte
       genc_assign (str retvar) (genc_construct env sigma context (out_punivs cstru))
   | _ -> (user_err (str "not impelemented (genc_body_assign:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term))
 
-(* tail position.  usual return. *)
-let rec genc_body_tail (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (term : EConstr.t) : Pp.t =
+(* tail position.  "return" part is generalized as gen_ret. *)
+let rec genc_body_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (term : EConstr.t) : Pp.t =
   match EConstr.kind sigma term with
   | Constr.Rel i ->
-      genc_return (str (varname_of_rel context i))
+      gen_ret (str (varname_of_rel context i))
   | Constr.LetIn (name, expr, exprty, body) ->
       let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
       let name = Context.binder_name name in
@@ -443,50 +443,21 @@ let rec genc_body_tail (env : Environ.env) (sigma : Evd.evar_map) (context : con
       let (exprbody, varname) = genc_body_var env sigma context name expr exprty in
       exprbody ++
       (if ismt exprbody then mt () else spc ()) ++
-      genc_body_tail env2 sigma (CtxVar varname :: context) body
+      genc_body_tail gen_ret env2 sigma (CtxVar varname :: context) body
   | Constr.App (f, argsary) ->
       (match EConstr.kind sigma f with
       | Constr.Rel i ->
           (match List.nth context (i-1) with
           | CtxRec (fname, argvars) -> genc_goto env sigma context (fname, argvars) argsary
-          | _ -> genc_return (genc_app env sigma context f argsary))
-      | _ -> genc_return (genc_app env sigma context f argsary))
+          | _ -> gen_ret (genc_app env sigma context f argsary))
+      | _ -> gen_ret (genc_app env sigma context f argsary))
   | Constr.Case (ci, tyf, expr, brs) ->
-      genc_case_nobreak env sigma context ci tyf expr brs genc_body_tail
+      genc_case_nobreak env sigma context ci tyf expr brs (genc_body_tail gen_ret)
   | Constr.Const ctntu ->
-      genc_return (genc_const env sigma context (out_punivs ctntu))
+      gen_ret (genc_const env sigma context (out_punivs ctntu))
   | Constr.Construct cstru ->
-      genc_return (genc_construct env sigma context (out_punivs cstru))
+      gen_ret (genc_construct env sigma context (out_punivs cstru))
   | _ -> (user_err (str "not impelemented (genc_body_tail:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term))
-
-(* tail position.  assign and return. *)
-let rec genc_mufun_body_tail (env : Environ.env) (sigma : Evd.evar_map) (retvar : string) (context : context_elt list) (term : EConstr.t) : Pp.t =
-  match EConstr.kind sigma term with
-  | Constr.Rel i ->
-      genc_void_return retvar (str (varname_of_rel context i))
-  | Constr.LetIn (name, expr, exprty, body) ->
-      let decl = Context.Rel.Declaration.LocalDef (name, expr, exprty) in
-      let name = Context.binder_name name in
-      let env2 = EConstr.push_rel decl env in
-      let (exprbody, varname) = genc_body_var env sigma context name expr exprty in
-      exprbody ++
-      (if ismt exprbody then mt () else spc ()) ++
-      genc_mufun_body_tail env2 sigma retvar (CtxVar varname :: context) body
-  | Constr.App (f, argsary) ->
-      (match EConstr.kind sigma f with
-      | Constr.Rel i ->
-          (match List.nth context (i-1) with
-          | CtxRec (fname, argvars) -> genc_goto env sigma context (fname, argvars) argsary
-          | _ -> genc_void_return retvar (genc_app env sigma context f argsary))
-      | _ -> genc_void_return retvar (genc_app env sigma context f argsary))
-  | Constr.Case (ci, tyf, expr, brs) ->
-      genc_case_nobreak env sigma context ci tyf expr brs
-        (fun envb sigma -> genc_mufun_body_tail envb sigma retvar)
-  | Constr.Const ctntu ->
-      genc_void_return retvar (genc_const env sigma context (out_punivs ctntu))
-  | Constr.Construct cstru ->
-      genc_void_return retvar (genc_construct env sigma context (out_punivs cstru))
-  | _ -> (user_err (str "not impelemented (genc_mufun_body_tail:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term))
 
 let found_funref (context : (int * bool ref * bool ref * bool ref) option list) (i : int) =
   match List.nth context (i-1) with
@@ -581,7 +552,7 @@ let genc_func_single (env : Environ.env) (sigma : Evd.evar_map)
   str ")" ++ spc () ++
   str "{" ++ brk (1,2) ++
   hv 0 (
-    genc_body_tail env sigma context body) ++
+    genc_body_tail genc_return env sigma context body) ++
   spc () ++ str "}")
 
 let find_headcalls
@@ -688,7 +659,8 @@ let genc_mufun_bodies_func (env : Environ.env) (sigma :Evd.evar_map) (mfnm : str
                       (fun (var, ty) -> hv 0 (str var ++ spc () ++ str "=" ++ spc () ++ str "((struct" ++ spc () ++ str nm ++ spc () ++ str "*)argsp)->" ++ str var ++ str ";"))
                       fargs) ++ spc () ++
                   (if tailcall then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
-                  genc_mufun_body_tail envb sigma ("(*(" ^ c_typename env sigma rety ^ " *)retp)") context body ++ spc () ++
+                  let gen_ret = (genc_void_return ("(*(" ^ c_typename env sigma rety ^ " *)retp)")) in
+                  genc_body_tail gen_ret envb sigma context body ++ spc () ++
                   str "return;")))
             ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
     str "}")
@@ -727,7 +699,7 @@ let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : st
           let fname_argn = goto_label nm in
           hv 0 (
             (if tailcall || (i <> 0 && i == j) then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
-            genc_body_tail envb sigma context body))
+            genc_body_tail genc_return envb sigma context body))
         ntfcb_ary)) ++
   spc () ++ str "}")
 
