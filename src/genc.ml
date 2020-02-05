@@ -80,6 +80,33 @@ let global_gensym_with_nameopt (nameopt : Name.t option) : string =
   | None -> global_gensym ()
   | Some name -> global_gensym_with_name name
 
+let local_gensym_id : (int ref) list ref = ref []
+
+let  local_gensym_with (f : unit -> 'a) : 'a =
+  local_gensym_id := (ref 0) :: !local_gensym_id;
+  let ret = f () in
+  local_gensym_id := List.tl !local_gensym_id;
+  ret
+
+let local_gensym () : string =
+  let idref = List.hd !local_gensym_id in
+  let n = !idref in
+  idref := n + 1;
+  "v" ^ string_of_int n
+
+let local_gensym_with_str (suffix : string) : string =
+  local_gensym () ^ "_" ^ (c_id suffix)
+
+let local_gensym_with_name (name : Name.t) : string =
+  match name with
+  | Name.Anonymous -> local_gensym ()
+  | Name.Name id -> local_gensym () ^ "_" ^ (c_id (Id.to_string id))
+
+let local_gensym_with_nameopt (nameopt : Name.t option) : string =
+  match nameopt with
+  | None -> local_gensym ()
+  | Some name -> local_gensym_with_name name
+
 let rec argtys_and_rety_of_type (sigma : Evd.evar_map) (ty : EConstr.types) : EConstr.types list * EConstr.types =
   match EConstr.kind sigma ty with
   | Prod (name, ty', body) ->

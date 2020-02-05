@@ -1295,54 +1295,6 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-(* variables in types are not changed *)
-let unique_variable_name (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  let genname (x : Name.t Context.binder_annot) : Name.t Context.binder_annot =
-    Context.map_annot (fun n -> Name (Id.of_string (local_gensym_with_name n))) x
-  in
-  let rec aux (term : EConstr.t) : EConstr.t =
-    match EConstr.kind sigma term with
-    | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
-    | Const _ | Construct _ -> term
-    | Evar (ev, es) ->
-        mkEvar (ev, Array.map aux es)
-    | Proj (proj, e) ->
-        mkProj (proj, aux e)
-    | Cast (e,ck,t) ->
-        let e' = aux e in
-        mkCast (e', ck, t)
-    | App (f, args) ->
-        let f' = aux f in
-        let args' = Array.map aux args in
-        mkApp (f', args')
-    | LetIn (x,e,t,b) ->
-        let x' = genname x in
-        let e' = aux e in
-        let b' = aux b in
-        mkLetIn (x', e', t, b')
-    | Case (ci, p, item, branches) ->
-        let item' = aux item in
-        let branches' = Array.map aux branches in
-        mkCase (ci, p, item', branches')
-    | Prod (x,t,b) ->
-        let x' = genname x in
-        let b' = aux b in
-        mkProd (x', t, b')
-    | Lambda (x,t,b) ->
-        let x' = genname x in
-        let b' = aux b in
-        mkLambda (x', t, b')
-    | Fix ((ia, i), (nary, tary, fary)) ->
-        let nary' = Array.map genname nary in
-        let fary' = Array.map aux fary in
-        mkFix ((ia, i), (nary', tary, fary'))
-    | CoFix (i, (nary, tary, fary)) ->
-        let nary' = Array.map genname nary in
-        let fary' = Array.map aux fary in
-        mkCoFix (i, (nary', tary, fary'))
-  in
-  local_gensym_with (fun () -> aux term)
-
 let debug_specialization (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
   if !opt_debug_specialization then
     Feedback.msg_debug (Pp.str ("--" ^ step ^ "-->") ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term))
@@ -1395,8 +1347,6 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "reduce_function" term;
   let term = delete_unused_let env sigma term in
   debug_specialization env sigma "delete_unused_let" term;
-  let term = unique_variable_name sigma term in
-  debug_specialization env sigma "unique_variable_name" term;
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
   let kind = Decls.IsDefinition Decls.Definition in
