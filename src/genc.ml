@@ -62,23 +62,23 @@ let case_cstrfield (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types
   | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
   | None -> raise (CodeGenError "[bug] inductive match configuration not registered") (* should be called after case_swfunc *)
 
-let gensym () : string =
+let global_gensym () : string =
   let n = !gensym_id in
   gensym_id := n + 1;
   "g" ^ string_of_int n
 
-let gensym_with_str (suffix : string) : string =
-  gensym () ^ "_" ^ (c_id suffix)
+let global_gensym_with_str (suffix : string) : string =
+  global_gensym () ^ "_" ^ (c_id suffix)
 
-let gensym_with_name (name : Name.t) : string =
+let global_gensym_with_name (name : Name.t) : string =
   match name with
-  | Names.Name.Anonymous -> gensym ()
-  | Names.Name.Name id -> gensym () ^ "_" ^ (c_id (Id.to_string id))
+  | Names.Name.Anonymous -> global_gensym ()
+  | Names.Name.Name id -> global_gensym () ^ "_" ^ (c_id (Id.to_string id))
 
-let gensym_with_nameopt (nameopt : Name.t option) : string =
+let global_gensym_with_nameopt (nameopt : Name.t option) : string =
   match nameopt with
-  | None -> gensym ()
-  | Some name -> gensym_with_name name
+  | None -> global_gensym ()
+  | Some name -> global_gensym_with_name name
 
 let local_gensym_id : (int ref) list ref = ref []
 
@@ -726,12 +726,12 @@ let genc_func (env : Environ.env) (sigma : Evd.evar_map) (fname : string) (ty : 
             fname
           else
             let nm = Context.binder_name nm in
-            gensym_with_name nm)
+            global_gensym_with_name nm)
         nameary
       in
       let ntfcb_ary = fargs_and_body_ary env2 sigma strnameary ty ia i nameary' tyary funary in
       let callsites_ary = scan_callsites sigma i ntfcb_ary in
-      let mfnm = gensym_with_str fname in
+      let mfnm = global_gensym_with_str fname in
       genc_func_mutual env sigma mfnm i ntfcb_ary callsites_ary
   | _ ->
       let fargs, envb, body = fargs_and_body env sigma term in
