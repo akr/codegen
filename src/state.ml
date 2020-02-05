@@ -167,7 +167,7 @@ type code_generation =
 
 (*
  * list of code_generation in reverse order.
- * CodeGen EndFile consumes this list.
+ * CodeGen GenerateFile consumes this list.
  *)
 let generation_list = Summary.ref ~name:"CodegenGeneration"
   ([] : code_generation list)

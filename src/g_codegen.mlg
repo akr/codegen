@@ -82,14 +82,14 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PARTAPP_NAME SPECIALIZED_NAME..
 
-  CodeGen EndFile "FILENAME"
+  CodeGen GenerateFile "FILENAME"
 
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
   "CodeGen Function" and "CodeGen Primitive" declares C function name for
   a Gallina function.
-  "CodeGen EndFile" generates function declared by "CodeGen Function".
+  "CodeGen GenerateFile" generates functions declared by "CodeGen Function".
   The actual C definition of functions declared by "CodeGen Primitive"
   should be provided by a user.
 
@@ -192,8 +192,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
 
-    | [ "CodeGen" "EndFile" string(fn) ] ->
-      { gen_endfile fn }
+    | [ "CodeGen" "GenerateFile" string(fn) ] ->
+      { generate_file fn }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
       { codegen_global_inline funcs }

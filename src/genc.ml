@@ -825,7 +825,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Sys.rename temp_fn fn;
   Feedback.msg_info (str ("file generated: " ^ fn)))
 
-let gen_endfile (fn : string) =
+let generate_file (fn : string) =
   gen_file fn (List.rev !generation_list);
   generation_list := []
 

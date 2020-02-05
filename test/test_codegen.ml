@@ -173,7 +173,7 @@ let codegen_test_template (ctx : test_ctxt)
   write_file src_fn
     ("From codegen Require codegen.\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen EndFile " ^ (escape_coq_str gen_fn) ^ ".\n");
+    "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
     ("#include <assert.h>\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
