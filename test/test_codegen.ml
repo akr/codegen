@@ -329,6 +329,28 @@ let test_tail_constructor_bool (ctx : test_ctxt) : unit =
       assert(constructor_false() == false);
     |}
 
+let test_tail_constant_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      CodeGen Snippet "
+      bool my_true(void) { return true; }
+      bool my_false(void) { return false; }
+      ".
+      Set CodeGen Dev.
+      Definition my_true := true.
+      Definition my_false := false.
+      CodeGen Primitive my_true.
+      CodeGen Primitive my_false.
+      Definition constant_true : bool := my_true.
+      Definition constant_false : bool := my_false.
+      CodeGen Function constant_true.
+      CodeGen Function constant_false.
+    |})
+    {|
+      assert(constant_true() == true);
+      assert(constant_false() == false);
+    |}
+
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -611,6 +633,7 @@ let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
     "test_tail_constructor_bool" >:: test_tail_constructor_bool;
+    "test_tail_constant_bool" >:: test_tail_constant_bool;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;
