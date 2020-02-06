@@ -833,20 +833,20 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail gen_ret env2 sigma b rest)
+  | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Case _ -> user_err (Pp.str "gen_tail: unsupported term Case:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Fix _ -> user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Float _ -> user_err (Pp.str "gen_tail: unsupported term Float:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Var _ -> user_err (Pp.str "gen_tail: unsupported term Var:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Meta _ -> user_err (Pp.str "gen_tail: unsupported term Meta:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Evar _ -> user_err (Pp.str "gen_tail: unsupported term Evar:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Sort _ -> user_err (Pp.str "gen_tail: unsupported term Sort:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Ind _ -> user_err (Pp.str "gen_tail: unsupported term Ind:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Float _ -> user_err (Pp.str "gen_tail: unsupported term Float:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Prod _ -> user_err (Pp.str "gen_tail: unsupported term Prod:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Fix _ -> user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | CoFix _ -> user_err (Pp.str "gen_tail: unsupported term CoFix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Case _ -> user_err (Pp.str "gen_tail: unsupported term Case:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 
 let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
