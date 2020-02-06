@@ -791,6 +791,12 @@ let gen_function (cfunc_name : string) : Pp.t =
 let brace (pp : Pp.t) : Pp.t =
   str "{" ++ hv 0 (brk (1,2) ++ pp ++ brk (1,-2) ++ str "}")
 
+let carg_of_garg (env : Environ.env) (i : int) : string =
+  let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+  match x with
+  | Name.Anonymous -> assert false
+  | Name.Name id -> Id.to_string id
+
 let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_tail1 gen_ret env sigma term cargs in
   (*
@@ -804,12 +810,7 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
   match EConstr.kind sigma term with
   | Rel i ->
       if List.length cargs = 0 then
-        let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        let str =
-          match x with
-          | Name.Anonymous -> assert false
-          | Name.Name id -> Id.to_string id
-        in
+        let str = carg_of_garg env i in
         gen_ret (Pp.str str)
       else
         assert false
@@ -817,6 +818,13 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       gen_ret (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs))
   | Construct (cstr,_) ->
       gen_ret (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs))
+  | App (f,args) ->
+      let cargs2 =
+        List.append
+          (Array.to_list (Array.map (fun arg -> carg_of_garg env (destRel sigma arg)) args))
+          cargs
+      in
+      gen_tail gen_ret env sigma f cargs2
   | Lambda (x,t,b) ->
       (match cargs with
       | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" ++ Pp.spc () ++

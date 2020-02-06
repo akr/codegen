@@ -329,6 +329,32 @@ let test_tail_constructor_bool (ctx : test_ctxt) : unit =
       assert(constructor_false() == false);
     |}
 
+let test_tail_constructor_args (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Set CodeGen Dev.
+      Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
+      CodeGen Inductive Type bool_pair => "bool_pair".
+      CodeGen Inductive Match bool_pair => ""
+      | bpair => "default" "bool_pair_fst" "bool_pair_snd".
+      CodeGen Primitive bpair => "bpair".
+
+      CodeGen Snippet "
+      typedef int bool_pair;
+      #define bpair(a,b) (((a) << 1) | (b))
+      #define bool_pair_fst(x) ((x) >> 1)
+      #define bool_pair_snd(x) ((x) & 1)
+      ".
+
+      Definition call_bpair a b : bool_pair := bpair a b.
+      CodeGen Function call_bpair.
+    |}) {|
+      assert(call_bpair(false, false) == 0);
+      assert(call_bpair(false, true) == 1);
+      assert(call_bpair(true, false) == 2);
+      assert(call_bpair(true, true) == 3);
+    |}
+
 let test_tail_constant_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -633,6 +659,7 @@ let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
     "test_tail_constructor_bool" >:: test_tail_constructor_bool;
+    "test_tail_constructor_args" >:: test_tail_constructor_args;
     "test_tail_constant_bool" >:: test_tail_constant_bool;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
