@@ -777,17 +777,19 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   in
   (ctnt, ty, body)
 
+let gen_function (cfunc_name : string) : Pp.t =
+  let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  linear_type_check_term body;
+  let ty = EConstr.of_constr ty in
+  let body = EConstr.of_constr body in
+  genc_func env sigma cfunc_name ty body
+
 let gen (cfunc_list : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
-      let env = Global.env () in
-      let sigma = Evd.from_env env in
-      linear_type_check_term body;
-      let ty = EConstr.of_constr ty in
-      let body = EConstr.of_constr body in
-      let pp = genc_func env sigma cfunc_name ty body in
-      Feedback.msg_info pp)
+      Feedback.msg_info (gen_function cfunc_name))
     cfunc_list
 
 let codegen_snippet (str : string) : unit =
@@ -809,14 +811,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
-          let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
-          let env = Global.env () in
-          let sigma = Evd.from_env env in
-          linear_type_check_term body;
-          let ty = EConstr.of_constr ty in
-          let body = EConstr.of_constr body in
-          let pp = genc_func env sigma cfunc_name ty body in
-          Pp.pp_with fmt (pp ++ Pp.fnl ())
+          Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
           Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
     gen_list;
