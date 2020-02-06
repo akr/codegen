@@ -835,16 +835,15 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
           gen_tail gen_ret env2 sigma b rest)
   | _ -> user_err (Pp.str "gen_tail: unsupported term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 
-
 let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
-  let c_fargs = List.rev (List.map
+  let c_fargs = List.map
     (fun (x,t) -> (local_gensym_with_name (Context.binder_name x), t))
-    argument_name_type_pairs)
+    (List.rev argument_name_type_pairs)
   in
   let body = EConstr.of_constr body in
   hv 0 (
