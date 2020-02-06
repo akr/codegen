@@ -377,6 +377,23 @@ let test_tail_constant_bool (ctx : test_ctxt) : unit =
       assert(constant_false() == false);
     |}
 
+let test_tail_constant_args (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Set CodeGen Dev.
+
+      CodeGen Primitive negb.
+      CodeGen Snippet "
+      #define negb(b) (!(b))
+      ".
+
+      Definition call_negb (b : bool) : bool := negb b.
+      CodeGen Function call_negb.
+    |}) {|
+      assert(call_negb(false) == true);
+      assert(call_negb(true) == false);
+    |}
+
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -661,6 +678,7 @@ let suite : OUnit2.test =
     "test_tail_constructor_bool" >:: test_tail_constructor_bool;
     "test_tail_constructor_args" >:: test_tail_constructor_args;
     "test_tail_constant_bool" >:: test_tail_constant_bool;
+    "test_tail_constant_args" >:: test_tail_constant_args;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;
