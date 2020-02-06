@@ -305,6 +305,17 @@ let list_nat_src = {|
       ".
 |}
 
+let test_tail_rel (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Set CodeGen Dev.
+      Definition mono_id_bool (b : bool) := b.
+      CodeGen Function mono_id_bool => "mono_id_bool".
+    |}) {|
+      assert(mono_id_bool(true) == true);
+      assert(mono_id_bool(false) == false);
+    |}
+
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -585,6 +596,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
 
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
+    "test_tail_rel" >:: test_tail_rel;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;

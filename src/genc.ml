@@ -786,10 +786,82 @@ let gen_function (cfunc_name : string) : Pp.t =
   let body = EConstr.of_constr body in
   genc_func env sigma cfunc_name ty body
 
+let brace (pp : Pp.t) : Pp.t =
+  str "{" ++ hv 0 (brk (1,2) ++ pp ++ brk (1,-2) ++ str "}")
+
+let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  let pp = gen_tail1 gen_ret env sigma term cargs in
+  (*
+  Feedback.msg_debug (Pp.str "gen_tail:" ++ Pp.spc () ++
+    Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
+    Pp.str "->" ++ Pp.spc () ++
+    pp);
+  *)
+  pp
+and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      if List.length cargs = 0 then
+        let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        let str =
+          match x with
+          | Name.Anonymous -> assert false
+          | Name.Name id -> Id.to_string id
+        in
+        gen_ret (Pp.str str)
+      else
+        assert false
+  | Lambda (x,t,b) ->
+      (match cargs with
+      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" ++ Pp.spc () ++
+          Printer.pr_econstr_env env sigma term)
+      | arg :: rest ->
+          let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
+          let env2 = EConstr.push_rel decl env in
+          gen_tail gen_ret env2 sigma b rest)
+  | _ -> user_err (Pp.str "gen_tail: unsupported term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+
+
+let gen_func2_sub (cfunc_name : string) : Pp.t =
+  let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
+  let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
+  let c_fargs = List.rev (List.map
+    (fun (x,t) -> (local_gensym_with_name (Context.binder_name x), t))
+    argument_name_type_pairs)
+  in
+  let body = EConstr.of_constr body in
+  hv 0 (
+  str "static" ++ spc () ++
+  str (c_typename env sigma return_type) ++ spc () ++
+  str cfunc_name ++ str "(" ++
+  hv 0 (genc_fargs env sigma c_fargs) ++
+  str ")" ++ spc () ++
+  brace (gen_tail genc_return env sigma body (List.map fst c_fargs)))
+
+let gen_function2 (cfunc_name : string) : Pp.t =
+  local_gensym_with (fun () -> gen_func2_sub cfunc_name)
+
+let gen_function0 (cfunc_name : string) : Pp.t =
+  if !opt_codegen_dev then
+    gen_function2 cfunc_name
+  else
+    gen_function cfunc_name
+
+(* Vernacular commands *)
+
+let gen2 (cfunc_list : string list) : unit =
+  List.iter
+    (fun cfunc_name ->
+      Feedback.msg_info (gen_function2 cfunc_name))
+    cfunc_list
+
 let gen (cfunc_list : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      Feedback.msg_info (gen_function cfunc_name))
+      Feedback.msg_info (gen_function0 cfunc_name))
     cfunc_list
 
 let codegen_snippet (str : string) : unit =
@@ -811,7 +883,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
-          Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
+          Pp.pp_with fmt (gen_function0 cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
           Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
     gen_list;
