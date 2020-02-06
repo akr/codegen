@@ -207,40 +207,42 @@ let varname_of_rel (context : context_elt list) (i : int) : string =
   | CtxVar varname -> varname
   | _ -> raise (Invalid_argument "unexpected context element")
 
+let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
+  let sp_inst =
+    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
+    | None ->
+        (match EConstr.kind sigma f with
+        | Constr.Const (ctnt, _) ->
+            user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
+        | Constr.Construct (cstr, _) ->
+            user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
+        | _ -> assert false)
+    | Some (sp_cfg, sp_inst) ->
+        sp_inst
+  in
+  let c_fname = sp_inst.sp_cfunc_name in
+  let gen_constant = Array.length argvars = 0 && sp_inst.sp_gen_constant
+  in
+  if gen_constant then
+    str c_fname
+  else
+    str c_fname ++ str "(" ++
+    pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
+    str ")"
+
 let genc_app (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (f : EConstr.t) (argsary : EConstr.t array) : Pp.t =
+  let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
   match EConstr.kind sigma f with
   | Constr.Rel i ->
       (match List.nth context (i-1) with
       | CtxVar _ -> user_err (str "indirect call not implemented")
       | CtxRec (fname, _) ->
-          let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
           let c_fname = c_funcname fname in
           str c_fname ++ str "(" ++
           pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
           str ")")
   | Constr.Const _ | Constr.Construct _ ->
-      let sp_inst =
-        match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
-        | None ->
-            (match EConstr.kind sigma f with
-            | Constr.Const (ctnt, _) ->
-                user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
-            | Constr.Construct (cstr, _) ->
-                user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
-            | _ -> assert false)
-        | Some (sp_cfg, sp_inst) ->
-            sp_inst
-      in
-      let c_fname = sp_inst.sp_cfunc_name in
-      let gen_constant = Array.length argsary = 0 && sp_inst.sp_gen_constant
-      in
-      if gen_constant then
-        str c_fname
-      else
-        let argvars = Array.map (fun arg -> varname_of_rel context (destRel sigma arg)) argsary in
-        str c_fname ++ str "(" ++
-        pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
-        str ")"
+      gen_app_const_construct env sigma f argvars
   | _ -> assert false
 
 let genc_multi_assign (env : Environ.env) (sigma : Evd.evar_map) (assignments : (string * (string * EConstr.types)) array) : Pp.t =
