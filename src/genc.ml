@@ -813,6 +813,8 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
         gen_ret (Pp.str str)
       else
         assert false
+  | Construct (cstr,_) ->
+      gen_ret (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs))
   | Lambda (x,t,b) ->
       (match cargs with
       | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" ++ Pp.spc () ++
