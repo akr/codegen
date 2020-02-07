@@ -550,8 +550,8 @@ let genc_func_single (env : Environ.env) (sigma : Evd.evar_map)
       string_of_int (List.length fargs) ^ " lambdas")));
   let c_fname = c_funcname fname in
   hv 0 (
-  str "static" ++ spc () ++
-  str (c_typename env sigma rety) ++ spc () ++
+  hv 0 (str "static" ++ spc () ++
+        str (c_typename env sigma rety)) ++ spc () ++
   str c_fname ++ str "(" ++
   hv 0 (genc_fargs env sigma fargs) ++
   str ")" ++ spc () ++
@@ -932,8 +932,8 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let body = EConstr.of_constr body in
   let (vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail genc_return env sigma body (List.map fst c_fargs))) in
   hv 0 (
-  str "static" ++ spc () ++
-  str (c_typename env sigma return_type) ++ spc () ++
+  hv 0 (str "static" ++ spc () ++
+        str (c_typename env sigma return_type)) ++ spc () ++
   str cfunc_name ++ str "(" ++
   hv 0 (genc_fargs env sigma c_fargs) ++
   str ")" ++ spc () ++
