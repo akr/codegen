@@ -420,6 +420,25 @@ let test_tail_match_nat (ctx : test_ctxt) : unit =
       assert(f(1) == true);
     |}
 
+let test_tail_match_singleton (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Set CodeGen Dev.
+      Inductive singleton : Set := C : bool -> singleton.
+      CodeGen Inductive Type singleton => "singleton".
+      CodeGen Inductive Match singleton => ""
+      | C => "unused-case-label" "access".
+      CodeGen Snippet "
+      typedef bool singleton;
+      #define access(s) s
+      ".
+      Definition f (x : singleton) := match x with C y => y end.
+      CodeGen Function f => "f".
+    |}) {|
+      assert(f(true) == true);
+      assert(f(false) == false);
+    |}
+
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -707,6 +726,7 @@ let suite : OUnit2.test =
     "test_tail_constant_args" >:: test_tail_constant_args;
     "test_tail_match_bool" >:: test_tail_match_bool;
     "test_tail_match_nat" >:: test_tail_match_nat;
+    "test_tail_match_singleton" >:: test_tail_match_singleton;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;

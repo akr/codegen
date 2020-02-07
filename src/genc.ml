@@ -857,26 +857,43 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       let item_cvar = carg_of_garg env (destRel sigma item) in
       (*let result_type = Retyping.get_type_of env sigma term in*)
       (*let result_type = Reductionops.nf_all env sigma result_type in*)
-
-(*
-      if Array.length brs = 1 then
-	let ndecls = ci.Constr.ci_cstr_ndecls.(0) in
-	let br = brs.(0) in
-	let cstr_index = 1 in
-	genc_case_branch_body env sigma context bodyfunc item_type item_cvar ndecls br cstr_index
-      else
-*)
-        let n = Array.length branches in
-	let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
-        let caselabel_accessors =
-          Array.map
-            (fun j ->
-              (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
-               Array.map
-                 (case_cstrfield env sigma (EConstr.of_constr item_type) j)
-                 (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
-            (iota_ary 1 n)
+      let gen_branch accessors br =
+        (
+        let branch_type = Retyping.get_type_of env sigma br in
+        let branch_type = Reductionops.nf_all env sigma branch_type in
+        let (branch_arg_types, _) = decompose_prod sigma branch_type in
+        let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
+        let branch_arg_types = CArray.rev_of_list branch_arg_types in
+        let c_vars = Array.map
+          (fun (x,t) ->
+            let c_var = local_gensym_with_annotated_name x in
+            add_local_var (c_typename env sigma t) c_var;
+            c_var)
+          branch_arg_types
         in
+        pp_join_ary (spc ())
+          (Array.map2
+            (fun c_var access -> str c_var ++ str " =" ++ spc () ++
+              str access ++ str "(" ++ str item_cvar ++ str ");")
+            c_vars accessors) ++ spc () ++
+        gen_tail gen_ret env sigma br (List.append (Array.to_list c_vars) cargs))
+      in
+      let n = Array.length branches in
+      let caselabel_accessors =
+        Array.map
+          (fun j ->
+            (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
+             Array.map
+               (case_cstrfield env sigma (EConstr.of_constr item_type) j)
+               (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
+          (iota_ary 1 n)
+      in
+      if n = 1 then
+        let accessors = snd caselabel_accessors.(0) in
+	let br = branches.(0) in
+        gen_branch accessors br
+      else
+	let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
 	let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
 	hv 0 (
 	hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
@@ -884,25 +901,8 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
 	  (Array.mapi
 	    (fun i br ->
               let (caselabel, accessors) = caselabel_accessors.(i) in
-              let branch_type = Retyping.get_type_of env sigma br in
-              let branch_type = Reductionops.nf_all env sigma branch_type in
-              let (branch_arg_types, _) = decompose_prod sigma branch_type in
-              let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
-              let branch_arg_types = CArray.rev_of_list branch_arg_types in
-              let c_vars = Array.map
-                (fun (x,t) ->
-                  let c_var = local_gensym_with_annotated_name x in
-                  add_local_var (c_typename env sigma t) c_var;
-                  c_var)
-                branch_arg_types
-              in
-              str caselabel ++ str ":" ++
-              pp_prejoin_ary (spc ())
-                (Array.map2
-                  (fun c_var access -> str c_var ++ spc () ++ str "=" ++ spc () ++ str access ++ str "(" ++ str item_cvar ++ str ");")
-                  c_vars accessors) ++ spc () ++
-              gen_tail gen_ret env sigma br (List.append (Array.to_list c_vars) cargs)
-	    )
+              str caselabel ++ str ":" ++ spc () ++
+              gen_branch accessors br)
 	    branches)))
 
   | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
