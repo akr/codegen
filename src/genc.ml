@@ -102,6 +102,9 @@ let local_gensym_with_name (name : Name.t) : string =
   | Name.Anonymous -> local_gensym ()
   | Name.Name id -> local_gensym () ^ "_" ^ (c_id (Id.to_string id))
 
+let local_gensym_with_annotated_name (name : Name.t Context.binder_annot) : string =
+  local_gensym_with_name (Context.binder_name name)
+
 let local_gensym_with_nameopt (nameopt : Name.t option) : string =
   match nameopt with
   | None -> local_gensym ()
@@ -789,7 +792,22 @@ let gen_function (cfunc_name : string) : Pp.t =
   genc_func env sigma cfunc_name ty body
 
 let brace (pp : Pp.t) : Pp.t =
-  str "{" ++ hv 0 (brk (1,2) ++ pp ++ brk (1,-2) ++ str "}")
+  str "{" ++ hv 2 (spc () ++ pp ++ spc () ++ str "}")
+
+let local_vars : ((string * string) list ref) list ref = ref []
+
+let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
+  let vars = ref [] in
+  local_vars := vars :: !local_vars;
+  let ret = f () in
+  (!vars, ret)
+
+let local_vars_get () =
+  !(List.hd !local_vars)
+
+let  add_local_var (c_type : string) (c_var : string) : unit =
+  let vars = List.hd !local_vars in
+  vars := (c_type, c_var) :: !vars
 
 let carg_of_garg (env : Environ.env) (i : int) : string =
   let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
@@ -833,8 +851,61 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail gen_ret env2 sigma b rest)
+  | Case (ci,predicate,item,branches) ->
+      let item_relindex = destRel sigma item in
+      let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
+      let item_cvar = carg_of_garg env (destRel sigma item) in
+      (*let result_type = Retyping.get_type_of env sigma term in*)
+      (*let result_type = Reductionops.nf_all env sigma result_type in*)
+
+(*
+      if Array.length brs = 1 then
+	let ndecls = ci.Constr.ci_cstr_ndecls.(0) in
+	let br = brs.(0) in
+	let cstr_index = 1 in
+	genc_case_branch_body env sigma context bodyfunc item_type item_cvar ndecls br cstr_index
+      else
+*)
+        let n = Array.length branches in
+	let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
+        let caselabel_accessors =
+          Array.map
+            (fun j ->
+              (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
+               Array.map
+                 (case_cstrfield env sigma (EConstr.of_constr item_type) j)
+                 (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
+            (iota_ary 1 n)
+        in
+	let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
+	hv 0 (
+	hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+	brace (pp_join_ary (spc ())
+	  (Array.mapi
+	    (fun i br ->
+              let (caselabel, accessors) = caselabel_accessors.(i) in
+              let branch_type = Retyping.get_type_of env sigma br in
+              let branch_type = Reductionops.nf_all env sigma branch_type in
+              let (branch_arg_types, _) = decompose_prod sigma branch_type in
+              let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
+              let branch_arg_types = CArray.rev_of_list branch_arg_types in
+              let c_vars = Array.map
+                (fun (x,t) ->
+                  let c_var = local_gensym_with_annotated_name x in
+                  add_local_var (c_typename env sigma t) c_var;
+                  c_var)
+                branch_arg_types
+              in
+              str caselabel ++ str ":" ++
+              pp_prejoin_ary (spc ())
+                (Array.map2
+                  (fun c_var access -> str c_var ++ spc () ++ str "=" ++ spc () ++ str access ++ str "(" ++ str item_cvar ++ str ");")
+                  c_vars accessors) ++ spc () ++
+              gen_tail gen_ret env sigma br (List.append (Array.to_list c_vars) cargs)
+	    )
+	    branches)))
+
   | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Case _ -> user_err (Pp.str "gen_tail: unsupported term Case:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Fix _ -> user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
@@ -859,13 +930,20 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
     (List.rev argument_name_type_pairs)
   in
   let body = EConstr.of_constr body in
+  let (vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail genc_return env sigma body (List.map fst c_fargs))) in
   hv 0 (
   str "static" ++ spc () ++
   str (c_typename env sigma return_type) ++ spc () ++
   str cfunc_name ++ str "(" ++
   hv 0 (genc_fargs env sigma c_fargs) ++
   str ")" ++ spc () ++
-  brace (gen_tail genc_return env sigma body (List.map fst c_fargs)))
+  brace (
+    pp_postjoin_list (spc ())
+      (List.map
+        (fun (c_type, c_var) -> hv 0 (str c_type ++ spc () ++ str c_var ++ str ";"))
+        (local_vars_get ()))
+    ++
+    pp_body))
 
 let gen_function2 (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func2_sub cfunc_name)

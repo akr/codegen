@@ -381,17 +381,43 @@ let test_tail_constant_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Set CodeGen Dev.
-
       CodeGen Primitive negb.
-      CodeGen Snippet "
-      #define negb(b) (!(b))
-      ".
-
+      CodeGen Snippet "#define negb(b) (!(b))".
       Definition call_negb (b : bool) : bool := negb b.
       CodeGen Function call_negb.
     |}) {|
       assert(call_negb(false) == true);
       assert(call_negb(true) == false);
+    |}
+
+let test_tail_match_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Set CodeGen Dev.
+      Definition f (b : bool) :=
+        match b with
+        | true => false
+        | false => true
+        end.
+      CodeGen Function f => "f".
+    |}) {|
+      assert(f(true) == false);
+      assert(f(false) == true);
+    |}
+
+let test_tail_match_nat (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ {|
+      Set CodeGen Dev.
+      Definition f (n : nat) :=
+        match n with
+        | O => false
+        | S n' => true
+        end.
+      CodeGen Function f => "f".
+    |}) {|
+      assert(f(0) == false);
+      assert(f(1) == true);
     |}
 
 let test_mono_id_bool (ctx : test_ctxt) : unit =
@@ -679,6 +705,8 @@ let suite : OUnit2.test =
     "test_tail_constructor_args" >:: test_tail_constructor_args;
     "test_tail_constant_bool" >:: test_tail_constant_bool;
     "test_tail_constant_args" >:: test_tail_constant_args;
+    "test_tail_match_bool" >:: test_tail_match_bool;
+    "test_tail_match_nat" >:: test_tail_match_nat;
     "test_mono_id_bool" >:: test_mono_id_bool;
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;
