@@ -82,7 +82,7 @@ let global_gensym_with_nameopt (nameopt : Name.t option) : string =
 
 let local_gensym_id : (int ref) list ref = ref []
 
-let local_gensym_with (f : unit -> 'a) : 'a =
+let  local_gensym_with (f : unit -> 'a) : 'a =
   local_gensym_id := (ref 0) :: !local_gensym_id;
   let ret = f () in
   local_gensym_id := List.tl !local_gensym_id;
@@ -109,13 +109,6 @@ let local_gensym_with_nameopt (nameopt : Name.t option) : string =
   match nameopt with
   | None -> local_gensym ()
   | Some name -> local_gensym_with_name name
-
-let make_gensym (prefix : string) =
-  let idref = ref 0 in
-  fun () ->
-    let n = !idref in
-    idref := n + 1;
-    prefix ^ string_of_int n
 
 let rec argtys_and_rety_of_type (sigma : Evd.evar_map) (ty : EConstr.types) : EConstr.types list * EConstr.types =
   match EConstr.kind sigma ty with
@@ -925,65 +918,6 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
   | Ind _ -> user_err (Pp.str "gen_tail: unsupported term Ind:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Prod _ -> user_err (Pp.str "gen_tail: unsupported term Prod:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | CoFix _ -> user_err (Pp.str "gen_tail: unsupported term CoFix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-
-let localvar_add_unique_prefix (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  let gensym = make_gensym "u" in
-  let genname (x : Name.t Context.binder_annot) : Name.t Context.binder_annot =
-    Context.map_annot (fun n ->
-      Name.Name (Id.of_string
-        (match n with
-        | Name.Anonymous -> gensym ()
-        | Name.Name id -> gensym () ^ "_" ^ (Id.to_string id)))) x
-  in
-  let rec aux (term : EConstr.t) : EConstr.t =
-    match EConstr.kind sigma term with
-    | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
-    | Const _ | Construct _ -> term
-    | Evar (ev, es) ->
-        mkEvar (ev, Array.map aux es)
-    | Proj (proj, e) ->
-        mkProj (proj, aux e)
-    | Cast (e,ck,t) ->
-        let e' = aux e in
-        let t' = aux t in
-        mkCast (e', ck, t')
-    | App (f, args) ->
-        let f' = aux f in
-        let args' = Array.map aux args in
-        mkApp (f', args')
-    | LetIn (x,e,t,b) ->
-        let x' = genname x in
-        let e' = aux e in
-        let t' = aux t in
-        let b' = aux b in
-        mkLetIn (x', e', t', b')
-    | Case (ci, p, item, branches) ->
-        let item' = aux item in
-        let p' = aux p in
-        let branches' = Array.map aux branches in
-        mkCase (ci, p', item', branches')
-    | Prod (x,t,b) ->
-        let x' = genname x in
-        let t' = aux t in
-        let b' = aux b in
-        mkProd (x', t', b')
-    | Lambda (x,t,b) ->
-        let x' = genname x in
-        let t' = aux t in
-        let b' = aux b in
-        mkLambda (x', t', b')
-    | Fix ((ia, i), (nary, tary, fary)) ->
-        let nary' = Array.map genname nary in
-        let tary' = Array.map aux tary in
-        let fary' = Array.map aux fary in
-        mkFix ((ia, i), (nary', tary', fary'))
-    | CoFix (i, (nary, tary, fary)) ->
-        let nary' = Array.map genname nary in
-        let tary' = Array.map aux tary in
-        let fary' = Array.map aux fary in
-        mkCoFix (i, (nary', tary', fary'))
-  in
-  aux term
 
 let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
