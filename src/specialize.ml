@@ -712,11 +712,13 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ia : int array)
 
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  let t1 = Unix.times () in
   (if !opt_debug_reduce_exp then
     Feedback.msg_debug (Pp.str "reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = reduce_exp1 env sigma term in
   (if !opt_debug_reduce_exp then
-    Feedback.msg_debug (Pp.str "reduce_exp ret: " ++ Printer.pr_econstr_env env sigma result));
+    let t2 = Unix.times () in
+    Feedback.msg_debug (Pp.str "reduce_exp ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_exp" env sigma term result;
   result
 and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -876,9 +878,12 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f_nf : EConstr.t) (ar
                   let fi_nf_subst = Vars.substl (List.map (fun j -> mkRel j) (iota_list (bounded_fix-n+1) n)) fi_nf in
                   let term2 = mkApp (fi_nf_subst, args_nf) in
                   debug_reduction "fix-reuse-let" (fun () ->
+                    let env2 = Environ.pop_rel_context (destRel sigma decarg_var) env in
+                    let nf_decarg_val = Reductionops.nf_all env2 sigma decarg_val in
                     Pp.str "decreasing-argument = " ++
                     Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
-                    Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
+                    Printer.pr_econstr_env env2 sigma decarg_val ++ Pp.str " = " ++
+                    Printer.pr_econstr_env env sigma nf_decarg_val ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
@@ -1295,11 +1300,21 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
+let specialization_time = ref (Unix.times ())
+
+let init_debug_specialization () : unit =
+  if !opt_debug_specialization then
+    specialization_time := Unix.times ()
+
 let debug_specialization (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
   if !opt_debug_specialization then
-    Feedback.msg_debug (Pp.str ("--" ^ step ^ "-->") ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term))
+    (let old = !specialization_time in
+    let now = Unix.times () in
+    Feedback.msg_debug (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term));
+    specialization_time := now)
 
 let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
+  init_debug_specialization ();
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None ->
