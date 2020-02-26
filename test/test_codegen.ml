@@ -699,6 +699,24 @@ let test_reduce_proj (ctx : test_ctxt) : unit =
       assert(f1_mk(7, 8) == 8);
     |}
 
+let test_deeply_nested_match (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Require Import List.
+      Fixpoint f (s : list bool) : nat :=
+	match s with
+	| nil => 0
+	| cons true (cons true (cons true (cons true rest))) => f rest
+	| cons _ rest => f rest
+	end.
+      CodeGen Function f (repeat true 0) => "f0".
+      CodeGen Function f (repeat true 10) => "f10".
+    |}) {|
+      assert(f0() == 0);
+      assert(f10() == 0);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -743,6 +761,7 @@ let suite : OUnit2.test =
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
+    "test_deeply_nested_match" >:: test_deeply_nested_match;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
 
