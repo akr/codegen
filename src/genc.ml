@@ -82,7 +82,7 @@ let global_gensym_with_nameopt (nameopt : Name.t option) : string =
 
 let local_gensym_id : (int ref) list ref = ref []
 
-let  local_gensym_with (f : unit -> 'a) : 'a =
+let local_gensym_with (f : unit -> 'a) : 'a =
   local_gensym_id := (ref 0) :: !local_gensym_id;
   let ret = f () in
   local_gensym_id := List.tl !local_gensym_id;
@@ -805,7 +805,7 @@ let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
 let local_vars_get () =
   !(List.hd !local_vars)
 
-let  add_local_var (c_type : string) (c_var : string) : unit =
+let add_local_var (c_type : string) (c_var : string) : unit =
   let vars = List.hd !local_vars in
   vars := (c_type, c_var) :: !vars
 
