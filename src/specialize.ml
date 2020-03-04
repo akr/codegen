@@ -830,7 +830,14 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
       let m = destRel sigma f in
       match EConstr.lookup_rel m env with
       | Context.Rel.Declaration.LocalAssum _ -> f
-      | Context.Rel.Declaration.LocalDef (x,e,t) -> Vars.lift m e
+      | Context.Rel.Declaration.LocalDef (x,e,t) ->
+          (* We don't inline Case expression at function position because
+             it can duplicate computation.
+             Proj should be supported after we support downward funargs
+             (restricted closures).  *)
+          match EConstr.kind sigma (fst (decompose_app sigma e)) with
+          | Rel _ | Const _ | Construct _ | Fix _ -> Vars.lift m e
+          | _ -> f
     else
       f
   in
