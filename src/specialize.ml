@@ -836,7 +836,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
              Proj should be supported after we support downward funargs
              (restricted closures).  *)
           match EConstr.kind sigma (fst (decompose_app sigma e)) with
-          | Rel _ | Const _ | Construct _ | Fix _ -> Vars.lift m e
+          | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ -> Vars.lift m e
           | _ -> f
     else
       f

@@ -682,6 +682,39 @@ let test_cast (ctx : test_ctxt) : unit =
       assert(nat_id(4) == 4);
     |}
 
+let test_delta_fun_constant (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition add (a b : nat) : nat := let f := Nat.add in f a b.
+      CodeGen Function add.
+    |}) {|
+      assert(add(2,3) == 5);
+    |}
+
+let test_delta_fun_constructor (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition succ (n : nat) : nat := let f := S in f n.
+      CodeGen Function succ.
+    |}) {|
+      assert(succ(2) == 3);
+    |}
+
+let test_delta_fun_lambda (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition succ (n : nat) : nat := let f x := S x in f n.
+      CodeGen Function succ.
+    |}) {|
+      assert(succ(2) == 3);
+    |}
+
+(* test_delta_fun_rel *)
+(* test_delta_fun_fix *)
+
 (* codegen removes TestRecord type completely at reduction.
    So, no inductive type cofiguration required for TestRecord. *)
 let test_reduce_proj (ctx : test_ctxt) : unit =
@@ -758,6 +791,9 @@ let suite : OUnit2.test =
     "test_even_odd" >:: test_even_odd;
     "test_app_let" >:: test_app_let;
     "test_cast" >:: test_cast;
+    "test_delta_fun_constant" >:: test_delta_fun_constant;
+    "test_delta_fun_constructor" >:: test_delta_fun_constructor;
+    "test_delta_fun_lambda" >:: test_delta_fun_lambda;
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
