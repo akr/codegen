@@ -787,8 +787,7 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
 
 let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
   assert_coq_failure ctx
-    (*~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function:")*)
-    ~regexp_in_output:(Str.regexp_string "add")
+    ~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function: add")
     (nat_src ^
     {|
       Set CodeGen Dev.
