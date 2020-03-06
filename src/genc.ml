@@ -919,17 +919,107 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
   | Prod _ -> user_err (Pp.str "gen_tail: unsupported term Prod:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | CoFix _ -> user_err (Pp.str "gen_tail: unsupported term CoFix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 
+exception NeedMultipleFunction
+
+let rec needs_multiple_function_rec (env : Environ.env) (sigma : Evd.evar_map) (outer_recfuncs : bool list) (inner_recfuncs : bool list) (term : EConstr.t) : unit =
+  (*
+  let pr_recfuncs recfuncs =
+    pp_join_list (Pp.spc ())
+      (CList.map_filter_i
+        (fun i b ->
+          if b then
+            let x = Context.Rel.Declaration.get_name (Environ.lookup_rel (i+1) env) in
+            let str =
+              match x with
+              | Name.Anonymous -> "<anon>"
+              | Name.Name id -> Id.to_string id
+            in
+            Some (Pp.str str)
+          else
+            None)
+        recfuncs)
+  in
+  Feedback.msg_info (Pp.str "needs_multiple_function_rec:");
+  Feedback.msg_info (Pp.str "  outer_recfuncs: " ++ hv 0 (pr_recfuncs outer_recfuncs));
+  Feedback.msg_info (Pp.str "  inner_recfuncs: " ++ hv 0 (pr_recfuncs inner_recfuncs));
+  Feedback.msg_info (Pp.str "  term: " ++ Printer.pr_econstr_env env sigma term);
+  *)
+  needs_multiple_function_rec1 env sigma outer_recfuncs inner_recfuncs term
+and needs_multiple_function_rec1 (env : Environ.env) (sigma : Evd.evar_map) (outer_recfuncs : bool list) (inner_recfuncs : bool list) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      if List.nth outer_recfuncs (i-1) then
+        raise NeedMultipleFunction
+  | Var _ | Meta _ | Evar _ | Sort _ | Ind _
+  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> ()
+  | Cast (e,ck,ty) ->
+      needs_multiple_function_rec env sigma outer_recfuncs inner_recfuncs term
+  | LetIn (x,e,t,b) ->
+      let outer_recfuncs1 = List.map2 (||) outer_recfuncs inner_recfuncs in
+      let inner_recfuncs1 = List.init (List.length outer_recfuncs1) (fun _ -> false) in
+      needs_multiple_function_rec env sigma outer_recfuncs1 inner_recfuncs1 e;
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      needs_multiple_function_rec env2 sigma (false :: outer_recfuncs) (false :: inner_recfuncs) b
+  | App (f,args) ->
+      (* arguments cannot refer functions until downward funarg support *)
+      Array.iter
+        (fun arg ->
+          let i = destRel sigma arg in
+          (if List.nth outer_recfuncs (i-1) then raise NeedMultipleFunction);
+          (if List.nth inner_recfuncs (i-1) then raise NeedMultipleFunction))
+        args;
+      needs_multiple_function_rec env sigma outer_recfuncs inner_recfuncs f
+  | Case (ci,predicate,item,branches) ->
+      (* match item cannot refer function because its type is inductive type *)
+      Array.iter
+        (needs_multiple_function_rec env sigma outer_recfuncs inner_recfuncs)
+        branches
+  | Proj (proj, e) ->
+      (* projection item cannot refer function because its type is inductive type *)
+      ()
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      needs_multiple_function_rec env2 sigma (false :: outer_recfuncs) (false :: inner_recfuncs) b
+  | Fix ((ia, i), (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
+      let env2 = push_rec_types prec env in
+      let n = Array.length fary in
+      let outer_recfuncs2 = List.append (List.init n (fun _ -> false)) outer_recfuncs in
+      let inner_recfuncs2 = List.append (List.init n (fun _ -> true)) inner_recfuncs in
+      Array.iter
+        (needs_multiple_function_rec env2 sigma outer_recfuncs2 inner_recfuncs2)
+        fary
+  | CoFix (i, (nary, tary, fary)) ->
+      (* we don't support CoFix, though *)
+      let prec = (nary, tary, fary) in
+      let env2 = push_rec_types prec env in
+      let n = Array.length fary in
+      let outer_recfuncs2 = List.append (List.init n (fun _ -> false)) outer_recfuncs in
+      let inner_recfuncs2 = List.append (List.init n (fun _ -> true)) inner_recfuncs in
+      Array.iter
+        (needs_multiple_function_rec env2 sigma outer_recfuncs2 inner_recfuncs2)
+        fary
+
+let needs_multiple_function (env : Environ.env) (sigma : Evd.evar_map) (body : EConstr.t) : bool =
+  try
+    needs_multiple_function_rec env sigma [] [] body;
+    false
+  with NeedMultipleFunction -> true
+
 let gen_func2_sub (cfunc_name : string) : Pp.t =
-  let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
   let env = Global.env () in
   let sigma = Evd.from_env env in
+  let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  let body = EConstr.of_constr body in
+  (if needs_multiple_function env sigma body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" ++ Pp.spc () ++ Pp.str cfunc_name));
   let ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
   let c_fargs = List.map
     (fun (x,t) -> (local_gensym_with_name (Context.binder_name x), t))
     (List.rev argument_name_type_pairs)
   in
-  let body = EConstr.of_constr body in
   let (vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail genc_return env sigma body (List.map fst c_fargs))) in
   hv 0 (
   hv 0 (str "static" ++ spc () ++

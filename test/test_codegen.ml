@@ -184,6 +184,41 @@ let codegen_test_template (ctx : test_ctxt)
   assert_command ctx cc ["-o"; exe_fn; main_fn];
   assert_command ctx exe_fn []
 
+let assert_coq_failure
+    ?(regexp_in_output : Str.regexp option)
+    (ctx : test_ctxt)
+    (coq_commands : string) : unit =
+  let d =
+    match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
+    | Some _ -> make_temp_dir "codegen-test" ""
+    | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
+  in
+  let src_fn = d ^ "/src.v" in
+  let gen_fn = d ^ "/gen.c" in
+  write_file src_fn
+    ("From codegen Require codegen.\n" ^
+    delete_indent coq_commands ^ "\n" ^
+    "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
+  let foutput stream =
+    let buf = Buffer.create 0 in
+    Stream.iter (Buffer.add_char buf) stream;
+    let text = Buffer.contents buf in
+    match regexp_in_output with
+    | None -> ()
+    | Some expected ->
+        try
+          ignore (Str.search_forward expected text 0);
+          assert_bool "expected regexp found" true
+        with Not_found ->
+          assert_bool "expected regexp not found" false
+  in
+  assert_command
+    ~exit_code:(Unix.WEXITED 1)
+    ~use_stderr:true
+    ~foutput:foutput
+    ~ctxt:ctx
+    coqc (List.append coq_opts [src_fn])
+
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
       CodeGen Inductive Match bool => ""
@@ -750,6 +785,21 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
       assert(f10() == 0);
     |}
 
+let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
+  assert_coq_failure ctx
+    (*~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function:")*)
+    ~regexp_in_output:(Str.regexp_string "add")
+    (nat_src ^
+    {|
+      Set CodeGen Dev.
+      Fixpoint add (a b : nat) : nat :=
+	match a with
+	| O => b
+	| S a' => S (add a' b)
+	end.
+      CodeGen Function add.
+    |})
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -798,6 +848,7 @@ let suite : OUnit2.test =
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     "test_deeply_nested_match" >:: test_deeply_nested_match;
+    "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
 
