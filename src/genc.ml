@@ -921,9 +921,11 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
 
 exception NeedsMultipleFunctions
 
+type nmf_var = NMFRec | NMFArg of int | NMFOther (* NMF : Needs Multiple Functions *)
+
 let rec needs_multiple_functions_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (top_callable : bool)
-    (top_recfuncs : bool list)
+    (top_numargs : int option)
+    (top_vars : nmf_var list)
     (outer_recfuncs : bool list)
     (inner_recfuncs : bool list)
     (term : EConstr.t) : unit =
@@ -951,34 +953,37 @@ let rec needs_multiple_functions_rec (env : Environ.env) (sigma : Evd.evar_map)
   Feedback.msg_info (Pp.str "  inner_recfuncs: " ++ hv 0 (pr_recfuncs inner_recfuncs));
   Feedback.msg_info (Pp.str "  term: " ++ Printer.pr_econstr_env env sigma term);
   *)
-  needs_multiple_functions_rec1 env sigma top_callable top_recfuncs outer_recfuncs inner_recfuncs term
+  needs_multiple_functions_rec1 env sigma top_numargs top_vars outer_recfuncs inner_recfuncs term
 and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
-    (top_callable : bool)
-    (top_recfuncs : bool list)
+    (top_numargs : int option)
+    (top_vars : nmf_var list)
     (outer_recfuncs : bool list)
     (inner_recfuncs : bool list)
     (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
   | Rel i ->
-      if List.nth outer_recfuncs (i-1) && not (List.nth top_recfuncs (i-1)) then
-        raise NeedsMultipleFunctions
+      if List.nth outer_recfuncs (i-1) then
+        (match List.nth top_vars (i-1) with
+        | NMFRec -> ()
+        | NMFArg _ -> raise NeedsMultipleFunctions
+        | NMFOther -> raise NeedsMultipleFunctions)
   | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Float _ | Prod _ -> ()
   | Cast (e,ck,ty) ->
-      needs_multiple_functions_rec env sigma top_callable top_recfuncs outer_recfuncs inner_recfuncs term
+      needs_multiple_functions_rec env sigma top_numargs top_vars outer_recfuncs inner_recfuncs term
   | LetIn (x,e,t,b) ->
-      let top_callable1 = false in
-      let top_recfuncs1 = top_recfuncs in
+      let top_numargs1 = None in
+      let top_vars1 = top_vars in
       let outer_recfuncs1 = List.map2 (||) outer_recfuncs inner_recfuncs in
       let inner_recfuncs1 = List.init (List.length outer_recfuncs1) (fun _ -> false) in
-      needs_multiple_functions_rec env sigma top_callable1 top_recfuncs1 outer_recfuncs1 inner_recfuncs1 e;
+      needs_multiple_functions_rec env sigma top_numargs1 top_vars1 outer_recfuncs1 inner_recfuncs1 e;
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let top_callable2 = false in
-      let top_recfuncs2 = false :: top_recfuncs1 in
+      let top_numargs2 = None in
+      let top_vars2 = NMFOther :: top_vars in
       let outer_recfuncs2 = false :: outer_recfuncs in
       let inner_recfuncs2 = false :: inner_recfuncs in
-      needs_multiple_functions_rec env2 sigma top_callable2 top_recfuncs2 outer_recfuncs2 inner_recfuncs2 b
+      needs_multiple_functions_rec env2 sigma top_numargs2 top_vars2 outer_recfuncs2 inner_recfuncs2 b
   | App (f,args) ->
       (* arguments cannot refer functions until downward funarg support *)
       Array.iter
@@ -987,14 +992,22 @@ and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
           (if List.nth outer_recfuncs (i-1) then raise NeedsMultipleFunctions);
           (if List.nth inner_recfuncs (i-1) then raise NeedsMultipleFunctions))
         args;
-      (* top_callable_f can be true in some condition, though *)
-      let top_callable_f = false in
-      needs_multiple_functions_rec env sigma top_callable_f top_recfuncs outer_recfuncs inner_recfuncs f
+      let top_numargs_f =
+        match top_numargs with
+        | None -> None
+        | Some m ->
+            let n = Array.length args in
+            if Array.map (destRel sigma) args = iota_ary (m-n) n then
+              Some (m-n)
+            else
+              None
+      in
+      needs_multiple_functions_rec env sigma top_numargs_f top_vars outer_recfuncs inner_recfuncs f
   | Case (ci,predicate,item,branches) ->
       (* match item cannot refer function because its type is inductive type *)
-      let top_callable_branch = false in
+      let top_numargs_branch = None in
       Array.iter
-        (needs_multiple_functions_rec env sigma top_callable_branch top_recfuncs outer_recfuncs inner_recfuncs)
+        (needs_multiple_functions_rec env sigma top_numargs_branch top_vars outer_recfuncs inner_recfuncs)
         branches
   | Proj (proj, e) ->
       (* projection item cannot refer function because its type is inductive type *)
@@ -1002,32 +1015,39 @@ and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let top_callable_body = top_callable in
-      let top_recfuncs_body = false :: top_recfuncs in
+      let (top_numargs_body, top_vars_body) =
+        match top_numargs with
+        | None -> (None, NMFOther :: top_vars)
+        | Some m -> (Some (m+1), NMFArg m :: top_vars)
+      in
       let outer_recfuncs_body = false :: outer_recfuncs in
       let inner_recfuncs_body = false :: inner_recfuncs in
-      needs_multiple_functions_rec env2 sigma top_callable_body top_recfuncs_body outer_recfuncs_body inner_recfuncs_body b
+      needs_multiple_functions_rec env2 sigma top_numargs_body top_vars_body outer_recfuncs_body inner_recfuncs_body b
   | Fix ((ia, i), (nary, tary, fary)) ->
       let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
       let n = Array.length fary in
-      let top_callable_f_ary =
-        if top_callable then Array.init n (fun j -> i = j)
-                        else Array.make n false
+      let top_numargs_f_ary =
+        match top_numargs with
+        | None -> Array.make n None
+        | Some m -> Array.init n (fun j -> if i = j then Some m else None)
       in
-      let top_recfuncs_f = List.append (CArray.rev_to_list top_callable_f_ary) top_recfuncs in
+      let top_vars_f =
+        let ary = Array.map (fun tn -> if Option.has_some tn then NMFRec else NMFOther) top_numargs_f_ary in
+        List.append (CArray.rev_to_list ary) top_vars
+      in
       let outer_recfuncs2 = List.append (List.init n (fun _ -> false)) outer_recfuncs in
       let inner_recfuncs2 = List.append (List.init n (fun _ -> true)) inner_recfuncs in
       Array.iteri
         (fun i ->
-          (needs_multiple_functions_rec env2 sigma top_callable_f_ary.(i) top_recfuncs_f outer_recfuncs2 inner_recfuncs2))
+          (needs_multiple_functions_rec env2 sigma top_numargs_f_ary.(i) top_vars_f outer_recfuncs2 inner_recfuncs2))
         fary
   | CoFix (i, (nary, tary, fary)) ->
       user_err (Pp.str "[codegen] CoFix is not supported")
 
 let needs_multiple_functions (env : Environ.env) (sigma : Evd.evar_map) (body : EConstr.t) : bool =
   try
-    needs_multiple_functions_rec env sigma true [] [] [] body;
+    needs_multiple_functions_rec env sigma (Some 0) [] [] [] body;
     false
   with NeedsMultipleFunctions -> true
 
