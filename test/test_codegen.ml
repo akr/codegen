@@ -184,8 +184,9 @@ let codegen_test_template (ctx : test_ctxt)
   assert_command ctx cc ["-o"; exe_fn; main_fn];
   assert_command ctx exe_fn []
 
-let assert_coq_failure
-    ?(regexp_in_output : Str.regexp option)
+let assert_coq_exit
+    ~(exit_code : Unix.process_status)
+    ~(regexp_in_output : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
   let d =
@@ -213,11 +214,31 @@ let assert_coq_failure
           assert_bool "expected regexp not found" false
   in
   assert_command
-    ~exit_code:(Unix.WEXITED 1)
+    ~exit_code:exit_code
     ~use_stderr:true
     ~foutput:foutput
     ~ctxt:ctx
     coqc (List.append coq_opts [src_fn])
+
+let assert_coq_success
+    ?(regexp_in_output : Str.regexp option)
+    (ctx : test_ctxt)
+    (coq_commands : string) : unit =
+  assert_coq_exit
+    ~exit_code:(Unix.WEXITED 0)
+    ~regexp_in_output:regexp_in_output
+    ctx
+    coq_commands
+
+let assert_coq_failure
+    ?(regexp_in_output : Str.regexp option)
+    (ctx : test_ctxt)
+    (coq_commands : string) : unit =
+  assert_coq_exit
+    ~exit_code:(Unix.WEXITED 1)
+    ~regexp_in_output:regexp_in_output
+    ctx
+    coq_commands
 
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
@@ -785,9 +806,8 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
       assert(f10() == 0);
     |}
 
-let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
-  assert_coq_failure ctx
-    ~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function: add")
+let test_signle_function (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
     (nat_src ^
     {|
       Set CodeGen Dev.
@@ -797,6 +817,21 @@ let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
 	| S a' => S (add a' b)
 	end.
       CodeGen Function add.
+    |})
+
+let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
+  assert_coq_failure ctx
+    ~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function: double")
+    (nat_src ^
+    {|
+      Set CodeGen Dev.
+      Definition double (n : nat) : nat :=
+	(fix add (a b : nat) : nat :=
+	  match a with
+	  | O => b
+	  | S a' => S (add a' b)
+	  end) n n.
+      CodeGen Function double.
     |})
 
 let test_map_succ (ctx : test_ctxt) : unit =
@@ -847,6 +882,7 @@ let suite : OUnit2.test =
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     "test_deeply_nested_match" >:: test_deeply_nested_match;
+    (*"test_signle_function" >:: test_signle_function;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
