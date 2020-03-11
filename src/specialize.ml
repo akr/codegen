@@ -254,10 +254,16 @@ let specialization_instance_internal
             user_err (Pp.str "Gallina function name is invalid in C:" ++ spc () ++ str name));
           name
   in
-  (if CString.Map.mem cfunc_name !cfunc_instance_map then
-    user_err
-      (Pp.str "C function name already used:" ++ Pp.spc () ++
-      Pp.str cfunc_name));
+  (match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+  | None -> ()
+  | Some (sp_cfg, sp_inst) ->
+      user_err
+        (Pp.str "C function name already used:" ++ Pp.spc () ++
+        Pp.str cfunc_name ++ Pp.spc () ++
+        Pp.str "for" ++ Pp.spc () ++
+        Printer.pr_constr_env env sigma sp_inst.sp_partapp ++ Pp.spc () ++
+        Pp.str "but also for" ++ Pp.spc () ++
+        Printer.pr_constr_env env sigma partapp));
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
       let specialization_name = match names_opt with

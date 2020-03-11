@@ -36,32 +36,16 @@ using Coq and monomorphization plugin.
 #include <inttypes.h>
 
 #include <stdbool.h>
-#define n0_true() true
-#define n0_false() false
-
-typedef uint64_t nat;
-#define n0_O() ((nat)0)
-#define n1_S(n) ((n)+1)
-#define sw_nat(n) (n)
-#define case_O_nat case 0
-#define case_S_nat default
-#define field0_S_nat(n) ((n)-1)
-
-#define n2_addn(a,b) ((a)+(b))
-#define n2_subn(a,b) ((a)-(b))
-#define n2_muln(a,b) ((a)*(b))
-#define n2_divn(a,b) ((a)/(b))
-#define n2_modn(a,b) ((a)%(b))
 
 typedef struct {
   uint64_t *buf;
-  nat len; /* current length [bit] */
-  nat max; /* maximum length [bit] */
+  uint64_t len; /* current length [bit] */
+  uint64_t max; /* maximum length [bit] */
 } *bits;
 
-#define n1_bsize(s) ((s)->len)
+#define bsize(s) ((s)->len)
 
-bits alloc_bits(nat max)
+bits alloc_bits(uint64_t max)
 {
   bits s;
   s = malloc(sizeof(*s));
@@ -75,15 +59,15 @@ bits alloc_bits(nat max)
   return s;
 }
 
-bool get_bit(bits s, nat i)
+bool get_bit(bits s, uint64_t i)
 {
   assert(i < s->len);
   return (s->buf[i / 64] >> (i % 64)) & 1;
 }
 
-nat get_bits(bits s, nat w, nat i)
+uint64_t get_bits(bits s, uint64_t w, uint64_t i)
 {
-  nat n = 0;
+  uint64_t n = 0;
   for (; 0 < w; w--)
     n = (n << 1) | get_bit(s, i + w - 1);
   return n;
@@ -93,7 +77,7 @@ bits add_bit(bits s, bool b)
 {
   if (s->max <= s->len) {
     uint64_t *buf;
-    nat max;
+    uint64_t max;
     max = s->max * 2;
     assert(s->max < max);
     buf = realloc(s->buf, max / CHAR_BIT);
@@ -110,7 +94,7 @@ bits add_bit(bits s, bool b)
   return s;
 }
 
-bits add_bits(bits s, nat w, nat n)
+bits add_bits(bits s, uint64_t w, uint64_t n)
 {
   for (; 0 < w; w--) {
     s = add_bit(s, n & 1);
@@ -119,10 +103,10 @@ bits add_bits(bits s, nat w, nat n)
   return s;
 }
 
-nat n4_bcount(bool b, nat n, nat m, bits bs)
+uint64_t bcount(bool b, uint64_t n, uint64_t m, bits bs)
 {
-  nat ret = 0;
-  nat i;
+  uint64_t ret = 0;
+  uint64_t i;
   for (i = n; i < n + m; i++)
     if (get_bit(bs, i) == b)
       ret++;
@@ -130,12 +114,12 @@ nat n4_bcount(bool b, nat n, nat m, bits bs)
 }
 
 typedef struct {
-  nat w;
+  uint64_t w;
   bits s;
 } DArr;
 #define MDArr DArr
 
-DArr n1_emptyD(nat w)
+DArr emptyD(uint64_t w)
 {
   DArr d;
   assert(0 < w);
@@ -144,67 +128,26 @@ DArr n1_emptyD(nat w)
   return d;
 }
 
-#define n1_bwidth(d) ((d).w)
+#define bwidth(d) ((d).w)
 
-DArr n2_pushD(DArr d, nat n)
+DArr pushD(DArr d, uint64_t n)
 {
   d.s = add_bits(d.s, d.w, n);
   return d;
 }
 
-#define n1_freezeD(D) (D)
+#define freezeD(D) (D)
 
-#define n2_lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
-#define n1_sizeD(d) (n1_bsize(d) / (d).w)
+#define lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
+#define sizeD(d) (bsize(d) / (d).w)
 
-typedef struct {
-  MDArr D1;
-  MDArr D2;
-} prod_MDArr_MDArr;
-#define n2_pair_MDArr_MDArr(D1, D2) ((prod_MDArr_MDArr){ (D1), (D2) })
-#define field0_pair_prod_MDArr_MDArr(x) ((x).D1)
-#define field1_pair_prod_MDArr_MDArr(x) ((x).D2)
-
-typedef struct {
-  MDArr D;
-  nat n;
-} prod_MDArr_nat;
-#define n2_pair_MDArr_nat(D, n) ((prod_MDArr_nat){ (D), (n) })
-#define field0_pair_prod_MDArr_nat(x) ((x).D)
-#define field1_pair_prod_MDArr_nat(x) ((x).n)
-
-typedef struct {
-  prod_MDArr_MDArr D12;
-  nat n;
-} prod_prod_MDArr_MDArr_nat;
-#define n2_pair_prod_MDArr_MDArr_nat(D12, n) \
-  ((prod_prod_MDArr_MDArr_nat){ (D12), (n) })
-#define field0_pair_prod_prod_MDArr_MDArr_nat(x) ((x).D12)
-#define field1_pair_prod_prod_MDArr_MDArr_nat(x) ((x).n)
-
-static inline nat
-n1_bitlen(nat n)
+static inline uint64_t
+bitlen(uint64_t n)
 {
   if (n == 0) return 0;
   assert(64 <= sizeof(long) * CHAR_BIT);
   return 64 - __builtin_clzl(n);
 }
-
-typedef struct {
-  bool query_bit;
-  bits input_bits;
-  nat ratio;
-  nat blksz2;
-  DArr dir1;
-  DArr dir2;
-} Aux;
-#define n6_mkAux(b, s, k, sz2, D1, D2) ((Aux){ (b), (s), (k), (sz2), (D1), (D2) })
-#define n1_query_bit(aux) ((aux).query_bit)
-#define n1_input_bits(aux) ((aux).input_bits)
-#define n1_blksz2(aux) ((aux).blksz2)
-#define n1_ratio(aux) ((aux).ratio)
-#define n1_dir1(aux) ((aux).dir1)
-#define n1_dir2(aux) ((aux).dir2)
 
 #include "rank_proved.c"
 
@@ -212,7 +155,7 @@ typedef struct {
 
 void print_bits(bits s)
 {
-  nat n = n1_bsize(s);
+  nat n = bsize(s);
   nat i;
   for (i = 0; i < n; i++)
     putchar(get_bit(s, i) ? '1' : '0');
@@ -230,25 +173,25 @@ void test_one(bits s, nat i)
   nat m;
   struct timespec t1, t2;
 
-  if (n1_bsize(s) < i) {
+  if (bsize(s) < i) {
     fprintf(stderr, "index too big\n");
     exit(EXIT_FAILURE);
   }
 
-  Aux aux = n2_rank_init(1, s);
+  Aux aux = rank_init(1, s);
   res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t1);
   if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
-  m = n2_rank_lookup(aux, i);
+  m = rank_lookup(aux, i);
   res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t2);
   if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
-  assert (m == n4_bcount(1, 0, i, s));
+  assert (m == bcount(1, 0, i, s));
   printf("rank(%lu) = %lu (%"PRId64"[ns])\n", i, m, difftimespec(t1, t2));
 }
 
 void test_all(bits s)
 {
-  Aux aux = n2_rank_init(1, s);
-  nat n = n1_bsize(s);
+  Aux aux = rank_init(1, s);
+  nat n = bsize(s);
   nat i;
   struct timespec t1, t2;
   for (i = 0; i <= n; i++) {
@@ -256,10 +199,10 @@ void test_all(bits s)
     nat m;
     res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t1);
     if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
-    m = n2_rank_lookup(aux, i);
+    m = rank_lookup(aux, i);
     res = clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t2);
     if (res == -1) { perror("clock_gettime"); exit(EXIT_FAILURE); }
-    assert (m == n4_bcount(1, 0, i, s));
+    assert (m == bcount(1, 0, i, s));
     printf("rank(%lu) = %lu (%"PRId64"[ns])\n", i, m, difftimespec(t1, t2));
   }
 }

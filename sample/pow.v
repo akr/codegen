@@ -22,11 +22,44 @@ Fixpoint fastpow_iter a k x :=
 
 Definition fastpow a k := fastpow_iter a k 1.
 
-CodeGen Terminate Monomorphization odd.
-CodeGen Terminate Monomorphization muln.
-CodeGen Terminate Monomorphization uphalf.
-CodeGen Monomorphization fastpow.
-Print _fastpow.
-Print _fastpow_iter.
+CodeGen Inductive Type bool => "bool".
+CodeGen Inductive Match bool => ""
+| true => "default"
+| false => "case 0".
+CodeGen Constant true => "true".
+CodeGen Constant false => "false".
 
-CodeGen GenCFile "sample/pow_proved.c" _fastpow_iter _fastpow.
+CodeGen Snippet "
+#include <stdbool.h> /* for bool, true and false */
+".
+
+CodeGen Inductive Type nat => "nat".
+CodeGen Inductive Match nat => ""
+| O => "case 0"
+| S => "default" "nat_pred".
+CodeGen Constant O => "0".
+CodeGen Primitive S => "nat_succ".
+
+CodeGen Snippet "
+#include <stdint.h>
+typedef uint64_t nat;
+#define nat_succ(n) ((n)+1)
+#define nat_pred(n) ((n)-1)
+".
+
+CodeGen Primitive muln => "muln".
+CodeGen Primitive odd => "odd".
+CodeGen Primitive uphalf' => "uphalf".
+CodeGen Snippet "
+#define muln(x,y) ((x) * (y))
+#define odd(n) ((n)&1)
+
+/* (n)+1 in uphalf(n) doesn't cause integer overflow
+ * because uphalf' is applied to k' which is k-1.  */
+#define uphalf(n) (((n)+1)>>1)
+".
+
+CodeGen Function fastpow_iter.
+CodeGen Function fastpow.
+
+CodeGen GenerateFile "sample/pow_proved.c".

@@ -100,6 +100,137 @@ Definition rank_lookup aux i :=
   lookupD D1 j1 + lookupD D2 j2 +
   bcount b (j2 * sz2) j3 s.
 
+CodeGen Linear MDArr.
+
+CodeGen Inductive Type bool => "bool".
+CodeGen Inductive Match bool => ""
+| true => "default"
+| false => "case 0".
+CodeGen Constant true => "true".
+CodeGen Constant false => "false".
+
+CodeGen Snippet "
+#include <stdbool.h> /* for bool, true and false */
+".
+
+CodeGen Inductive Type nat => "nat".
+CodeGen Inductive Match nat => ""
+| O => "case 0"
+| S => "default" "nat_pred".
+CodeGen Constant O => "0".
+CodeGen Primitive S => "nat_succ".
+
+CodeGen Snippet "
+#include <stdint.h>
+typedef uint64_t nat;
+#define nat_succ(n) ((n)+1)
+#define nat_pred(n) ((n)-1)
+".
+
+CodeGen Primitive addn => "addn".
+CodeGen Primitive subn => "subn".
+CodeGen Primitive muln => "muln".
+CodeGen Primitive divn => "divn".
+CodeGen Primitive modn => "modn".
+CodeGen Primitive bitlen => "bitlen".
+CodeGen Primitive bcount => "bcount".
+CodeGen Primitive eqb => "eqb".
+CodeGen Primitive negb => "negb".
+CodeGen Primitive eqn => "eqn".
+CodeGen Snippet "
+#define addn(x,y) ((x) + (y))
+#define subn(x,y) ((x) - (y))
+#define muln(x,y) ((x) * (y))
+#define divn(x,y) ((x) / (y))
+#define modn(x,y) ((x) % (y))
+".
+
+CodeGen Inductive Type bits => "bits".
+CodeGen Inductive Type DArr => "DArr".
+CodeGen Inductive Type MDArr => "MDArr".
+
+CodeGen Inductive Type (MDArr * MDArr)%type => "prod_MDArr_MDArr".
+CodeGen Inductive Match (MDArr * MDArr)%type => ""
+| pair => "" "field0_pair_prod_MDArr_MDArr" "field1_pair_prod_MDArr_MDArr".
+CodeGen Primitive pair MDArr MDArr => "pair_MDArr_MDArr".
+CodeGen Snippet "
+typedef struct {
+  MDArr D1;
+  MDArr D2;
+} prod_MDArr_MDArr;
+#define pair_MDArr_MDArr(D1, D2) ((prod_MDArr_MDArr){ (D1), (D2) })
+#define field0_pair_prod_MDArr_MDArr(x) ((x).D1)
+#define field1_pair_prod_MDArr_MDArr(x) ((x).D2)
+".
+
+CodeGen Inductive Type (MDArr * nat)%type => "prod_MDArr_nat".
+CodeGen Inductive Match (MDArr * nat)%type => ""
+| pair => "" "field0_pair_prod_MDArr_nat" "field1_pair_prod_MDArr_nat".
+CodeGen Primitive pair MDArr nat => "pair_MDArr_nat".
+CodeGen Snippet "
+typedef struct {
+  MDArr D;
+  nat n;
+} prod_MDArr_nat;
+#define pair_MDArr_nat(D, n) ((prod_MDArr_nat){ (D), (n) })
+#define field0_pair_prod_MDArr_nat(x) ((x).D)
+#define field1_pair_prod_MDArr_nat(x) ((x).n)
+".
+
+CodeGen Inductive Type ((MDArr * MDArr) * nat)%type => "prod_prod_MDArr_MDArr_nat".
+CodeGen Inductive Match ((MDArr * MDArr) * nat)%type => ""
+| pair => "" "field0_pair_prod_prod_MDArr_MDArr_nat" "field1_pair_prod_prod_MDArr_MDArr_nat".
+CodeGen Primitive pair (MDArr * MDArr)%type nat => "pair_prod_MDArr_MDArr_nat".
+CodeGen Snippet "
+typedef struct {
+  prod_MDArr_MDArr D12;
+  nat n;
+} prod_prod_MDArr_MDArr_nat;
+#define pair_prod_MDArr_MDArr_nat(D12, n) \
+  ((prod_prod_MDArr_MDArr_nat){ (D12), (n) })
+#define field0_pair_prod_prod_MDArr_MDArr_nat(x) ((x).D12)
+#define field1_pair_prod_prod_MDArr_MDArr_nat(x) ((x).n)
+".
+
+CodeGen Inductive Type Aux => "Aux".
+CodeGen Inductive Match Aux => ""
+| mkAux => "" "get_query_bit" "get_input_bits" "get_blksz2" "get_ratio" "get_dir1" "get_dir2".
+CodeGen Primitive mkAux => "mkAux".
+CodeGen Primitive query_bit => "get_query_bit".
+CodeGen Primitive input_bits => "get_input_bits".
+CodeGen Primitive blksz2 => "get_blksz2".
+CodeGen Primitive ratio => "get_ratio".
+CodeGen Primitive dir1 => "get_dir1".
+CodeGen Primitive dir2 => "get_dir2".
+CodeGen Snippet "
+typedef struct {
+  bool query_bit;
+  bits input_bits;
+  nat ratio;
+  nat blksz2;
+  DArr dir1;
+  DArr dir2;
+} Aux;
+#define mkAux(b, s, k, sz2, D1, D2) ((Aux){ (b), (s), (k), (sz2), (D1), (D2) })
+#define get_query_bit(aux) ((aux).query_bit)
+#define get_input_bits(aux) ((aux).input_bits)
+#define get_blksz2(aux) ((aux).blksz2)
+#define get_ratio(aux) ((aux).ratio)
+#define get_dir1(aux) ((aux).dir1)
+#define get_dir2(aux) ((aux).dir2)
+".
+
+CodeGen Function Nat.pred.
+CodeGen Function neq0.
+CodeGen Function buildDir2.
+CodeGen Function buildDir1.
+CodeGen Function buildDir.
+CodeGen Function rank_init.
+CodeGen Function rank_lookup.
+
+CodeGen GenerateFile "sample/rank_proved.c".
+
+(*
 CodeGen Terminate Monomorphization addn.
 CodeGen Terminate Monomorphization subn.
 CodeGen Terminate Monomorphization muln.
@@ -118,8 +249,8 @@ Print _buildDir1.
 Print _buildDir.
 Print _rank_init.
 Print _rank_lookup.
+*)
 
-CodeGen Linear MDArr.
 
 (* GenCFile checks them internaly
 CodeGen LinearCheck _pred _neq0.
@@ -130,6 +261,7 @@ CodeGen LinearCheck _rank_init.
 CodeGen LinearCheck _rank_lookup.
 *)
 
+(*
 CodeGen GenCFile "sample/rank_proved.c"
   _pred
   _neq0
@@ -139,3 +271,4 @@ CodeGen GenCFile "sample/rank_proved.c"
   _rank_init
   _rank_lookup.
 
+*)
