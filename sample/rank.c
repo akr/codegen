@@ -18,7 +18,7 @@ Example:
   ./rank 10010101 5
   ./rank rand 10
 
-Note that n11_buildDir, n2_rank_init and n2_rank_lookup is generated
+Note that buildDir, rank_init and rank_lookup is generated
 using Coq and monomorphization plugin.
 */
 
@@ -26,7 +26,8 @@ using Coq and monomorphization plugin.
 /* not efficient */
 
 #include <stdlib.h>
-#include <stdint.h>
+#include <stdbool.h> /* bool, true, false */
+#include <stdint.h> /* uint64_t */
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
@@ -35,17 +36,24 @@ using Coq and monomorphization plugin.
 #include <unistd.h>
 #include <inttypes.h>
 
-#include <stdbool.h>
+typedef uint64_t nat;
+#define succn(n) ((n)+1)
+#define predn(n) ((n)-1)
+#define addn(x,y) ((x) + (y))
+#define subn(x,y) ((x) - (y))
+#define muln(x,y) ((x) * (y))
+#define divn(x,y) ((x) / (y))
+#define modn(x,y) ((x) % (y))
 
 typedef struct {
   uint64_t *buf;
-  uint64_t len; /* current length [bit] */
-  uint64_t max; /* maximum length [bit] */
+  nat len; /* current length [bit] */
+  nat max; /* maximum length [bit] */
 } *bits;
 
 #define bsize(s) ((s)->len)
 
-bits alloc_bits(uint64_t max)
+bits alloc_bits(nat max)
 {
   bits s;
   s = malloc(sizeof(*s));
@@ -59,15 +67,15 @@ bits alloc_bits(uint64_t max)
   return s;
 }
 
-bool get_bit(bits s, uint64_t i)
+bool get_bit(bits s, nat i)
 {
   assert(i < s->len);
   return (s->buf[i / 64] >> (i % 64)) & 1;
 }
 
-uint64_t get_bits(bits s, uint64_t w, uint64_t i)
+nat get_bits(bits s, nat w, nat i)
 {
-  uint64_t n = 0;
+  nat n = 0;
   for (; 0 < w; w--)
     n = (n << 1) | get_bit(s, i + w - 1);
   return n;
@@ -77,7 +85,7 @@ bits add_bit(bits s, bool b)
 {
   if (s->max <= s->len) {
     uint64_t *buf;
-    uint64_t max;
+    nat max;
     max = s->max * 2;
     assert(s->max < max);
     buf = realloc(s->buf, max / CHAR_BIT);
@@ -94,7 +102,7 @@ bits add_bit(bits s, bool b)
   return s;
 }
 
-bits add_bits(bits s, uint64_t w, uint64_t n)
+bits add_bits(bits s, nat w, nat n)
 {
   for (; 0 < w; w--) {
     s = add_bit(s, n & 1);
@@ -103,10 +111,10 @@ bits add_bits(bits s, uint64_t w, uint64_t n)
   return s;
 }
 
-uint64_t bcount(bool b, uint64_t n, uint64_t m, bits bs)
+nat bcount(bool b, nat n, nat m, bits bs)
 {
-  uint64_t ret = 0;
-  uint64_t i;
+  nat ret = 0;
+  nat i;
   for (i = n; i < n + m; i++)
     if (get_bit(bs, i) == b)
       ret++;
@@ -114,12 +122,12 @@ uint64_t bcount(bool b, uint64_t n, uint64_t m, bits bs)
 }
 
 typedef struct {
-  uint64_t w;
+  nat w;
   bits s;
 } DArr;
 #define MDArr DArr
 
-DArr emptyD(uint64_t w)
+DArr emptyD(nat w)
 {
   DArr d;
   assert(0 < w);
@@ -130,7 +138,7 @@ DArr emptyD(uint64_t w)
 
 #define bwidth(d) ((d).w)
 
-DArr pushD(DArr d, uint64_t n)
+DArr pushD(DArr d, nat n)
 {
   d.s = add_bits(d.s, d.w, n);
   return d;
@@ -141,13 +149,54 @@ DArr pushD(DArr d, uint64_t n)
 #define lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
 #define sizeD(d) (bsize(d) / (d).w)
 
-static inline uint64_t
-bitlen(uint64_t n)
+typedef struct {
+  MDArr D1;
+  MDArr D2;
+} pair_MDArr_MDArr;
+#define make_pair_MDArr_MDArr(D1, D2) ((pair_MDArr_MDArr){ (D1), (D2) })
+#define pair_MDArr_MDArr_D1(x) ((x).D1)
+#define pair_MDArr_MDArr_D2(x) ((x).D2)
+
+typedef struct {
+  MDArr D;
+  nat n;
+} pair_MDArr_nat;
+#define make_pair_MDArr_nat(D, n) ((pair_MDArr_nat){ (D), (n) })
+#define pair_MDArr_nat_D(x) ((x).D)
+#define pair_MDArr_nat_n(x) ((x).n)
+
+typedef struct {
+  pair_MDArr_MDArr D12;
+  nat n;
+} pair_2MDArr_nat;
+#define make_pair_2MDArr_nat(D12, n) \
+  ((pair_2MDArr_nat){ (D12), (n) })
+#define pair_2MDArr_nat_D12(x) ((x).D12)
+#define pair_2MDArr_nat_n(x) ((x).n)
+
+static inline nat
+bitlen(nat n)
 {
   if (n == 0) return 0;
   assert(64 <= sizeof(long) * CHAR_BIT);
   return 64 - __builtin_clzl(n);
 }
+
+typedef struct {
+  bool query_bit;
+  bits input_bits;
+  nat ratio;
+  nat blksz2;
+  DArr dir1;
+  DArr dir2;
+} Aux;
+#define mkAux(b, s, k, sz2, D1, D2) ((Aux){ (b), (s), (k), (sz2), (D1), (D2) })
+#define aux_query_bit(aux) ((aux).query_bit)
+#define aux_input_bits(aux) ((aux).input_bits)
+#define aux_blksz2(aux) ((aux).blksz2)
+#define aux_ratio(aux) ((aux).ratio)
+#define aux_dir1(aux) ((aux).dir1)
+#define aux_dir2(aux) ((aux).dir2)
 
 #include "rank_proved.c"
 
