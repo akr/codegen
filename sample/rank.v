@@ -130,20 +130,20 @@ CodeGen Inductive Type bits => "bits".
 CodeGen Inductive Type DArr => "DArr".
 CodeGen Inductive Type MDArr => "MDArr".
 
-CodeGen Inductive Type (MDArr * MDArr)%type => "pair_MDArr_MDArr".
-CodeGen Inductive Match (MDArr * MDArr)%type => ""
+CodeGen Inductive Type MDArr*MDArr => "pair_MDArr_MDArr".
+CodeGen Inductive Match MDArr*MDArr => ""
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
 
-CodeGen Inductive Type (MDArr * nat)%type => "pair_MDArr_nat".
-CodeGen Inductive Match (MDArr * nat)%type => ""
+CodeGen Inductive Type MDArr*nat => "pair_MDArr_nat".
+CodeGen Inductive Match MDArr*nat => ""
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
 
-CodeGen Inductive Type ((MDArr * MDArr) * nat)%type => "pair_2MDArr_nat".
-CodeGen Inductive Match ((MDArr * MDArr) * nat)%type => ""
+CodeGen Inductive Type MDArr*MDArr*nat => "pair_2MDArr_nat".
+CodeGen Inductive Match MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
-CodeGen Primitive pair (MDArr * MDArr)%type nat => "make_pair_2MDArr_nat".
+CodeGen Primitive pair (MDArr*MDArr)%type nat => "make_pair_2MDArr_nat".
 
 CodeGen Inductive Type Aux => "Aux".
 CodeGen Inductive Match Aux => ""

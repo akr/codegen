@@ -41,8 +41,8 @@ let quote_coq_string s =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let nf_interp_constr env sigma t =
-  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+let nf_interp_type env sigma t =
+  let (sigma, t) = Constrintern.interp_type_evars env sigma t in
   let t = Reductionops.nf_all env sigma t in
   let t = EConstr.to_constr sigma t in
   (sigma, t)
@@ -78,7 +78,7 @@ let codegen_print_inductive coq_type_list =
     ConstrMap.iter (fun key ind_cfg -> codegen_print_inductive1 env sigma ind_cfg) !ind_config_map
   else
     coq_type_list |> List.iter (fun user_coq_type ->
-      let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+      let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
       match ConstrMap.find_opt coq_type !ind_config_map with
       | None -> user_err (Pp.str "inductive type not registered:" ++
           Pp.spc () ++ Printer.pr_constr_env env sigma coq_type)
@@ -139,7 +139,7 @@ let get_ind_config coq_type =
 let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
@@ -159,7 +159,7 @@ let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string
     (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   let ind_cfg = get_ind_config coq_type in
   (match ind_cfg.c_swfunc with
