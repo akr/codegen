@@ -121,22 +121,22 @@ let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d 
     user_err (Pp.str "specialization already configured:" ++ spc () ++ Printer.pr_constr_env env sigma func));
   ignore (codegen_specialization_define_arguments env sigma func sd_list)
 
-let rec determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : s_or_d list =
+let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
   let ty = Reductionops.whd_all env sigma ty in
   match EConstr.kind sigma ty with
-  | Prod (x,t,c) ->
+  | Prod (x,t,b) ->
       let t = Reductionops.whd_all env sigma t in
-      let sd =
-        if EConstr.isSort sigma t then
-          SorD_S
-        else
-          SorD_D
-      in
+      let is_type_arg = EConstr.isSort sigma t in
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env = EConstr.push_rel decl env in
-      sd :: determine_sd_list env sigma c
+      is_type_arg :: determine_type_arguments env sigma b
   | _ -> []
+
+let determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : s_or_d list =
+  List.map
+    (function true -> SorD_S | false -> SorD_D)
+    (determine_type_arguments env sigma ty)
 
 let codegen_specialization_auto_arguments_internal
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -201,15 +201,18 @@ let gensym_ps (suffix : string) : Names.Id.t * Names.Id.t =
   (Id.of_string p, Id.of_string s)
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
+    (istypearg_list : bool list)
     (user_args : Constrexpr.constr_expr list) : Evd.evar_map * EConstr.t list =
-  let interp_arg sigma user_arg =
+  let interp_arg sigma istypearg user_arg =
     let sigma0 = sigma in
-    let (sigma, arg) = Constrintern.interp_constr_evars env sigma user_arg in
+    let interp = if istypearg then Constrintern.interp_type_evars
+                              else Constrintern.interp_constr_evars in
+    let (sigma, arg) = interp env sigma user_arg in
     (* Feedback.msg_info (Printer.pr_econstr_env env sigma arg); *)
     Pretyping.check_evars env sigma0 sigma arg;
     (sigma, arg)
   in
-  CList.fold_left_map interp_arg sigma user_args
+  CList.fold_left2_map interp_arg sigma istypearg_list user_args
 
 let label_name_of_constant_or_constructor (func : Constr.t) : string =
   match Constr.kind func with
@@ -326,16 +329,28 @@ let codegen_function_internal
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     user_args
   in
-  let user_args = List.filter_map
+  let static_args = List.filter_map
     (fun arg -> match arg with None -> None| Some a -> Some a)
     user_args
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, args) = interp_args env sigma user_args in
+  let func = func_of_qualid env func in
+  let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
+  let func_istypearg_list = determine_type_arguments env sigma func_type in
+  (if List.length func_istypearg_list < List.length sd_list then
+    user_err (Pp.str "[codegen] too many arguments:" ++ Pp.spc () ++
+      Printer.pr_constr_env env sigma func ++ Pp.spc () ++
+      Pp.str "(" ++
+      Pp.int (List.length sd_list) ++ Pp.str " for " ++
+      Pp.int (List.length func_istypearg_list) ++ Pp.str ")"));
+  let func_istypearg_list = CList.map_filter_i
+    (fun i arg -> match arg with None -> None | Some _ -> Some (List.nth func_istypearg_list i))
+    user_args
+  in
+  let (sigma, args) = interp_args env sigma func_istypearg_list static_args in
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  let func = func_of_qualid env func in
   ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
   specialization_instance_internal ~gen_constant:gen_constant env sigma func args (Some names)
 

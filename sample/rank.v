@@ -143,7 +143,7 @@ CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
 CodeGen Inductive Type MDArr*MDArr*nat => "pair_2MDArr_nat".
 CodeGen Inductive Match MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
-CodeGen Primitive pair (MDArr*MDArr)%type nat => "make_pair_2MDArr_nat".
+CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
 
 CodeGen Inductive Type Aux => "Aux".
 CodeGen Inductive Match Aux => ""

@@ -559,6 +559,74 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
       assert(mono_id_bool(false) == false);
     |}
 
+let test_pair_bool_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      CodeGen Inductive Type bool*bool => "pair_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+      CodeGen Primitive pair bool bool => "make_pair_bool_bool".
+      CodeGen Snippet "
+      typedef struct {
+        bool fst;
+        bool snd;
+      } pair_bool_bool;
+      #define make_pair_bool_bool(fst, snd) ((pair_bool_bool){ (fst), (snd) })
+      #define pair_bool_bool_fst(x) ((x).fst)
+      #define pair_bool_bool_snd(x) ((x).snd)
+      ".
+      Definition fst_pair (v : bool * bool) := match v with pair x y => x end.
+      Definition snd_pair (v : bool * bool) := match v with pair x y => y end.
+      CodeGen Function fst_pair.
+      CodeGen Function snd_pair.
+    |}) {|
+      pair_bool_bool v = make_pair_bool_bool(true, false);
+      assert(fst_pair(v) == true);
+      assert(snd_pair(v) == false);
+      v = make_pair_bool_bool(false, true);
+      assert(fst_pair(v) == false);
+      assert(snd_pair(v) == true);
+    |}
+
+let test_pair_2bool_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      CodeGen Inductive Type bool*bool => "pair_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+      CodeGen Primitive pair bool bool => "make_pair_bool_bool".
+
+      CodeGen Inductive Type bool*bool*bool => "pair_2bool_bool".
+      CodeGen Inductive Match bool*bool*bool => ""
+      | pair => "" "pair_2bool_bool_fst" "pair_2bool_bool_snd".
+      CodeGen Primitive pair (bool*bool) bool => "make_pair_2bool_bool".
+
+      CodeGen Snippet "
+      typedef struct { bool fst; bool snd; } pair_bool_bool;
+      #define make_pair_bool_bool(fst, snd) ((pair_bool_bool){ (fst), (snd) })
+      #define pair_bool_bool_fst(x) ((x).fst)
+      #define pair_bool_bool_snd(x) ((x).snd)
+      typedef struct { pair_bool_bool fst; bool snd; } pair_2bool_bool;
+      #define make_pair_2bool_bool(fst, snd) ((pair_2bool_bool){ (fst), (snd) })
+      #define pair_2bool_bool_fst(x) ((x).fst)
+      #define pair_2bool_bool_snd(x) ((x).snd)
+      ".
+      Definition fst_pair (v : bool * bool * bool) := match v with pair x y => x end.
+      Definition snd_pair (v : bool * bool * bool) := match v with pair x y => y end.
+      CodeGen Function fst_pair.
+      CodeGen Function snd_pair.
+    |}) {|
+      pair_2bool_bool v;
+      v = make_pair_2bool_bool(make_pair_bool_bool(true, false), true);
+      assert(fst_pair(v).fst == true);
+      assert(fst_pair(v).snd == false);
+      assert(snd_pair(v) == true);
+      v = make_pair_2bool_bool(make_pair_bool_bool(false, true), false);
+      assert(fst_pair(v).fst == false);
+      assert(fst_pair(v).snd == true);
+      assert(snd_pair(v) == false);
+    |}
+
 let test_nat_add_rec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
@@ -866,6 +934,8 @@ let suite : OUnit2.test =
     "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
     "test_mono_id_mybool" >:: test_mono_id_mybool;
     "test_mybool_true" >:: test_mybool_true;
+    "test_pair_bool_bool" >:: test_pair_bool_bool;
+    "test_pair_2bool_bool" >:: test_pair_2bool_bool;
     "test_nat_add_rec" >:: test_nat_add_rec;
     "test_nat_add_iter" >:: test_nat_add_iter;
     "test_list_bool" >:: test_list_bool;
