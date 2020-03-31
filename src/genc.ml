@@ -826,6 +826,9 @@ let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_
   pp
 and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _
+  | Evar _ | Prod _ | CoFix _ ->
+      user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -920,13 +923,6 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
   | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Float _ -> user_err (Pp.str "gen_tail: unsupported term Float:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Var _ -> user_err (Pp.str "gen_tail: unsupported term Var:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Meta _ -> user_err (Pp.str "gen_tail: unsupported term Meta:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Evar _ -> user_err (Pp.str "gen_tail: unsupported term Evar:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Sort _ -> user_err (Pp.str "gen_tail: unsupported term Sort:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Ind _ -> user_err (Pp.str "gen_tail: unsupported term Ind:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Prod _ -> user_err (Pp.str "gen_tail: unsupported term Prod:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | CoFix _ -> user_err (Pp.str "gen_tail: unsupported term CoFix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 and gen_assign (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 ret_var env sigma term cargs in
   (*
