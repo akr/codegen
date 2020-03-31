@@ -874,6 +874,19 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
       assert(f10() == 0);
     |}
 
+let test_let_add (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Set CodeGen Dev.
+      Definition add3 (a b c : nat) : nat :=
+        let ab := a + b in
+        ab + c.
+      CodeGen Function add3.
+    |}) {|
+      assert(add3(1,2,3) == 6);
+    |}
+
 let test_add_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -970,6 +983,7 @@ let suite : OUnit2.test =
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     "test_deeply_nested_match" >:: test_deeply_nested_match;
+    "test_let_add" >:: test_let_add;
     (*"test_add_tailrec" >:: test_add_tailrec;*)
     (*"test_add_nontailrec" >:: test_add_nontailrec;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;

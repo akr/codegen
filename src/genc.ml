@@ -905,10 +905,17 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
               gen_branch accessors br)
 	    branches)))
 
+  | LetIn (n,e,t,b) ->
+      let c_var = local_gensym_with_annotated_name n in
+      add_local_var (c_typename env sigma t) c_var;
+      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), t, e) in
+      let env2 = EConstr.push_rel decl env in
+      gen_assign c_var env sigma e [] ++
+      gen_tail gen_ret env2 sigma b cargs
+
   | Fix ((ia, i), (nary, tary, fary)) ->
       user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 
-  | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
@@ -920,6 +927,46 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
   | Ind _ -> user_err (Pp.str "gen_tail: unsupported term Ind:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Prod _ -> user_err (Pp.str "gen_tail: unsupported term Prod:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | CoFix _ -> user_err (Pp.str "gen_tail: unsupported term CoFix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+and gen_assign (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  let pp = gen_assign1 ret_var env sigma term cargs in
+  (*
+  Feedback.msg_debug (Pp.str "gen_assign:" ++ Pp.spc () ++
+    Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
+    Pp.str "->" ++ Pp.spc () ++
+    pp);
+  *)
+  pp
+and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _
+  | Evar _ | Prod _ | CoFix _ ->
+      user_err (str "[codegen:gen_assign] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+  | Rel i ->
+      if List.length cargs = 0 then
+        let str = carg_of_garg env i in
+        genc_assign (Pp.str ret_var) (Pp.str str)
+      else
+        user_err (Pp.str "[codegen:gen_assign] fix/closure call not supported yet")
+  | Const (ctnt,_) ->
+      genc_assign (Pp.str ret_var) (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs))
+  | Construct (cstr,_) ->
+      genc_assign (Pp.str ret_var) (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs))
+  | App (f,args) ->
+      let cargs2 =
+        List.append
+          (Array.to_list (Array.map (fun arg -> carg_of_garg env (destRel sigma arg)) args))
+          cargs
+      in
+      gen_assign1 ret_var env sigma f cargs2
+
+  | Cast _
+  | Int _ | Float _
+  | Proj _
+  | LetIn _
+  | Case _
+  | Lambda _
+  | Fix _ ->
+      user_err (str "[codegen] not impelemented (gen_assign:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
 
 exception NeedsMultipleFunctions
 
