@@ -874,7 +874,25 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
       assert(f10() == 0);
     |}
 
-let test_signle_function (ctx : test_ctxt) : unit =
+let test_add_tailrec (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Set CodeGen Dev.
+      Fixpoint add (a b : nat) : nat :=
+	match a with
+	| O => b
+	| S a' => add a' (S b)
+	end.
+      CodeGen Function add.
+    |}) {|
+      assert(add(0,0) == 0);
+      assert(add(0,1) == 1);
+      assert(add(1,0) == 1);
+      assert(add(1,1) == 2);
+    |}
+
+let test_add_nontailrec (ctx : test_ctxt) : unit =
   assert_coq_success ctx
     (nat_src ^
     {|
@@ -952,7 +970,8 @@ let suite : OUnit2.test =
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
     "test_deeply_nested_match" >:: test_deeply_nested_match;
-    (*"test_signle_function" >:: test_signle_function;*)
+    (*"test_add_tailrec" >:: test_add_tailrec;*)
+    (*"test_add_nontailrec" >:: test_add_nontailrec;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
     (*"test_map_succ" >:: test_map_succ;*)
   ]
