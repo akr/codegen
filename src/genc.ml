@@ -905,8 +905,10 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
               gen_branch accessors br)
 	    branches)))
 
+  | Fix ((ia, i), (nary, tary, fary)) ->
+      user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+
   | LetIn _ -> user_err (Pp.str "gen_tail: unsupported term LetIn:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Fix _ -> user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
   | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
@@ -1200,8 +1202,8 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
       let fary' = Array.map (fun f -> gensym_fix_vars env2 sigma h outer_vars2 inner_vars2 f numargs) fary in
       let nary' = Array.init n
         (fun i ->
-          let u = Array.get fixvar_usages i in
-          let name = Context.binder_name (Array.get nary i) in
+          let u = fixvar_usages.(i) in
+          let name = Context.binder_name nary.(i) in
           let gensym_with_name =
             if u.how_used_as_call then
               global_gensym_with_name
