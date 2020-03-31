@@ -827,7 +827,9 @@ let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_
 and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
-  | Evar _ | Prod _ | CoFix _ ->
+  | Evar _ | Prod _
+  | Int _ | Float _
+  | Cast _ | CoFix _ ->
       user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
@@ -920,9 +922,6 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Cast _ -> user_err (Pp.str "gen_tail: unsupported term Cast:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Int _ -> user_err (Pp.str "gen_tail: unsupported term Int:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
-  | Float _ -> user_err (Pp.str "gen_tail: unsupported term Float:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
 and gen_assign (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 ret_var env sigma term cargs in
   (*
@@ -935,7 +934,9 @@ and gen_assign (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (te
 and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
-  | Evar _ | Prod _ | CoFix _ ->
+  | Evar _ | Prod _
+  | Int _ | Float _
+  | Cast _ | CoFix _ ->
       user_err (str "[codegen:gen_assign] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
@@ -955,14 +956,12 @@ and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (t
       in
       gen_assign1 ret_var env sigma f cargs2
 
-  | Cast _
-  | Int _ | Float _
   | Proj _
   | LetIn _
   | Case _
   | Lambda _
   | Fix _ ->
-      user_err (str "[codegen] not impelemented (gen_assign:" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+      user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
 
 exception NeedsMultipleFunctions
 
