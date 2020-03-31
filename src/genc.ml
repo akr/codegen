@@ -910,8 +910,8 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
               gen_branch accessors br)
 	    branches)))
 
-  | LetIn (n,e,t,b) ->
-      let c_var = local_gensym_with_annotated_name n in
+  | LetIn (x,e,t,b) ->
+      let c_var = local_gensym_with_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), t, e) in
       let env2 = EConstr.push_rel decl env in
