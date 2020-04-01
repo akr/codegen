@@ -816,15 +816,23 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Name id -> Id.to_string id
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
-    hv 0 (
-    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
-    brace (pp_join_ary (spc ())
-      (Array.map
-        (fun (caselabel, pp_branch) ->
-          str caselabel ++ str ":" ++ spc () ++ pp_branch)
-        branches)))
+  hv 0 (
+  hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+  brace (pp_join_ary (spc ())
+    (Array.map
+      (fun (caselabel, pp_branch) ->
+        str caselabel ++ str ":" ++ spc () ++ pp_branch)
+      branches)))
 
-let gen_match (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
+let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
+  gen_switch_without_break swexpr
+    (Array.map
+      (fun (caselabel, pp_branch) ->
+        (caselabel, pp_branch ++ spc () ++ str "break;"))
+      branches)
+
+let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
+    (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
     (cargs : string list) : Pp.t =
@@ -871,7 +879,7 @@ let gen_match (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> st
   else
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
-    gen_switch_without_break swexpr
+    gen_switch swexpr
       (Array.mapi
         (fun i br ->
           let (caselabel, accessors) = caselabel_accessors.(i) in
@@ -920,7 +928,7 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
           let env2 = EConstr.push_rel decl env in
           gen_tail gen_ret env2 sigma b rest)
   | Case (ci,predicate,item,branches) ->
-      gen_match (gen_tail gen_ret) env sigma ci predicate item branches cargs
+      gen_match gen_switch_without_break (gen_tail gen_ret) env sigma ci predicate item branches cargs
   | LetIn (x,e,t,b) ->
       let c_var = local_gensym_with_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
