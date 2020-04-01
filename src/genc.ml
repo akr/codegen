@@ -815,6 +815,15 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Anonymous -> assert false
   | Name.Name id -> Id.to_string id
 
+let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
+    hv 0 (
+    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+    brace (pp_join_ary (spc ())
+      (Array.map
+        (fun (caselabel, pp_branch) ->
+          str caselabel ++ str ":" ++ spc () ++ pp_branch)
+        branches)))
+
 let gen_match (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
@@ -862,15 +871,12 @@ let gen_match (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> st
   else
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
-    hv 0 (
-    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
-    brace (pp_join_ary (spc ())
+    gen_switch_without_break swexpr
       (Array.mapi
         (fun i br ->
           let (caselabel, accessors) = caselabel_accessors.(i) in
-          str caselabel ++ str ":" ++ spc () ++
-          gen_branch accessors br)
-        branches)))
+          (caselabel, gen_branch accessors br))
+        branches)
 
 let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_tail1 gen_ret env sigma term cargs in
