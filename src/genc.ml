@@ -815,6 +815,63 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Anonymous -> assert false
   | Name.Name id -> Id.to_string id
 
+let gen_match (gen_tail_gen_ret : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
+    (cargs : string list) : Pp.t =
+  let item_relindex = destRel sigma item in
+  let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
+  let item_cvar = carg_of_garg env (destRel sigma item) in
+  (*let result_type = Retyping.get_type_of env sigma term in*)
+  (*let result_type = Reductionops.nf_all env sigma result_type in*)
+  let gen_branch accessors br =
+    (
+    let branch_type = Retyping.get_type_of env sigma br in
+    let branch_type = Reductionops.nf_all env sigma branch_type in
+    let (branch_arg_types, _) = decompose_prod sigma branch_type in
+    let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
+    let branch_arg_types = CArray.rev_of_list branch_arg_types in
+    let c_vars = Array.map
+      (fun (x,t) ->
+        let c_var = local_gensym_with_annotated_name x in
+        add_local_var (c_typename env sigma t) c_var;
+        c_var)
+      branch_arg_types
+    in
+    pp_join_ary (spc ())
+      (Array.map2
+        (fun c_var access -> str c_var ++ str " =" ++ spc () ++
+          str access ++ str "(" ++ str item_cvar ++ str ");")
+        c_vars accessors) ++ spc () ++
+    gen_tail_gen_ret env sigma br (List.append (Array.to_list c_vars) cargs))
+  in
+  let n = Array.length branches in
+  let caselabel_accessors =
+    Array.map
+      (fun j ->
+        (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
+         Array.map
+           (case_cstrfield env sigma (EConstr.of_constr item_type) j)
+           (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
+      (iota_ary 1 n)
+  in
+  if n = 1 then
+    let accessors = snd caselabel_accessors.(0) in
+    let br = branches.(0) in
+    gen_branch accessors br
+  else
+    let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
+    let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
+    hv 0 (
+    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+    brace (pp_join_ary (spc ())
+      (Array.mapi
+        (fun i br ->
+          let (caselabel, accessors) = caselabel_accessors.(i) in
+          str caselabel ++ str ":" ++ spc () ++
+          gen_branch accessors br)
+        branches)))
+
 let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_tail1 gen_ret env sigma term cargs in
   (*
@@ -857,59 +914,7 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
           let env2 = EConstr.push_rel decl env in
           gen_tail gen_ret env2 sigma b rest)
   | Case (ci,predicate,item,branches) ->
-      let item_relindex = destRel sigma item in
-      let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
-      let item_cvar = carg_of_garg env (destRel sigma item) in
-      (*let result_type = Retyping.get_type_of env sigma term in*)
-      (*let result_type = Reductionops.nf_all env sigma result_type in*)
-      let gen_branch accessors br =
-        (
-        let branch_type = Retyping.get_type_of env sigma br in
-        let branch_type = Reductionops.nf_all env sigma branch_type in
-        let (branch_arg_types, _) = decompose_prod sigma branch_type in
-        let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
-        let branch_arg_types = CArray.rev_of_list branch_arg_types in
-        let c_vars = Array.map
-          (fun (x,t) ->
-            let c_var = local_gensym_with_annotated_name x in
-            add_local_var (c_typename env sigma t) c_var;
-            c_var)
-          branch_arg_types
-        in
-        pp_join_ary (spc ())
-          (Array.map2
-            (fun c_var access -> str c_var ++ str " =" ++ spc () ++
-              str access ++ str "(" ++ str item_cvar ++ str ");")
-            c_vars accessors) ++ spc () ++
-        gen_tail gen_ret env sigma br (List.append (Array.to_list c_vars) cargs))
-      in
-      let n = Array.length branches in
-      let caselabel_accessors =
-        Array.map
-          (fun j ->
-            (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
-             Array.map
-               (case_cstrfield env sigma (EConstr.of_constr item_type) j)
-               (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
-          (iota_ary 1 n)
-      in
-      if n = 1 then
-        let accessors = snd caselabel_accessors.(0) in
-	let br = branches.(0) in
-        gen_branch accessors br
-      else
-	let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
-	let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
-	hv 0 (
-	hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
-	brace (pp_join_ary (spc ())
-	  (Array.mapi
-	    (fun i br ->
-              let (caselabel, accessors) = caselabel_accessors.(i) in
-              str caselabel ++ str ":" ++ spc () ++
-              gen_branch accessors br)
-	    branches)))
-
+      gen_match (gen_tail gen_ret) env sigma ci predicate item branches cargs
   | LetIn (x,e,t,b) ->
       let c_var = local_gensym_with_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
