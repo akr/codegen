@@ -887,6 +887,7 @@ let test_let_add (ctx : test_ctxt) : unit =
       assert(add3(1,2,3) == 6);
     |}
 
+(* gen_assign Case *)
 let test_let_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -899,6 +900,21 @@ let test_let_match (ctx : test_ctxt) : unit =
     |}) {|
       assert(tst(true) == true);
       assert(tst(false) == false);
+    |}
+
+(* gen_assign LetIn *)
+let test_let_match_let (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Set CodeGen Dev.
+      Definition tst (b : bool) : nat :=
+        let n := match b with true => let z := O in S z | false => O end in
+        S n.
+      CodeGen Function tst.
+    |}) {|
+      assert(tst(false) == 1);
+      assert(tst(true) == 2);
     |}
 
 let test_add_tailrec (ctx : test_ctxt) : unit =
@@ -999,6 +1015,7 @@ let suite : OUnit2.test =
     "test_deeply_nested_match" >:: test_deeply_nested_match;
     "test_let_add" >:: test_let_add;
     "test_let_match" >:: test_let_match;
+    "test_let_match_let" >:: test_let_match_let;
     (*"test_add_tailrec" >:: test_add_tailrec;*)
     (*"test_add_nontailrec" >:: test_add_nontailrec;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;

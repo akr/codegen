@@ -946,7 +946,7 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
-      gen_assign c_var env sigma e [] ++
+      gen_assign c_var env sigma e [] ++ Pp.spc () ++
       gen_tail gen_ret env2 sigma b cargs
 
   | Fix ((ia, i), (nary, tary, fary)) ->
@@ -987,8 +987,15 @@ and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (t
   | Case (ci,predicate,item,branches) ->
       gen_match gen_switch_with_break (gen_assign ret_var) env sigma ci predicate item branches cargs
 
+  | LetIn (x,e,t,b) ->
+      let c_var = local_gensym_with_annotated_name x in
+      add_local_var (c_typename env sigma t) c_var;
+      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
+      let env2 = EConstr.push_rel decl env in
+      gen_assign c_var env sigma e [] ++ Pp.spc () ++
+      gen_assign ret_var env2 sigma b cargs
+
   | Proj _
-  | LetIn _
   | Lambda _
   | Fix _ ->
       user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
