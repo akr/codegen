@@ -792,7 +792,7 @@ let gen_function (cfunc_name : string) : Pp.t =
   genc_func env sigma cfunc_name ty body
 
 let brace (pp : Pp.t) : Pp.t =
-  hv 0 (str "{" ++ brk (1,2) ++ hv 0 pp ++ brk (1,-2) ++ str "}")
+  hv 0 (str "{" ++ brk (1,2) ++ hv 0 pp ++ brk (1,0) ++ str "}")
 
 let local_vars : ((string * string) list ref) list ref = ref []
 
@@ -858,12 +858,20 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
         c_var)
       branch_arg_types
     in
-    pp_join_ary (spc ())
-      (Array.map2
-        (fun c_var access -> str c_var ++ str " =" ++ spc () ++
-          str access ++ str "(" ++ str item_cvar ++ str ");")
-        c_vars accessors) ++ spc () ++
-    gen_branch_body env sigma br (List.append (Array.to_list c_vars) cargs))
+    let c_field_access =
+      pp_join_ary (spc ())
+        (Array.map2
+          (fun c_var access -> str c_var ++ str " =" ++ spc () ++
+            str access ++ str "(" ++ str item_cvar ++ str ");")
+          c_vars accessors)
+    in
+    let c_branch_body =
+      gen_branch_body env sigma br (List.append (Array.to_list c_vars) cargs)
+    in
+    if Array.length accessors = 0 then
+      c_branch_body
+    else
+      c_field_access ++ spc () ++ c_branch_body)
   in
   (*Feedback.msg_debug (Pp.str "gen_match:3");*)
   let n = Array.length branches in
