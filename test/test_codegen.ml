@@ -862,11 +862,11 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
     {|
       Require Import List.
       Fixpoint f (s : list bool) : nat :=
-	match s with
-	| nil => 0
-	| cons true (cons true (cons true (cons true rest))) => f rest
-	| cons _ rest => f rest
-	end.
+        match s with
+        | nil => 0
+        | cons true (cons true (cons true (cons true rest))) => f rest
+        | cons _ rest => f rest
+        end.
       CodeGen Function f (repeat true 0) => "f0".
       CodeGen Function f (repeat true 10) => "f10".
     |}) {|
@@ -923,10 +923,10 @@ let test_add_tailrec (ctx : test_ctxt) : unit =
     {|
       Set CodeGen Dev.
       Fixpoint add (a b : nat) : nat :=
-	match a with
-	| O => b
-	| S a' => add a' (S b)
-	end.
+        match a with
+        | O => b
+        | S a' => add a' (S b)
+        end.
       CodeGen Function add.
     |}) {|
       assert(add(0,0) == 0);
@@ -941,10 +941,10 @@ let test_add_nontailrec (ctx : test_ctxt) : unit =
     {|
       Set CodeGen Dev.
       Fixpoint add (a b : nat) : nat :=
-	match a with
-	| O => b
-	| S a' => S (add a' b)
-	end.
+        match a with
+        | O => b
+        | S a' => S (add a' b)
+        end.
       CodeGen Function add.
     |})
 
@@ -955,11 +955,11 @@ let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
     {|
       Set CodeGen Dev.
       Definition double (n : nat) : nat :=
-	(fix add (a b : nat) : nat :=
-	  match a with
-	  | O => b
-	  | S a' => S (add a' b)
-	  end) n n.
+        (fix add (a b : nat) : nat :=
+          match a with
+          | O => b
+          | S a' => S (add a' b)
+          end) n n.
       CodeGen Function double.
     |})
 
