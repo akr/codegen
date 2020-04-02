@@ -794,7 +794,7 @@ let gen_function (cfunc_name : string) : Pp.t =
   genc_func env sigma cfunc_name ty body
 
 let brace (pp : Pp.t) : Pp.t =
-  hv 0 (str "{" ++ brk (1,2) ++ hv 0 pp ++ brk (1,0) ++ str "}")
+  hv 2 (str "{" ++ spc () ++ pp ++ brk (1,-2) ++ str "}")
 
 let local_vars : ((string * string) list ref) list ref = ref []
 
