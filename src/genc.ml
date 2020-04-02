@@ -28,6 +28,14 @@ open State
 open Linear
 open Specialize
 
+let (+++) d1 d2 =
+  if Pp.ismt d1 then
+    d2
+  else if Pp.ismt d2 then
+    d1
+  else
+    d1 ++ Pp.spc () ++ d2
+
 let c_funcname (fname : string) : string =
   c_id fname
 
@@ -37,7 +45,7 @@ let goto_label (fname : string) : string =
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg -> ind_cfg
-  | None -> user_err (Pp.str "[codegen:get_ind_config] C type not configured:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma t)
+  | None -> user_err (Pp.str "[codegen:get_ind_config] C type not configured:" +++ Printer.pr_econstr_env env sigma t)
 
 let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   (get_ind_config env sigma t).c_type
@@ -47,7 +55,7 @@ let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) :
   match ind_cfg.c_swfunc with
   | Some c_swfunc -> c_swfunc
   | None -> user_err (
-    Pp.str "inductive match configuration not registered:" ++ Pp.spc () ++
+    Pp.str "inductive match configuration not registered:" +++
     Printer.pr_lconstr_env env sigma ind_cfg.coq_type)
 
 let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string =
@@ -179,31 +187,31 @@ let fargs_and_body_ary (env : Environ.env) (sigma : Evd.evar_map)
 
 let genc_farg (env : Environ.env) (sigma : Evd.evar_map) (farg : string * EConstr.types) : Pp.t =
   let (var, ty) = farg in
-  hv 2 (str (c_typename env sigma ty) ++ spc () ++ str var)
+  hv 2 (str (c_typename env sigma ty) +++ str var)
 
 let genc_fargs (env : Environ.env) (sigma : Evd.evar_map) (fargs : (string * EConstr.types) list) : Pp.t =
   match fargs with
   | [] -> str "void"
   | farg1 :: rest ->
       List.fold_left
-        (fun pp farg -> pp ++ str "," ++ spc () ++ genc_farg env sigma farg)
+        (fun pp farg -> pp ++ str "," +++ genc_farg env sigma farg)
         (genc_farg env sigma farg1)
         rest
 
 let genc_vardecl (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) : Pp.t =
-  hv 0 (str (c_typename env sigma ty) ++ spc () ++ str varname ++ str ";")
+  hv 0 (str (c_typename env sigma ty) +++ str varname ++ str ";")
 
 let genc_varinit (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (varname : string) (init : Pp.t) : Pp.t =
-  hv 0 (str (c_typename env sigma ty) ++ spc () ++ str varname ++ spc () ++ str "=" ++ spc () ++ init ++ str ";")
+  hv 0 (str (c_typename env sigma ty) +++ str varname +++ str "=" +++ init ++ str ";")
 
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
-  hv 0 (lhs ++ spc () ++ str "=" ++ spc () ++ rhs ++ str ";")
+  hv 0 (lhs +++ str "=" +++ rhs ++ str ";")
 
 let genc_return (arg : Pp.t) : Pp.t =
-  hv 0 (str "return" ++ spc () ++ arg ++ str ";")
+  hv 0 (str "return" +++ arg ++ str ";")
 
 let genc_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  hv 0 (genc_assign (str retvar) arg ++ spc () ++ str "return;")
+  hv 0 (genc_assign (str retvar) arg +++ str "return;")
 
 let varname_of_rel (context : context_elt list) (i : int) : string =
   match List.nth context (i-1) with
@@ -216,9 +224,9 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
     | None ->
         (match EConstr.kind sigma f with
         | Constr.Const (ctnt, _) ->
-            user_err (Pp.str "C function name not configured:" ++ Pp.spc () ++ Printer.pr_constant env ctnt)
+            user_err (Pp.str "C function name not configured:" +++ Printer.pr_constant env ctnt)
         | Constr.Construct (cstr, _) ->
-            user_err (Pp.str "C constructor name not configured:" ++ Pp.spc () ++ Printer.pr_constructor env cstr)
+            user_err (Pp.str "C constructor name not configured:" +++ Printer.pr_constructor env cstr)
         | _ -> assert false)
     | Some (sp_cfg, sp_inst) ->
         sp_inst
@@ -265,14 +273,14 @@ let genc_multi_assign (env : Environ.env) (sigma : Evd.evar_map) (assignments : 
           (List.iter
             (fun (lhs, (rhs, ty)) ->
               let pp = genc_assign (str lhs) (str rhs) in
-              if Pp.ismt !rpp then rpp := pp else rpp := !rpp ++ spc () ++ pp)
+              rpp := !rpp +++ pp)
             nonblocked_ass;
           loop blocked_ass)
         else
           (let a_lhs, (a_rhs, a_ty) = a in
           let tmp = local_gensym () in
           let pp = genc_varinit env sigma a_ty tmp (str a_lhs) in
-          (if Pp.ismt !rpp then rpp := pp else rpp := !rpp ++ spc () ++ pp);
+          (rpp := !rpp +++ pp);
           let ass2 = List.map
             (fun (lhs, (rhs, ty)) ->
               if rhs = a_lhs then (lhs, (tmp, ty)) else (lhs, (rhs, ty)))
@@ -294,8 +302,8 @@ let genc_goto (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt 
       argvars argsary)
   in
   let pp_assigns = genc_multi_assign env sigma assignments in
-  let pp_goto = (hv 0 (str "goto" ++ spc () ++ str fname_argn ++ str ";")) in
-  if Pp.ismt pp_assigns then pp_goto else pp_assigns ++ spc () ++ pp_goto)
+  let pp_goto = (hv 0 (str "goto" +++ str fname_argn ++ str ";")) in
+  if Pp.ismt pp_assigns then pp_goto else pp_assigns +++ pp_goto)
 
 let genc_const (env : Environ.env) (sigma : Evd.evar_map) (context : context_elt list) (ctnt : Constant.t) : Pp.t =
   genc_app env sigma context (mkConst ctnt) [| |]
@@ -345,8 +353,8 @@ let genc_case_branch (env : Environ.env) (sigma : Evd.evar_map)
     (br : EConstr.t) (cstr_index : int) : Pp.t =
   let cstr_label = case_cstrlabel env sigma exprty cstr_index in
   let pp_label = str cstr_label ++ str ":" in
-  hv 0 (hv 0 (pp_label ++ spc () ++ str "{") ++ brk (1,2) ++
-    hv 0 (genc_case_branch_body env sigma context bodyfunc exprty exprvar ndecls br cstr_index) ++ spc () ++
+  hv 0 (hv 0 (pp_label +++ str "{") ++ brk (1,2) ++
+    hv 0 (genc_case_branch_body env sigma context bodyfunc exprty exprvar ndecls br cstr_index) +++
     str "}")
 
 let genc_case_nobreak (env : Environ.env) (sigma : Evd.evar_map)
@@ -364,7 +372,7 @@ let genc_case_nobreak (env : Environ.env) (sigma : Evd.evar_map)
     let swfunc = case_swfunc env sigma exprty in
     let swexpr = if swfunc = "" then str exprvar else str swfunc ++ str "(" ++ str exprvar ++ str ")" in
     hv 0 (
-    hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+    hv 0 (str "switch" +++ str "(" ++ swexpr ++ str ")") +++
     str "{" ++ brk (1,2) ++
     hv 0 (
     pp_join_ary (spc ())
@@ -372,15 +380,14 @@ let genc_case_nobreak (env : Environ.env) (sigma : Evd.evar_map)
         (genc_case_branch env sigma context bodyfunc exprty exprvar)
         ci.Constr.ci_cstr_ndecls
         brs
-        (iota_ary 1 (Array.length brs)))) ++
-    spc () ++ str "}")
+        (iota_ary 1 (Array.length brs)))) +++ str "}")
 
 let genc_case_break (env : Environ.env) (sigma : Evd.evar_map)
     (context : context_elt list) (ci : Constr.case_info) (tyf : EConstr.t)
     (expr : EConstr.t) (brs : EConstr.t array)
     (bodyfunc : Environ.env -> Evd.evar_map -> context_elt list -> EConstr.constr -> Pp.t) : Pp.t =
   genc_case_nobreak env sigma context ci tyf expr brs
-    (fun envb sigma context2 body -> bodyfunc envb sigma context2 body ++ spc () ++ str "break;")
+    (fun envb sigma context2 body -> bodyfunc envb sigma context2 body +++ str "break;")
 
 let genc_geninitvar (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (namehint : Names.Name.t) (init : Pp.t) : Pp.t * string =
   let varname = local_gensym_with_name namehint in
@@ -397,12 +404,12 @@ let rec genc_body_var (env : Environ.env) (sigma : Evd.evar_map) (context : cont
       let env2 = EConstr.push_rel decl env in
       let (exprbody, exprvarname) = genc_body_var env sigma context name expr exprty in
       let (bodybody, bodyvarname) = genc_body_var env2 sigma (CtxVar exprvarname :: context) namehint body termty in
-      (exprbody ++ (if ismt exprbody then mt () else spc ()) ++ bodybody, bodyvarname)
+      (exprbody +++ bodybody, bodyvarname)
   | Constr.App (f, argsary) ->
       genc_geninitvar env sigma termty namehint (genc_app env sigma context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
       let varname = local_gensym_with_name namehint in
-      (genc_vardecl env sigma termty varname ++ spc () ++
+      (genc_vardecl env sigma termty varname +++
        genc_case_break env sigma context ci tyf expr brs
         (fun envb sigma context2 body -> genc_body_assign envb sigma context2 varname body),
       varname)
@@ -422,8 +429,7 @@ and genc_body_assign (env : Environ.env) (sigma : Evd.evar_map) (context : conte
       let name = Context.binder_name name in
       let env2 = EConstr.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigma context name expr exprty in
-      exprbody ++
-      (if ismt exprbody then mt () else spc ()) ++
+      exprbody +++
       genc_body_assign env2 sigma (CtxVar varname :: context) retvar body
   | Constr.App (f, argsary) ->
       genc_assign (str retvar) (genc_app env sigma context f argsary)
@@ -446,8 +452,7 @@ let rec genc_body_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd
       let name = Context.binder_name name in
       let env2 = EConstr.push_rel decl env in
       let (exprbody, varname) = genc_body_var env sigma context name expr exprty in
-      exprbody ++
-      (if ismt exprbody then mt () else spc ()) ++
+      exprbody +++
       genc_body_tail gen_ret env2 sigma (CtxVar varname :: context) body
   | Constr.App (f, argsary) ->
       (match EConstr.kind sigma f with
@@ -517,7 +522,7 @@ let rec scan_callsites_rec (env : Environ.env) (sigma : Evd.evar_map) (tail : bo
         ci.Constr.ci_cstr_nargs brs)
   | Constr.Proj (proj, expr) ->
       scan_callsites_rec env sigma false context expr
-  | _ -> user_err ~hdr:"scan_callsites_rec" (hv 0 (str "unexpected term:" ++ spc () ++ Printer.pr_econstr_env env sigma term))
+  | _ -> user_err ~hdr:"scan_callsites_rec" (hv 0 (str "unexpected term:" +++ Printer.pr_econstr_env env sigma term))
 
 let scan_callsites (sigma : Evd.evar_map) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array) :
@@ -550,15 +555,14 @@ let genc_func_single (env : Environ.env) (sigma : Evd.evar_map)
       string_of_int (List.length fargs) ^ " lambdas")));
   let c_fname = c_funcname fname in
   hv 0 (
-  hv 0 (str "static" ++ spc () ++
-        str (c_typename env sigma rety)) ++ spc () ++
+  hv 0 (str "static" +++
+        str (c_typename env sigma rety)) +++
   str c_fname ++ str "(" ++
   hv 0 (genc_fargs env sigma fargs) ++
-  str ")" ++ spc () ++
+  str ")" +++
   str "{" ++ brk (1,2) ++
   hv 0 (
-    genc_body_tail genc_return env sigma context body) ++
-  spc () ++ str "}")
+    genc_body_tail genc_return env sigma context body) +++ str "}")
 
 let find_headcalls
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
@@ -574,9 +578,9 @@ let find_headcalls
 let genc_mufun_struct_one (env : Environ.env) (sigma : Evd.evar_map) (ntfcb : string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) : Pp.t =
   let nm, ty, fargs, context, envb, body = ntfcb in
   hv 0 (
-  str "struct" ++ spc () ++
-  str nm ++ spc () ++
-  str "{" ++ spc () ++
+  str "struct" +++
+  str nm +++
+  str "{" +++
   pp_postjoin_list (str ";" ++ spc ()) (List.map (genc_farg env sigma) fargs) ++
   str "};")
 
@@ -592,23 +596,22 @@ let genc_mufun_entry (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) 
   let (argtys, rety) = nargtys_and_rety_of_type sigma (List.length fargs) ty in
   let c_fname = c_funcname nm in
   hv 0 (
-  str "static" ++ spc () ++
-  str (c_typename env sigma rety) ++ spc () ++
+  str "static" +++
+  str (c_typename env sigma rety) +++
   str c_fname ++ str "(" ++
   hv 0 (genc_fargs env sigma fargs) ++
-  str ")" ++ spc () ++
+  str ")" +++
   str "{" ++ brk (1,2) ++
   hv 0 (
-    hv 0 (str "struct" ++ spc () ++ str nm ++ spc () ++ str "args" ++ spc () ++
-      str "=" ++ spc () ++ str "{" ++ spc () ++
+    hv 0 (str "struct" +++ str nm +++ str "args" +++
+      str "=" +++ str "{" +++
       pp_join_list (str "," ++ spc ())
         (List.map
           (fun (var, ty) -> hv 0 (str var))
-        fargs) ++ spc () ++ str "};") ++ spc () ++
-    hv 0 (str (c_typename env sigma rety) ++ spc () ++ str "ret;") ++ spc () ++
-    hv 0 (str mfnm ++ str "(" ++ int i ++ str "," ++ spc () ++ str "&args," ++ spc () ++ str "&ret);") ++ spc () ++
-    hv 0 (str "return" ++ spc () ++ str "ret;")) ++
-  spc () ++ str "}")
+        fargs) +++ str "};") +++
+    hv 0 (str (c_typename env sigma rety) +++ str "ret;") +++
+    hv 0 (str mfnm ++ str "(" ++ int i ++ str "," +++ str "&args," +++ str "&ret);") +++
+    hv 0 (str "return" +++ str "ret;")) +++ str "}")
 
 let genc_mufun_entries (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
@@ -619,25 +622,25 @@ let genc_mufun_entries (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string
 
 let genc_mufun_forward_decl (mfnm : string) : Pp.t =
   hv 0 (
-  str "static" ++ spc () ++
-  str "void" ++ spc () ++
+  str "static" +++
+  str "void" +++
   str mfnm ++ str "(" ++
   hv 0 (
-    hv 0 (str "int" ++ spc () ++ str "i") ++ str "," ++ spc () ++
-    hv 0 (str "void*" ++ spc () ++ str "argsp") ++ str "," ++ spc () ++
-    hv 0 (str "void*" ++ spc () ++ str "retp")) ++ str ");")
+    hv 0 (str "int" +++ str "i") ++ str "," +++
+    hv 0 (str "void*" +++ str "argsp") ++ str "," +++
+    hv 0 (str "void*" +++ str "retp")) ++ str ");")
 
 let genc_mufun_bodies_func (env : Environ.env) (sigma :Evd.evar_map) (mfnm : string) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
     (callsites_ary : (bool * bool * bool) array) : Pp.t =
   hv 0 (
-  str "static" ++ spc () ++
-  str "void" ++ spc () ++
+  str "static" +++
+  str "void" +++
   str mfnm ++ str "(" ++
   hv 0 (
-    hv 0 (str "int" ++ spc () ++ str "i") ++ str "," ++ spc () ++
-    hv 0 (str "void*" ++ spc () ++ str "argsp") ++ str "," ++ spc () ++
-    hv 0 (str "void*" ++ spc () ++ str "retp")) ++ str ")" ++ spc () ++
+    hv 0 (str "int" +++ str "i") ++ str "," +++
+    hv 0 (str "void*" +++ str "argsp") ++ str "," +++
+    hv 0 (str "void*" +++ str "retp")) ++ str ")" +++
   str "{" ++ brk (1,2) ++
   hv 0 (
     pp_join_ary (spc ())
@@ -645,10 +648,10 @@ let genc_mufun_bodies_func (env : Environ.env) (sigma :Evd.evar_map) (mfnm : str
         (fun (nm, ty, fargs, context, envb, body) ->
            pp_join_list (spc ())
              (List.map
-               (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) ++ spc () ++ str var ++ str ";"))
+               (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) +++ str var ++ str ";"))
                fargs))
-        ntfcb_ary) ++ spc () ++
-    hv 0 (str "switch" ++ spc () ++ str "(i)") ++ spc () ++ str "{" ++ brk (1,2) ++
+        ntfcb_ary) +++
+    hv 0 (str "switch" +++ str "(i)") +++ str "{" ++ brk (1,2) ++
       hv 0 (
         pp_join_ary (spc ())
           (Array.mapi
@@ -657,17 +660,17 @@ let genc_mufun_bodies_func (env : Environ.env) (sigma :Evd.evar_map) (mfnm : str
               let (argtys, rety) = nargtys_and_rety_of_type sigma (List.length fargs) ty in
               let fname_argn = goto_label nm in
               hv 0 (
-                (if j == i then str "default:" else hv 0 (str "case" ++ spc () ++ int j ++ str ":")) ++ brk (1,2) ++
+                (if j == i then str "default:" else hv 0 (str "case" +++ int j ++ str ":")) ++ brk (1,2) ++
                 hv 0 (
                   pp_join_list (spc ())
                     (List.map
-                      (fun (var, ty) -> hv 0 (str var ++ spc () ++ str "=" ++ spc () ++ str "((struct" ++ spc () ++ str nm ++ spc () ++ str "*)argsp)->" ++ str var ++ str ";"))
-                      fargs) ++ spc () ++
+                      (fun (var, ty) -> hv 0 (str var +++ str "=" +++ str "((struct" +++ str nm +++ str "*)argsp)->" ++ str var ++ str ";"))
+                      fargs) +++
                   (if tailcall then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
                   let gen_ret = (genc_void_return ("(*(" ^ c_typename env sigma rety ^ " *)retp)")) in
-                  genc_body_tail gen_ret envb sigma context body ++ spc () ++
+                  genc_body_tail gen_ret envb sigma context body +++
                   str "return;")))
-            ntfcb_ary)) ++ spc () ++ str "}") ++ spc () ++
+            ntfcb_ary)) +++ str "}") +++
     str "}")
 
 let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) (i : int)
@@ -678,11 +681,11 @@ let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : st
   let c_fname = c_funcname entry_nm in
   let label_fname_argn = goto_label entry_nm in
   hv 0 (
-  str "static" ++ spc () ++
-  str (c_typename env sigma entry_rety) ++ spc () ++
+  str "static" +++
+  str (c_typename env sigma entry_rety) +++
   str c_fname ++ str "(" ++
   hv 0 (genc_fargs env sigma entry_fargs) ++
-  str ")" ++ spc () ++
+  str ")" +++
   str "{" ++ brk (1,2) ++
   hv 0 (
     pp_postjoin_ary (spc ())
@@ -693,10 +696,10 @@ let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : st
           else
             pp_join_list (spc ())
               (List.map
-                (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) ++ spc () ++ str var ++ str ";"))
+                (fun (var, ty) -> hv 0 (str (c_typename env sigma ty) +++ str var ++ str ";"))
                 fargs))
         ntfcb_ary) ++
-    (if i = 0 then mt () else hv 0 (str "goto" ++ spc () ++ str label_fname_argn ++ str ";") ++ spc ()) ++
+    (if i = 0 then mt () else hv 0 (str "goto" +++ str label_fname_argn ++ str ";") ++ spc ()) ++
     pp_join_ary (spc ())
       (Array.mapi
         (fun j (nm, ty, fargs, context, envb, body) ->
@@ -705,8 +708,7 @@ let genc_mufun_single_func (env : Environ.env) (sigma : Evd.evar_map) (mfnm : st
           hv 0 (
             (if tailcall || (i <> 0 && i == j) then str fname_argn ++ str ":;" ++ spc () else mt ()) ++
             genc_body_tail genc_return envb sigma context body))
-        ntfcb_ary)) ++
-  spc () ++ str "}")
+        ntfcb_ary)) +++ str "}")
 
 let genc_func_mutual (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) (i : int)
     (ntfcb_ary : (string * EConstr.types * (string * EConstr.types) list * context_elt list * Environ.env * EConstr.t) array)
@@ -715,9 +717,9 @@ let genc_func_mutual (env : Environ.env) (sigma : Evd.evar_map) (mfnm : string) 
   if num_entry_funcs = 1 then
     genc_mufun_single_func env sigma mfnm i ntfcb_ary callsites_ary
   else
-    genc_mufun_structs env sigma ntfcb_ary callsites_ary ++ spc () ++
-    genc_mufun_forward_decl mfnm ++ spc () ++
-    genc_mufun_entries env sigma mfnm ntfcb_ary callsites_ary ++ spc () ++
+    genc_mufun_structs env sigma ntfcb_ary callsites_ary +++
+    genc_mufun_forward_decl mfnm +++
+    genc_mufun_entries env sigma mfnm ntfcb_ary callsites_ary +++
     genc_mufun_bodies_func env sigma mfnm i ntfcb_ary callsites_ary
 
 let genc_func (env : Environ.env) (sigma : Evd.evar_map) (fname : string) (ty : EConstr.types) (term : EConstr.t) : Pp.t =
@@ -817,18 +819,18 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   hv 0 (
-  hv 0 (str "switch" ++ spc () ++ str "(" ++ swexpr ++ str ")") ++ spc () ++
+  hv 0 (str "switch" +++ str "(" ++ swexpr ++ str ")") +++
   brace (pp_join_ary (spc ())
     (Array.map
       (fun (caselabel, pp_branch) ->
-        str caselabel ++ str ":" ++ spc () ++ pp_branch)
+        str caselabel ++ str ":" +++ pp_branch)
       branches)))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   gen_switch_without_break swexpr
     (Array.map
       (fun (caselabel, pp_branch) ->
-        (caselabel, pp_branch ++ spc () ++ str "break;"))
+        (caselabel, pp_branch +++ str "break;"))
       branches)
 
 let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
@@ -861,17 +863,14 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
     let c_field_access =
       pp_join_ary (spc ())
         (Array.map2
-          (fun c_var access -> str c_var ++ str " =" ++ spc () ++
+          (fun c_var access -> str c_var ++ str " =" +++
             str access ++ str "(" ++ str item_cvar ++ str ");")
           c_vars accessors)
     in
     let c_branch_body =
       gen_branch_body env sigma br (List.append (Array.to_list c_vars) cargs)
     in
-    if Array.length accessors = 0 then
-      c_branch_body
-    else
-      c_field_access ++ spc () ++ c_branch_body)
+    c_field_access +++ c_branch_body)
   in
   (*Feedback.msg_debug (Pp.str "gen_match:3");*)
   let n = Array.length branches in
@@ -1373,15 +1372,15 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail genc_return env sigma body (List.map fst c_fargs))) in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
   hv 0 (
-  hv 0 (str "static" ++ spc () ++
-        str (c_typename env sigma return_type)) ++ spc () ++
+  hv 0 (str "static" +++
+        str (c_typename env sigma return_type)) +++
   str cfunc_name ++ str "(" ++
   hv 0 (genc_fargs env sigma c_fargs) ++
-  str ")" ++ spc () ++
+  str ")" +++
   brace (
     pp_postjoin_list (spc ())
       (List.map
-        (fun (c_type, c_var) -> hv 0 (str c_type ++ spc () ++ str c_var ++ str ";"))
+        (fun (c_type, c_var) -> hv 0 (str c_type +++ str c_var ++ str ";"))
         (local_vars_get ()))
     ++
     pp_body))
