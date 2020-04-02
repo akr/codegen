@@ -823,7 +823,7 @@ let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) 
   brace (pp_join_ary (spc ())
     (Array.map
       (fun (caselabel, pp_branch) ->
-        str caselabel ++ str ":" +++ pp_branch)
+        str caselabel ++ str ":" ++ hv 2 (spc () ++ pp_branch))
       branches)))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
