@@ -763,8 +763,8 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
-        user_err (Pp.str "C function name not found:" ++
-                  Pp.spc () ++ Pp.str cfunc_name)
+        user_err (Pp.str "C function name not found:" +++
+                  Pp.str cfunc_name)
     | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
   let ctnt =
@@ -778,7 +778,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
     let cdef = Environ.lookup_constant ctnt env in
     let ty = cdef.Declarations.const_type in
     match Global.body_of_constant_body Library.indirect_accessor cdef with
-    | None -> user_err (Pp.str "couldn't obtain the body:" ++ Pp.spc () ++
+    | None -> user_err (Pp.str "couldn't obtain the body:" +++
                         Printer.pr_constant env ctnt)
     | Some (body,_, _) -> (ctnt, ty, body)
   in
@@ -794,7 +794,7 @@ let gen_function (cfunc_name : string) : Pp.t =
   genc_func env sigma cfunc_name ty body
 
 let brace (pp : Pp.t) : Pp.t =
-  hv 2 (str "{" ++ spc () ++ pp ++ brk (1,-2) ++ str "}")
+  hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
 
 let local_vars : ((string * string) list ref) list ref = ref []
 
@@ -903,15 +903,15 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
         branches))
 
 let rec gen_tail (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "gen_tail start:" ++ Pp.spc () ++
-    Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
+  (*Feedback.msg_debug (Pp.str "gen_tail start:" +++
+    Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
     pp_join_list (Pp.spc ()) (List.map Pp.str cargs) ++
     Pp.str ")");*)
   let pp = gen_tail1 gen_ret env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "gen_tail return:" ++ Pp.spc () ++
-    Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
-    Pp.str "->" ++ Pp.spc () ++
+  (*Feedback.msg_debug (Pp.str "gen_tail return:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "->" +++
     pp);*)
   pp
 and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
@@ -940,7 +940,7 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       gen_tail gen_ret env sigma f cargs2
   | Lambda (x,t,b) ->
       (match cargs with
-      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" ++ Pp.spc () ++
+      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term)
       | arg :: rest ->
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
@@ -953,18 +953,18 @@ and gen_tail1 (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
-      gen_assign c_var env sigma e [] ++ Pp.spc () ++
+      gen_assign c_var env sigma e [] +++
       gen_tail gen_ret env2 sigma b cargs
 
   | Fix ((ia, i), (nary, tary, fary)) ->
-      user_err (Pp.str "gen_tail: unsupported term Fix:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "gen_tail: unsupported term Fix:" +++ Printer.pr_econstr_env env sigma term)
 
-  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma term)
+  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 and gen_assign (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 ret_var env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "gen_assign:" ++ Pp.spc () ++
-    Printer.pr_econstr_env env sigma term ++ Pp.spc () ++
-    Pp.str "->" ++ Pp.spc () ++
+  (*Feedback.msg_debug (Pp.str "gen_assign:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "->" +++
     pp);*)
   pp
 and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
@@ -999,7 +999,7 @@ and gen_assign1 (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (t
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
-      gen_assign c_var env sigma e [] ++ Pp.spc () ++
+      gen_assign c_var env sigma e [] +++
       gen_assign ret_var env2 sigma b cargs
 
   | Proj _
@@ -1357,7 +1357,7 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
   let body = EConstr.of_constr body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
-  (if needs_multiple_functions env sigma body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" ++ Pp.spc () ++ Pp.str cfunc_name));
+  (if needs_multiple_functions env sigma body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
   let body = rename_fix_var env sigma cfunc_name body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:3");*)
