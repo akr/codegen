@@ -1149,6 +1149,7 @@ type fixfunc_info = {
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
   fixfunc_used_as_closure: bool;
+  fixfunc_formal_arguments: string list;
 }
 
 let encode_fixvar
@@ -1296,6 +1297,8 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
             else
               local_gensym_with_name
           in
+          let args_and_ret_type = EConstr.decompose_prod sigma tary.(i) in
+          let formal_arguments = List.rev_map (fun (x,t) -> local_gensym_with_annotated_name x) (fst args_and_ret_type) in
           let newstrname =
             encode_fixvar
               u.how_used_as_call u.how_used_as_goto u.how_used_as_closure
@@ -1305,6 +1308,7 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
             fixfunc_used_as_call = u.how_used_as_call;
             fixfunc_used_as_goto = u.how_used_as_goto;
             fixfunc_used_as_closure = u.how_used_as_closure;
+            fixfunc_formal_arguments = formal_arguments;
           };
           (Context.nameR newid))
       in
@@ -1339,6 +1343,7 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
         fixfunc_used_as_call = true;
         fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
         fixfunc_used_as_closure = usage.fixfunc_used_as_closure;
+        fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
       };
       mkFix ((ia, i), (nary', tary, fary))
   (* xxx: consider App *)
