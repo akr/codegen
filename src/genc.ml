@@ -1384,7 +1384,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
       ignore pp_assignments;
-      let (ni_used_as_call, ni_used_as_goto, ni_used_as_closure, ni_funcname) = decode_fixvar (Id.to_string ni_id) in
+      let (_, _, _, ni_funcname) = decode_fixvar (Id.to_string ni_id) in
       let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
       ignore pp_goto_entry;
       let pp_bodies =
