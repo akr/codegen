@@ -1016,7 +1016,7 @@ let suite : OUnit2.test =
     "test_let_add" >:: test_let_add;
     "test_let_match" >:: test_let_match;
     "test_let_match_let" >:: test_let_match_let;
-    (*"test_add_tailrec" >:: test_add_tailrec;*)
+    "test_add_tailrec" >:: test_add_tailrec;
     (*"test_add_nontailrec" >:: test_add_nontailrec;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
     (*"test_map_succ" >:: test_map_succ;*)
