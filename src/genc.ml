@@ -973,38 +973,6 @@ type fixfunc_info = {
 
 type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
 
-let encode_fixvar
-    (used_as_call : bool)
-    (used_as_goto : bool)
-    (used_as_closure : bool)
-    (name : string) : string =
-  let s = "f" in
-  let s = s ^ (if used_as_call then "g" else "u") in
-  let s = s ^ (if used_as_goto then "l" else "u") in
-  let s = s ^ (if used_as_closure then "c" else "u") in
-  let s = s ^ "_" ^ name in
-  s
-
-let decode_fixvar
-    (s : string) : (bool * bool * bool * string) =
-  (if String.length s < 5 then
-    user_err (Pp.str "[codegen] too short encoded fix variable: " ++ Pp.str s));
-  (if s.[0] <> 'f' then
-    user_err (Pp.str "[codegen] encoded fix variable doesn't start with 'f': " ++ Pp.str s));
-  (if s.[1] <> 'g' && s.[1] <> 'u' then
-    user_err (Pp.str "[codegen] 2nd char. of encoded fix variable must be 'g' or 'u': " ++ Pp.str s));
-  (if s.[2] <> 'l' && s.[2] <> 'u' then
-    user_err (Pp.str "[codegen] 3rd char. of encoded fix variable must be 'l' or 'u': " ++ Pp.str s));
-  (if s.[3] <> 'c' && s.[3] <> 'u' then
-    user_err (Pp.str "[codegen] 4th char. of encoded fix variable must be 'c' or 'u': " ++ Pp.str s));
-  (if s.[4] <> '_' then
-    user_err (Pp.str "[codegen] 5th char. of encoded fix variable must be '_': " ++ Pp.str s));
-  let used_as_call = s.[1] <> 'u' in
-  let used_as_goto = s.[2] <> 'u' in
-  let used_as_closure = s.[3] <> 'u' in
-  let name = String.sub s 5 (String.length s - 5) in
-  (used_as_call, used_as_goto, used_as_closure, name)
-
 let num_funargs (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
   let t = Retyping.get_type_of env sigma term in
   let t = Reductionops.nf_all env sigma t in
@@ -1125,10 +1093,7 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
               (*add_local_var (c_typename env sigma t) c_arg;*)
               (c_arg, t))
             (fst args_and_ret_type) in
-          let newstrname =
-            encode_fixvar
-              u.how_used_as_call u.how_used_as_goto u.how_used_as_closure
-              (gensym_with_name name) in
+          let newstrname = gensym_with_name name in
           let newid = Id.of_string newstrname in
           Hashtbl.add h newid {
             fixfunc_used_as_call = u.how_used_as_call;
@@ -1158,12 +1123,12 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
             user_err
               (Pp.str "[codegen bug] unexpected anonymous name in fix-term")
       in
-      let (used_as_call, used_as_goto, used_as_closure, name) = decode_fixvar (Id.to_string oldid) in
-      let newstrname = encode_fixvar used_as_call used_as_goto used_as_closure name in
+      let usage = Hashtbl.find h oldid in
+      let name = Id.to_string oldid in
+      let newstrname = name in
       let newid = Id.of_string newstrname in
       let nary' = Array.copy nary in
       nary'.(i) <- Context.map_annot (fun name -> Name.Name newid) nary.(i);
-      let usage = Hashtbl.find h oldid in
       Hashtbl.remove h oldid;
       Hashtbl.add h newid {
         fixfunc_used_as_call = true;
@@ -1337,7 +1302,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
                 Printer.pr_econstr_env env sigma term);
             let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
             let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-            let (_, _, _, funcname) = decode_fixvar var_str in
+            let funcname = var_str in
             let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
   | Const (ctnt,_) ->
@@ -1384,7 +1349,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
       ignore pp_assignments;
-      let (_, _, _, ni_funcname) = decode_fixvar (Id.to_string ni_id) in
+      let ni_funcname = Id.to_string ni_id in
       let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
       ignore pp_goto_entry;
       let pp_bodies =
@@ -1394,7 +1359,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
             let nj_id = id_of_name nj in
             let uj = Hashtbl.find fixinfo nj_id in
             let nj_formal_argvars = List.map fst uj.fixfunc_formal_arguments in
-            let (_, _, _, nj_funcname) = decode_fixvar (Id.to_string nj_id) in
+            let nj_funcname = Id.to_string nj_id in
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
           nary in
