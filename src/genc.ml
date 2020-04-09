@@ -1080,13 +1080,13 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
       let nary' = Array.init n
         (fun i ->
           let u = fixvar_usages.(i) in
-          let name = Context.binder_name nary.(i) in
           let gensym_with_name =
             if u.how_used_as_call then
               global_gensym_with_name
             else
               local_gensym_with_name
           in
+          let c_name = gensym_with_name (Context.binder_name nary.(i)) in
           let args_and_ret_type = EConstr.decompose_prod sigma tary.(i) in
           let formal_arguments = List.rev_map
             (fun (x,t) ->
@@ -1094,7 +1094,6 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
               (c_arg, t))
             (fst args_and_ret_type)
           in
-          let c_name = gensym_with_name name in
           let newkey = Name.Name (Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo))) in
           Hashtbl.add fixinfo newkey {
             fixfunc_c_name = c_name;
@@ -1326,8 +1325,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
 
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let ni = nary.(i) in
-      let ui = Hashtbl.find fixinfo (Context.binder_name ni) in
+      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
       if List.length cargs < List.length ni_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
