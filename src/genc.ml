@@ -1330,9 +1330,6 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
       if List.length cargs < List.length ni_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
-      List.iter
-        (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
-        ni_formal_arguments;
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
       ignore pp_assignments;
@@ -1344,7 +1341,11 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
           (fun j nj ->
             let fj = fary.(j) in
             let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
-            let nj_formal_argvars = List.map fst uj.fixfunc_formal_arguments in
+            let nj_formal_arguments = uj.fixfunc_formal_arguments in
+            List.iter
+              (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
+              nj_formal_arguments;
+            let nj_formal_argvars = List.map fst nj_formal_arguments in
             let nj_funcname = uj.fixfunc_c_name in
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
