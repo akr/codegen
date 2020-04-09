@@ -983,6 +983,52 @@ let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
       CodeGen Function double.
     |})
 
+let test_nth (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Set CodeGen Dev.
+      Require Import List.
+      CodeGen Function nth nat => "nth".
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      #define list3(v1, v2, v3) cons(v1, cons(v2, cons(v3, NULL)))
+      list_nat s = list3(1,2,3);
+      assert(nth(0, s, 999) == 1);
+      assert(nth(1, s, 999) == 2);
+      assert(nth(2, s, 999) == 3);
+      assert(nth(3, s, 999) == 999);
+    |}
+
+let test_rev_append (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Set CodeGen Dev.
+      Require Import List.
+      CodeGen Function nth nat => "nth".
+      CodeGen Function rev_append nat => "rev_append".
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      #define list3(v1, v2, v3) cons(v1, cons(v2, cons(v3, NULL)))
+      list_nat s1 = list2(1,2,3);
+      list_nat s2 = list2(4,5,6);
+      list_nat s3 = rev_append(s1, s2);
+      assert(nth(0, s3, 999) == 3);
+      assert(nth(1, s3, 999) == 2);
+      assert(nth(2, s3, 999) == 1);
+      assert(nth(3, s3, 999) == 4);
+      assert(nth(4, s3, 999) == 5);
+      assert(nth(5, s3, 999) == 6);
+      assert(nth(6, s3, 999) == 999);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -1041,6 +1087,8 @@ let suite : OUnit2.test =
     (*"test_add_nontailrec" >:: test_add_nontailrec;*)
     "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
     (*"test_map_succ" >:: test_map_succ;*)
+    "test_nth" >:: test_nth;
+    "test_rev_append" >:: test_rev_append;
   ]
 
 let () =
