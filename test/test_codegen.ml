@@ -498,6 +498,7 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
+      Set CodeGen Dev.
       Definition mono_id_bool (b : bool) := b.
       CodeGen Function mono_id_bool => "mono_id_bool".
     |}) {|
@@ -508,6 +509,7 @@ let test_mono_id_bool (ctx : test_ctxt) : unit =
 let test_mono_id_mybool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
+      Set CodeGen Dev.
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen Inductive Type mybool => "mybool".
       CodeGen Inductive Match mybool => ""
@@ -530,6 +532,7 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
 let test_mybool_true (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
+      Set CodeGen Dev.
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen Inductive Type mybool => "mybool".
       CodeGen Inductive Match mybool => ""
@@ -552,6 +555,7 @@ let test_mybool_true (ctx : test_ctxt) : unit =
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
+      Set CodeGen Dev.
       Definition mono_id_bool (b : bool) := b.
       CodeGen Function mono_id_bool.
     |}) {|
@@ -562,6 +566,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
 let test_pair_bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
+      Set CodeGen Dev.
       CodeGen Inductive Type bool*bool => "pair_bool_bool".
       CodeGen Inductive Match bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
@@ -591,6 +596,7 @@ let test_pair_bool_bool (ctx : test_ctxt) : unit =
 let test_pair_2bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
+      Set CodeGen Dev.
       CodeGen Inductive Type bool*bool => "pair_bool_bool".
       CodeGen Inductive Match bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
@@ -643,6 +649,7 @@ let test_nat_add_rec (ctx : test_ctxt) : unit =
 let test_nat_add_iter (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
+      Set CodeGen Dev.
       Fixpoint my_add_iter (m n : nat) : nat :=
         match m with
         | O => n
@@ -656,6 +663,7 @@ let test_nat_add_iter (ctx : test_ctxt) : unit =
 let test_list_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ list_bool_src ^ {|
+      Set CodeGen Dev.
       Definition is_nil (s : list bool) :=
         match s with
         | nil => true
@@ -706,6 +714,7 @@ let test_nil_nat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ list_nat_src ^
     {|
+      Set CodeGen Dev.
       Definition nil_nat := @nil nat.
       CodeGen Function nil_nat.
     |}) {|
@@ -717,6 +726,7 @@ let test_singleton_list (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
+      Set CodeGen Dev.
       Definition singleton_list (n : nat) : list nat := cons n nil.
       CodeGen Function singleton_list.
     |}) {|
@@ -734,6 +744,7 @@ let test_add3 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition add3 (n : nat) : nat := 3 + n.
       CodeGen Global Inline Nat.add.
       CodeGen Function add3.
@@ -745,6 +756,7 @@ let test_mul3 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition mul3 (n : nat) : nat := 3 * n.
       CodeGen Global Inline Nat.mul.
       CodeGen Function mul3.
@@ -790,6 +802,7 @@ let test_app_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition foo := (let x := 1 in Nat.add x) 2.
       CodeGen Function foo.
     |}) {|
@@ -800,6 +813,7 @@ let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition nat_id (n : nat) : nat := (n : nat) + 0.
       CodeGen Function nat_id.
     |}) {|
@@ -810,6 +824,7 @@ let test_delta_fun_constant (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition add (a b : nat) : nat := let f := Nat.add in f a b.
       CodeGen Function add.
     |}) {|
@@ -820,6 +835,7 @@ let test_delta_fun_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition succ (n : nat) : nat := let f := S in f n.
       CodeGen Function succ.
     |}) {|
@@ -830,6 +846,7 @@ let test_delta_fun_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Definition succ (n : nat) : nat := let f x := S x in f n.
       CodeGen Function succ.
     |}) {|
@@ -845,6 +862,7 @@ let test_reduce_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Set Primitive Projections.
       Record TestRecord (par:nat) : Set := mk { f0 : nat; f1 : nat }.
       Definition f0_mk a b : nat := f0 10 (mk 10 a b).
@@ -860,6 +878,7 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
+      Set CodeGen Dev.
       Require Import List.
       Fixpoint f (s : list bool) : nat :=
         match s with
@@ -967,6 +986,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
+      Set CodeGen Dev.
       Require Import List.
       Definition map_succ (s : list nat) : list nat :=
         map S s.
