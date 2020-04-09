@@ -768,6 +768,7 @@ let test_even_odd (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
     {|
+      Set CodeGen Dev.
       Fixpoint even (n : nat) : bool :=
         match n with
         | O => true
