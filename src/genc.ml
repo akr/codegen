@@ -965,6 +965,7 @@ type how_fixfunc_used = {
 }
 
 type fixfunc_info = {
+  fixfunc_c_name: string;
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
   fixfunc_used_as_closure: bool;
@@ -1090,18 +1091,19 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
           let formal_arguments = List.rev_map
             (fun (x,t) ->
               let c_arg = local_gensym_with_annotated_name x in
-              (*add_local_var (c_typename env sigma t) c_arg;*)
               (c_arg, t))
-            (fst args_and_ret_type) in
-          let newstrname = gensym_with_name name in
-          let newid = Id.of_string newstrname in
-          Hashtbl.add h newid {
+            (fst args_and_ret_type)
+          in
+          let newstrkey = gensym_with_name name in
+          let newkey = Id.of_string newstrkey in
+          Hashtbl.add h newkey {
+            fixfunc_c_name = newstrkey;
             fixfunc_used_as_call = u.how_used_as_call;
             fixfunc_used_as_goto = u.how_used_as_goto;
             fixfunc_used_as_closure = u.how_used_as_closure;
             fixfunc_formal_arguments = formal_arguments;
           };
-          (Context.nameR newid))
+          (Context.nameR newkey))
       in
       mkFix ((ia, i), (nary', tary, fary'))
 
@@ -1116,27 +1118,23 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
       mkLambda (x,t,e')
   | Fix ((ia, i), (nary, tary, fary)) ->
       let oldname = Context.binder_name nary.(i) in
-      let oldid =
+      let id =
         match oldname with
         | Name.Name id -> id
         | Name.Anonymous ->
             user_err
               (Pp.str "[codegen bug] unexpected anonymous name in fix-term")
       in
-      let usage = Hashtbl.find h oldid in
-      let name = Id.to_string oldid in
+      let usage = Hashtbl.find h id in
       let newstrname = name in
-      let newid = Id.of_string newstrname in
-      let nary' = Array.copy nary in
-      nary'.(i) <- Context.map_annot (fun name -> Name.Name newid) nary.(i);
-      Hashtbl.remove h oldid;
-      Hashtbl.add h newid {
+      Hashtbl.replace h id {
+        fixfunc_c_name = newstrname;
         fixfunc_used_as_call = true;
         fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
         fixfunc_used_as_closure = usage.fixfunc_used_as_closure;
         fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
       };
-      mkFix ((ia, i), (nary', tary, fary))
+      mkFix ((ia, i), (nary, tary, fary))
   (* xxx: consider App *)
   | _ -> term
 
@@ -1302,7 +1300,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
                 Printer.pr_econstr_env env sigma term);
             let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
             let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-            let funcname = var_str in
+            let funcname = u.fixfunc_c_name in
             let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
   | Const (ctnt,_) ->
@@ -1349,7 +1347,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
       ignore pp_assignments;
-      let ni_funcname = Id.to_string ni_id in
+      let ni_funcname = ui.fixfunc_c_name in
       let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
       ignore pp_goto_entry;
       let pp_bodies =
@@ -1359,7 +1357,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
             let nj_id = id_of_name nj in
             let uj = Hashtbl.find fixinfo nj_id in
             let nj_formal_argvars = List.map fst uj.fixfunc_formal_arguments in
-            let nj_funcname = Id.to_string nj_id in
+            let nj_funcname = uj.fixfunc_c_name in
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
           nary in
