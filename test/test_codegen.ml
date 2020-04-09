@@ -1017,8 +1017,8 @@ let test_rev_append (ctx : test_ctxt) : unit =
       #define tail(s) list_nat_tail(s)
       #define cons(h,t) list_nat_cons(h,t)
       #define list3(v1, v2, v3) cons(v1, cons(v2, cons(v3, NULL)))
-      list_nat s1 = list2(1,2,3);
-      list_nat s2 = list2(4,5,6);
+      list_nat s1 = list3(1,2,3);
+      list_nat s2 = list3(4,5,6);
       list_nat s3 = rev_append(s1, s2);
       assert(nth(0, s3, 999) == 3);
       assert(nth(1, s3, 999) == 2);
