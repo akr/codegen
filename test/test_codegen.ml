@@ -1035,7 +1035,7 @@ let test_rev_append (ctx : test_ctxt) : unit =
       assert(nth(6, s3, 999) == 999);
     |}
 
-(* nested loop *)
+(* nested fix-term *)
 let test_merge (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -1079,6 +1079,37 @@ let test_merge (ctx : test_ctxt) : unit =
       assert(nth(6, s3, 999) == 1);
       assert(nth(7, s3, 999) == 0);
       assert(nth(8, s3, 999) == 999);
+    |}
+
+(* nested fix-term *)
+let test_sum_nested_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Set CodeGen Dev.
+      Require Import List.
+      Definition sum (s : list nat) (n : nat) : nat :=
+        (fix f (s : list nat) :=
+          fix g (m : nat) :=
+            fun (n : nat) =>
+              match m with
+              | O =>
+                  match s with
+                  | nil => n
+                  | cons v s' => f s' v n
+                  end
+              | S m' => g m' (S n)
+              end) s 0 n.
+      (*Compute sum (1 :: 2 :: 3 :: 4 :: nil) 0.*)
+      CodeGen Function sum.
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      #define list4(v1, v2, v3, v4) cons(v1, cons(v2, cons(v3, cons(v4, NULL))))
+      list_nat s = list4(1,2,3,4);
+      assert(sum(s, 0) == 10);
     |}
 
 let test_map_succ (ctx : test_ctxt) : unit =
@@ -1142,6 +1173,7 @@ let suite : OUnit2.test =
     "test_nth" >:: test_nth;
     "test_rev_append" >:: test_rev_append;
     "test_merge" >:: test_merge;
+    "test_sum_nested_fix" >:: test_sum_nested_fix;
   ]
 
 let () =
