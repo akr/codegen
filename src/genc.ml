@@ -1094,10 +1094,10 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
               (c_arg, t))
             (fst args_and_ret_type)
           in
-          let newstrkey = gensym_with_name name in
-          let newkey = Id.of_string newstrkey in
+          let c_name = gensym_with_name name in
+          let newkey = Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length h)) in
           Hashtbl.add h newkey {
-            fixfunc_c_name = newstrkey;
+            fixfunc_c_name = c_name;
             fixfunc_used_as_call = u.how_used_as_call;
             fixfunc_used_as_goto = u.how_used_as_goto;
             fixfunc_used_as_closure = u.how_used_as_closure;
@@ -1118,17 +1118,16 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
       mkLambda (x,t,e')
   | Fix ((ia, i), (nary, tary, fary)) ->
       let oldname = Context.binder_name nary.(i) in
-      let id =
+      let key =
         match oldname with
         | Name.Name id -> id
         | Name.Anonymous ->
             user_err
               (Pp.str "[codegen bug] unexpected anonymous name in fix-term")
       in
-      let usage = Hashtbl.find h id in
-      let newstrname = name in
-      Hashtbl.replace h id {
-        fixfunc_c_name = newstrname;
+      let usage = Hashtbl.find h key in
+      Hashtbl.replace h key {
+        fixfunc_c_name = name;
         fixfunc_used_as_call = true;
         fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
         fixfunc_used_as_closure = usage.fixfunc_used_as_closure;
