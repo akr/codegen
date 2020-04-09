@@ -972,7 +972,7 @@ type fixfunc_info = {
   fixfunc_formal_arguments: (string * EConstr.types) list;
 }
 
-type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
+type fixinfo_t = (Name.t, fixfunc_info) Hashtbl.t
 
 let num_funargs (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
   let t = Retyping.get_type_of env sigma term in
@@ -1095,7 +1095,7 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
             (fst args_and_ret_type)
           in
           let c_name = gensym_with_name name in
-          let newkey = Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo)) in
+          let newkey = Name.Name (Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo))) in
           Hashtbl.add fixinfo newkey {
             fixfunc_c_name = c_name;
             fixfunc_used_as_call = u.how_used_as_call;
@@ -1103,7 +1103,7 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
             fixfunc_used_as_closure = u.how_used_as_closure;
             fixfunc_formal_arguments = formal_arguments;
           };
-          (Context.nameR newkey))
+          (Context.annotR newkey))
       in
       mkFix ((ia, i), (nary', tary, fary'))
 
@@ -1117,14 +1117,7 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
       let e' = rename_top_fix_var env2 sigma fixinfo name e in
       mkLambda (x,t,e')
   | Fix ((ia, i), (nary, tary, fary)) ->
-      let oldname = Context.binder_name nary.(i) in
-      let key =
-        match oldname with
-        | Name.Name id -> id
-        | Name.Anonymous ->
-            user_err
-              (Pp.str "[codegen bug] unexpected anonymous name in fix-term")
-      in
+      let key = Context.binder_name nary.(i) in
       let usage = Hashtbl.find fixinfo key in
       Hashtbl.replace fixinfo key {
         fixfunc_c_name = name;
@@ -1288,8 +1281,8 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
         let str = carg_of_garg env i in
         gen_ret (Pp.str str)
       else
-        let var_str = carg_of_garg env i in
-        let uopt = Hashtbl.find_opt fixinfo (Id.of_string var_str) in
+        let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        let uopt = Hashtbl.find_opt fixinfo key in
         (match uopt with
         | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
         | Some u ->
@@ -1334,8 +1327,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let ni = nary.(i) in
-      let ni_id = id_of_name ni in
-      let ui = Hashtbl.find fixinfo ni_id in
+      let ui = Hashtbl.find fixinfo (Context.binder_name ni) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
       if List.length cargs < List.length ni_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
@@ -1353,8 +1345,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
         Array.mapi
           (fun j nj ->
             let fj = fary.(j) in
-            let nj_id = id_of_name nj in
-            let uj = Hashtbl.find fixinfo nj_id in
+            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
             let nj_formal_argvars = List.map fst uj.fixfunc_formal_arguments in
             let nj_funcname = uj.fixfunc_c_name in
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
