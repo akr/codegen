@@ -282,6 +282,9 @@ let nat_src = {|
       CodeGen Primitive Nat.lor => "nat_lor".
       CodeGen Primitive Nat.ldiff => "nat_ldiff".
       CodeGen Primitive Nat.lxor => "nat_lxor".
+      CodeGen Primitive Nat.eqb => "nat_eqb".
+      CodeGen Primitive Nat.leb => "nat_leb".
+      CodeGen Primitive Nat.ltb => "nat_ltb".
       CodeGen Snippet "
       #define nat_add(x,y) ((x) + (y))
       #define nat_sub(x,y) ((x) - (y))
@@ -297,6 +300,9 @@ let nat_src = {|
       #define nat_lor(x,y) ((x) | (y))
       #define nat_ldiff(x,y) ((x) & ~(y))
       #define nat_lxor(x,y) ((x) ^ (y))
+      #define nat_eqb(x,y) ((x) == (y))
+      #define nat_leb(x,y) ((x) <= (y))
+      #define nat_ltb(x,y) ((x) < (y))
       ".
 |}
 
@@ -1029,6 +1035,52 @@ let test_rev_append (ctx : test_ctxt) : unit =
       assert(nth(6, s3, 999) == 999);
     |}
 
+(* nested loop *)
+let test_merge (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Set CodeGen Dev.
+      Require Import List.
+      Definition merge :=
+        fix f (s1 : list nat) :=
+          fix g (s2 : list nat) :=
+            fun s =>
+              match s1 with
+              | nil => rev_append s2 s
+              | cons v1 s1' =>
+                  match s2 with
+                  | nil => rev_append s1 s
+                  | cons v2 s2' =>
+                      if Nat.ltb v1 v2 then
+                        f s1' s2 (cons v1 s)
+                      else
+                        g s2' (cons v2 s)
+                  end
+              end.
+      CodeGen Function nth nat => "nth".
+      CodeGen Function rev_append nat => "rev_append".
+      CodeGen Function merge.
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      #define list4(v1, v2, v3, v4) cons(v1, cons(v2, cons(v3, cons(v4, NULL))))
+      list_nat s1 = list4(0,2,8,10);
+      list_nat s2 = list4(1,4,5,20);
+      list_nat s3 = merge(s1, s2, NULL);
+      assert(nth(0, s3, 999) == 20);
+      assert(nth(1, s3, 999) == 10);
+      assert(nth(2, s3, 999) == 8);
+      assert(nth(3, s3, 999) == 5);
+      assert(nth(4, s3, 999) == 4);
+      assert(nth(5, s3, 999) == 2);
+      assert(nth(6, s3, 999) == 1);
+      assert(nth(7, s3, 999) == 0);
+      assert(nth(8, s3, 999) == 999);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -1089,6 +1141,7 @@ let suite : OUnit2.test =
     (*"test_map_succ" >:: test_map_succ;*)
     "test_nth" >:: test_nth;
     "test_rev_append" >:: test_rev_append;
+    "test_merge" >:: test_merge;
   ]
 
 let () =
