@@ -1112,6 +1112,31 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
       assert(sum(s, 0) == 10);
     |}
 
+(* gen_assign Fix, multiple loops *)
+let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Set CodeGen Dev.
+      Require Import List.
+      Definition f a b c :=
+        let ab :=
+          (fix add1 x y :=
+            match x with
+            | O => y
+            | S x' => add1 x' (S y)
+            end) a b
+        in
+        (fix add2 x y :=
+          match x with
+          | O => y
+          | S x' => add2 x' (S y)
+          end) ab c.
+      CodeGen Function f.
+    |}) {|
+      assert(f(1, 2, 3) == 6);
+    |}
+
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^ list_nat_src ^
@@ -1174,6 +1199,7 @@ let suite : OUnit2.test =
     "test_rev_append" >:: test_rev_append;
     "test_merge" >:: test_merge;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
+    "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
   ]
 
 let () =

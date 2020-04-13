@@ -1014,6 +1014,15 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
     (outer_vars : how_fixfunc_used option list)
     (inner_vars : how_fixfunc_used option list)
     (term : EConstr.t) (numargs : int) : EConstr.t =
+  (*Feedback.msg_debug (Pp.str "[codegen:gensym_fix_vars] start:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "numargs=" ++ Pp.int numargs);*)
+  gensym_fix_vars1 env sigma fixinfo outer_vars inner_vars term numargs
+and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
+    (fixinfo : fixinfo_t)
+    (outer_vars : how_fixfunc_used option list)
+    (inner_vars : how_fixfunc_used option list)
+    (term : EConstr.t) (numargs : int) : EConstr.t =
   match EConstr.kind sigma term with
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
@@ -1031,7 +1040,12 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
             (fun u -> u.how_used_as_goto <- true))
         else
           (fixvar_usage1 outer_vars inner_vars i
-            (fun u -> u.how_used_as_closure <- true)));
+            (fun u ->
+              (*Feedback.msg_debug
+                (Pp.str "[codegen:gensym_fix_vars:Rel] u.how_used_as_closure<-true" +++
+                Pp.str "numargs=" ++ Pp.int numargs +++
+                Pp.str "numargs_in_type=" ++ Pp.int numargs_in_type);*)
+              u.how_used_as_closure <- true)));
       term
   | Int _ | Float _ | Const _ | Construct _ -> term
   | Proj (proj, e) ->
@@ -1042,7 +1056,9 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
         (fun arg ->
           let i = destRel sigma arg in
           (fixvar_usage1 outer_vars inner_vars i
-            (fun u -> u.how_used_as_closure <- true)))
+            (fun u ->
+              (*Feedback.msg_debug (Pp.str "[codegen:gensym_fix_vars:App] u.how_used_as_closure <- true");*)
+              u.how_used_as_closure <- true)))
         args);
       let f' = gensym_fix_vars env sigma fixinfo outer_vars inner_vars f (Array.length args + numargs) in
       mkApp (f', args)
@@ -1058,7 +1074,11 @@ let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
       mkLetIn (x, e', t, b')
   | Case (ci, p, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
-      let branches' = Array.map (fun br -> gensym_fix_vars env sigma fixinfo outer_vars inner_vars br numargs) branches in
+      let branches' = Array.mapi
+        (fun i br ->
+          let numargs' = ci.Constr.ci_cstr_nargs.(i) + numargs in
+          gensym_fix_vars env sigma fixinfo outer_vars inner_vars br numargs')
+        branches in
       mkCase (ci, p, item, branches')
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
@@ -1332,10 +1352,8 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
           Printer.pr_econstr_env env sigma term);
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-      ignore pp_assignments;
       let ni_funcname = ui.fixfunc_c_name in
       let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
-      ignore pp_goto_entry;
       let pp_bodies =
         Array.mapi
           (fun j nj ->
@@ -1350,8 +1368,8 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
           nary in
-      ignore pp_bodies;
       pp_assignments +++ pp_goto_entry +++ pp_join_ary (Pp.spc ()) pp_bodies
+
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 and gen_assign (fixinfo : fixinfo_t) (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 fixinfo ret_var env sigma term cargs in
@@ -1395,9 +1413,56 @@ and gen_assign1 (fixinfo : fixinfo_t) (ret_var : string) (env : Environ.env) (si
       gen_assign fixinfo c_var env sigma e [] +++
       gen_assign fixinfo ret_var env2 sigma b cargs
 
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      if Array.exists
+           (fun n ->
+             let ui = Hashtbl.find fixinfo (Context.binder_name n) in
+             ui.fixfunc_used_as_call || ui.fixfunc_used_as_closure)
+           nary
+      then
+        (let msg = ref (Pp.mt ()) in
+          msg := !msg +++ Pp.hov 0 (Pp.str "[codegen] gen_assign: fix term not purely tail recursive:") +++
+                          Pp.hv 0 (Printer.pr_econstr_env env sigma term);
+         Array.iter
+           (fun n ->
+             let ui = Hashtbl.find fixinfo (Context.binder_name n) in
+             if ui.fixfunc_used_as_call then
+               msg := !msg +++ Pp.hov 0 (Pp.str "recursive function," +++ Pp.str ui.fixfunc_c_name ++ Pp.str ", is used as a call");
+             if ui.fixfunc_used_as_closure then
+               msg := !msg +++ Pp.hov 0 (Pp.str "recursive function," +++ Pp.str ui.fixfunc_c_name ++ Pp.str ", is used as a closure"))
+           nary;
+          user_err (Pp.hv 0 !msg));
+      let env2 = EConstr.push_rec_types prec env in
+      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
+      let ni_formal_arguments = ui.fixfunc_formal_arguments in
+      if List.length cargs < List.length ni_formal_arguments then
+        user_err (Pp.str "[codegen] gen_assign: partial application for fix-term (higher-order term not supported yet):" +++
+          Printer.pr_econstr_env env sigma term);
+      let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
+      let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+      let ni_funcname = ui.fixfunc_c_name in
+      let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
+      let exit_label = "exit_" ^ ni_funcname in
+      let pp_exit = Pp.hov 0 (Pp.str exit_label ++ Pp.str ":;") in
+      let pp_bodies =
+        Array.mapi
+          (fun j nj ->
+            let fj = fary.(j) in
+            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
+            let nj_formal_arguments = uj.fixfunc_formal_arguments in
+            List.iter
+              (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
+              nj_formal_arguments;
+            let nj_formal_argvars = List.map fst nj_formal_arguments in
+            let nj_funcname = uj.fixfunc_c_name in
+            let pp_label = Pp.str ("entry_" ^ nj_funcname) in
+            let gen_ret arg = genc_assign (Pp.str ret_var) arg +++ Pp.hov 0 (Pp.str "goto" +++ Pp.str exit_label ++ Pp.str ";") in
+            hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
+          nary in
+      pp_assignments +++ pp_goto_entry +++ pp_join_ary (Pp.spc ()) pp_bodies +++ pp_exit
+
   | Proj _
-  | Lambda _
-  | Fix _ ->
+  | Lambda _ ->
       user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
 
 let gen_func2_sub (cfunc_name : string) : Pp.t =
