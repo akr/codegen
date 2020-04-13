@@ -1115,7 +1115,7 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
 (* gen_assign Fix, multiple loops *)
 let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (bool_src ^ nat_src ^ list_nat_src ^
+    (bool_src ^ nat_src ^
     {|
       Set CodeGen Dev.
       Require Import List.
