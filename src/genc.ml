@@ -1114,7 +1114,7 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
               (c_arg, t))
             (fst args_and_ret_type)
           in
-          let newkey = Name.Name (Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo))) in
+          let newkey = Name.Name (Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo) ^ "_" ^ c_name)) in
           Hashtbl.add fixinfo newkey {
             fixfunc_c_name = c_name;
             fixfunc_used_as_call = u.how_used_as_call;
