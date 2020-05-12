@@ -828,7 +828,7 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
 
 exception NeedsMultipleFunctions
 
-type nmf_var = NMFRec | NMFArg of int | NMFOther (* NMF : Needs Multiple Functions *)
+type nmf_var = NMFRec | NMFArg | NMFOther (* NMF : Needs Multiple Functions *)
 
 let rec needs_multiple_functions_rec (env : Environ.env) (sigma : Evd.evar_map)
     (top_numargs : int option)
@@ -872,7 +872,7 @@ and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
       if List.nth outer_recfuncs (i-1) then
         (match List.nth top_vars (i-1) with
         | NMFRec -> ()
-        | NMFArg _ -> raise NeedsMultipleFunctions
+        | NMFArg -> raise NeedsMultipleFunctions
         | NMFOther -> raise NeedsMultipleFunctions)
   | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Float _ | Prod _ -> ()
@@ -925,7 +925,7 @@ and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
       let (top_numargs_body, top_vars_body) =
         match top_numargs with
         | None -> (None, NMFOther :: top_vars)
-        | Some m -> (Some (m+1), NMFArg m :: top_vars)
+        | Some m -> (Some (m+1), NMFArg :: top_vars)
       in
       let outer_recfuncs_body = false :: outer_recfuncs in
       let inner_recfuncs_body = false :: inner_recfuncs in
