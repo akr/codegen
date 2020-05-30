@@ -1076,76 +1076,6 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECo
           | Some e -> e)
       | _ -> mkApp (f, args)
 
-(*
- * expand_eta assumes term is already reduced by reduce_exp,
- * "body" of following syntax:
- *
- *  body = let | exp
- *
- *  exp = lambda | app | func                   # body - let
- *
- *  func = var | ctnt | cstr | fix | match      # body - let - lambda - app
- *
- *  let = "let" var ":=" exp "in" body          # no (let x := (let ...) in body) because "letin" reduction
- *
- *  lambda = "fun" var "=>" body
- *
- *  app = func var+     # no ((let ...) args) because "app-let" reduction
- *                      # no ((fun ...) args) because "beta" reduction
- *                      # no ((f args) args) because mkApp generates single application.
- *
- *  fix = "fix" (var ":=" body)+ "for" var
- *
- *  match = "match" var "with" ( "|" cstr "=>" body )* "end"
- *
- * expand_eta apply eta expansion to "app" until the type
- * of "app" is not a function type.
- *)
-let rec expand_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (if !opt_debug_expand_eta then
-    Feedback.msg_debug (Pp.str "expand_eta arg: " ++ Printer.pr_econstr_env env sigma term));
-  let result = expand_eta_body env sigma term in
-  (if !opt_debug_expand_eta then
-    Feedback.msg_debug (Pp.str "expand_eta ret: " ++ Printer.pr_econstr_env env sigma result));
-  check_convertible "expand_eta" (new_env_with_rels env) sigma term result;
-  result
-and expand_eta_body (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | LetIn (x, e, t, b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      mkLetIn (x, expand_eta_exp env sigma e, t, expand_eta_body env2 sigma b)
-  | _ -> expand_eta_exp env sigma term
-and expand_eta_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Lambda (x, t, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      mkLambda (x, t, expand_eta_body env2 sigma b)
-  | App (func, args) ->
-      let func' = expand_eta_func env sigma func in
-      let term_type = Retyping.get_type_of env sigma term in
-      expand_eta_app env sigma func' args term_type
-  | _ -> expand_eta_func env sigma term
-and expand_eta_func (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      mkFix ((ia, i), (nary, tary, Array.map (expand_eta_body env2 sigma) fary))
-  | CoFix (i, ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      mkCoFix (i, (nary, tary, Array.map (expand_eta_body env2 sigma) fary))
-  | Case (ci, p, item, branches) ->
-      mkCase (ci, p, item, Array.map (expand_eta_body env sigma) branches)
-  | _ -> term
-and expand_eta_app (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (args : EConstr.t array) (term_type : EConstr.types) : EConstr.t =
-  let term_type = Reductionops.nf_all env sigma term_type in
-  let (n, relc, body_type) = Termops.decompose_prod_letin sigma term_type in
-  let term' = mkApp (func, args) in
-  let lifted_term = Vars.lift n term' in
-  let args = Array.map (fun i -> mkRel i) (array_rev (iota_ary 1 n)) in
-  it_mkLambda_or_LetIn (mkApp (lifted_term, args)) relc
-
 let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
   if n <= 0 then
     0
@@ -1325,6 +1255,158 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
+let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
+  let t = Reductionops.nf_all env sigma t in
+  let (args, result_type) = decompose_prod sigma t in
+  List.length args
+
+(* copied from num_funargs of genc.ml *)
+let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
+  let t = Retyping.get_type_of env sigma term in
+  numargs_of_type env sigma t
+
+(*
+let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
+  match l with
+  | [] -> b
+  | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
+*)
+
+let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
+  Feedback.msg_debug (Pp.str "complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
+  let result = complete_args_fun1 env sigma term p q in
+  Feedback.msg_debug (Pp.str "complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);
+  check_convertible "complete_args_fun" env sigma term result;
+  result
+and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      if p > 0 then
+        mkLambda (x, t, complete_args_fun env2 sigma e (p-1) q)
+      else if p = 0 && q > 0 then
+        mkLambda (x, t, complete_args_fun env2 sigma e 0 (q-1))
+      else (* p = 0 && q = 0 *)
+        let p' = numargs_of_exp env2 sigma e in
+        mkLambda (x, t, complete_args_fun env2 sigma e p' 0)
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary2 = Array.map2
+        (fun t f ->
+          let p' = numargs_of_type env sigma t in
+          complete_args_fun env2 sigma f p' 0)
+        tary fary
+      in
+      mkFix ((ia, i), (nary, tary, fary2))
+  | _ ->
+      let t = Retyping.get_type_of env sigma term in
+      let t = Reductionops.nf_all env sigma t in
+      let (fargs, result_type) = decompose_prod sigma t in
+      let fargs' = CList.lastn p fargs in
+      let term' = Vars.lift p term in
+      let vs = array_rev (iota_ary 1 p) in
+      let term'' = complete_args_exp env sigma term' vs q in
+      compose_lam fargs' term''
+and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
+  let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
+  Feedback.msg_debug (Pp.str "complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
+  let result = complete_args_exp1 env sigma term vs q in
+  Feedback.msg_debug (Pp.str "complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);
+  check_convertible "complete_args_exp" env sigma term' result;
+  result
+and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
+  if isApp sigma term then
+    let (f, args) = destApp sigma term in
+    let vs' = Array.map (fun a -> destRel sigma a) args in
+    complete_args_exp env sigma f (Array.append vs' vs) q
+  else
+  let p = Array.length vs in
+  let ty = Retyping.get_type_of env sigma term in
+  let ty = Reductionops.nf_all env sigma ty in
+  let (fargs, result_type) = decompose_prod sigma ty in
+  let r = List.length fargs - p - q in
+  let mkClosure () =
+    let fargs' = CList.skipn r fargs in
+    let term' = Vars.lift (q+r) term in
+    let args =
+      Array.append
+        (Array.map (fun j -> mkRel (j+q+r)) vs)
+        (Array.map (fun j -> mkRel j) (array_rev (iota_ary 1 (q+r))))
+    in
+    compose_lam fargs' (mkApp (term', args))
+  in
+  let mkAppOrClosure () =
+    if r = 0 then
+      mkApp (term, Array.map (fun j -> mkRel j) vs)
+    else
+      mkClosure ()
+  in
+  match EConstr.kind sigma term with
+  | App _ -> assert false
+  | Cast (e,ck,t) -> complete_args_exp env sigma e vs q
+  | Rel i ->
+      if p = 0 && q = 0 then
+        term
+      else
+        mkAppOrClosure ()
+  | Const _ -> mkAppOrClosure ()
+  | Construct _ -> mkAppOrClosure ()
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      if p = 0 && q = 0 then
+        mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1) 0)
+      else if p > 0 then
+        let term' = Vars.subst1 (mkRel vs.(0)) e in
+        let vs' = Array.sub vs 1 (p-1) in
+        complete_args_exp env sigma term' vs' q
+      else (* p = 0 and q > 0 *)
+        mkLambda (x, t, complete_args_fun env2 sigma e 0 (q-1))
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let vs' = Array.map (fun j -> j+1) vs in
+      mkLetIn (x,
+        complete_args_exp env sigma e [||] 0,
+        t,
+        complete_args_exp env2 sigma b vs' q)
+  | Case (ci, epred, item, branches) ->
+      mkApp (
+        mkCase (ci, epred, item,
+          Array.mapi
+            (fun i br ->
+              complete_args_fun env sigma br ci.ci_cstr_nargs.(i) (p+q))
+            branches),
+        Array.map (fun j -> mkRel j) vs)
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkApp (
+        mkFix ((ia, i),
+          (nary,
+           tary,
+           Array.mapi
+             (fun j f ->
+               let t = tary.(j) in
+               let n = numargs_of_type env sigma t in
+               complete_args_fun env2 sigma f n 0)
+             fary)),
+        Array.map (fun j -> mkRel j) vs)
+  | Proj (proj, e) ->
+      mkApp (
+        mkProj (proj,
+          complete_args_exp env sigma e [||] 0),
+        Array.map (fun j -> mkRel j) vs)
+  | Var _ | Meta _ | Evar _
+  | Sort _ | Prod _ | Ind _
+  | CoFix _
+  | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:complete_arguments_exp] unexpected term:" +++
+        Printer.pr_econstr_env env sigma term)
+
+let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  complete_args_fun env sigma term (numargs_of_exp env sigma term) 0
+
 let specialization_time = ref (Unix.times ())
 
 let init_debug_specialization () : unit =
@@ -1379,14 +1461,14 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "reduce_exp" term;
   let term = replace env sigma term in
   debug_specialization env sigma "replace" term;
-  (*let term = expand_eta env sigma term in
-  debug_specialization env sigma "expand_eta" term;*)
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
   let term = reduce_function env sigma term in
   debug_specialization env sigma "reduce_function" term;
   let term = delete_unused_let env sigma term in
   debug_specialization env sigma "delete_unused_let" term;
+  let term = complete_args env sigma term in
+  debug_specialization env sigma "complete_args" term;
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
   let kind = Decls.IsDefinition Decls.Definition in

@@ -28,14 +28,6 @@ open State
 open Linear
 open Specialize
 
-let (+++) d1 d2 =
-  if Pp.ismt d1 then
-    d2
-  else if Pp.ismt d2 then
-    d1
-  else
-    d1 ++ Pp.spc () ++ d2
-
 let c_funcname (fname : string) : string =
   c_id fname
 

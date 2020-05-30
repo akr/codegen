@@ -161,6 +161,14 @@ let merge_range (r1 : (int*int) option) (r2 : (int*int) option) : (int*int) opti
 let merge_range3 (r1 : (int*int) option) (r2 : (int*int) option) (r3 : (int*int) option) : (int*int) option =
   merge_range (merge_range r1 r2) r3
 
+let (+++) d1 d2 =
+  if Pp.ismt d1 then
+    d2
+  else if Pp.ismt d2 then
+    d1
+  else
+    d1 ++ Pp.spc () ++ d2
+
 let pp_join_ary sep ary =
   if Array.length ary = 0 then
     mt ()
