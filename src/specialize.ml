@@ -1317,13 +1317,12 @@ and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   result
 and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
   let p = Array.length vs in
-  let fargs = Lazy.from_fun
-    (fun () ->
+  let fargs = lazy (
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
       fst (decompose_prod sigma ty))
   in
-  let r = Lazy.from_fun (fun () -> List.length (Lazy.force fargs) - p - q) in
+  let r = lazy (List.length (Lazy.force fargs) - p - q) in
   let mkClosure () =
     let fargs = Lazy.force fargs in
     let r = Lazy.force r in
