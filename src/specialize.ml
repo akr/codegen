@@ -1316,11 +1316,6 @@ and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "complete_args_exp" env sigma term' result;
   result
 and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
-  if isApp sigma term then
-    let (f, args) = destApp sigma term in
-    let vs' = Array.map (fun a -> destRel sigma a) args in
-    complete_args_exp env sigma f (Array.append vs' vs) q
-  else
   let p = Array.length vs in
   let ty = Retyping.get_type_of env sigma term in
   let ty = Reductionops.nf_all env sigma ty in
@@ -1343,7 +1338,9 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       mkClosure ()
   in
   match EConstr.kind sigma term with
-  | App _ -> assert false
+  | App (f,args) ->
+      let vs' = Array.map (fun a -> destRel sigma a) args in
+      complete_args_exp env sigma f (Array.append vs' vs) q
   | Cast (e,ck,t) -> complete_args_exp env sigma e vs q
   | Rel i ->
       if p = 0 && q = 0 then
