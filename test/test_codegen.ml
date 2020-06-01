@@ -816,6 +816,24 @@ let test_app_let (ctx : test_ctxt) : unit =
       assert(foo() == 3);
     |}
 
+let test_app_match (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Set CodeGen Dev.
+      Definition add_or_sub b n :=
+        (match b with
+        | true => Nat.add 10
+        | false => Nat.sub 10
+        end) n.
+      CodeGen Function add_or_sub.
+    |}) {|
+      assert(add_or_sub(true, 1) == 11);
+      assert(add_or_sub(true, 2) == 12);
+      assert(add_or_sub(false, 1) == 9);
+      assert(add_or_sub(false, 2) == 8);
+    |}
+
 let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -1180,6 +1198,7 @@ let suite : OUnit2.test =
     "test_mul3" >:: test_mul3;
     "test_even_odd" >:: test_even_odd;
     "test_app_let" >:: test_app_let;
+    "test_app_match" >:: test_app_match;
     "test_cast" >:: test_cast;
     "test_delta_fun_constant" >:: test_delta_fun_constant;
     "test_delta_fun_constructor" >:: test_delta_fun_constructor;
