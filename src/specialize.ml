@@ -1324,8 +1324,8 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   in
   let r = lazy (List.length (Lazy.force fargs) - p - q) in
   let mkClosure () =
-    let fargs = Lazy.force fargs in
-    let r = Lazy.force r in
+    let lazy fargs = fargs in
+    let lazy r = r in
     let fargs' = CList.skipn r fargs in
     let term' = Vars.lift (q+r) term in
     let args =
@@ -1336,7 +1336,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     compose_lam fargs' (mkApp (term', args))
   in
   let mkAppOrClosure () =
-    let r = Lazy.force r in
+    let lazy r = r in
     if r = 0 then
       mkApp (term, Array.map (fun j -> mkRel j) vs)
     else
@@ -1358,7 +1358,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       if p = 0 && q = 0 then
-        let r = Lazy.force r in
+        let lazy r = r in
         mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1) 0)
       else if p > 0 then
         let term' = Vars.subst1 (mkRel vs.(0)) e in
