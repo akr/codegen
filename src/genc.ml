@@ -92,15 +92,15 @@ let local_gensym () : string =
   let idref = List.hd !local_gensym_id in
   let n = !idref in
   idref := n + 1;
-  "v" ^ string_of_int n
+  "tmp" ^ string_of_int n
 
 let local_gensym_with_str (suffix : string) : string =
   local_gensym () ^ "_" ^ (c_id suffix)
 
 let local_gensym_with_name (name : Name.t) : string =
   match name with
-  | Name.Anonymous -> local_gensym ()
-  | Name.Name id -> local_gensym () ^ "_" ^ (c_id (Id.to_string id))
+  | Name.Anonymous -> user_err (Pp.str "local_gensym_with_name with anonymous name")
+  | Name.Name id -> Id.to_string id
 
 let local_gensym_with_annotated_name (name : Name.t Context.binder_annot) : string =
   local_gensym_with_name (Context.binder_name name)
@@ -794,18 +794,22 @@ let local_vars : ((string * string) list ref) list ref = ref []
 
 let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
   let vars = ref [] in
-  local_vars := vars :: !local_vars;
+  let old = !local_vars in
+  local_vars := vars :: old;
   let ret = f () in
+  local_vars := old;
   (!vars, ret)
-
-let local_vars_get () =
-  !(List.hd !local_vars)
 
 let add_local_var (c_type : string) (c_var : string) : unit =
   if !local_vars = [] then
     user_err (Pp.str "[codegen:bug] add_local_var is called outside of local_vars_with");
   let vars = List.hd !local_vars in
-  vars := (c_type, c_var) :: !vars
+  match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
+  | Some (c_type1, c_var1) ->
+      (if c_type1 <> c_type then
+        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable"));
+      ()
+  | None -> vars := (c_type, c_var) :: !vars
 
 let id_of_name (name : Name.t Context.binder_annot) : Id.t =
   match Context.binder_name name with
@@ -1475,7 +1479,14 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
     argument_name_type_pairs
   in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:5");*)
-  let (vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail fixinfo genc_return env sigma body (List.map fst c_fargs))) in
+  let (local_vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail fixinfo genc_return env sigma body (List.map fst c_fargs))) in
+  let local_vars = List.filter
+    (fun (c_type, c_var) ->
+      match List.find_opt (fun (c_var1, ty1) -> c_var = c_var1) c_fargs with
+      | Some _ -> false (* xxx: check type mismach *)
+      | None -> true)
+    local_vars
+  in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
   hv 0 (
   hv 0 (str "static" +++
@@ -1487,7 +1498,7 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
     pp_postjoin_list (spc ())
       (List.map
         (fun (c_type, c_var) -> hv 0 (str c_type +++ str c_var ++ str ";"))
-        (local_vars_get ()))
+        local_vars)
     ++
     pp_body))
 

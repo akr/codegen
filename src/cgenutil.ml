@@ -450,6 +450,11 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
           Some (i, ctnt_ary)
       | _ -> None
 
+let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
+  match l with
+  | [] -> b
+  | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
+
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with
   | Rel _ -> "Rel"

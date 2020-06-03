@@ -1265,13 +1265,6 @@ let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   let t = Retyping.get_type_of env sigma term in
   numargs_of_type env sigma t
 
-(*
-let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
-  match l with
-  | [] -> b
-  | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
-*)
-
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
   Feedback.msg_debug (Pp.str "complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
   let result = complete_args_fun1 env sigma term p q in
@@ -1410,7 +1403,18 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   complete_args_fun env sigma term (numargs_of_exp env sigma term) 0
 
-let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t): EConstr.t =
+let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      x :: formal_argument_names env2 sigma e
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      formal_argument_names env2 sigma fary.(i)
+  | _ -> []
+
+let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let num_vars = ref 0 in
   let make_new_name prefix counter old_name =
     counter := !counter +1;
@@ -1422,7 +1426,6 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t): E
   let make_new_var old_name = Context.map_annot (fun old_name -> make_new_name "v" num_vars old_name) old_name in
   let num_fixfuncs = ref 0 in
   let make_new_fixfunc old_name = Context.map_annot (fun old_name -> make_new_name "fixfunc" num_fixfuncs old_name) old_name in
-
   let rec r (env : Environ.env) (term : EConstr.t) (vars : Name.t Context.binder_annot list) =
     match EConstr.kind sigma term with
     | Lambda (x,t,e) ->
@@ -1446,7 +1449,18 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t): E
     | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
         let env2 = push_rec_types prec env in
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
-        mkFix ((ia, i), (nary2, tary, Array.map (fun e -> r env2 e []) fary))
+        let fary2 = Array.map (fun e -> r env2 e []) fary in
+        let tary2 = Array.mapi (fun i t ->
+            let f = fary2.(i) in
+            let argnames = List.rev (formal_argument_names env2 sigma f) in
+            let (args, result_type) = decompose_prod sigma t in
+            (if List.length argnames <> List.length args then
+              user_err (Pp.str "[codegen:rename_vars:bug] unexpected length of formal arguments:"));
+            let args2 = List.map2 (fun (arg_name, arg_type) arg_name2 -> (arg_name2, arg_type)) args argnames in
+            compose_prod args2 result_type)
+          tary
+        in
+        mkFix ((ia, i), (nary2, tary2, fary2))
     | App (f,args) ->
         let vars2 =
           (List.append
