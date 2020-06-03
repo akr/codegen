@@ -1417,7 +1417,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t): E
     let prefix = prefix ^ string_of_int !counter in
     match old_name with
     | Name.Anonymous -> Name.mk_name (Id.of_string prefix)
-    | Name.Name id -> Name.mk_name (Id.of_string (prefix ^ "_" ^ Id.to_string id))
+    | Name.Name id -> Name.mk_name (Id.of_string (prefix ^ "_" ^ (c_id (Id.to_string id))))
   in
   let make_new_var old_name = Context.map_annot (fun old_name -> make_new_name "v" num_vars old_name) old_name in
   let num_fixfuncs = ref 0 in
