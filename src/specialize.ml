@@ -1410,6 +1410,74 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   complete_args_fun env sigma term (numargs_of_exp env sigma term) 0
 
+let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t): EConstr.t =
+  let num_vars = ref 0 in
+  let make_new_name prefix counter old_name =
+    counter := !counter +1;
+    let prefix = prefix ^ string_of_int !counter in
+    match old_name with
+    | Name.Anonymous -> Name.mk_name (Id.of_string prefix)
+    | Name.Name id -> Name.mk_name (Id.of_string (prefix ^ "_" ^ Id.to_string id))
+  in
+  let make_new_var old_name = Context.map_annot (fun old_name -> make_new_name "v" num_vars old_name) old_name in
+  let num_fixfuncs = ref 0 in
+  let make_new_fixfunc old_name = Context.map_annot (fun old_name -> make_new_name "fixfunc" num_fixfuncs old_name) old_name in
+
+  let rec r (env : Environ.env) (term : EConstr.t) (vars : Name.t Context.binder_annot list) =
+    match EConstr.kind sigma term with
+    | Lambda (x,t,e) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        (match vars with
+        | [] ->
+            let x2 = make_new_var x in
+            mkLambda (x2, t, r env2 e vars)
+        | var :: rest ->
+            if Name.is_anonymous (Context.binder_name var) then
+              let x2 = make_new_var x in
+              mkLambda (x2, t, r env2 e rest)
+            else
+              mkLambda (var, t, r env2 e rest))
+    | LetIn (x,e,t,b) ->
+        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let env2 = EConstr.push_rel decl env in
+        let x2 = make_new_var x in
+        mkLetIn (x2, r env e [], t, r env2 b vars)
+    | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+        let env2 = push_rec_types prec env in
+        let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
+        mkFix ((ia, i), (nary2, tary, Array.map (fun e -> r env2 e []) fary))
+    | App (f,args) ->
+        let vars2 =
+          (List.append
+            (CArray.map_to_list
+              (fun a ->
+                let decl = Environ.lookup_rel (destRel sigma a) env in
+                Context.Rel.Declaration.get_annot decl)
+              args)
+            vars)
+        in
+        mkApp (r env f vars2, args)
+    | Cast (e,ck,t) -> mkCast (r env e vars, ck, t)
+    | Rel i -> term
+    | Const _ -> term
+    | Construct _ -> term
+    | Case (ci, epred, item, branches) ->
+        mkCase (ci, epred, item,
+          Array.mapi
+            (fun i br ->
+              r env br
+                (List.append
+                  (List.init ci.ci_cstr_nargs.(i) (fun _ -> Context.anonR))
+                  vars))
+            branches)
+    | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
+    | CoFix _ | Proj (_, _) | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:rename_vars] unexpected term:" +++
+        Printer.pr_econstr_env env sigma term)
+  in
+  r env term []
+
 let specialization_time = ref (Unix.times ())
 
 let init_debug_specialization () : unit =
@@ -1472,6 +1540,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "delete_unused_let" term;
   let term = complete_args env sigma term in
   debug_specialization env sigma "complete_args" term;
+  let term = rename_vars env sigma term in
+  debug_specialization env sigma "rename_vars" term;
   let univs = Evd.univ_entry ~poly:false sigma in
   let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
   let kind = Decls.IsDefinition Decls.Definition in
