@@ -94,21 +94,13 @@ let local_gensym () : string =
   idref := n + 1;
   "tmp" ^ string_of_int n
 
-let local_gensym_with_str (suffix : string) : string =
-  local_gensym () ^ "_" ^ (c_id suffix)
-
-let local_gensym_with_name (name : Name.t) : string =
+let str_of_name (name : Name.t) : string =
   match name with
-  | Name.Anonymous -> user_err (Pp.str "local_gensym_with_name with anonymous name")
+  | Name.Anonymous -> user_err (Pp.str "str_of_name with anonymous name")
   | Name.Name id -> Id.to_string id
 
-let local_gensym_with_annotated_name (name : Name.t Context.binder_annot) : string =
-  local_gensym_with_name (Context.binder_name name)
-
-let local_gensym_with_nameopt (nameopt : Name.t option) : string =
-  match nameopt with
-  | None -> local_gensym ()
-  | Some name -> local_gensym_with_name name
+let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
+  str_of_name (Context.binder_name name)
 
 let rec argtys_and_rety_of_type (sigma : Evd.evar_map) (ty : EConstr.types) : EConstr.types list * EConstr.types =
   match EConstr.kind sigma ty with
@@ -138,7 +130,7 @@ let rec fargs_and_body (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Constr.Lambda (name, ty, body) ->
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       let env2 = EConstr.push_rel decl env in
-      let var = local_gensym_with_name (Context.binder_name name) in
+      let var = str_of_name (Context.binder_name name) in
       let fargs1, env1, body1 = fargs_and_body env2 sigma body in
       let fargs2 = (var, ty) :: fargs1 in
       (fargs2, env1, body1)
@@ -330,7 +322,7 @@ let genc_case_branch_body (env : Environ.env) (sigma : Evd.evar_map)
     List.map2
       (fun (name, ty) field_index ->
         let name = Context.binder_name name in
-        let varname = local_gensym_with_name name in
+        let varname = str_of_name name in
         let cstr_field = case_cstrfield env sigma exprty cstr_index field_index in
         (CtxVar varname, genc_varinit env sigma ty varname (str cstr_field ++ str "(" ++ str exprvar ++ str ")")))
        decls
@@ -384,7 +376,7 @@ let genc_case_break (env : Environ.env) (sigma : Evd.evar_map)
     (fun envb sigma context2 body -> bodyfunc envb sigma context2 body +++ str "break;")
 
 let genc_geninitvar (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (namehint : Names.Name.t) (init : Pp.t) : Pp.t * string =
-  let varname = local_gensym_with_name namehint in
+  let varname = str_of_name namehint in
   (genc_varinit env sigma ty varname init, varname)
 
 (* not tail position. return a variable *)
@@ -402,7 +394,7 @@ let rec genc_body_var (env : Environ.env) (sigma : Evd.evar_map) (context : cont
   | Constr.App (f, argsary) ->
       genc_geninitvar env sigma termty namehint (genc_app env sigma context f argsary)
   | Constr.Case (ci, tyf, expr, brs) ->
-      let varname = local_gensym_with_name namehint in
+      let varname = str_of_name namehint in
       (genc_vardecl env sigma termty varname +++
        genc_case_break env sigma context ci tyf expr brs
         (fun envb sigma context2 body -> genc_body_assign envb sigma context2 varname body),
@@ -1100,13 +1092,13 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
             if u.how_used_as_call then
               global_gensym_with_name
             else
-              local_gensym_with_name
+              str_of_name
           in
           let c_name = gensym_with_name (Context.binder_name nary.(i)) in
           let args_and_ret_type = EConstr.decompose_prod sigma tary.(i) in
           let formal_arguments = List.rev_map
             (fun (x,t) ->
-              let c_arg = local_gensym_with_annotated_name x in
+              let c_arg = str_of_annotated_name x in
               (c_arg, t))
             (fst args_and_ret_type)
           in
@@ -1190,7 +1182,7 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
     let branch_arg_types = CArray.rev_of_list branch_arg_types in
     let c_vars = Array.map
       (fun (x,t) ->
-        let c_var = local_gensym_with_annotated_name x in
+        let c_var = str_of_annotated_name x in
         add_local_var (c_typename env sigma t) c_var;
         c_var)
       branch_arg_types
@@ -1332,7 +1324,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
   | Case (ci,predicate,item,branches) ->
       gen_match gen_switch_without_break (gen_tail fixinfo gen_ret) env sigma ci predicate item branches cargs
   | LetIn (x,e,t,b) ->
-      let c_var = local_gensym_with_annotated_name x in
+      let c_var = str_of_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1402,7 +1394,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (ret_var : string) (env : Environ.env) (si
       gen_match gen_switch_with_break (gen_assign fixinfo ret_var) env sigma ci predicate item branches cargs
 
   | LetIn (x,e,t,b) ->
-      let c_var = local_gensym_with_annotated_name x in
+      let c_var = str_of_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1475,7 +1467,7 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:4");*)
   let c_fargs = List.rev_map
-    (fun (x,t) -> (local_gensym_with_annotated_name x, t))
+    (fun (x,t) -> (str_of_annotated_name x, t))
     argument_name_type_pairs
   in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:5");*)
