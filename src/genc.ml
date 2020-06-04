@@ -997,20 +997,20 @@ let fixvar_usage1
     : unit =
   fixvar_usage2 outer_vars inner_vars i func func
 
-let rec gensym_fix_vars (env : Environ.env) (sigma : Evd.evar_map)
+let rec collect_fix_usage (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
     (outer_vars : how_fixfunc_used option list)
     (inner_vars : how_fixfunc_used option list)
-    (term : EConstr.t) (numargs : int) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen:gensym_fix_vars] start:" +++
+    (term : EConstr.t) (numargs : int) : unit =
+  (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs);*)
-  gensym_fix_vars1 env sigma fixinfo outer_vars inner_vars term numargs
-and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
+  collect_fix_usage1 env sigma fixinfo outer_vars inner_vars term numargs
+and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
     (outer_vars : how_fixfunc_used option list)
     (inner_vars : how_fixfunc_used option list)
-    (term : EConstr.t) (numargs : int) : EConstr.t =
+    (term : EConstr.t) (numargs : int) : unit =
   match EConstr.kind sigma term with
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
@@ -1030,26 +1030,23 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
           (fixvar_usage1 outer_vars inner_vars i
             (fun u ->
               (*Feedback.msg_debug
-                (Pp.str "[codegen:gensym_fix_vars:Rel] u.how_used_as_closure<-true" +++
+                (Pp.str "[codegen:collect_fix_usage:Rel] u.how_used_as_closure<-true" +++
                 Pp.str "numargs=" ++ Pp.int numargs +++
                 Pp.str "numargs_in_type=" ++ Pp.int numargs_in_type);*)
-              u.how_used_as_closure <- true)));
-      term
-  | Int _ | Float _ | Const _ | Construct _ -> term
-  | Proj (proj, e) ->
-      term (* e must be a Rel which type is inductive (non-function) type *)
-  | Cast (e,ck,t) -> gensym_fix_vars env sigma fixinfo outer_vars inner_vars e numargs
+              u.how_used_as_closure <- true)))
+  | Int _ | Float _ | Const _ | Construct _ -> ()
+  | Proj (proj, e) -> () (* e must be a Rel which type is inductive (non-function) type *)
+  | Cast (e,ck,t) -> collect_fix_usage env sigma fixinfo outer_vars inner_vars e numargs
   | App (f, args) ->
       (Array.iter
         (fun arg ->
           let i = destRel sigma arg in
           (fixvar_usage1 outer_vars inner_vars i
             (fun u ->
-              (*Feedback.msg_debug (Pp.str "[codegen:gensym_fix_vars:App] u.how_used_as_closure <- true");*)
+              (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage:App] u.how_used_as_closure <- true");*)
               u.how_used_as_closure <- true)))
         args);
-      let f' = gensym_fix_vars env sigma fixinfo outer_vars inner_vars f (Array.length args + numargs) in
-      mkApp (f', args)
+      collect_fix_usage env sigma fixinfo outer_vars inner_vars f (Array.length args + numargs)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1057,24 +1054,21 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
       let inner_vars1 = [] in
       let outer_vars2 = outer_vars in
       let inner_vars2 = None :: inner_vars in
-      let e' = gensym_fix_vars env sigma fixinfo outer_vars1 inner_vars1 e 0 in
-      let b' = gensym_fix_vars env2 sigma fixinfo outer_vars2 inner_vars2 b numargs in
-      mkLetIn (x, e', t, b')
+      collect_fix_usage env sigma fixinfo outer_vars1 inner_vars1 e 0;
+      collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 b numargs
   | Case (ci, p, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
-      let branches' = Array.mapi
-        (fun i br ->
-          let numargs' = ci.Constr.ci_cstr_nargs.(i) + numargs in
-          gensym_fix_vars env sigma fixinfo outer_vars inner_vars br numargs')
-        branches in
-      mkCase (ci, p, item, branches')
+      for i = 0 to Array.length branches - 1 do
+        let br = branches.(i) in
+        let numargs' = ci.Constr.ci_cstr_nargs.(i) + numargs in
+        collect_fix_usage env sigma fixinfo outer_vars inner_vars br numargs'
+      done
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       let outer_vars2 = outer_vars in
       let inner_vars2 = None :: inner_vars in
-      let b' = gensym_fix_vars env2 sigma fixinfo outer_vars2 inner_vars2 b (numargs-1) in
-      mkLambda (x, t, b')
+      collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 b (numargs-1)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let n = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
@@ -1084,9 +1078,8 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
           how_used_as_goto = false;
           how_used_as_closure = false; }) in
       let inner_vars2 = List.append (CArray.map_to_list (fun u -> Some u) fixvar_usages) inner_vars in
-      let fary' = Array.map (fun f -> gensym_fix_vars env2 sigma fixinfo outer_vars2 inner_vars2 f numargs) fary in
-      let nary' = Array.init n
-        (fun i ->
+      Array.iter (fun f -> collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 f numargs) fary;
+      for i = 0 to n - 1 do
           let u = fixvar_usages.(i) in
           let gensym_with_name =
             if u.how_used_as_call then
@@ -1102,27 +1095,24 @@ and gensym_fix_vars1 (env : Environ.env) (sigma : Evd.evar_map)
               (c_arg, t))
             (fst args_and_ret_type)
           in
-          let newkey = Name.Name (Id.of_string ("fixfunc" ^ string_of_int (Hashtbl.length fixinfo) ^ "_" ^ c_name)) in
-          Hashtbl.add fixinfo newkey {
+          let key = Context.binder_name nary.(i) in
+          Hashtbl.add fixinfo key {
             fixfunc_c_name = c_name;
             fixfunc_used_as_call = u.how_used_as_call;
             fixfunc_used_as_goto = u.how_used_as_goto;
             fixfunc_used_as_closure = u.how_used_as_closure;
             fixfunc_formal_arguments = formal_arguments;
-          };
-          (Context.annotR newkey))
-      in
-      mkFix ((ia, i), (nary', tary, fary'))
+          }
+      done
 
-let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
+let rec adjust_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
-    (name : string) (term : EConstr.t) : EConstr.t =
+    (name : string) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let e' = rename_top_fix_var env2 sigma fixinfo name e in
-      mkLambda (x,t,e')
+      adjust_top_fix_var env2 sigma fixinfo name e
   | Fix ((ia, i), (nary, tary, fary)) ->
       let key = Context.binder_name nary.(i) in
       let usage = Hashtbl.find fixinfo key in
@@ -1132,17 +1122,16 @@ let rec rename_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
         fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
         fixfunc_used_as_closure = usage.fixfunc_used_as_closure;
         fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
-      };
-      mkFix ((ia, i), (nary, tary, fary))
+      }
   (* xxx: consider App *)
-  | _ -> term
+  | _ -> ()
 
-let rename_fix_var (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : (EConstr.t * fixinfo_t) =
+let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
   let fixinfo = Hashtbl.create 0 in
   let numargs = num_funargs env sigma term in
-  let term2 = gensym_fix_vars env sigma fixinfo [] [] term numargs in
-  let term3 = rename_top_fix_var env sigma fixinfo name term2 in
-  (term3, fixinfo)
+  collect_fix_usage env sigma fixinfo [] [] term numargs;
+  adjust_top_fix_var env sigma fixinfo name term;
+  fixinfo
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   hv 0 (
@@ -1461,7 +1450,7 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
   (if needs_multiple_functions env sigma body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
-  let (body, fixinfo) = rename_fix_var env sigma cfunc_name body in
+  let fixinfo = collect_fix_info env sigma cfunc_name body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:3");*)
   let ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
