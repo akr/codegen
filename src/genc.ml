@@ -1307,6 +1307,8 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
       | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term)
       | arg :: rest ->
+          (if Context.binder_name x <> Name.Name (Id.of_string arg) then
+            user_err (Pp.str "[codegen:gen_tail] lambda argument doesn't match to outer application argument"));
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail fixinfo gen_ret env2 sigma b rest)
