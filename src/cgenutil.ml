@@ -103,6 +103,29 @@ let array_find_index (p : 'a -> bool) (ary : 'a array) : int =
 let array_combine (a1 : 'a array) (a2 : 'b array) : ('a * 'b) array =
   Array.map2 (fun x y -> (x,y)) a1 a2
 
+let array_flatten (v : 'a array array) : 'a array =
+  let nonempty = ref 0 in
+  let total = ref 0 in
+  for i = 0 to Array.length v - 1 do
+    let w = v.(i) in
+    let l = Array.length w in
+    (if l <> 0 then nonempty := i);
+    total := !total + l
+  done;
+  if !total = 0 then
+    [||]
+  else
+    let u = Array.make !total v.(!nonempty).(0) in
+    let k = ref 0 in
+    for i = 0 to Array.length v - 1 do
+      let w = v.(i) in
+      for j = 0 to Array.length w - 1 do
+        u.(!k) <- w.(j);
+        k := !k + 1
+      done
+    done;
+    u
+
 let rec ncons n x s =
   if n = 0 then
     s

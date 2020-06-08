@@ -1442,25 +1442,71 @@ and gen_assign1 (fixinfo : fixinfo_t) (ret_var : string) (env : Environ.env) (si
   | Lambda _ ->
       user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
 
+let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (fargs : (string * EConstr.types) list) (fixfuncs : string list) (term : EConstr.t) :
+    ((string * EConstr.types) list * string list * Environ.env * EConstr.t) array =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let c_var = (str_of_annotated_name x, t) in
+      obtain_function_bodies_rec env2 sigma (c_var :: fargs) fixfuncs b
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let bodies = Array.mapi
+        (fun j nj ->
+          let fixfunc_name = str_of_annotated_name nj in
+          let fj = fary.(j) in
+          obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj)
+        nary
+      in
+      let reorered_bodies = Array.copy bodies in
+      Array.blit bodies 0 reorered_bodies 1 i;
+      reorered_bodies.(0) <- bodies.(i);
+      array_flatten reorered_bodies
+  | _ ->
+      [|(fargs, fixfuncs, env, term)|]
+
+let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
+   (term : EConstr.t) :
+    ((string * EConstr.types) list * string list * Environ.env * EConstr.t) array =
+  obtain_function_bodies_rec env sigma [] [] term
+
 let gen_func2_sub (cfunc_name : string) : Pp.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc_name in
-  let body = EConstr.of_constr body in
+  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  let whole_body = EConstr.of_constr whole_body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
-  (if needs_multiple_functions env sigma body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
+  (if needs_multiple_functions env sigma whole_body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
-  let fixinfo = collect_fix_info env sigma cfunc_name body in
+  let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:3");*)
-  let ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
-  let (argument_name_type_pairs, return_type) = decompose_prod sigma ty in
+  let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
+  let (_, return_type) = decompose_prod sigma whole_ty in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:4");*)
-  let c_fargs = List.rev_map
-    (fun (x,t) -> (str_of_annotated_name x, t))
-    argument_name_type_pairs
-  in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:5");*)
-  let (local_vars, pp_body) = local_vars_with (fun () -> hv 0 (gen_tail fixinfo genc_return env sigma body (List.map fst c_fargs))) in
+  let bodies = obtain_function_bodies env sigma whole_body in
+  let (first_args, _, _, _) = bodies.(0) in
+  let c_fargs = List.rev first_args in
+  let (local_vars, pp_body) = local_vars_with
+    (fun () ->
+      pp_join_ary (spc ()) (Array.map
+        (fun (args, fixes, env2, body) ->
+          List.iter
+            (fun (arg_name, arg_type) -> add_local_var (c_typename env sigma arg_type) arg_name)
+            args;
+          let labels = List.map
+            (fun fix_name ->
+              let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fix_name)) in
+              "entry_" ^ fix_usage.fixfunc_c_name)
+            fixes
+          in
+          hv 0 (
+            pp_join_list (spc ())
+              (List.map (fun l -> Pp.str (l ^ ":;")) labels) +++
+            gen_tail fixinfo genc_return env2 sigma body []))
+        bodies))
+    in
   let local_vars = List.filter
     (fun (c_type, c_var) ->
       match List.find_opt (fun (c_var1, ty1) -> c_var = c_var1) c_fargs with
