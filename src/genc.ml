@@ -16,6 +16,8 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
+module StrSet = Set.Make(String)
+
 open Names
 open GlobRef
 open Pp
@@ -814,137 +816,128 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Anonymous -> user_err (Pp.str "[codegen:bug] carg_of_garg require non-anonymous Name")
   | Name.Name id -> Id.to_string id
 
-exception NeedsMultipleFunctions
-
-type nmf_var = NMFRec | NMFArg | NMFOther (* NMF : Needs Multiple Functions *)
-
-let rec needs_multiple_functions_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (top_numargs : int option)
-    (top_vars : nmf_var list)
-    (outer_recfuncs : bool list)
-    (inner_recfuncs : bool list)
-    (term : EConstr.t) : unit =
-  (*
-  let pr_recfuncs recfuncs =
-    pp_join_list (Pp.spc ())
-      (CList.map_filter_i
-        (fun i b ->
-          if b then
-            let x = Context.Rel.Declaration.get_name (Environ.lookup_rel (i+1) env) in
-            let str =
-              match x with
-              | Name.Anonymous -> "<anon>"
-              | Name.Name id -> Id.to_string id
-            in
-            Some (Pp.str str)
-          else
-            None)
-        recfuncs)
-  in
-  Feedback.msg_info (Pp.str "needs_multiple_functions_rec:");
-  Feedback.msg_info (Pp.str "  top_callable: " ++ Pp.bool top_callable);
-  Feedback.msg_info (Pp.str "  top_recfuncs: " ++ hv 0 (pr_recfuncs top_recfuncs));
-  Feedback.msg_info (Pp.str "  outer_recfuncs: " ++ hv 0 (pr_recfuncs outer_recfuncs));
-  Feedback.msg_info (Pp.str "  inner_recfuncs: " ++ hv 0 (pr_recfuncs inner_recfuncs));
-  Feedback.msg_info (Pp.str "  term: " ++ Printer.pr_econstr_env env sigma term);
-  *)
-  needs_multiple_functions_rec1 env sigma top_numargs top_vars outer_recfuncs inner_recfuncs term
-and needs_multiple_functions_rec1 (env : Environ.env) (sigma : Evd.evar_map)
-    (top_numargs : int option)
-    (top_vars : nmf_var list)
-    (outer_recfuncs : bool list)
-    (inner_recfuncs : bool list)
-    (term : EConstr.t) : unit =
+(* Set of fixfuncs which will be called (not goto) (but includes closure creations) *)
+let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (outer_recfuncs : bool list) (inner_recfuncs : bool list)
+    (term : EConstr.t) : StrSet.t =
   match EConstr.kind sigma term with
   | Rel i ->
       if List.nth outer_recfuncs (i-1) then
-        (match List.nth top_vars (i-1) with
-        | NMFRec -> ()
-        | NMFArg -> raise NeedsMultipleFunctions
-        | NMFOther -> raise NeedsMultipleFunctions)
+        let decl = Environ.lookup_rel i env in
+        let name = Context.Rel.Declaration.get_name decl in
+        let strname = str_of_name name in
+        StrSet.singleton strname
+      else
+        StrSet.empty
   | Var _ | Meta _ | Evar _ | Sort _ | Ind _
-  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> ()
+  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> StrSet.empty
   | Cast (e,ck,ty) ->
-      needs_multiple_functions_rec env sigma top_numargs top_vars outer_recfuncs inner_recfuncs term
+      called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs term
   | LetIn (x,e,t,b) ->
-      let top_numargs1 = None in
-      let top_vars1 = top_vars in
       let outer_recfuncs1 = List.map2 (||) outer_recfuncs inner_recfuncs in
       let inner_recfuncs1 = List.init (List.length outer_recfuncs1) (fun _ -> false) in
-      needs_multiple_functions_rec env sigma top_numargs1 top_vars1 outer_recfuncs1 inner_recfuncs1 e;
+      let res1 = called_fixfuncs_rec env sigma outer_recfuncs1 inner_recfuncs1 e in
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let top_numargs2 = None in
-      let top_vars2 = NMFOther :: top_vars in
       let outer_recfuncs2 = false :: outer_recfuncs in
       let inner_recfuncs2 = false :: inner_recfuncs in
-      needs_multiple_functions_rec env2 sigma top_numargs2 top_vars2 outer_recfuncs2 inner_recfuncs2 b
+      let res2 = called_fixfuncs_rec env2 sigma outer_recfuncs2 inner_recfuncs2 b in
+      StrSet.union res1 res2
   | App (f,args) ->
       (* arguments cannot refer functions until downward funarg support *)
-      Array.iter
-        (fun arg ->
-          let i = destRel sigma arg in
-          (if List.nth outer_recfuncs (i-1) then raise NeedsMultipleFunctions);
-          (if List.nth inner_recfuncs (i-1) then raise NeedsMultipleFunctions))
-        args;
-      let top_numargs_f =
-        match top_numargs with
-        | None -> None
-        | Some m ->
-            let n = Array.length args in
-            if Array.map (destRel sigma) args = iota_ary (m-n) n then
-              Some (m-n)
+      let f_result = called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs f in
+      let args_refer_fixfunc =
+        Array.map
+          (fun arg ->
+            let i = destRel sigma arg in
+            (if List.nth outer_recfuncs (i-1) || List.nth inner_recfuncs (i-1) then
+              let decl = Environ.lookup_rel i env in
+              let name = Context.Rel.Declaration.get_name decl in
+              let strname = str_of_name name in
+              Some strname
             else
-              None
+              None))
+          args
       in
-      needs_multiple_functions_rec env sigma top_numargs_f top_vars outer_recfuncs inner_recfuncs f
+      Array.fold_left
+        (fun res arg_refer_fixfunc ->
+          match arg_refer_fixfunc with
+          | None -> res
+          | Some strname -> StrSet.add strname res)
+        f_result args_refer_fixfunc
   | Case (ci,predicate,item,branches) ->
       (* match item cannot refer function because its type is inductive type *)
-      let top_numargs_branch = None in
-      Array.iter
-        (needs_multiple_functions_rec env sigma top_numargs_branch top_vars outer_recfuncs inner_recfuncs)
+      let sets = Array.map
+        (called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs)
         branches
+      in
+      Array.fold_left StrSet.union StrSet.empty sets
   | Proj (proj, e) ->
       (* projection item cannot refer function because its type is inductive type *)
-      ()
+      StrSet.empty
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let (top_numargs_body, top_vars_body) =
-        match top_numargs with
-        | None -> (None, NMFOther :: top_vars)
-        | Some m -> (Some (m+1), NMFArg :: top_vars)
-      in
       let outer_recfuncs_body = false :: outer_recfuncs in
       let inner_recfuncs_body = false :: inner_recfuncs in
-      needs_multiple_functions_rec env2 sigma top_numargs_body top_vars_body outer_recfuncs_body inner_recfuncs_body b
+      called_fixfuncs_rec env2 sigma outer_recfuncs_body inner_recfuncs_body b
   | Fix ((ia, i), (nary, tary, fary)) ->
       let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
       let n = Array.length fary in
-      let top_numargs_f_ary =
-        match top_numargs with
-        | None -> Array.make n None
-        | Some m -> Array.init n (fun j -> if i = j then Some m else None)
-      in
-      let top_vars_f =
-        let ary = Array.map (fun tn -> if Option.has_some tn then NMFRec else NMFOther) top_numargs_f_ary in
-        List.append (CArray.rev_to_list ary) top_vars
-      in
       let outer_recfuncs2 = List.append (List.init n (fun _ -> false)) outer_recfuncs in
       let inner_recfuncs2 = List.append (List.init n (fun _ -> true)) inner_recfuncs in
-      Array.iteri
+      let sets = Array.mapi
         (fun i ->
-          (needs_multiple_functions_rec env2 sigma top_numargs_f_ary.(i) top_vars_f outer_recfuncs2 inner_recfuncs2))
+          (called_fixfuncs_rec env2 sigma outer_recfuncs2 inner_recfuncs2))
         fary
+      in
+      Array.fold_left StrSet.union StrSet.empty sets
   | CoFix (i, (nary, tary, fary)) ->
       user_err (Pp.str "[codegen] CoFix is not supported")
 
-let needs_multiple_functions (env : Environ.env) (sigma : Evd.evar_map) (body : EConstr.t) : bool =
-  try
-    needs_multiple_functions_rec env sigma (Some 0) [] [] [] body;
-    false
-  with NeedsMultipleFunctions -> true
+let called_fixfuncs (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
+  called_fixfuncs_rec env sigma [] [] term
+
+let rec fixfuncs_callable_from_main (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      StrSet.empty
+  | Var _ | Meta _ | Evar _ | Sort _ | Ind _
+  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> StrSet.empty
+  | Cast (e,ck,ty) ->
+      fixfuncs_callable_from_main env sigma term
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      fixfuncs_callable_from_main env2 sigma b
+  | App (f,args) ->
+      StrSet.empty (* consider eta-redex? *)
+  | Case (ci,predicate,item,branches) ->
+      (* match item cannot refer function because its type is inductive type *)
+      let sets = Array.map
+        (fixfuncs_callable_from_main env sigma)
+        branches
+      in
+      Array.fold_left StrSet.union StrSet.empty sets
+  | Proj (proj, e) ->
+      (* projection item cannot refer function because its type is inductive type *)
+      StrSet.empty
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      fixfuncs_callable_from_main env2 sigma b
+  | Fix ((ia, i), (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
+      let env2 = push_rec_types prec env in
+      fixfuncs_callable_from_main env2 sigma fary.(i)
+  | CoFix (i, (nary, tary, fary)) ->
+      user_err (Pp.str "[codegen] CoFix is not supported")
+
+let needs_multiple_functions (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
+  let called = called_fixfuncs env sigma term in
+  let callable_from_main = fixfuncs_callable_from_main env sigma term in
+  not (StrSet.is_empty (StrSet.diff called callable_from_main))
 
 type how_fixfunc_used = {
   mutable how_used_as_call: bool;
@@ -1471,7 +1464,10 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
 
 let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
    (term : EConstr.t) :
-    ((string * EConstr.types) list * string list * Environ.env * EConstr.t) array =
+    ((string * EConstr.types) list *
+     string list *
+     Environ.env *
+     EConstr.t) array =
   obtain_function_bodies_rec env sigma [] [] term
 
 let gen_func2_sub (cfunc_name : string) : Pp.t =
