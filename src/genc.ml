@@ -17,6 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 module StrSet = Set.Make(String)
+module IntSet = Set.Make(Int)
 
 open Names
 open GlobRef
@@ -1024,49 +1025,63 @@ type fixfunc_info = {
 
 type fixinfo_t = (Name.t, fixfunc_info) Hashtbl.t
 
-let fixvar_usage2
-    (outer_vars : how_fixfunc_used option list)
-    (inner_vars : how_fixfunc_used option list)
-    (i : int)
-    (outer_func : how_fixfunc_used -> unit)
-    (inner_func : how_fixfunc_used -> unit)
-    : unit =
-  let (b, uopt) =
-    try
-      (true, List.nth inner_vars (i - 1))
-    with Failure _ ->
-      (false, List.nth outer_vars (i - 1 - List.length inner_vars))
-  in
-  match uopt with
-  | None -> ()
-  | Some u ->
-      if b then
-        inner_func u
-      else
-        outer_func u
+let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t) : unit =
+  Hashtbl.iter
+    (fun fixfunc info ->
+      Feedback.msg_debug (hv 2 (Pp.str (str_of_name fixfunc) ++ Pp.str ":" +++
+        Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
+        Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
+        Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
+        Pp.str "used_as_closure=" ++ Pp.bool info.fixfunc_used_as_closure +++
+        Pp.str "formal_arguments=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Printer.pr_econstr_env env sigma ty) info.fixfunc_formal_arguments) ++ Pp.str ")")))
+    fixinfo
 
-let fixvar_usage1
-    (outer_vars : how_fixfunc_used option list)
-    (inner_vars : how_fixfunc_used option list)
-    (i : int)
-    (func : how_fixfunc_used -> unit)
-    : unit =
-  fixvar_usage2 outer_vars inner_vars i func func
-
-let rec collect_fix_usage (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t)
-    (outer_vars : how_fixfunc_used option list)
-    (inner_vars : how_fixfunc_used option list)
-    (term : EConstr.t) (numargs : int) : unit =
-  (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
+let rec collect_fix_usage (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) (numargs : int) :
+    (* variables at tail position *) IntSet.t *
+    (* variables at non-tail position *) IntSet.t *
+    (* variables at argument position *) IntSet.t =
+  Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
-    Pp.str "numargs=" ++ Pp.int numargs);*)
-  collect_fix_usage1 env sigma fixinfo outer_vars inner_vars term numargs
-and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t)
-    (outer_vars : how_fixfunc_used option list)
-    (inner_vars : how_fixfunc_used option list)
-    (term : EConstr.t) (numargs : int) : unit =
+    Pp.str "numargs=" ++ Pp.int numargs);
+  let result = collect_fix_usage1 fixinfo env sigma term numargs in
+  let (tailset, nontailset, argset) = result in
+  Feedback.msg_debug (hov 2 (Pp.str "[codegen:collect_fix_usage] end:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "numargs=" ++ Pp.int numargs
+    +++
+    Pp.str "tailset={" ++
+    pp_join_list (Pp.str ",")
+      (List.map
+        (fun i ->
+          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+          Pp.int i ++ Pp.str "=" ++ Name.print name
+          )
+        (IntSet.elements tailset)) ++
+    Pp.str "}"
+    +++
+    Pp.str "nontailset={" ++
+    pp_join_list (Pp.str ",")
+      (List.map
+        (fun i ->
+          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+          Pp.int i ++ Pp.str "=" ++ Name.print name)
+        (IntSet.elements nontailset)) ++
+    Pp.str "}" +++
+    Pp.str "argset={" ++
+    pp_join_list (Pp.str ",")
+      (List.map
+        (fun i ->
+          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+          Pp.int i ++ Pp.str "=" ++ Name.print name)
+        (IntSet.elements argset)) ++
+    Pp.str "}"));
+  result
+and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) (numargs : int) :
+    (* variables at tail position *) IntSet.t *
+    (* variables at non-tail position *) IntSet.t *
+    (* variables at argument position *) IntSet.t =
   match EConstr.kind sigma term with
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
@@ -1075,93 +1090,165 @@ and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Rel i ->
-      let numargs_in_type = numargs_of_exp env sigma term in
-      (if 0 < numargs_in_type then (* non-function is not interesting here *)
-        if numargs = numargs_in_type then
-          (fixvar_usage2 outer_vars inner_vars i
-            (fun u -> u.how_used_as_call <- true)
-            (fun u -> u.how_used_as_goto <- true))
-        else
-          (fixvar_usage1 outer_vars inner_vars i
-            (fun u ->
-              (*Feedback.msg_debug
-                (Pp.str "[codegen:collect_fix_usage:Rel] u.how_used_as_closure<-true" +++
-                Pp.str "numargs=" ++ Pp.int numargs +++
-                Pp.str "numargs_in_type=" ++ Pp.int numargs_in_type);*)
-              u.how_used_as_closure <- true)))
-  | Int _ | Float _ | Const _ | Construct _ -> ()
-  | Proj (proj, e) -> () (* e must be a Rel which type is inductive (non-function) type *)
-  | Cast (e,ck,t) -> collect_fix_usage env sigma fixinfo outer_vars inner_vars e numargs
+  | Rel i -> (IntSet.singleton i, IntSet.empty, IntSet.empty)
+  | Int _ | Float _ | Const _ | Construct _ -> (IntSet.empty, IntSet.empty, IntSet.empty)
+  | Proj (proj, e) ->
+      (* e must be a Rel which type is inductive (non-function) type *)
+      (IntSet.empty, IntSet.empty, IntSet.empty)
+  | Cast (e,ck,t) -> collect_fix_usage fixinfo env sigma e numargs
   | App (f, args) ->
-      (Array.iter
-        (fun arg ->
-          let i = destRel sigma arg in
-          (fixvar_usage1 outer_vars inner_vars i
-            (fun u ->
-              (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage:App] u.how_used_as_closure <- true");*)
-              u.how_used_as_closure <- true)))
-        args);
-      collect_fix_usage env sigma fixinfo outer_vars inner_vars f (Array.length args + numargs)
+      let (tailset_f, nontailset_f, argset_f) = collect_fix_usage fixinfo env sigma f (Array.length args + numargs) in
+      let argset = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) argset_f args in
+      (tailset_f, nontailset_f, argset)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let outer_vars1 = List.append outer_vars inner_vars in
-      let inner_vars1 = [] in
-      let outer_vars2 = outer_vars in
-      let inner_vars2 = None :: inner_vars in
-      collect_fix_usage env sigma fixinfo outer_vars1 inner_vars1 e 0;
-      collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 b numargs
+      let (tailset_e, nontailset_e, argset_e) = collect_fix_usage fixinfo env sigma e 0 in
+      let (tailset_b, nontailset_b, argset_b) = collect_fix_usage fixinfo env2 sigma b numargs in
+      let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+      let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+      let argset_b = IntSet.map pred (IntSet.filter ((<) 1) argset_b) in
+      let nontailset = IntSet.union
+        (IntSet.union tailset_e nontailset_e)
+        nontailset_b
+      in
+      let argset = IntSet.union argset_e argset_b in
+      (tailset_b, nontailset, argset)
   | Case (ci, p, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
-      for i = 0 to Array.length branches - 1 do
-        let br = branches.(i) in
-        let numargs' = ci.Constr.ci_cstr_nargs.(i) + numargs in
-        collect_fix_usage env sigma fixinfo outer_vars inner_vars br numargs'
-      done
+      let branches_result = Array.mapi
+        (fun i br -> collect_fix_usage fixinfo env sigma br
+          (ci.Constr.ci_cstr_nargs.(i) + numargs))
+        branches
+      in
+      let tailset =
+        Array.fold_left
+          (fun set (tailset_br, nontailset_br, argset_br) ->
+            IntSet.union set tailset_br)
+          IntSet.empty
+          branches_result
+      in
+      let nontailset =
+        Array.fold_left
+          (fun set (tailset_br, nontailset_br, argset_br) ->
+            IntSet.union set nontailset_br)
+          IntSet.empty branches_result
+      in
+      let argset =
+        Array.fold_left
+          (fun set (tailset_br, nontailset_br, argset_br) ->
+            IntSet.union set argset_br)
+          IntSet.empty branches_result
+      in
+      (tailset, nontailset, argset)
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let outer_vars2 = outer_vars in
-      let inner_vars2 = None :: inner_vars in
-      (* xxx: numargs can be 0 for closure creation *)
-      collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 b (numargs-1)
+      if numargs = 0 then
+        (* closure creation *)
+        let (tailset_b, nontailset_b, argset_b) = collect_fix_usage fixinfo env2 sigma b (numargs_of_exp env sigma term) in
+        let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+        let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+        let argset_b = IntSet.map pred (IntSet.filter ((<) 1) argset_b) in
+        (IntSet.empty, IntSet.union tailset_b nontailset_b, argset_b)
+      else
+        let (tailset_b, nontailset_b, argset_b) = collect_fix_usage fixinfo env2 sigma b (numargs-1) in
+        let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+        let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+        let argset_b = IntSet.map pred (IntSet.filter ((<) 1) argset_b) in
+        (tailset_b, nontailset_b, argset_b)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let n = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
-      let outer_vars2 = outer_vars in
-      let fixvar_usages = Array.init n (fun i -> {
-          how_used_as_call = false;
-          how_used_as_goto = false;
-          how_used_as_closure = false; }) in
-      let inner_vars2 = List.append (CArray.map_to_list (fun u -> Some u) fixvar_usages) inner_vars in
-      (* xxx: numargs should be vary for each function *)
-      Array.iter (fun f -> collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 f numargs) fary;
-      for i = 0 to n - 1 do
-          let u = fixvar_usages.(i) in
+      let fixfuncs_result = Array.mapi
+        (fun i f -> collect_fix_usage fixinfo env2 sigma f
+          (numargs_of_type env sigma tary.(i)))
+        fary
+      in
+      let tailset_fs =
+        Array.fold_left
+          (fun set (tailset_f, nontailset_f, argset_f) ->
+            IntSet.union set tailset_f)
+          IntSet.empty fixfuncs_result
+      in
+      let nontailset_fs =
+        Array.fold_left
+          (fun set (tailset_f, nontailset_f, argset_f) ->
+            IntSet.union set nontailset_f)
+          IntSet.empty fixfuncs_result
+      in
+      let argset_fs =
+        Array.fold_left
+          (fun set (tailset_f, nontailset_f, argset_f) ->
+            IntSet.union set argset_f)
+          IntSet.empty fixfuncs_result
+      in
+      if numargs < numargs_of_type env sigma tary.(i) || (* closure creation *)
+         IntSet.exists ((>=) n) nontailset_fs ||
+         IntSet.exists ((>=) n) argset_fs then
+        (* At least one fix-bounded function is used at
+          non-tail position or argument position.
+          Assuming fix-bounded functions are strongly-connected,
+          there is no tail position in this fix term. *)
+        (
+          for j = 1 to n do
+          let fname = Context.binder_name nary.(j-1) in
+          let used_as_goto = IntSet.mem j tailset_fs in
+          let used_as_call = IntSet.mem j nontailset_fs in
+          let used_as_closure = IntSet.mem j argset_fs in
           let gensym_with_name =
-            if u.how_used_as_call then
+            if used_as_call || used_as_closure then
               global_gensym_with_name
             else
               str_of_name
           in
-          let c_name = gensym_with_name (Context.binder_name nary.(i)) in
-          let args_and_ret_type = EConstr.decompose_prod sigma tary.(i) in
+          let c_name = gensym_with_name fname in
+          let args_and_ret_type = EConstr.decompose_prod sigma tary.(j-1) in
           let formal_arguments = List.rev_map
             (fun (x,t) ->
               let c_arg = str_of_annotated_name x in
               (c_arg, t))
             (fst args_and_ret_type)
           in
-          let key = Context.binder_name nary.(i) in
-          Hashtbl.add fixinfo key {
+          Hashtbl.add fixinfo fname {
             fixfunc_c_name = c_name;
-            fixfunc_used_as_call = u.how_used_as_call;
-            fixfunc_used_as_goto = u.how_used_as_goto;
-            fixfunc_used_as_closure = u.how_used_as_closure;
+            fixfunc_used_as_call = used_as_call;
+            fixfunc_used_as_goto = used_as_goto;
+            fixfunc_used_as_closure = used_as_closure;
             fixfunc_formal_arguments = formal_arguments;
           }
-      done
+        done;
+        let tailset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
+        let nontailset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) nontailset_fs) in
+        let argset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) argset_fs) in
+        (IntSet.empty, IntSet.union tailset_fs nontailset_fs, argset_fs))
+      else
+        (
+          for j = 1 to n do
+          let fname = Context.binder_name nary.(j-1) in
+          let used_as_goto = IntSet.mem j tailset_fs in
+          let used_as_call = false in
+          let used_as_closure = false in
+          let c_name = str_of_name fname in
+          let args_and_ret_type = EConstr.decompose_prod sigma tary.(j-1) in
+          let formal_arguments = List.rev_map
+            (fun (x,t) ->
+              let c_arg = str_of_annotated_name x in
+              (c_arg, t))
+            (fst args_and_ret_type)
+          in
+          Hashtbl.add fixinfo fname {
+            fixfunc_c_name = c_name;
+            fixfunc_used_as_call = used_as_call;
+            fixfunc_used_as_goto = used_as_goto;
+            fixfunc_used_as_closure = used_as_closure;
+            fixfunc_formal_arguments = formal_arguments;
+          }
+        done;
+        let tailset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
+        let nontailset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) nontailset_fs) in
+        let argset_fs = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) argset_fs) in
+        (tailset_fs, nontailset_fs, argset_fs))
 
 let rec adjust_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
@@ -1187,7 +1274,8 @@ let rec adjust_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
-  collect_fix_usage env sigma fixinfo [] [] term numargs;
+  ignore (collect_fix_usage fixinfo env sigma term numargs);
+  (*show_fixinfo env sigma fixinfo;*)
   adjust_top_fix_var env sigma fixinfo name term;
   fixinfo
 
