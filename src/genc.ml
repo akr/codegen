@@ -939,6 +939,75 @@ let needs_multiple_functions (env : Environ.env) (sigma : Evd.evar_map) (term : 
   let callable_from_main = fixfuncs_callable_from_main env sigma term in
   not (StrSet.is_empty (StrSet.diff called callable_from_main))
 
+let rec fixfuncs_share_entry (env : Environ.env) (sigma : Evd.evar_map) (representative_fixfunc : string option) (term : EConstr.t) (numargs : int) (h : (string,string) Hashtbl.t) : unit =
+  match EConstr.kind sigma term with
+  | Rel i -> ()
+  | Var _ | Meta _ | Evar _ | Sort _ | Ind _
+  | Const _ | Construct _ | Int _ | Float _ | Prod _ -> ()
+  | Cast (e,ck,ty) -> fixfuncs_share_entry env sigma representative_fixfunc e numargs h
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      fixfuncs_share_entry env sigma None e 0 h;
+      fixfuncs_share_entry env2 sigma None e numargs h
+  | App (f,args) ->
+      fixfuncs_share_entry env sigma None f (Array.length args + numargs) h
+  | Case (ci,predicate,item,branches) ->
+      Array.iteri
+        (fun i branch -> fixfuncs_share_entry env sigma None branch (ci.Constr.ci_cstr_nargs.(i) + numargs) h)
+        branches
+  | Proj (proj, e) ->
+      (* projection item cannot refer function because its type is inductive type *)
+      ()
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      if numargs = 0 then
+        (* closure creation *)
+        fixfuncs_share_entry env2 sigma None b (numargs_of_exp env sigma term) h
+      else
+        fixfuncs_share_entry env2 sigma representative_fixfunc b (numargs - 1) h
+  | Fix ((ia, i), (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
+      let env2 = push_rec_types prec env in
+      Array.iteri
+        (fun j f ->
+          let fixfunc_name = str_of_annotated_name nary.(j) in
+          let numargs2 = numargs_of_type env sigma tary.(i) in
+          let representative_fixfunc2 =
+            if i = j then
+              match representative_fixfunc with
+              | None -> Some (str_of_annotated_name nary.(j))
+              | Some representative_fixfunc_name ->
+                if numargs < numargs2 then
+                  (* closure creation *)
+                  (Hashtbl.add h fixfunc_name fixfunc_name;
+                  Some (str_of_annotated_name nary.(j)))
+                else
+                  (Hashtbl.add h fixfunc_name representative_fixfunc_name;
+                  representative_fixfunc)
+            else
+              (Hashtbl.add h fixfunc_name fixfunc_name;
+              Some fixfunc_name)
+          in
+          fixfuncs_share_entry env2 sigma representative_fixfunc2 f numargs2 h)
+        fary
+  | CoFix (i, (nary, tary, fary)) ->
+      user_err (Pp.str "[codegen] CoFix is not supported")
+
+(*
+(* tail position is represented as
+  - whole function itself (None)
+  - `e` of `let x = e in b` (Some x)
+  - closure creation
+    - `fun x => b` without arguments (Some x)
+    - `fix f x y ... := ...` with fewer arguments (Some x)
+*)
+let rec fixfuncs_share_tail (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t) (tail_position : string option) (term : EConstr.t) (numargs : int) (h : (string,string) Hashtbl.t) : unit =
+  match EConstr.kind sigma term with
+  ...
+*)
+
 type how_fixfunc_used = {
   mutable how_used_as_call: bool;
   mutable how_used_as_goto: bool;
