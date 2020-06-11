@@ -1255,16 +1255,6 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
-  let t = Reductionops.nf_all env sigma t in
-  let (args, result_type) = decompose_prod sigma t in
-  List.length args
-
-(* copied from num_funargs of genc.ml *)
-let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
-  let t = Retyping.get_type_of env sigma term in
-  numargs_of_type env sigma t
-
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
   Feedback.msg_debug (Pp.str "complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
   let result = complete_args_fun1 env sigma term p q in

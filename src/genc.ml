@@ -955,12 +955,6 @@ type fixfunc_info = {
 
 type fixinfo_t = (Name.t, fixfunc_info) Hashtbl.t
 
-let num_funargs (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
-  let t = Retyping.get_type_of env sigma term in
-  let t = Reductionops.nf_all env sigma t in
-  let (args, result_type) = decompose_prod sigma t in
-  List.length args
-
 let fixvar_usage2
     (outer_vars : how_fixfunc_used option list)
     (inner_vars : how_fixfunc_used option list)
@@ -1013,7 +1007,7 @@ and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
   | Rel i ->
-      let numargs_in_type = num_funargs env sigma term in
+      let numargs_in_type = numargs_of_exp env sigma term in
       (if 0 < numargs_in_type then (* non-function is not interesting here *)
         if numargs = numargs_in_type then
           (fixvar_usage2 outer_vars inner_vars i
@@ -1061,6 +1055,7 @@ and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rel decl env in
       let outer_vars2 = outer_vars in
       let inner_vars2 = None :: inner_vars in
+      (* xxx: numargs can be 0 for closure creation *)
       collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 b (numargs-1)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let n = Array.length nary in
@@ -1071,6 +1066,7 @@ and collect_fix_usage1 (env : Environ.env) (sigma : Evd.evar_map)
           how_used_as_goto = false;
           how_used_as_closure = false; }) in
       let inner_vars2 = List.append (CArray.map_to_list (fun u -> Some u) fixvar_usages) inner_vars in
+      (* xxx: numargs should be vary for each function *)
       Array.iter (fun f -> collect_fix_usage env2 sigma fixinfo outer_vars2 inner_vars2 f numargs) fary;
       for i = 0 to n - 1 do
           let u = fixvar_usages.(i) in
@@ -1121,7 +1117,7 @@ let rec adjust_top_fix_var (env : Environ.env) (sigma : Evd.evar_map)
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
   let fixinfo = Hashtbl.create 0 in
-  let numargs = num_funargs env sigma term in
+  let numargs = numargs_of_exp env sigma term in
   collect_fix_usage env sigma fixinfo [] [] term numargs;
   adjust_top_fix_var env sigma fixinfo name term;
   fixinfo
@@ -1484,6 +1480,18 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let (_, return_type) = decompose_prod sigma whole_ty in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:4");*)
   let bodies = obtain_function_bodies env sigma whole_body in
+  (*
+  (if 1 < Array.length bodies &&
+    Array.exists
+      (fun (args, fixes, env2, body) ->
+        List.exists
+          (fun fixfunc_name ->
+            let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fixfunc_name)) in
+            fix_usage.fixfunc_used_as_call ||
+            fix_usage.fixfunc_used_as_closure)
+          fixes) (Array.sub bodies 1 (Array.length bodies - 1)) then
+    user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
+  *)
   let (first_args, _, _, _) = bodies.(0) in
   let c_fargs = List.rev first_args in
   let (local_vars, pp_body) = local_vars_with

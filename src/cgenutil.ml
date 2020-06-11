@@ -235,6 +235,15 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
+let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
+  let t = Reductionops.nf_all env sigma t in
+  let (args, result_type) = decompose_prod sigma t in
+  List.length args
+
+let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
+  let t = Retyping.get_type_of env sigma term in
+  numargs_of_type env sigma t
+
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
 let rec mangle_type_buf (buf : Buffer.t) (ty : EConstr.t) : unit =
