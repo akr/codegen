@@ -1041,11 +1041,11 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd
     (* variables at tail position *) IntSet.t *
     (* variables at non-tail position *) IntSet.t *
     (* variables at argument position *) IntSet.t =
-  Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
+  (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
-    Pp.str "numargs=" ++ Pp.int numargs);
+    Pp.str "numargs=" ++ Pp.int numargs);*)
   let result = collect_fix_usage1 fixinfo env sigma term numargs in
-  let (tailset, nontailset, argset) = result in
+  (*let (tailset, nontailset, argset) = result in
   Feedback.msg_debug (hov 2 (Pp.str "[codegen:collect_fix_usage] end:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs
@@ -1075,7 +1075,7 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd
           let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
           Pp.int i ++ Pp.str "=" ++ Name.print name)
         (IntSet.elements argset)) ++
-    Pp.str "}"));
+    Pp.str "}"));*)
   result
 and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) (numargs : int) :
