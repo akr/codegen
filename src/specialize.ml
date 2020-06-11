@@ -1256,9 +1256,9 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   result
 
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  Feedback.msg_debug (Pp.str "complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_fun1 env sigma term p q in
-  Feedback.msg_debug (Pp.str "complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_fun" env sigma term result;
   result
 and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
@@ -1293,9 +1293,9 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       compose_lam fargs' term''
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
-  Feedback.msg_debug (Pp.str "complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_exp1 env sigma term vs q in
-  Feedback.msg_debug (Pp.str "complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_exp" env sigma term' result;
   result
 and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
