@@ -890,12 +890,12 @@ let rec fixfuncs_share_entry (env : Environ.env) (sigma : Evd.evar_map) (represe
           let representative_fixfunc2 =
             if i = j then
               match representative_fixfunc with
-              | None -> Some (str_of_annotated_name nary.(j))
+              | None -> Some fixfunc_name
               | Some representative_fixfunc_name ->
                 if numargs < numargs2 then
                   (* closure creation *)
                   (Hashtbl.add h fixfunc_name fixfunc_name;
-                  Some (str_of_annotated_name nary.(j)))
+                  Some fixfunc_name)
                 else
                   (Hashtbl.add h fixfunc_name representative_fixfunc_name;
                   representative_fixfunc)
