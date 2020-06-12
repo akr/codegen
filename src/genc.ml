@@ -818,7 +818,7 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Name id -> Id.to_string id
 
 (* Set of fixfuncs which will be called (not goto) (but includes closure creations) *)
-let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
+let rec fixfuncs_called_as_func_rec (env : Environ.env) (sigma : Evd.evar_map)
     (outer_recfuncs : bool list) (inner_recfuncs : bool list)
     (term : EConstr.t) : StrSet.t =
   match EConstr.kind sigma term with
@@ -833,20 +833,20 @@ let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Float _ | Prod _ -> StrSet.empty
   | Cast (e,ck,ty) ->
-      called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs term
+      fixfuncs_called_as_func_rec env sigma outer_recfuncs inner_recfuncs term
   | LetIn (x,e,t,b) ->
       let outer_recfuncs1 = List.map2 (||) outer_recfuncs inner_recfuncs in
       let inner_recfuncs1 = List.init (List.length outer_recfuncs1) (fun _ -> false) in
-      let res1 = called_fixfuncs_rec env sigma outer_recfuncs1 inner_recfuncs1 e in
+      let res1 = fixfuncs_called_as_func_rec env sigma outer_recfuncs1 inner_recfuncs1 e in
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
       let outer_recfuncs2 = false :: outer_recfuncs in
       let inner_recfuncs2 = false :: inner_recfuncs in
-      let res2 = called_fixfuncs_rec env2 sigma outer_recfuncs2 inner_recfuncs2 b in
+      let res2 = fixfuncs_called_as_func_rec env2 sigma outer_recfuncs2 inner_recfuncs2 b in
       StrSet.union res1 res2
   | App (f,args) ->
       (* arguments cannot refer functions until downward funarg support *)
-      let f_result = called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs f in
+      let f_result = fixfuncs_called_as_func_rec env sigma outer_recfuncs inner_recfuncs f in
       let args_refer_fixfunc =
         Array.map
           (fun arg ->
@@ -869,7 +869,7 @@ let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Case (ci,predicate,item,branches) ->
       (* match item cannot refer function because its type is inductive type *)
       let sets = Array.map
-        (called_fixfuncs_rec env sigma outer_recfuncs inner_recfuncs)
+        (fixfuncs_called_as_func_rec env sigma outer_recfuncs inner_recfuncs)
         branches
       in
       Array.fold_left StrSet.union StrSet.empty sets
@@ -881,7 +881,7 @@ let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rel decl env in
       let outer_recfuncs_body = false :: outer_recfuncs in
       let inner_recfuncs_body = false :: inner_recfuncs in
-      called_fixfuncs_rec env2 sigma outer_recfuncs_body inner_recfuncs_body b
+      fixfuncs_called_as_func_rec env2 sigma outer_recfuncs_body inner_recfuncs_body b
   | Fix ((ia, i), (nary, tary, fary)) ->
       let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
@@ -890,15 +890,15 @@ let rec called_fixfuncs_rec (env : Environ.env) (sigma : Evd.evar_map)
       let inner_recfuncs2 = List.append (List.init n (fun _ -> true)) inner_recfuncs in
       let sets = Array.mapi
         (fun i ->
-          (called_fixfuncs_rec env2 sigma outer_recfuncs2 inner_recfuncs2))
+          (fixfuncs_called_as_func_rec env2 sigma outer_recfuncs2 inner_recfuncs2))
         fary
       in
       Array.fold_left StrSet.union StrSet.empty sets
   | CoFix (i, (nary, tary, fary)) ->
       user_err (Pp.str "[codegen] CoFix is not supported")
 
-let called_fixfuncs (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
-  called_fixfuncs_rec env sigma [] [] term
+let fixfuncs_called_as_func (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
+  fixfuncs_called_as_func_rec env sigma [] [] term
 
 let rec fixfuncs_callable_from_main (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
   match EConstr.kind sigma term with
@@ -936,7 +936,7 @@ let rec fixfuncs_callable_from_main (env : Environ.env) (sigma : Evd.evar_map) (
       user_err (Pp.str "[codegen] CoFix is not supported")
 
 let needs_multiple_functions (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
-  let called = called_fixfuncs env sigma term in
+  let called = fixfuncs_called_as_func env sigma term in
   let callable_from_main = fixfuncs_callable_from_main env sigma term in
   not (StrSet.is_empty (StrSet.diff called callable_from_main))
 
