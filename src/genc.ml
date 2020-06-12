@@ -817,24 +817,24 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Anonymous -> user_err (Pp.str "[codegen:bug] carg_of_garg require non-anonymous Name")
   | Name.Name id -> Id.to_string id
 
-let rec fixfuncs_callable_from_main (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
+let rec fixfuncs_callable_from_top (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : StrSet.t =
   match EConstr.kind sigma term with
   | Rel i ->
       StrSet.empty
   | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Float _ | Prod _ -> StrSet.empty
   | Cast (e,ck,ty) ->
-      fixfuncs_callable_from_main env sigma term
+      fixfuncs_callable_from_top env sigma term
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      fixfuncs_callable_from_main env2 sigma b
+      fixfuncs_callable_from_top env2 sigma b
   | App (f,args) ->
       StrSet.empty (* consider eta-redex? *)
   | Case (ci,predicate,item,branches) ->
       (* match item cannot refer function because its type is inductive type *)
       let sets = Array.map
-        (fixfuncs_callable_from_main env sigma)
+        (fixfuncs_callable_from_top env sigma)
         branches
       in
       Array.fold_left StrSet.union StrSet.empty sets
@@ -844,11 +844,11 @@ let rec fixfuncs_callable_from_main (env : Environ.env) (sigma : Evd.evar_map) (
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      fixfuncs_callable_from_main env2 sigma b
+      fixfuncs_callable_from_top env2 sigma b
   | Fix ((ia, i), (nary, tary, fary)) ->
       let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
-      StrSet.add (str_of_annotated_name nary.(i)) (fixfuncs_callable_from_main env2 sigma fary.(i))
+      StrSet.add (str_of_annotated_name nary.(i)) (fixfuncs_callable_from_top env2 sigma fary.(i))
   | CoFix (i, (nary, tary, fary)) ->
       user_err (Pp.str "[codegen] CoFix is not supported")
 
@@ -1192,13 +1192,13 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   fixinfo
 
 let needs_multiple_functions (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
-  let callable_from_main = fixfuncs_callable_from_main env sigma term in
+  let callable_from_top = fixfuncs_callable_from_top env sigma term in
   Hashtbl.fold
     (fun name info b ->
       let strname = str_of_name name in
       if b then
         b
-      else if StrSet.mem strname callable_from_main then
+      else if StrSet.mem strname callable_from_top then
         false
       else if info.fixfunc_used_as_call || info.fixfunc_used_as_closure then
         true
