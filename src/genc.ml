@@ -1552,19 +1552,9 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
      EConstr.t) array =
   obtain_function_bodies_rec env sigma [] [] term
 
-let gen_func2_sub (cfunc_name : string) : Pp.t =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
-  let whole_body = EConstr.of_constr whole_body in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
-  let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
-  (if needs_multiple_functions fixinfo env sigma whole_body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:3");*)
-  let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
-  let (_, return_type) = decompose_prod sigma whole_ty in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:4");*)
+let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+  (whole_body : EConstr.t) (return_type : EConstr.types)
+  (fixinfo : fixinfo_t) : Pp.t =
   let bodies = obtain_function_bodies env sigma whole_body in
   (*
   (if 1 < Array.length bodies &&
@@ -1620,6 +1610,20 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
         local_vars)
     ++
     pp_body))
+
+let gen_func2_sub (cfunc_name : string) : Pp.t =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  let whole_body = EConstr.of_constr whole_body in
+  let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
+  let (_, return_type) = decompose_prod sigma whole_ty in
+  (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
+  let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
+  (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
+  (if needs_multiple_functions fixinfo env sigma whole_body then user_err (Pp.str "[codegen not supported yet] needs multiple function:" +++ Pp.str cfunc_name));
+  (*Feedback.msg_debug (Pp.str "gen_func2_sub:4");*)
+  gen_func2_single cfunc_name env sigma whole_body return_type fixinfo
 
 let gen_function2 (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func2_sub cfunc_name)
