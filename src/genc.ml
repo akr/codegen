@@ -1405,8 +1405,6 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
           Printer.pr_econstr_env env sigma term);
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-      let ni_funcname = ui.fixfunc_c_name in
-      let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
       let pp_bodies =
         Array.mapi
           (fun j nj ->
@@ -1421,7 +1419,10 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
           nary in
-      pp_assignments +++ pp_goto_entry +++ pp_join_ary (Pp.spc ()) pp_bodies
+      let reordered_pp_bodies = Array.copy pp_bodies in
+      Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
+      reordered_pp_bodies.(0) <- pp_bodies.(i);
+      pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies
 
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 and gen_assign (fixinfo : fixinfo_t) (ret_var : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
@@ -1536,10 +1537,10 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
           obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj)
         nary
       in
-      let reorered_bodies = Array.copy bodies in
-      Array.blit bodies 0 reorered_bodies 1 i;
-      reorered_bodies.(0) <- bodies.(i);
-      array_flatten reorered_bodies
+      let reordered_bodies = Array.copy bodies in
+      Array.blit bodies 0 reordered_bodies 1 i;
+      reordered_bodies.(0) <- bodies.(i);
+      array_flatten reordered_bodies
   | _ ->
       [|(fargs, fixfuncs, env, term)|]
 
