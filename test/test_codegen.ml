@@ -1044,20 +1044,22 @@ let test_add_nontailrec (ctx : test_ctxt) : unit =
       CodeGen Function add.
     |})
 
-let test_multiple_function_not_supported (ctx : test_ctxt) : unit =
-  assert_coq_failure ctx
-    ~regexp_in_output:(Str.regexp_string "[codegen not supported yet] needs multiple function: double")
+let test_tail_fix_double (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
     (nat_src ^
     {|
       Set CodeGen Dev.
-      Definition double (n : nat) : nat :=
+      Definition dbl (n : nat) : nat :=
         (fix add (a b : nat) : nat :=
           match a with
           | O => b
           | S a' => S (add a' b)
           end) n n.
-      CodeGen Function double.
-    |})
+      CodeGen Function dbl.
+    |}) {|
+      assert(dbl(0) == 0);
+      assert(dbl(1) == 2);
+    |}
 
 let test_nth (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1265,9 +1267,9 @@ let suite : OUnit2.test =
     "test_let_match" >:: test_let_match;
     "test_let_match_let" >:: test_let_match_let;
     "test_add_tailrec" >:: test_add_tailrec;
-    (*"test_add_nontailrec" >:: test_add_nontailrec;*)
-    "test_multiple_function_not_supported" >:: test_multiple_function_not_supported;
-    (*"test_map_succ" >:: test_map_succ;*)
+    "test_add_nontailrec" >:: test_add_nontailrec;
+    "test_map_succ" >:: test_map_succ;
+    "test_tail_fix_double" >:: test_tail_fix_double;
     "test_nth" >:: test_nth;
     "test_rev_append" >:: test_rev_append;
     "test_merge" >:: test_merge;

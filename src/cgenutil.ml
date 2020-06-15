@@ -192,6 +192,18 @@ let (+++) d1 d2 =
   else
     d1 ++ Pp.spc () ++ d2
 
+let pp_sjoin_ary (ary : Pp.t array) : Pp.t =
+  Array.fold_left
+    (fun pp elt -> pp +++ elt)
+    (mt ())
+    ary
+
+let pp_sjoin_list (l : Pp.t list) : Pp.t =
+  List.fold_left
+    (fun pp elt -> pp +++ elt)
+    (mt ())
+    l
+
 let pp_join_ary sep ary =
   if Array.length ary = 0 then
     mt ()
