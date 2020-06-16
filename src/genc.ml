@@ -1846,6 +1846,7 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
+  linear_type_check_term whole_body;
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let args_and_ret_type = decompose_prod sigma whole_ty in
