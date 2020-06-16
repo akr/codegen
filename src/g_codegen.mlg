@@ -215,8 +215,5 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { linear_type_check_list libref_list }
     | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
       { linear_type_check_test t1 t2 }
-    | [ "CodeGen" "GenC" ne_global_list(libref_list) ] -> { genc libref_list }
-    | [ "CodeGen" "GenCFile" string(fn) ne_global_list(libref_list) ] ->
-      { genc_file fn libref_list }
 
 END

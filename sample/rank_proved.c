@@ -1,182 +1,208 @@
 static nat
-pred(nat v0_n)
+pred(nat v1_n)
 {
-  switch (v0_n)
+  nat v2_u;
+  switch (v1_n)
+  { case 0: return v1_n; default: v2_u = predn(v1_n); return v2_u; }
+}
+static nat
+neq0(nat v1_n)
+{ nat v2_n; v2_n = pred(v1_n); return succn(v2_n); }
+static pair_MDArr_nat
+buildDir2(bool v1_b,
+          bits v2_s,
+          nat v3_sz2,
+          nat v4_c,
+          nat v5_i,
+          MDArr v6_D2,
+          nat v7_m2)
+{
+  nat v12_n;
+  MDArr v11_m;
+  nat v10_n;
+  nat v9_m;
+  nat v8_cp;
+  entry_fixfunc1_buildDir2:;
+  switch (v4_c)
   {
-    case 0: { return v0_n; }
-    default: { nat v1_u = predn(v0_n); return v1_u; }
+    case 0:
+      return make_pair_MDArr_nat(v6_D2, v7_m2);
+    default:
+      v8_cp = predn(v4_c);
+      v9_m = bcount(v1_b, v5_i, v3_sz2, v2_s);
+      v10_n = addn(v5_i, v3_sz2);
+      v11_m = pushD(v6_D2, v7_m2);
+      v12_n = addn(v7_m2, v9_m);
+      v4_c = v8_cp;
+      v5_i = v10_n;
+      v6_D2 = v11_m;
+      v7_m2 = v12_n;
+      goto entry_fixfunc1_buildDir2;
   }
 }
-static nat neq0(nat v0_n) { nat v1_n = pred(v0_n); return succn(v1_n); }
-static
-pair_MDArr_nat
-buildDir2(bool v0_b,
-          bits v1_s,
-          nat v2_sz2,
-          nat v3_c,
-          nat v4_i,
-          MDArr v5_D2,
-          nat v6_m2)
+static pair_2MDArr_nat
+buildDir1(bool v1_b,
+          bits v2_s,
+          nat v3_k,
+          nat v4_sz1,
+          nat v5_sz2,
+          nat v6_c,
+          nat v7_i,
+          MDArr v8_D1,
+          MDArr v9_D2,
+          nat v10_m1)
 {
-  entry_buildDir2:;
-  switch (v3_c)
+  nat v19_n;
+  nat v18_n;
+  nat v17_m2;
+  MDArr v16_D2_;
+  pair_MDArr_nat v15_p;
+  nat v14_n;
+  MDArr v13_D1_;
+  nat v12_cp;
+  pair_MDArr_MDArr v11_p;
+  entry_fixfunc1_buildDir1:;
+  switch (v6_c)
   {
-    case 0: { return make_pair_MDArr_nat(v5_D2, v6_m2); }
-    default: {
-      nat v7_cp = predn(v3_c);
-      nat v8_m = bcount(v0_b, v4_i, v2_sz2, v1_s);
-      nat v9_n = addn(v4_i, v2_sz2);
-      MDArr v10_m = pushD(v5_D2, v6_m2);
-      nat v11_n = addn(v6_m2, v8_m);
-      v3_c = v7_cp;
-      v4_i = v9_n;
-      v5_D2 = v10_m;
-      v6_m2 = v11_n;
-      goto entry_buildDir2;
-    }
-  }
-}
-static
-pair_2MDArr_nat
-buildDir1(bool v0_b,
-          bits v1_s,
-          nat v2_k,
-          nat v3_sz1,
-          nat v4_sz2,
-          nat v5_c,
-          nat v6_i,
-          MDArr v7_D1,
-          MDArr v8_D2,
-          nat v9_m1)
-{
-  entry_buildDir1:;
-  switch (v5_c)
-  {
-    case 0: {
-      pair_MDArr_MDArr v10_p = make_pair_MDArr_MDArr(v7_D1, v8_D2);
-      return make_pair_2MDArr_nat(v10_p, v9_m1);
-    }
-    default: {
-      nat v11_cp = predn(v5_c);
-      MDArr v12_D1_ = pushD(v7_D1, v9_m1);
-      nat v13_n = 0;
-      pair_MDArr_nat
-      v14_p
-      =
-      buildDir2(v0_b,
-      v1_s,
-      v4_sz2,
-      v2_k,
-      v6_i,
-      v8_D2,
-      v13_n);
-      MDArr v15_D2_ = pair_MDArr_nat_D(v14_p);
-      nat v16_m2 = pair_MDArr_nat_n(v14_p);
-      nat v17_n = addn(v6_i, v3_sz1);
-      nat v18_n = addn(v9_m1, v16_m2);
-      v5_c = v11_cp;
-      v6_i = v17_n;
-      v7_D1 = v12_D1_;
-      v8_D2 = v15_D2_;
-      v9_m1 = v18_n;
-      goto entry_buildDir1;
-    }
+    case 0:
+      v11_p = make_pair_MDArr_MDArr(v8_D1, v9_D2);
+      return make_pair_2MDArr_nat(v11_p, v10_m1);
+    default:
+      v12_cp = predn(v6_c);
+      v13_D1_ = pushD(v8_D1, v10_m1);
+      v14_n = 0;
+      v15_p = buildDir2(v1_b, v2_s, v5_sz2, v3_k, v7_i, v9_D2, v14_n);
+      v16_D2_ = pair_MDArr_nat_D(v15_p);
+      v17_m2 = pair_MDArr_nat_n(v15_p);
+      v18_n = addn(v7_i, v4_sz1);
+      v19_n = addn(v10_m1, v17_m2);
+      v6_c = v12_cp;
+      v7_i = v18_n;
+      v8_D1 = v13_D1_;
+      v9_D2 = v16_D2_;
+      v10_m1 = v19_n;
+      goto entry_fixfunc1_buildDir1;
   }
 }
 static pair_MDArr_MDArr
-buildDir(bool v0_b, bits v1_s, nat v2_k, nat v3_sz2, nat v4_w1, nat v5_w2)
+buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
 {
-  nat v6_sz1 = muln(v2_k, v3_sz2);
-  nat v7_n = bsize(v1_s);
-  nat v8_n2 = divn(v7_n, v3_sz2);
-  nat v9_n1 = divn(v8_n2, v2_k);
-  nat v10_n = 0;
-  MDArr v11_m = emptyD(v4_w1);
-  MDArr v12_m = emptyD(v5_w2);
-  nat v13_n = 0;
-  pair_2MDArr_nat
-  v14_p
-  =
-  buildDir1(v0_b,
-  v1_s,
-  v2_k,
-  v6_sz1,
-  v3_sz2,
-  v9_n1,
-  v10_n,
-  v11_m,
-  v12_m,
-  v13_n);
-  pair_MDArr_MDArr v15_p = pair_2MDArr_nat_D12(v14_p);
-  nat v16_m1 = pair_2MDArr_nat_n(v14_p);
-  MDArr v17_D1 = pair_MDArr_MDArr_D1(v15_p);
-  MDArr v18_D2 = pair_MDArr_MDArr_D2(v15_p);
-  nat v19_n = modn(v8_n2, v2_k);
-  nat v20_n = muln(v9_n1, v6_sz1);
-  nat v21_n = 0;
-  pair_MDArr_nat
-  v22_p
-  =
-  buildDir2(v0_b,
-  v1_s,
-  v3_sz2,
-  v19_n,
-  v20_n,
-  v18_D2,
-  v21_n);
-  MDArr v23_D2 = pair_MDArr_nat_D(v22_p);
-  nat v24_m2 = pair_MDArr_nat_n(v22_p);
-  MDArr v25_m = pushD(v17_D1, v16_m1);
-  MDArr v26_m = pushD(v23_D2, v24_m2);
-  return make_pair_MDArr_MDArr(v25_m, v26_m);
+  MDArr v27_m;
+  MDArr v26_m;
+  nat v25_m2;
+  MDArr v24_D2;
+  pair_MDArr_nat v23_p;
+  nat v22_n;
+  nat v21_n;
+  nat v20_n;
+  MDArr v19_D2;
+  MDArr v18_D1;
+  nat v17_m1;
+  pair_MDArr_MDArr v16_p;
+  pair_2MDArr_nat v15_p;
+  nat v14_n;
+  MDArr v13_m;
+  MDArr v12_m;
+  nat v11_n;
+  nat v10_n1;
+  nat v9_n2;
+  nat v8_n;
+  nat v7_sz1;
+  v7_sz1 = muln(v3_k, v4_sz2);
+  v8_n = bsize(v2_s);
+  v9_n2 = divn(v8_n, v4_sz2);
+  v10_n1 = divn(v9_n2, v3_k);
+  v11_n = 0;
+  v12_m = emptyD(v5_w1);
+  v13_m = emptyD(v6_w2);
+  v14_n = 0;
+  v15_p = buildDir1(v1_b, v2_s, v3_k, v7_sz1, v4_sz2, v10_n1, v11_n, v12_m,
+  v13_m, v14_n);
+  v16_p = pair_2MDArr_nat_D12(v15_p);
+  v17_m1 = pair_2MDArr_nat_n(v15_p);
+  v18_D1 = pair_MDArr_MDArr_D1(v16_p);
+  v19_D2 = pair_MDArr_MDArr_D2(v16_p);
+  v20_n = modn(v9_n2, v3_k);
+  v21_n = muln(v10_n1, v7_sz1);
+  v22_n = 0;
+  v23_p = buildDir2(v1_b, v2_s, v4_sz2, v20_n, v21_n, v19_D2, v22_n);
+  v24_D2 = pair_MDArr_nat_D(v23_p);
+  v25_m2 = pair_MDArr_nat_n(v23_p);
+  v26_m = pushD(v18_D1, v17_m1);
+  v27_m = pushD(v24_D2, v25_m2);
+  return make_pair_MDArr_MDArr(v26_m, v27_m);
 }
 static Aux
-rank_init(bool v0_b, bits v1_s)
+rank_init(bool v1_b, bits v2_s)
 {
-  nat v2_n = bsize(v1_s);
-  nat v3_kp = bitlen(v2_n);
-  nat v4_k = succn(v3_kp);
-  nat v5_sz2p = bitlen(v2_n);
-  nat v6_sz2 = succn(v5_sz2p);
-  nat v7_sz1 = muln(v4_k, v6_sz2);
-  nat v8_n = divn(v2_n, v7_sz1);
-  nat v9_n = muln(v8_n, v7_sz1);
-  nat v10_n = bitlen(v9_n);
-  nat v11_w1 = neq0(v10_n);
-  nat v12_n = muln(v3_kp, v6_sz2);
-  nat v13_n = bitlen(v12_n);
-  nat v14_w2 = neq0(v13_n);
-  pair_MDArr_MDArr
-  v15_p
-  =
-  buildDir(v0_b,
-  v1_s,
-  v4_k,
-  v6_sz2,
-  v11_w1,
-  v14_w2);
-  MDArr v16_D1 = pair_MDArr_MDArr_D1(v15_p);
-  MDArr v17_D2 = pair_MDArr_MDArr_D2(v15_p);
-  DArr v18_d = freezeD(v16_D1);
-  DArr v19_d = freezeD(v17_D2);
-  return mkAux(v0_b, v1_s, v4_k, v6_sz2, v18_d, v19_d);
+  DArr v20_d;
+  DArr v19_d;
+  MDArr v18_D2;
+  MDArr v17_D1;
+  pair_MDArr_MDArr v16_p;
+  nat v15_w2;
+  nat v14_n;
+  nat v13_n;
+  nat v12_w1;
+  nat v11_n;
+  nat v10_n;
+  nat v9_n;
+  nat v8_sz1;
+  nat v7_sz2;
+  nat v6_sz2p;
+  nat v5_k;
+  nat v4_kp;
+  nat v3_n;
+  v3_n = bsize(v2_s);
+  v4_kp = bitlen(v3_n);
+  v5_k = succn(v4_kp);
+  v6_sz2p = bitlen(v3_n);
+  v7_sz2 = succn(v6_sz2p);
+  v8_sz1 = muln(v5_k, v7_sz2);
+  v9_n = divn(v3_n, v8_sz1);
+  v10_n = muln(v9_n, v8_sz1);
+  v11_n = bitlen(v10_n);
+  v12_w1 = neq0(v11_n);
+  v13_n = muln(v4_kp, v7_sz2);
+  v14_n = bitlen(v13_n);
+  v15_w2 = neq0(v14_n);
+  v16_p = buildDir(v1_b, v2_s, v5_k, v7_sz2, v12_w1, v15_w2);
+  v17_D1 = pair_MDArr_MDArr_D1(v16_p);
+  v18_D2 = pair_MDArr_MDArr_D2(v16_p);
+  v19_d = freezeD(v17_D1);
+  v20_d = freezeD(v18_D2);
+  return mkAux(v1_b, v2_s, v5_k, v7_sz2, v19_d, v20_d);
 }
 static nat
-rank_lookup(Aux v0_aux, nat v1_i)
+rank_lookup(Aux v1_aux, nat v2_i)
 {
-  bool v2_b = aux_query_bit(v0_aux);
-  bits v3_s = aux_input_bits(v0_aux);
-  nat v4_k = aux_ratio(v0_aux);
-  nat v5_sz2 = aux_blksz2(v0_aux);
-  DArr v6_D1 = aux_dir1(v0_aux);
-  DArr v7_D2 = aux_dir2(v0_aux);
-  nat v8_j2 = divn(v1_i, v5_sz2);
-  nat v9_j3 = modn(v1_i, v5_sz2);
-  nat v10_j1 = divn(v8_j2, v4_k);
-  nat v11_n = lookupD(v6_D1, v10_j1);
-  nat v12_n = lookupD(v7_D2, v8_j2);
-  nat v13_n = addn(v11_n, v12_n);
-  nat v14_n = muln(v8_j2, v5_sz2);
-  nat v15_n = bcount(v2_b, v14_n, v9_j3, v3_s);
-  return addn(v13_n, v15_n);
+  nat v16_n;
+  nat v15_n;
+  nat v14_n;
+  nat v13_n;
+  nat v12_n;
+  nat v11_j1;
+  nat v10_j3;
+  nat v9_j2;
+  DArr v8_D2;
+  DArr v7_D1;
+  nat v6_sz2;
+  nat v5_k;
+  bits v4_s;
+  bool v3_b;
+  v3_b = aux_query_bit(v1_aux);
+  v4_s = aux_input_bits(v1_aux);
+  v5_k = aux_ratio(v1_aux);
+  v6_sz2 = aux_blksz2(v1_aux);
+  v7_D1 = aux_dir1(v1_aux);
+  v8_D2 = aux_dir2(v1_aux);
+  v9_j2 = divn(v2_i, v6_sz2);
+  v10_j3 = modn(v2_i, v6_sz2);
+  v11_j1 = divn(v9_j2, v5_k);
+  v12_n = lookupD(v7_D1, v11_j1);
+  v13_n = lookupD(v8_D2, v9_j2);
+  v14_n = addn(v12_n, v13_n);
+  v15_n = muln(v9_j2, v6_sz2);
+  v16_n = bcount(v3_b, v15_n, v10_j3, v4_s);
+  return addn(v14_n, v16_n);
 }

@@ -83,15 +83,6 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_delete_let);
           optwrite = (:=) opt_debug_delete_let }
 
-(* Set/Unset CodeGen Dev. *)
-let opt_codegen_dev = ref false
-let () = let open Goptions in declare_bool_option
-        { optdepr  = false;
-          optname  = "Enables code generator of development version";
-          optkey   = ["CodeGen";"Dev"];
-          optread  = (fun () -> !opt_codegen_dev);
-          optwrite = (:=) opt_codegen_dev }
-
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 type cstr_config = {
