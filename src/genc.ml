@@ -672,39 +672,39 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
         branches))
 
 let gen_parallel_assignment (env : Environ.env) (sigma : Evd.evar_map) (assignments : (string * string * EConstr.types) array) : Pp.t =
-  let ass = Array.to_list assignments in
-  let ass = List.filter (fun (lhs, rhs, ty) -> lhs <> rhs) ass in
+  let assign = Array.to_list assignments in
+  let assign = List.filter (fun (lhs, rhs, ty) -> lhs <> rhs) assign in
   let rpp = ref (mt ()) in
   (* better algorithm using topological sort? *)
-  let rec loop ass =
-    match ass with
+  let rec loop assign =
+    match assign with
     | [] -> ()
     | a :: rest ->
-        let rhs_list = List.map (fun (lhs, rhs, ty) -> rhs) ass in
-        let blocked_ass, nonblocked_ass =
-          List.partition (fun (lhs, rhs, ty) -> List.mem lhs rhs_list) ass
+        let rhs_list = List.map (fun (lhs, rhs, ty) -> rhs) assign in
+        let blocked_assign, nonblocked_assign =
+          List.partition (fun (lhs, rhs, ty) -> List.mem lhs rhs_list) assign
         in
-        if nonblocked_ass <> [] then
+        if nonblocked_assign <> [] then
           (List.iter
             (fun (lhs, rhs, ty) ->
               let pp = genc_assign (str lhs) (str rhs) in
               rpp := !rpp +++ pp)
-            nonblocked_ass;
-          loop blocked_ass)
+            nonblocked_assign;
+          loop blocked_assign)
         else
           (let (a_lhs, a_rhs, a_ty) = a in
           let tmp = local_gensym () in
           add_local_var (c_typename env sigma a_ty) tmp;
           let pp = genc_assign (str tmp) (str a_lhs) in
           (rpp := !rpp +++ pp);
-          let ass2 = List.map
+          let assign2 = List.map
             (fun (lhs, rhs, ty) ->
               if rhs = a_lhs then (lhs, tmp, ty) else (lhs, rhs, ty))
-            ass
+            assign
           in
-          loop ass2)
+          loop assign2)
   in
-  loop ass;
+  loop assign;
   !rpp
 
 let rec gen_tail (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
