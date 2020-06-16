@@ -23,7 +23,7 @@ fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
   nat v6_n;
   bool v5_b;
   nat v4_k_;
-  entry_fixfunc1_fastpow_iter:;
+  entry_fixfunc1_fastpow_iter:
   switch (v2_k)
   {
     case 0:

@@ -22,7 +22,7 @@ buildDir2(bool v1_b,
   nat v10_n;
   nat v9_m;
   nat v8_cp;
-  entry_fixfunc1_buildDir2:;
+  entry_fixfunc1_buildDir2:
   switch (v4_c)
   {
     case 0:
@@ -61,7 +61,7 @@ buildDir1(bool v1_b,
   MDArr v13_D1_;
   nat v12_cp;
   pair_MDArr_MDArr v11_p;
-  entry_fixfunc1_buildDir1:;
+  entry_fixfunc1_buildDir1:
   switch (v6_c)
   {
     case 0:
