@@ -467,16 +467,16 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       mkProj (proj, e)
 *)
 
-let rec normalizeK (env : Environ.env) (sigma : Evd.evar_map)
+let rec normalizeV (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
-  (if !opt_debug_normalizeK then
-    Feedback.msg_debug (Pp.str "normalizeK arg: " ++ Printer.pr_econstr_env env sigma term));
-  let result = normalizeK1 env sigma term in
-  (if !opt_debug_normalizeK then
-    Feedback.msg_debug (Pp.str "normalizeK ret: " ++ Printer.pr_econstr_env env sigma result));
-  check_convertible "normalizeK" env sigma term result;
+  (if !opt_debug_normalizeV then
+    Feedback.msg_debug (Pp.str "normalizeV arg: " ++ Printer.pr_econstr_env env sigma term));
+  let result = normalizeV1 env sigma term in
+  (if !opt_debug_normalizeV then
+    Feedback.msg_debug (Pp.str "normalizeV ret: " ++ Printer.pr_econstr_env env sigma result));
+  check_convertible "normalizeV" env sigma term result;
   result
-and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
+and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   let wrap_lets hoisted_exprs lifted_term =
     let hoisted_types = List.map (Retyping.get_type_of env sigma) hoisted_exprs in
@@ -486,7 +486,7 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
       | [], [], [] -> acc_term
       | x :: names', e :: exprs', ty :: types' ->
           let ty' = Vars.lift i ty in
-          let e' = Vars.lift i (normalizeK env sigma e) in
+          let e' = Vars.lift i (normalizeV env sigma e) in
           let acc_term' = aux (i+1) names' exprs' types' acc_term in
           mkLetIn (x, e', ty', acc_term')
       | _, _, _ -> user_err (Pp.str "inconsistent list length")
@@ -499,38 +499,38 @@ and normalizeK1 (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x,ty,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (x, ty, normalizeK env2 sigma b)
+      mkLambda (x, ty, normalizeV env2 sigma b)
   | Fix ((ia, i), (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeK env2 sigma) funary in
+      let funary' = Array.map (normalizeV env2 sigma) funary in
       mkFix ((ia, i), (nameary, tyary, funary'))
   | CoFix (i, (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeK env2 sigma) funary in
+      let funary' = Array.map (normalizeV env2 sigma) funary in
       mkCoFix (i, (nameary, tyary, funary'))
   | LetIn (x,e,ty,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
-      let e' = normalizeK env sigma e in
-      let b' = normalizeK env2 sigma b in
+      let e' = normalizeV env sigma e in
+      let b' = normalizeV env2 sigma b in
       mkLetIn (x, e', ty, b')
   | Case (ci, p, item, branches) ->
       if isRel sigma item then
-        mkCase (ci, p, item, Array.map (normalizeK env sigma) branches)
+        mkCase (ci, p, item, Array.map (normalizeV env sigma) branches)
       else
         let term =
           mkCase (ci,
                   Vars.lift 1 p,
                   mkRel 1,
                   Array.map
-                    (fun branch -> Vars.lift 1 (normalizeK env sigma branch))
+                    (fun branch -> Vars.lift 1 (normalizeV env sigma branch))
                     branches)
         in
         wrap_lets [item] term
   | App (f,args) ->
-      let f = normalizeK env sigma f in
+      let f = normalizeV env sigma f in
       let hoist_args = Array.map (fun arg -> not (isRel sigma arg)) args in
       let nargs = Array.fold_left (fun n b -> n + if b then 1 else 0) 0 hoist_args in
       let hoisted_args = CList.filter_with (Array.to_list hoist_args) (Array.to_list args) in
@@ -1530,8 +1530,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   let term = inline env sigma inline_pred epartapp in
   debug_specialization env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
-  let term = normalizeK env sigma term in
-  debug_specialization env sigma "normalizeK" term;
+  let term = normalizeV env sigma term in
+  debug_specialization env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_specialization env sigma "reduce_exp" term;
   let term = replace env sigma term in

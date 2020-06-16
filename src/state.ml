@@ -29,14 +29,14 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_specialization);
           optwrite = (:=) opt_debug_specialization }
 
-(* Set/Unset Debug CodeGen NormalizeK. *)
-let opt_debug_normalizeK = ref false
+(* Set/Unset Debug CodeGen NormalizeV. *)
+let opt_debug_normalizeV = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of normarizeK";
-          optkey   = ["Debug";"CodeGen";"NormalizeK"];
-          optread  = (fun () -> !opt_debug_normalizeK);
-          optwrite = (:=) opt_debug_normalizeK }
+          optname  = "Enables printing trace of normalizeV";
+          optkey   = ["Debug";"CodeGen";"NormalizeV"];
+          optread  = (fun () -> !opt_debug_normalizeV);
+          optwrite = (:=) opt_debug_normalizeV }
 
 (* Set/Unset Debug CodeGen Reduction. *)
 let opt_debug_reduction = ref false
