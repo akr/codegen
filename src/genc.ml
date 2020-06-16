@@ -799,10 +799,15 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
               nj_formal_arguments;
             let nj_formal_argvars = List.map fst nj_formal_arguments in
             let nj_funcname = uj.fixfunc_c_name in
-            let pp_label = Pp.str ("entry_" ^ nj_funcname) in
+            let pp_label =
+              if uj.fixfunc_used_as_goto || Option.is_empty uj.fixfunc_top_call then
+                Pp.str ("entry_" ^ nj_funcname)  ++ Pp.str ":"
+              else
+                Pp.mt ()
+            in
             let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
                           assign_cont_exit_label = Some exit_label; } in
-            hv 0 (pp_label ++ Pp.str ":" +++ gen_assign fixinfo cont2 env2 sigma fj nj_formal_argvars))
+            hv 0 (pp_label +++ gen_assign fixinfo cont2 env2 sigma fj nj_formal_argvars))
           nary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
@@ -914,8 +919,13 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
               nj_formal_arguments;
             let nj_formal_argvars = List.map fst nj_formal_arguments in
             let nj_funcname = uj.fixfunc_c_name in
-            let pp_label = Pp.str ("entry_" ^ nj_funcname) in
-            hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
+            let pp_label =
+              if uj.fixfunc_used_as_goto || Option.is_empty uj.fixfunc_top_call then
+                Pp.str ("entry_" ^ nj_funcname) ++ Pp.str ":"
+              else
+                Pp.mt ()
+            in
+            hv 0 (pp_label +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
           nary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
@@ -970,10 +980,13 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
           List.iter
             (fun (arg_name, arg_type) -> add_local_var (c_typename env sigma arg_type) arg_name)
             args;
-          let labels = List.map
+          let labels = CList.map_filter
             (fun fix_name ->
               let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fix_name)) in
-              "entry_" ^ fix_usage.fixfunc_c_name)
+              if fix_usage.fixfunc_used_as_goto || Option.is_empty fix_usage.fixfunc_top_call then
+                Some ("entry_" ^ fix_usage.fixfunc_c_name)
+              else
+                None)
             fixes
           in
           hv 0 (
@@ -1131,10 +1144,13 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
           List.iter
             (fun (arg_name, arg_type) -> add_local_var (c_typename env sigma arg_type) arg_name)
             args;
-          let labels = List.map
+          let labels = CList.map_filter
             (fun fix_name ->
               let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fix_name)) in
-              "entry_" ^ fix_usage.fixfunc_c_name)
+              if fix_usage.fixfunc_used_as_goto || Option.is_empty fix_usage.fixfunc_top_call then
+                Some ("entry_" ^ fix_usage.fixfunc_c_name)
+              else
+                None)
             fixes
           in
           hv 0 (
