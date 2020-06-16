@@ -689,108 +689,7 @@ let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
   | None -> mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
-let rec gen_tail (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "gen_tail start:" +++
-    Printer.pr_econstr_env env sigma term +++
-    Pp.str "(" ++
-    pp_join_list (Pp.spc ()) (List.map Pp.str cargs) ++
-    Pp.str ")");*)
-  let pp = gen_tail1 fixinfo gen_ret env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "gen_tail return:" +++
-    Printer.pr_econstr_env env sigma term +++
-    Pp.str "->" +++
-    pp);*)
-  pp
-and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _
-  | Evar _ | Prod _
-  | Int _ | Float _
-  | Cast _ | CoFix _ ->
-      user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
-  | Rel i ->
-      if List.length cargs = 0 then
-        let str = carg_of_garg env i in
-        gen_ret (Pp.str str)
-      else
-        let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        let uopt = Hashtbl.find_opt fixinfo key in
-        (match uopt with
-        | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
-        | Some u ->
-            let formal_arguments = u.fixfunc_formal_arguments in
-            if List.length cargs < List.length formal_arguments then
-              user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
-                Printer.pr_econstr_env env sigma term);
-            let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
-            let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-            let funcname = u.fixfunc_c_name in
-            let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
-            pp_assignments +++ pp_goto_entry)
-  | Const (ctnt,_) ->
-      gen_ret (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs))
-  | Construct (cstr,_) ->
-      gen_ret (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs))
-  | App (f,args) ->
-      let cargs2 =
-        List.append
-          (Array.to_list (Array.map (fun arg -> carg_of_garg env (destRel sigma arg)) args))
-          cargs
-      in
-      gen_tail fixinfo gen_ret env sigma f cargs2
-  | Lambda (x,t,b) ->
-      (match cargs with
-      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" +++
-          Printer.pr_econstr_env env sigma term)
-      | arg :: rest ->
-          (if Context.binder_name x <> Name.Name (Id.of_string arg) then
-            Feedback.msg_warning (Pp.str "[codegen:gen_tail] lambda argument doesn't match to outer application argument"));
-          let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
-          let env2 = EConstr.push_rel decl env in
-          gen_tail fixinfo gen_ret env2 sigma b rest)
-  | Case (ci,predicate,item,branches) ->
-      gen_match gen_switch_without_break (gen_tail fixinfo gen_ret) env sigma ci predicate item branches cargs
-  | LetIn (x,e,t,b) ->
-      let c_var = str_of_annotated_name x in
-      add_local_var (c_typename env sigma t) c_var;
-      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
-      let env2 = EConstr.push_rel decl env in
-      let cont1 = { assign_cont_ret_var = c_var;
-                    assign_cont_exit_label = None; } in
-      gen_assign fixinfo cont1 env sigma e [] +++
-      gen_tail fixinfo gen_ret env2 sigma b cargs
-
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
-      let ni_formal_arguments = ui.fixfunc_formal_arguments in
-      if List.length cargs < List.length ni_formal_arguments then
-        user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
-          Printer.pr_econstr_env env sigma term);
-      let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
-      let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
-      let pp_bodies =
-        Array.mapi
-          (fun j nj ->
-            let fj = fary.(j) in
-            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
-            let nj_formal_arguments = uj.fixfunc_formal_arguments in
-            List.iter
-              (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
-              nj_formal_arguments;
-            let nj_formal_argvars = List.map fst nj_formal_arguments in
-            let nj_funcname = uj.fixfunc_c_name in
-            let pp_label = Pp.str ("entry_" ^ nj_funcname) in
-            hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
-          nary in
-      let reordered_pp_bodies = Array.copy pp_bodies in
-      Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
-      reordered_pp_bodies.(0) <- pp_bodies.(i);
-      pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies
-
-  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
-
-and gen_assign (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+let rec  gen_assign (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 fixinfo cont env sigma term cargs in
   (*Feedback.msg_debug (Pp.str "gen_assign:" +++
     Printer.pr_econstr_env env sigma term +++
@@ -921,6 +820,107 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
 
   | Proj _ ->
       user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+
+let rec gen_tail (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  (*Feedback.msg_debug (Pp.str "gen_tail start:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "(" ++
+    pp_join_list (Pp.spc ()) (List.map Pp.str cargs) ++
+    Pp.str ")");*)
+  let pp = gen_tail1 fixinfo gen_ret env sigma term cargs in
+  (*Feedback.msg_debug (Pp.str "gen_tail return:" +++
+    Printer.pr_econstr_env env sigma term +++
+    Pp.str "->" +++
+    pp);*)
+  pp
+and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _
+  | Evar _ | Prod _
+  | Int _ | Float _
+  | Cast _ | CoFix _ ->
+      user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+  | Rel i ->
+      if List.length cargs = 0 then
+        let str = carg_of_garg env i in
+        gen_ret (Pp.str str)
+      else
+        let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        let uopt = Hashtbl.find_opt fixinfo key in
+        (match uopt with
+        | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
+        | Some u ->
+            let formal_arguments = u.fixfunc_formal_arguments in
+            if List.length cargs < List.length formal_arguments then
+              user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
+                Printer.pr_econstr_env env sigma term);
+            let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
+            let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+            let funcname = u.fixfunc_c_name in
+            let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
+            pp_assignments +++ pp_goto_entry)
+  | Const (ctnt,_) ->
+      gen_ret (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs))
+  | Construct (cstr,_) ->
+      gen_ret (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs))
+  | App (f,args) ->
+      let cargs2 =
+        List.append
+          (Array.to_list (Array.map (fun arg -> carg_of_garg env (destRel sigma arg)) args))
+          cargs
+      in
+      gen_tail fixinfo gen_ret env sigma f cargs2
+  | Lambda (x,t,b) ->
+      (match cargs with
+      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" +++
+          Printer.pr_econstr_env env sigma term)
+      | arg :: rest ->
+          (if Context.binder_name x <> Name.Name (Id.of_string arg) then
+            Feedback.msg_warning (Pp.str "[codegen:gen_tail] lambda argument doesn't match to outer application argument"));
+          let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
+          let env2 = EConstr.push_rel decl env in
+          gen_tail fixinfo gen_ret env2 sigma b rest)
+  | Case (ci,predicate,item,branches) ->
+      gen_match gen_switch_without_break (gen_tail fixinfo gen_ret) env sigma ci predicate item branches cargs
+  | LetIn (x,e,t,b) ->
+      let c_var = str_of_annotated_name x in
+      add_local_var (c_typename env sigma t) c_var;
+      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let cont1 = { assign_cont_ret_var = c_var;
+                    assign_cont_exit_label = None; } in
+      gen_assign fixinfo cont1 env sigma e [] +++
+      gen_tail fixinfo gen_ret env2 sigma b cargs
+
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
+      let ni_formal_arguments = ui.fixfunc_formal_arguments in
+      if List.length cargs < List.length ni_formal_arguments then
+        user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
+          Printer.pr_econstr_env env sigma term);
+      let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
+      let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+      let pp_bodies =
+        Array.mapi
+          (fun j nj ->
+            let fj = fary.(j) in
+            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
+            let nj_formal_arguments = uj.fixfunc_formal_arguments in
+            List.iter
+              (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
+              nj_formal_arguments;
+            let nj_formal_argvars = List.map fst nj_formal_arguments in
+            let nj_funcname = uj.fixfunc_c_name in
+            let pp_label = Pp.str ("entry_" ^ nj_funcname) in
+            hv 0 (pp_label ++ Pp.str ":" +++ gen_tail fixinfo gen_ret env2 sigma fj nj_formal_argvars))
+          nary in
+      let reordered_pp_bodies = Array.copy pp_bodies in
+      Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
+      reordered_pp_bodies.(0) <- pp_bodies.(i);
+      pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies
+
+  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : (string * EConstr.types) list) (fixfuncs : string list) (term : EConstr.t) :
