@@ -786,9 +786,8 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
       let ni_funcname = ui.fixfunc_c_name in
-      let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ";") in
       let exit_label = "exit_" ^ ni_funcname in
-      let pp_exit = Pp.hov 0 (Pp.str exit_label ++ Pp.str ":;") in
+      let pp_exit = Pp.hov 0 (Pp.str exit_label ++ Pp.str ":") in
       let pp_bodies =
         Array.mapi
           (fun j nj ->
@@ -803,9 +802,12 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
             let pp_label = Pp.str ("entry_" ^ nj_funcname) in
             let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
                           assign_cont_exit_label = Some exit_label; } in
-            hv 0 (pp_label ++ Pp.str ":;" +++ gen_assign fixinfo cont2 env2 sigma fj nj_formal_argvars))
+            hv 0 (pp_label ++ Pp.str ":" +++ gen_assign fixinfo cont2 env2 sigma fj nj_formal_argvars))
           nary in
-      pp_assignments +++ pp_goto_entry +++ pp_join_ary (Pp.spc ()) pp_bodies +++ pp_exit
+      let reordered_pp_bodies = Array.copy pp_bodies in
+      Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
+      reordered_pp_bodies.(0) <- pp_bodies.(i);
+      pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies +++ pp_exit
 
   | Lambda (x,t,b) ->
       (match cargs with
@@ -976,7 +978,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
           in
           hv 0 (
             pp_join_list (spc ())
-              (List.map (fun l -> Pp.str (l ^ ":;")) labels) +++
+              (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
             gen_tail fixinfo genc_return env2 sigma body []))
         bodies))
     in
@@ -1137,7 +1139,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
           in
           hv 0 (
             pp_join_list (spc ())
-              (List.map (fun l -> Pp.str (l ^ ":;")) labels) +++
+              (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
             gen_tail fixinfo gen_ret env2 sigma body []))
         bodies))
     in
