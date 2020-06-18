@@ -92,17 +92,17 @@ let str_of_name (name : Name.t) : string =
 let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
   str_of_name (Context.binder_name name)
 
-let genc_farg (env : Environ.env) (sigma : Evd.evar_map) (farg : string * EConstr.types) : Pp.t =
+let genc_farg (farg : (*varname*)string * (*vartype*)string) : Pp.t =
   let (var, ty) = farg in
-  hv 2 (str (c_typename env sigma ty) +++ str var)
+  hv 2 (str ty +++ str var)
 
-let genc_fargs (env : Environ.env) (sigma : Evd.evar_map) (fargs : (string * EConstr.types) list) : Pp.t =
+let genc_fargs (fargs : (string * string) list) : Pp.t =
   match fargs with
   | [] -> str "void"
   | farg1 :: rest ->
       List.fold_left
-        (fun pp farg -> pp ++ str "," +++ genc_farg env sigma farg)
-        (genc_farg env sigma farg1)
+        (fun pp farg -> pp ++ str "," +++ genc_farg farg)
+        (genc_farg farg1)
         rest
 
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
@@ -875,13 +875,13 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
   | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fargs : (string * EConstr.types) list) (fixfuncs : string list) (term : EConstr.t) :
-    ((string * EConstr.types) list * string list * Environ.env * EConstr.t) array =
+    (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
+    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) array =
   match EConstr.kind sigma term with
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let c_var = (str_of_annotated_name x, t) in
+      let c_var = (str_of_annotated_name x, c_typename env sigma t) in
       obtain_function_bodies_rec env2 sigma (c_var :: fargs) fixfuncs b
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
@@ -901,7 +901,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
 
 let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
    (term : EConstr.t) :
-    ((string * EConstr.types) list *
+    (((*varname*)string * (*vartype*)string) list *
      string list *
      Environ.env *
      EConstr.t) array =
@@ -918,7 +918,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
       pp_join_ary (spc ()) (Array.map
         (fun (args, fixes, env2, body) ->
           List.iter
-            (fun (arg_name, arg_type) -> add_local_var (c_typename env sigma arg_type) arg_name)
+            (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             args;
           let labels = CList.map_filter
             (fun fix_name ->
@@ -947,7 +947,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
   hv 0 (str "static" +++
         str return_type) +++
   str cfunc_name ++ str "(" ++
-  hv 0 (genc_fargs env sigma c_fargs) ++
+  hv 0 (genc_fargs c_fargs) ++
   str ")" +++
   brace (
     pp_postjoin_list (spc ())
@@ -1079,7 +1079,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       pp_join_ary (spc ()) (Array.map
         (fun (args, fixes, env2, body) ->
           List.iter
-            (fun (arg_name, arg_type) -> add_local_var (c_typename env sigma arg_type) arg_name)
+            (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             args;
           let labels = CList.map_filter
             (fun fix_name ->
