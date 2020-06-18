@@ -176,7 +176,7 @@ let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
   local_vars := vars :: old;
   let ret = f () in
   local_vars := old;
-  (!vars, ret)
+  (List.rev !vars, ret)
 
 let add_local_var (c_type : string) (c_var : string) : unit =
   if !local_vars = [] then

@@ -17,11 +17,11 @@ buildDir2(bool v1_b,
           MDArr v6_D2,
           nat v7_m2)
 {
-  nat v12_n;
-  MDArr v11_m;
-  nat v10_n;
-  nat v9_m;
   nat v8_cp;
+  nat v9_m;
+  nat v10_n;
+  MDArr v11_m;
+  nat v12_n;
   entry_fixfunc1_buildDir2:
   switch (v4_c)
   {
@@ -52,15 +52,15 @@ buildDir1(bool v1_b,
           MDArr v9_D2,
           nat v10_m1)
 {
-  nat v19_n;
-  nat v18_n;
-  nat v17_m2;
-  MDArr v16_D2_;
-  pair_MDArr_nat v15_p;
-  nat v14_n;
-  MDArr v13_D1_;
-  nat v12_cp;
   pair_MDArr_MDArr v11_p;
+  nat v12_cp;
+  MDArr v13_D1_;
+  nat v14_n;
+  pair_MDArr_nat v15_p;
+  MDArr v16_D2_;
+  nat v17_m2;
+  nat v18_n;
+  nat v19_n;
   entry_fixfunc1_buildDir1:
   switch (v6_c)
   {
@@ -87,27 +87,27 @@ buildDir1(bool v1_b,
 static pair_MDArr_MDArr
 buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
 {
-  MDArr v27_m;
-  MDArr v26_m;
-  nat v25_m2;
-  MDArr v24_D2;
-  pair_MDArr_nat v23_p;
-  nat v22_n;
-  nat v21_n;
-  nat v20_n;
-  MDArr v19_D2;
-  MDArr v18_D1;
-  nat v17_m1;
-  pair_MDArr_MDArr v16_p;
-  pair_2MDArr_nat v15_p;
-  nat v14_n;
-  MDArr v13_m;
-  MDArr v12_m;
-  nat v11_n;
-  nat v10_n1;
-  nat v9_n2;
-  nat v8_n;
   nat v7_sz1;
+  nat v8_n;
+  nat v9_n2;
+  nat v10_n1;
+  nat v11_n;
+  MDArr v12_m;
+  MDArr v13_m;
+  nat v14_n;
+  pair_2MDArr_nat v15_p;
+  pair_MDArr_MDArr v16_p;
+  nat v17_m1;
+  MDArr v18_D1;
+  MDArr v19_D2;
+  nat v20_n;
+  nat v21_n;
+  nat v22_n;
+  pair_MDArr_nat v23_p;
+  MDArr v24_D2;
+  nat v25_m2;
+  MDArr v26_m;
+  MDArr v27_m;
   v7_sz1 = muln(v3_k, v4_sz2);
   v8_n = bsize(v2_s);
   v9_n2 = divn(v8_n, v4_sz2);
@@ -135,24 +135,24 @@ buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
 static Aux
 rank_init(bool v1_b, bits v2_s)
 {
-  DArr v20_d;
-  DArr v19_d;
-  MDArr v18_D2;
-  MDArr v17_D1;
-  pair_MDArr_MDArr v16_p;
-  nat v15_w2;
-  nat v14_n;
-  nat v13_n;
-  nat v12_w1;
-  nat v11_n;
-  nat v10_n;
-  nat v9_n;
-  nat v8_sz1;
-  nat v7_sz2;
-  nat v6_sz2p;
-  nat v5_k;
-  nat v4_kp;
   nat v3_n;
+  nat v4_kp;
+  nat v5_k;
+  nat v6_sz2p;
+  nat v7_sz2;
+  nat v8_sz1;
+  nat v9_n;
+  nat v10_n;
+  nat v11_n;
+  nat v12_w1;
+  nat v13_n;
+  nat v14_n;
+  nat v15_w2;
+  pair_MDArr_MDArr v16_p;
+  MDArr v17_D1;
+  MDArr v18_D2;
+  DArr v19_d;
+  DArr v20_d;
   v3_n = bsize(v2_s);
   v4_kp = bitlen(v3_n);
   v5_k = succn(v4_kp);
@@ -176,20 +176,20 @@ rank_init(bool v1_b, bits v2_s)
 static nat
 rank_lookup(Aux v1_aux, nat v2_i)
 {
-  nat v16_n;
-  nat v15_n;
-  nat v14_n;
-  nat v13_n;
-  nat v12_n;
-  nat v11_j1;
-  nat v10_j3;
-  nat v9_j2;
-  DArr v8_D2;
-  DArr v7_D1;
-  nat v6_sz2;
-  nat v5_k;
-  bits v4_s;
   bool v3_b;
+  bits v4_s;
+  nat v5_k;
+  nat v6_sz2;
+  DArr v7_D1;
+  DArr v8_D2;
+  nat v9_j2;
+  nat v10_j3;
+  nat v11_j1;
+  nat v12_n;
+  nat v13_n;
+  nat v14_n;
+  nat v15_n;
+  nat v16_n;
   v3_b = aux_query_bit(v1_aux);
   v4_s = aux_input_bits(v1_aux);
   v5_k = aux_ratio(v1_aux);

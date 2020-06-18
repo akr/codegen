@@ -18,11 +18,11 @@ typedef uint64_t nat;
 static nat
 fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
 {
-  nat v8_n;
-  nat v7_n;
-  nat v6_n;
-  bool v5_b;
   nat v4_k_;
+  bool v5_b;
+  nat v6_n;
+  nat v7_n;
+  nat v8_n;
   entry_fixfunc1_fastpow_iter:
   switch (v2_k)
   {
@@ -50,7 +50,7 @@ fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
 static nat
 fastpow(nat v1_a, nat v2_k)
 {
-  nat v4_n;
   nat v3_n;
+  nat v4_n;
   v3_n = 0; v4_n = nat_succ(v3_n); return fastpow_iter(v1_a, v2_k, v4_n);
 }
