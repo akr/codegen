@@ -582,7 +582,7 @@ let gen_match (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
           (caselabel, gen_branch accessors br))
         branches))
 
-let gen_parallel_assignment (env : Environ.env) (sigma : Evd.evar_map) (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
+let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
   let assign = Array.to_list assignments in
   let assign = List.filter (fun (lhs, rhs, ty) -> lhs <> rhs) assign in
   let rpp = ref (mt ()) in
@@ -659,7 +659,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
             in
             if info.fixfunc_goto_only_fix_term then
               let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) info.fixfunc_formal_arguments cargs in
-              let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+              let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
               let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
@@ -724,7 +724,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
         user_err (Pp.str "[codegen] gen_assign: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
-      let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+      let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
       let ni_funcname = ui.fixfunc_c_name in
       let exit_label = "exit_" ^ ni_funcname in
       let pp_exit = Pp.hov 0 (Pp.str exit_label ++ Pp.str ":") in
@@ -802,7 +802,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
             let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
-            let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+            let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
             let funcname = u.fixfunc_c_name in
             let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
@@ -847,7 +847,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
-      let pp_assignments = gen_parallel_assignment env sigma (Array.of_list assginments) in
+      let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
       let pp_bodies =
         Array.mapi
           (fun j nj ->
