@@ -132,8 +132,7 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
         sp_inst
   in
   let c_fname = sp_inst.sp_cfunc_name in
-  let gen_constant = Array.length argvars = 0 && sp_inst.sp_gen_constant
-  in
+  let gen_constant = Array.length argvars = 0 && sp_inst.sp_gen_constant in
   if gen_constant then
     str c_fname
   else
