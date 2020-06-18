@@ -2,6 +2,8 @@ Makefile.coq.conf
 Makefile.coq
 src/g_codegen.ml
 test/test_codegen
+sample/pow
+sample/rank
 oUnit-*
 *.bak
 *.swp
