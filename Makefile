@@ -29,11 +29,20 @@ clean :
 	  src/*.d \
 	  theories/*.glob \
 	  theories/*.vo \
+	  theories/*.vok \
+	  theories/*.vos \
 	  theories/*.d \
 	  test/*.cache \
 	  test/test_codegen \
 	  test/*.cmi \
 	  test/*.cmx \
 	  test/*.o \
-	  test/oUnit-*
+	  test/oUnit-* \
+	  sample/pow \
+	  sample/rank \
+	  sample/*.vo \
+	  sample/*.vok \
+	  sample/*.vos \
+	  sample/*.glob \
+	  oUnit-*
 
