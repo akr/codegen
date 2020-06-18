@@ -188,10 +188,13 @@ let add_local_var (c_type : string) (c_var : string) : unit =
       ()
   | None -> vars := (c_type, c_var) :: !vars
 
-let id_of_name (name : Name.t Context.binder_annot) : Id.t =
-  match Context.binder_name name with
+let id_of_name (name : Name.t) : Id.t =
+  match name with
   | Name.Anonymous -> user_err (Pp.str "[codegen:bug] id_of_name require non-anonymous Name")
   | Name.Name id -> id
+
+let id_of_annotated_name (name : Name.t Context.binder_annot) : Id.t =
+  id_of_name (Context.binder_name name)
 
 let carg_of_garg (env : Environ.env) (i : int) : string =
   let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
@@ -280,12 +283,12 @@ type fixfunc_info = {
   fixfunc_goto_only_fix_term: bool;
 }
 
-type fixinfo_t = (Name.t, fixfunc_info) Hashtbl.t
+type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
 
 let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t) : unit =
   Hashtbl.iter
     (fun fixfunc info ->
-      Feedback.msg_debug (hv 2 (Pp.str (str_of_name fixfunc) ++ Pp.str ":" +++
+      Feedback.msg_debug (hv 2 (Pp.str (Id.to_string fixfunc) ++ Pp.str ":" +++
         Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
         Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
         Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
@@ -479,7 +482,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
           (fst args_and_ret_type)
         in
         let return_type = snd args_and_ret_type in
-        Hashtbl.add fixinfo fname {
+        Hashtbl.add fixinfo (id_of_name fname) {
           fixfunc_c_name = c_name;
           fixfunc_used_as_call = used_as_call;
           fixfunc_used_as_goto = used_as_goto;
@@ -515,7 +518,7 @@ let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       detect_top_calls_rec env2 sigma fixinfo top_c_func_name outer_variables_rev fary.(i);
-      let key = Context.binder_name nary.(i) in
+      let key = id_of_annotated_name nary.(i) in
       let usage = Hashtbl.find fixinfo key in
       Hashtbl.replace fixinfo key {
         fixfunc_c_name = usage.fixfunc_c_name;
@@ -710,7 +713,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
       else
         let decl = Environ.lookup_rel i env in
         let name = Context.Rel.Declaration.get_name decl in
-        (match Hashtbl.find_opt fixinfo name with
+        (match Hashtbl.find_opt fixinfo (id_of_name name) with
         | Some info ->
             let fname =
               match info.fixfunc_top_call with
@@ -761,7 +764,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       if Array.exists
            (fun n ->
-             let ui = Hashtbl.find fixinfo (Context.binder_name n) in
+             let ui = Hashtbl.find fixinfo (id_of_annotated_name n) in
              ui.fixfunc_used_as_call || ui.fixfunc_used_as_closure)
            nary
       then
@@ -770,7 +773,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
                           Pp.hv 0 (Printer.pr_econstr_env env sigma term);
          Array.iter
            (fun n ->
-             let ui = Hashtbl.find fixinfo (Context.binder_name n) in
+             let ui = Hashtbl.find fixinfo (id_of_annotated_name n) in
              if ui.fixfunc_used_as_call then
                msg := !msg +++ Pp.hov 0 (Pp.str "recursive function," +++ Pp.str ui.fixfunc_c_name ++ Pp.str ", is used as a call");
              if ui.fixfunc_used_as_closure then
@@ -778,7 +781,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
            nary;
           user_err (Pp.hv 0 !msg));
       let env2 = EConstr.push_rec_types prec env in
-      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
+      let ui = Hashtbl.find fixinfo (id_of_annotated_name nary.(i)) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
       if List.length cargs < List.length ni_formal_arguments then
         user_err (Pp.str "[codegen] gen_assign: partial application for fix-term (higher-order term not supported yet):" +++
@@ -792,7 +795,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (cont : assign_cont) (env : Environ.env) (
         Array.mapi
           (fun j nj ->
             let fj = fary.(j) in
-            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
+            let uj = Hashtbl.find fixinfo (id_of_annotated_name nj) in
             let nj_formal_arguments = uj.fixfunc_formal_arguments in
             List.iter
               (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
@@ -853,7 +856,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
         gen_ret (Pp.str str)
       else
         let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        let uopt = Hashtbl.find_opt fixinfo key in
+        let uopt = Hashtbl.find_opt fixinfo (id_of_name key) in
         (match uopt with
         | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
         | Some u ->
@@ -901,7 +904,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
 
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let ui = Hashtbl.find fixinfo (Context.binder_name nary.(i)) in
+      let ui = Hashtbl.find fixinfo (id_of_annotated_name nary.(i)) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
       if List.length cargs < List.length ni_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
@@ -912,7 +915,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env)
         Array.mapi
           (fun j nj ->
             let fj = fary.(j) in
-            let uj = Hashtbl.find fixinfo (Context.binder_name nj) in
+            let uj = Hashtbl.find fixinfo (id_of_annotated_name nj) in
             let nj_formal_arguments = uj.fixfunc_formal_arguments in
             List.iter
               (fun (c_arg, t) -> add_local_var (c_typename env sigma t) c_arg)
@@ -982,7 +985,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
             args;
           let labels = CList.map_filter
             (fun fix_name ->
-              let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fix_name)) in
+              let fix_usage = Hashtbl.find fixinfo (Id.of_string fix_name) in
               if fix_usage.fixfunc_used_as_goto || Option.is_empty fix_usage.fixfunc_top_call then
                 Some ("entry_" ^ fix_usage.fixfunc_c_name)
               else
@@ -1146,7 +1149,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
             args;
           let labels = CList.map_filter
             (fun fix_name ->
-              let fix_usage = Hashtbl.find fixinfo (Name.Name (Id.of_string fix_name)) in
+              let fix_usage = Hashtbl.find fixinfo (Id.of_string fix_name) in
               if fix_usage.fixfunc_used_as_goto || Option.is_empty fix_usage.fixfunc_top_call then
                 Some ("entry_" ^ fix_usage.fixfunc_c_name)
               else
