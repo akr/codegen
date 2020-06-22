@@ -513,6 +513,18 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
         (caselabel, pp_branch +++ str "break;"))
       branches)
 
+let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Environ.env * EConstr.t) =
+  if n = 0 then
+    (env, term)
+  else
+    match EConstr.kind sigma term with
+    | Lambda (x,t,e) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        decompose_lam_n_env env2 sigma (n-1) e
+    | _ ->
+      user_err (str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term: " ++ Printer.pr_econstr_env env sigma term)
+
 let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
     (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -528,33 +540,34 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   (*Feedback.msg_debug (Pp.str "gen_match:2");*)
   let gen_branch accessors br =
     (
-    let branch_type = Retyping.get_type_of env sigma br in
-    let branch_type = Reductionops.nf_all env sigma branch_type in
-    let (branch_arg_types, _) = decompose_prod sigma branch_type in
-    let branch_arg_types = CList.lastn (Array.length accessors) branch_arg_types in
-    let branch_arg_types = CArray.rev_of_list branch_arg_types in
+    let n = Array.length accessors in
+    let (env2, branch_body) = decompose_lam_n_env env sigma n br in
     let c_vars = Array.map
-      (fun (x,t) ->
+      (fun i ->
+        let env3 = Environ.pop_rel_context (i-1) env2 in
+        let decl = Environ.lookup_rel 1 env3 in
+        let (x, _, t) = Context.Rel.Declaration.to_tuple decl in
         let c_id = id_of_annotated_name x in
         let c_var = Id.to_string c_id in
         (if Id.Set.mem c_id used then
-          add_local_var (c_typename env sigma t) c_var);
+          let env4 = Environ.pop_rel_context 1 env3 in
+          let t = EConstr.of_constr t in
+          add_local_var (c_typename env4 sigma t) c_var);
         c_var)
-      branch_arg_types
+      (array_rev (iota_ary 1 n))
     in
     let c_field_access =
       pp_sjoin_ary
         (Array.map2
           (fun c_var access ->
             if Id.Set.mem (Id.of_string c_var) used then
-              genc_assign (str c_var) (str access ++ str "(" ++ str item_cvar ++ str ")")
+              genc_assign (str c_var)
+                (str access ++ str "(" ++ str item_cvar ++ str ")")
             else
               mt ())
           c_vars accessors)
     in
-    let c_branch_body =
-      gen_branch_body env sigma br (List.append (Array.to_list c_vars) cargs)
-    in
+    let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
     c_field_access +++ c_branch_body)
   in
   (*Feedback.msg_debug (Pp.str "gen_match:3");*)
