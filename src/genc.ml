@@ -91,26 +91,26 @@ let str_of_name (name : Name.t) : string =
 let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
   str_of_name (Context.binder_name name)
 
-let genc_farg (farg : (*varname*)string * (*vartype*)string) : Pp.t =
+let gen_farg (farg : (*varname*)string * (*vartype*)string) : Pp.t =
   let (var, ty) = farg in
   hov 2 (str ty +++ str var)
 
-let genc_fargs (fargs : (string * string) list) : Pp.t =
+let gen_fargs (fargs : (string * string) list) : Pp.t =
   match fargs with
   | [] -> str "void"
   | farg1 :: rest ->
       List.fold_left
-        (fun pp farg -> pp ++ str "," +++ genc_farg farg)
-        (genc_farg farg1)
+        (fun pp farg -> pp ++ str "," +++ gen_farg farg)
+        (gen_farg farg1)
         rest
 
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ str "=" +++ rhs ++ str ";")
 
-let genc_return (arg : Pp.t) : Pp.t =
+let gen_return (arg : Pp.t) : Pp.t =
   hov 0 (str "return" +++ arg ++ str ";")
 
-let genc_void_return (retvar : string) (arg : Pp.t) : Pp.t =
+let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
   genc_assign (str retvar) arg +++ str "return;"
 
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
@@ -649,7 +649,7 @@ let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
   | None -> mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
-let rec  gen_assign (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+let rec gen_assign (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 fixinfo used cont env sigma term cargs in
   (*Feedback.msg_debug (Pp.str "gen_assign:" +++
     Printer.pr_econstr_env env sigma term +++
@@ -929,7 +929,7 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
      EConstr.t) array =
   obtain_function_bodies_rec env sigma [] [] term
 
-let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
   (whole_body : EConstr.t) (return_type : string)
   (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
   let bodies = obtain_function_bodies env sigma whole_body in
@@ -951,7 +951,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
           in
             pp_join_list (spc ())
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
-            gen_tail fixinfo used genc_return env2 sigma body [])
+            gen_tail fixinfo used gen_return env2 sigma body [])
         bodies))
   in
   let c_fargs =
@@ -965,12 +965,12 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
       | None -> true)
     local_vars
   in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
+  (*Feedback.msg_debug (Pp.str "gen_func_sub:6");*)
   v 0 (
   hov 0 (str "static" +++
         str return_type) +++
   str cfunc_name ++ str "(" ++
-  hov 0 (genc_fargs c_fargs) ++
+  hov 0 (gen_fargs c_fargs) ++
   str ")" +++
   vbrace (
     pp_postjoin_list (spc ())
@@ -980,7 +980,7 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
     ++
     pp_body))
 
-let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
   let pp_struct_args =
@@ -1094,7 +1094,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       formal_arguments return_type
   in
   let bodies = obtain_function_bodies env sigma whole_body in
-  let gen_ret = (genc_void_return ("(*(" ^ return_type ^ " *)ret)")) in
+  let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_join_ary (spc ()) (Array.map
@@ -1192,7 +1192,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       hov 0 (Pp.str "switch" +++ Pp.str "(g)") +++
       vbrace pp_switch_body
   in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
+  (*Feedback.msg_debug (Pp.str "gen_func_sub:6");*)
   v 0 (
     pp_struct_args +++
     pp_forward_decl +++
@@ -1251,7 +1251,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Cast (e,ck,ty) -> used_variables env sigma e
   | Proj (proj, e) -> used_variables env sigma e
 
-let gen_func2_sub (cfunc_name : string) : Pp.t =
+let gen_func_sub (cfunc_name : string) : Pp.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
@@ -1259,34 +1259,25 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:1");*)
+  (*Feedback.msg_debug (Pp.str "gen_func_sub:1");*)
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
-  (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
+  (*Feedback.msg_debug (Pp.str "gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   (if needs_multiple_functions fixinfo env sigma whole_body then
-    gen_func2_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used
+    gen_func_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used
   else
-    gen_func2_single cfunc_name env sigma whole_body return_type fixinfo used) ++
+    gen_func_single cfunc_name env sigma whole_body return_type fixinfo used) ++
   Pp.fnl ()
 
-let gen_function2 (cfunc_name : string) : Pp.t =
-  local_gensym_with (fun () -> gen_func2_sub cfunc_name)
-
-let gen_function0 (cfunc_name : string) : Pp.t =
-  gen_function2 cfunc_name
+let gen_function (cfunc_name : string) : Pp.t =
+  local_gensym_with (fun () -> gen_func_sub cfunc_name)
 
 (* Vernacular commands *)
-
-let gen2 (cfunc_list : string list) : unit =
-  List.iter
-    (fun cfunc_name ->
-      Feedback.msg_info (gen_function2 cfunc_name))
-    cfunc_list
 
 let gen (cfunc_list : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      Feedback.msg_info (gen_function0 cfunc_name))
+      Feedback.msg_info (gen_function cfunc_name))
     cfunc_list
 
 let codegen_snippet (str : string) : unit =
@@ -1308,7 +1299,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
-          Pp.pp_with fmt (gen_function0 cfunc_name ++ Pp.fnl ())
+          Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
           Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
     gen_list;

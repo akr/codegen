@@ -190,8 +190,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Snippet" string(str) ] ->
       { codegen_snippet str }
 
-    | [ "CodeGen" "Gen2" ne_string_list(cfunc_list) ] -> { gen2 cfunc_list }
-
     | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
 
     | [ "CodeGen" "GenerateFile" string(fn) ] ->
