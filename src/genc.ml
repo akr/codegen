@@ -539,9 +539,8 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
   (*Feedback.msg_debug (Pp.str "gen_match:2");*)
   let gen_branch accessors br =
-    (
-    let n = Array.length accessors in
-    let (env2, branch_body) = decompose_lam_n_env env sigma n br in
+    let m = Array.length accessors in
+    let (env2, branch_body) = decompose_lam_n_env env sigma m br in
     let c_vars = Array.map
       (fun i ->
         let env3 = Environ.pop_rel_context (i-1) env2 in
@@ -554,7 +553,7 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
           let t = EConstr.of_constr t in
           add_local_var (c_typename env4 sigma t) c_var);
         c_var)
-      (array_rev (iota_ary 1 n))
+      (array_rev (iota_ary 1 m))
     in
     let c_field_access =
       pp_sjoin_ary
@@ -568,7 +567,7 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
           c_vars accessors)
     in
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
-    c_field_access +++ c_branch_body)
+    c_field_access +++ c_branch_body
   in
   (*Feedback.msg_debug (Pp.str "gen_match:3");*)
   let n = Array.length branches in
