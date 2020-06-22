@@ -906,7 +906,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
 let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
    (term : EConstr.t) :
     (((*varname*)string * (*vartype*)string) list *
-     string list *
+     (*fixfuncs*)string list *
      Environ.env *
      EConstr.t) array =
   obtain_function_bodies_rec env sigma [] [] term
@@ -915,8 +915,6 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
   (whole_body : EConstr.t) (return_type : string)
   (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
   let bodies = obtain_function_bodies env sigma whole_body in
-  let (first_args, _, _, _) = bodies.(0) in
-  let c_fargs = List.rev first_args in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_join_ary (spc ()) (Array.map
@@ -938,7 +936,11 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
             gen_tail fixinfo used genc_return env2 sigma body []))
         bodies))
-    in
+  in
+  let c_fargs =
+    let (first_args, _, _, _) = bodies.(0) in
+    List.rev first_args
+  in
   let local_vars = List.filter
     (fun (c_type, c_var) ->
       match List.find_opt (fun (c_var1, ty1) -> c_var = c_var1) c_fargs with
@@ -1099,7 +1101,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
             gen_tail fixinfo used gen_ret env2 sigma body []))
         bodies))
-    in
+  in
   let pp_local_variables_decls =
     pp_join_list (spc ())
       (List.map
