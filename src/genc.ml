@@ -93,7 +93,7 @@ let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
 
 let genc_farg (farg : (*varname*)string * (*vartype*)string) : Pp.t =
   let (var, ty) = farg in
-  hv 2 (str ty +++ str var)
+  hov 2 (str ty +++ str var)
 
 let genc_fargs (fargs : (string * string) list) : Pp.t =
   match fargs with
@@ -108,10 +108,10 @@ let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ str "=" +++ rhs ++ str ";")
 
 let genc_return (arg : Pp.t) : Pp.t =
-  hv 0 (str "return" +++ arg ++ str ";")
+  hov 0 (str "return" +++ arg ++ str ";")
 
 let genc_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  hv 0 (genc_assign (str retvar) arg +++ str "return;")
+  genc_assign (str retvar) arg +++ str "return;"
 
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
   str c_fname ++ str "(" ++
@@ -164,8 +164,11 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   in
   (ctnt, ty, body)
 
-let brace (pp : Pp.t) : Pp.t =
+let hovbrace (pp : Pp.t) : Pp.t =
   hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+
+let vbrace (pp : Pp.t) : Pp.t =
+  v 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
 
 let local_vars : ((string * string) list ref) list ref = ref []
 
@@ -498,12 +501,12 @@ let needs_multiple_functions (fixinfo : fixinfo_t) (env : Environ.env) (sigma : 
     false
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
-  hv 0 (
+  v 0 (
   hov 0 (str "switch" +++ str "(" ++ swexpr ++ str ")") +++
-  brace (pp_join_ary (spc ())
+  vbrace (pp_join_ary (spc ())
     (Array.map
       (fun (caselabel, pp_branch) ->
-        str caselabel ++ str ":" ++ Pp.brk (1,2) ++ hv 0 pp_branch)
+        str caselabel ++ str ":" ++ Pp.brk (1,2) ++ v 0 pp_branch)
       branches)))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
@@ -764,7 +767,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
             in
             let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
                           assign_cont_exit_label = Some exit_label; } in
-            hv 0 (pp_label +++ gen_assign fixinfo used cont2 env2 sigma fj nj_formal_argvars))
+            pp_label +++ gen_assign fixinfo used cont2 env2 sigma fj nj_formal_argvars)
           nary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
@@ -882,7 +885,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
               else
                 Pp.mt ()
             in
-            hv 0 (pp_label +++ gen_tail fixinfo used gen_ret env2 sigma fj nj_formal_argvars))
+            pp_label +++ gen_tail fixinfo used gen_ret env2 sigma fj nj_formal_argvars)
           nary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
@@ -946,10 +949,9 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
                 None)
             fixes
           in
-          hv 0 (
             pp_join_list (spc ())
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
-            gen_tail fixinfo used genc_return env2 sigma body []))
+            gen_tail fixinfo used genc_return env2 sigma body [])
         bodies))
   in
   let c_fargs =
@@ -964,16 +966,16 @@ let gen_func2_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar
     local_vars
   in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
-  hv 0 (
-  hv 0 (str "static" +++
+  v 0 (
+  hov 0 (str "static" +++
         str return_type) +++
   str cfunc_name ++ str "(" ++
-  hv 0 (genc_fargs c_fargs) ++
+  hov 0 (genc_fargs c_fargs) ++
   str ")" +++
-  brace (
+  vbrace (
     pp_postjoin_list (spc ())
       (List.map
-        (fun (c_type, c_var) -> hv 0 (str c_type +++ str c_var ++ str ";"))
+        (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
         local_vars)
     ++
     pp_body))
@@ -986,7 +988,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       pp_sjoin_list
         (List.map
           (fun (c_arg, t) ->
-            hv 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
+            hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
           args)
     in
     (Hashtbl.fold
@@ -995,7 +997,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
            Option.is_empty info.fixfunc_top_call then
           hv 0 (
           Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
-          Pp.str "{" +++
+          hovbrace (
           pr_fields info.fixfunc_outer_variables +++
           pr_fields info.fixfunc_formal_arguments +++
           (if CList.is_empty info.fixfunc_outer_variables &&
@@ -1003,22 +1005,20 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
             (* empty struct is undefined behavior *)
             Pp.str "int" +++ Pp.str "dummy;"
           else
-            mt ()) +++
-          Pp.str "};")
+            mt ())) ++ Pp.str ";")
         else
           pp)
       fixinfo
       (mt ())) +++
     hv 0 (
     Pp.str ("struct codegen_args_" ^ cfunc_name) +++
-    Pp.str "{" +++
+    hovbrace (
     pr_fields formal_arguments +++
     (if CList.is_empty formal_arguments then
       (* empty struct is undefined behavior *)
       Pp.str "int" +++ Pp.str "dummy;"
     else
-      mt ()) +++
-    Pp.str "};")
+      mt ())) ++ Pp.str ";")
   in
   let pp_forward_decl =
     hv 0 (
@@ -1037,7 +1037,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
         (pp_join_list (Pp.str "," ++ Pp.spc ())
           (List.map
             (fun (c_arg, t) ->
-              hv 0 (Pp.str t +++ Pp.str c_arg))
+              hov 0 (Pp.str t +++ Pp.str c_arg))
             formal_arguments)) ++
         Pp.str ")"
       in
@@ -1045,12 +1045,12 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
         Pp.str ("struct codegen_args_" ^ c_name) +++
         Pp.str "args" +++
         Pp.str "=" +++
-        Pp.str "{" +++
-        (pp_join_list (Pp.str "," ++ Pp.spc ())
-          (List.map
-            (fun (c_arg, t) -> Pp.str c_arg)
-            formal_arguments)) +++
-        Pp.str "};"
+        hovbrace (
+          (pp_join_list (Pp.str "," ++ Pp.spc ())
+            (List.map
+              (fun (c_arg, t) -> Pp.str c_arg)
+            formal_arguments))) ++
+        Pp.str ";"
       in
       let pp_vardecl_ret =
         Pp.str return_type +++
@@ -1066,11 +1066,11 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       let pp_return =
         Pp.str "return ret;"
       in
-      hv 0 (
+      v 0 (
         hov 0 pp_return_type +++
         Pp.str c_name ++
         hov 0 (pp_parameters) +++
-        brace (
+        vbrace (
           hov 0 (pp_vardecl_args) +++
           hov 0 (pp_vardecl_ret) +++
           hov 0 pp_call +++
@@ -1111,7 +1111,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
                 None)
             fixes
           in
-          hv 0 (
+          v 0 (
             pp_join_list (spc ())
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
             gen_tail fixinfo used gen_ret env2 sigma body []))
@@ -1120,7 +1120,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
   let pp_local_variables_decls =
     pp_join_list (spc ())
       (List.map
-        (fun (c_type, c_var) -> hv 0 (str c_type +++ str c_var ++ str ";"))
+        (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
         local_vars)
   in
   let (num_cases, pp_switch_cases) =
@@ -1157,7 +1157,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
           in
           let pp_result =
             hov 0 pp_case ++ Pp.brk (1,2) ++
-            hv 0 (
+            v 0 (
               pp_assign_outer +++
               pp_assign_args +++
               hov 0 pp_goto)
@@ -1173,7 +1173,7 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
     pp_sjoin_list
       (List.map
         (fun (c_arg, t) ->
-          hv 0 (
+          hov 0 (
             Pp.str c_arg +++
             Pp.str "=" +++
             Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
@@ -1183,24 +1183,24 @@ let gen_func2_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
   let pp_switch_body =
     pp_switch_cases +++
     Pp.str "default:" ++ Pp.brk (1,2) ++
-    hv 0 pp_assign_args_default
+    pp_assign_args_default
   in
   let pp_switch =
     if num_cases = 0 then
       pp_assign_args_default
     else
       hov 0 (Pp.str "switch" +++ Pp.str "(g)") +++
-      brace pp_switch_body
+      vbrace pp_switch_body
   in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:6");*)
-  hv 0 (
+  v 0 (
     pp_struct_args +++
     pp_forward_decl +++
     pp_entry_functions +++
     Pp.str "static void" +++
     Pp.str ("codegen_functions_" ^ cfunc_name) ++
     Pp.str "(int g, void *args, void *ret)") +++
-    brace (
+    vbrace (
       pp_local_variables_decls +++
       pp_switch +++
       pp_body)
@@ -1263,10 +1263,11 @@ let gen_func2_sub (cfunc_name : string) : Pp.t =
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
   (*Feedback.msg_debug (Pp.str "gen_func2_sub:2");*)
   let used = used_variables env sigma whole_body in
-  if needs_multiple_functions fixinfo env sigma whole_body then
+  (if needs_multiple_functions fixinfo env sigma whole_body then
     gen_func2_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used
   else
-    gen_func2_single cfunc_name env sigma whole_body return_type fixinfo used
+    gen_func2_single cfunc_name env sigma whole_body return_type fixinfo used) ++
+  Pp.fnl ()
 
 let gen_function2 (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func2_sub cfunc_name)
