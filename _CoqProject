@@ -8,7 +8,6 @@ src/cgenutil.ml
 src/state.ml
 src/ind.ml
 src/g_codegen.mlg
-src/monomorph.ml
 src/specialize.ml
 src/linear.ml
 src/genc.ml

@@ -122,9 +122,6 @@ type type_linearity = Linear | Unrestricted | Investigating
 let type_linearity_list_empty : (EConstr.t * type_linearity) list = []
 let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
 
-let mono_global_visited_empty : ((GlobRef.t * EConstr.constr array) * Constant.t) list = []
-let mono_global_visited = Summary.ref mono_global_visited_empty ~name:"MonomorphizationVisited"
-
 type specialization_instance_name_status =
   SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
 
