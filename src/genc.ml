@@ -893,7 +893,10 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
         (fun j nj ->
           let fixfunc_name = str_of_annotated_name nj in
           let fj = fary.(j) in
-          obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj)
+          if i = j then
+            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj
+          else
+            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: []) fj)
         nary
       in
       let reordered_bodies = Array.copy bodies in
