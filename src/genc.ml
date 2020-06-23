@@ -409,11 +409,12 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
         not (IntSet.exists ((>=) n) nontailset_fs ||
              IntSet.exists ((>=) n) argset_fs)
       in
-      for j = 1 to n do
-        let fname = Context.binder_name nary.(j-1) in
-        let used_as_goto = IntSet.mem j tailset_fs in
-        let used_as_call = IntSet.mem j nontailset_fs in
-        let used_as_closure = IntSet.mem j argset_fs in
+      for j = 0 to n - 1 do
+        let fname = Context.binder_name nary.(j) in
+        let k = n - j in
+        let used_as_goto = IntSet.mem k tailset_fs in
+        let used_as_call = IntSet.mem k nontailset_fs in
+        let used_as_closure = IntSet.mem k argset_fs in
         let gensym_with_name =
           if used_as_call || used_as_closure then
             global_gensym_with_name
@@ -421,7 +422,11 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
             str_of_name
         in
         let c_name = gensym_with_name fname in
-        let (formal_arguments, return_type) = c_args_and_ret_type env sigma tary.(j-1) in
+        let (formal_arguments, return_type) = c_args_and_ret_type env sigma tary.(j) in
+        (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] fname=" ++ Names.Name.print fname);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_closure=" ++ Pp.bool used_as_closure);*)
         Hashtbl.add fixinfo (id_of_name fname) {
           fixfunc_c_name = c_name;
           fixfunc_used_as_call = used_as_call;

@@ -1211,6 +1211,35 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
       CodeGen Gen "swap_bb".
     |})
 
+let test_mftest (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint mftest (n : nat) :=
+	match n with
+	| O => O
+	| S nn => mftest2 nn
+	end
+      with mftest2 n :=
+	match n with
+	| O => O
+	| S nn => mftest3 nn + 1
+	end
+      with mftest3 n :=
+	match n with
+	| O => O
+	| S nn => mftest nn
+	end.
+      CodeGen Function mftest.
+    |}) {|
+      assert(mftest(0) == 0);
+      assert(mftest(1) == 0);
+      assert(mftest(2) == 1);
+      assert(mftest(3) == 1);
+      assert(mftest(4) == 1);
+      assert(mftest(5) == 2);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1261,6 +1290,7 @@ let suite : OUnit2.test =
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
+    "test_mftest" >:: test_mftest;
   ]
 
 let () =
