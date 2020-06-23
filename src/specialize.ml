@@ -1606,13 +1606,15 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    let m = !specialize_config_map in
    specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
+  (*let env = Global.env () in
+  Feedback.msg_debug (Pp.str "[codegen:codegen_specialization_specialize1] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   declared_ctnt
 
 let codegen_specialization_specialize (cfuncs : string list) : unit =
-  let env = Global.env () in
   List.iter
     (fun cfunc_name ->
       let declared_ctnt = codegen_specialization_specialize1 cfunc_name in
+      let env = Global.env () in
       Feedback.msg_info (Pp.str "Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
     cfuncs
 

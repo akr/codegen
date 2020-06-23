@@ -154,6 +154,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
     | SpDefinedCtnt ctnt -> ctnt
   in
   let env = Global.env () in
+  (*Feedback.msg_debug (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let (ctnt, ty, body) =
     let cdef = Environ.lookup_constant ctnt env in
     let ty = cdef.Declarations.const_type in
@@ -1252,9 +1253,9 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Proj (proj, e) -> used_variables env sigma e
 
 let gen_func_sub (cfunc_name : string) : Pp.t =
+  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in
   linear_type_check_term whole_body;
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in

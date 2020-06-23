@@ -1197,6 +1197,20 @@ let test_fully_dynamic_func_with_partapp_name (ctx : test_ctxt) : unit =
       Print add1_s.
     |})
 
+let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
+    (bool_src ^
+    {|
+      CodeGen Inductive Type bool*bool => "pair_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+
+      Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
+      Definition swap_bb p := @swap bool bool p.
+      CodeGen Function swap_bb.
+      CodeGen Gen "swap_bb".
+    |})
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1246,6 +1260,7 @@ let suite : OUnit2.test =
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
+    "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
   ]
 
 let () =
