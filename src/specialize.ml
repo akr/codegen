@@ -1321,6 +1321,7 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
       compose_lam fargs' term''
 
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
+  (*Feedback.msg_debug (Pp.str "complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
   (*Feedback.msg_debug (Pp.str "complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_exp1 env sigma term vs q in
@@ -1420,7 +1421,10 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         Printer.pr_econstr_env env sigma term)
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  complete_args_fun env sigma term (numargs_of_exp env sigma term) 0
+  (*Feedback.msg_debug (Pp.str "complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
+  let result = complete_args_fun env sigma term (numargs_of_exp env sigma term) 0 in
+  (*Feedback.msg_debug (Pp.str "complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
+  result
 
 let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
   match EConstr.kind sigma term with
@@ -1563,7 +1567,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   debug_specialization env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_specialization env sigma "reduce_exp" term;
-  let term = replace env sigma term in
+  let term = replace env sigma term in (* "replace" modifies global env *)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   debug_specialization env sigma "replace" term;
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
