@@ -248,12 +248,16 @@ let pp_postjoin_list sep l =
     l
 
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
+  (*Feedback.msg_debug (Pp.str "numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in
+  (*Feedback.msg_debug (Pp.str "numargs_of_type nf_all: " ++ Printer.pr_econstr_env env sigma t);*)
   let (args, result_type) = decompose_prod sigma t in
   List.length args
 
 let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
+  (*Feedback.msg_debug (Pp.str "numargs_of_exp arg: " ++ Printer.pr_econstr_env env sigma term);*)
   let t = Retyping.get_type_of env sigma term in
+  (*Feedback.msg_debug (Pp.str "numargs_of_exp t=" ++ Printer.pr_econstr_env env sigma t);*)
   numargs_of_type env sigma t
 
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
