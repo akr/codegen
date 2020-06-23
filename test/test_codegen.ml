@@ -1185,6 +1185,18 @@ let test_map_succ (ctx : test_ctxt) : unit =
       assert(head(map_succ(cons(1, NULL))) == 2);
     |}
 
+let test_fully_dynamic_func_with_partapp_name (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
+    (nat_src ^
+    {|
+      Definition add1 := Nat.add 1.
+      CodeGen Function add1 => add1_p add1_s.
+      Print add1_p.
+      Fail Print add1_s.
+      CodeGen Specialize "add1".
+      Print add1_s.
+    |})
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1233,6 +1245,7 @@ let suite : OUnit2.test =
     "test_merge" >:: test_merge;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
+    "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
   ]
 
 let () =

@@ -268,7 +268,8 @@ let specialization_instance_internal
         Pp.str "but also for" ++ Pp.spc () ++
         Printer.pr_constr_env env sigma partapp));
   let sp_inst =
-    if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list then
+    if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
+       (match names_opt with Some { spi_partapp_id = None } -> true | _ -> false) then
       let specialization_name = match names_opt with
         | Some { spi_specialized_id = Some id } -> SpExpectedId id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
