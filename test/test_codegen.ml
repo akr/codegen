@@ -1240,6 +1240,29 @@ let test_mftest (ctx : test_ctxt) : unit =
       assert(mftest(5) == 2);
     |}
 
+let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f x :=
+	let a :=
+	  (fix g y :=
+	    match y with
+	    | O => 0
+	    | S z => x + g z
+	    end) x
+	in
+	S a.
+      CodeGen Function f.
+    |}) {|
+      assert(f(0) == 1);
+      assert(f(1) == 2);
+      assert(f(2) == 5);
+      assert(f(3) == 10);
+      assert(f(4) == 17);
+      assert(f(5) == 26);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1291,6 +1314,7 @@ let suite : OUnit2.test =
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_mftest" >:: test_mftest;
+    "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
   ]
 
 let () =
