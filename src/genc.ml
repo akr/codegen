@@ -1264,7 +1264,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   let pp_switch_body =
     pp_switch_cases +++
     Pp.str "default:" ++ Pp.brk (1,2) ++
-    pp_assign_args_default
+    v 0 pp_assign_args_default
   in
   let pp_switch =
     if num_cases = 0 then
