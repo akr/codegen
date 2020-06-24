@@ -755,7 +755,8 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
               let nj_formal_argvars = List.map fst nj_formal_arguments in
               let nj_funcname = uj.fixfunc_c_name in
               let pp_label =
-                if uj.fixfunc_used_as_goto || Option.is_empty uj.fixfunc_top_call then
+                if uj.fixfunc_used_as_goto ||
+                   ((uj.fixfunc_used_as_call || uj.fixfunc_used_as_closure) && Option.is_empty uj.fixfunc_top_call) then
                   Pp.str ("entry_" ^ nj_funcname)  ++ Pp.str ":"
                 else
                   Pp.mt ()
