@@ -1088,7 +1088,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            args;
+            (List.rev args);
           pp_join_list (spc ())
             (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
           gen_tail fixinfo used gen_return env2 sigma body [])
@@ -1241,7 +1241,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            args;
+            (List.rev args);
           v 0 (
             pp_join_list (spc ())
               (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
