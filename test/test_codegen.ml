@@ -1216,20 +1216,20 @@ let test_mftest (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Fixpoint mftest (n : nat) :=
-	match n with
-	| O => O
-	| S nn => mftest2 nn
-	end
+        match n with
+        | O => O
+        | S nn => mftest2 nn
+        end
       with mftest2 n :=
-	match n with
-	| O => O
-	| S nn => mftest3 nn + 1
-	end
+        match n with
+        | O => O
+        | S nn => mftest3 nn + 1
+        end
       with mftest3 n :=
-	match n with
-	| O => O
-	| S nn => mftest nn
-	end.
+        match n with
+        | O => O
+        | S nn => mftest nn
+        end.
       CodeGen Function mftest.
     |}) {|
       assert(mftest(0) == 0);
@@ -1245,14 +1245,14 @@ let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition f x :=
-	let a :=
-	  (fix g y :=
-	    match y with
-	    | O => 0
-	    | S z => x + g z
-	    end) x
-	in
-	S a.
+        let a :=
+          (fix g y :=
+            match y with
+            | O => 0
+            | S z => x + g z
+            end) x
+        in
+        S a.
       CodeGen Function f.
     |}) {|
       assert(f(0) == 1);
@@ -1268,20 +1268,20 @@ let test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail (ctx : test_ctxt) : unit
     (nat_src ^
     {|
       Definition f a b c :=
-	let d :=
-	  (fix g x y z :=
-	    match x with
-	    | O =>
-	      (fix h u v :=
-		match u with
-		| O => v
-		| S u' => S (h u' v)
-		end) y z
-	    | S x' =>
-	      g x' (S y) z
-	    end) a b c
-	in
-	S d.
+        let d :=
+          (fix g x y z :=
+            match x with
+            | O =>
+              (fix h u v :=
+                match u with
+                | O => v
+                | S u' => S (h u' v)
+                end) y z
+            | S x' =>
+              g x' (S y) z
+            end) a b c
+        in
+        S d.
       CodeGen Function f.
     |}) {|
       assert(f(1,2,3) == 7);
