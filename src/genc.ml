@@ -211,11 +211,11 @@ type fixfunc_info = {
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
   fixfunc_used_as_closure: bool;
-  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *)
   fixfunc_formal_arguments: (string * string) list; (* [(varname1, vartype1); ...] *)
   fixfunc_return_type: string;
-  fixfunc_top_call: string option;
   fixfunc_goto_only_fix_term: bool;
+  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_outer_variables *)
+  fixfunc_top_call: string option; (* by detect_top_calls *)
 }
 
 type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
@@ -393,18 +393,6 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
             IntSet.union set argset_f)
           IntSet.empty fixfuncs_result
       in
-      let outer_variables = (* xxx: reduce variables *)
-        let n = Environ.nb_rel env in
-        List.rev_map
-          (fun k ->
-            let env0 = Environ.pop_rel_context (k-1) env in
-            let decl = Environ.lookup_rel 1 env0 in
-            let name = Context.Rel.Declaration.get_name decl in
-            let t = Context.Rel.Declaration.get_type decl in
-            let typename = c_typename env0 sigma (EConstr.of_constr t) in
-            (str_of_name name, typename))
-          (iota_list 1 n)
-      in
       let goto_only_fix_term =
         not (IntSet.exists ((>=) n) nontailset_fs ||
              IntSet.exists ((>=) n) argset_fs)
@@ -432,11 +420,11 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
           fixfunc_used_as_call = used_as_call;
           fixfunc_used_as_goto = used_as_goto;
           fixfunc_used_as_closure = used_as_closure;
-          fixfunc_outer_variables = outer_variables;
           fixfunc_formal_arguments = formal_arguments;
           fixfunc_return_type = return_type;
-          fixfunc_top_call = None; (* dummy. updated later *)
           fixfunc_goto_only_fix_term = goto_only_fix_term;
+          fixfunc_outer_variables = []; (* dummy. updated by set_fixinfo_outer_variables *)
+          fixfunc_top_call = None; (* dummy. updated detect_top_calls *)
         }
       done;
       let tailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
@@ -451,6 +439,66 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
         (IntSet.empty, IntSet.union tailset_fs' nontailset_fs', argset_fs')
       else
         (tailset_fs', nontailset_fs', argset_fs')
+
+(* xxx: reduce outer variables *)
+let rec set_fixinfo_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+    (outer : (string * string) list) (term : EConstr.t) : unit =
+  let result = set_fixinfo_outer_variables1 fixinfo env sigma outer term in
+  result
+and set_fixinfo_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+    (outer : (string * string) list) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
+  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
+  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
+  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
+  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
+  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
+  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Rel i -> ()
+  | Int _ | Float _ | Const _ | Construct _ -> ()
+  | Proj (proj, e) -> ()
+  | Cast (e,ck,t) -> set_fixinfo_outer_variables fixinfo env sigma outer e
+  | App (f, args) ->
+      set_fixinfo_outer_variables fixinfo env sigma outer f
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
+      set_fixinfo_outer_variables fixinfo env sigma outer e;
+      set_fixinfo_outer_variables fixinfo env2 sigma outer2 b
+  | Case (ci, p, item, branches) ->
+      Array.iter
+        (fun br ->
+          set_fixinfo_outer_variables fixinfo env sigma outer br)
+        branches
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
+      set_fixinfo_outer_variables fixinfo env2 sigma outer2 b
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let n = Array.length nary in
+      for j = 0 to n - 1 do
+        let key = id_of_annotated_name nary.(j) in
+        let usage = Hashtbl.find fixinfo key in
+        Hashtbl.replace fixinfo key {
+          fixfunc_c_name = usage.fixfunc_c_name;
+          fixfunc_used_as_call = usage.fixfunc_used_as_call;
+          fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
+          fixfunc_used_as_closure = usage.fixfunc_used_as_closure;
+          fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
+          fixfunc_return_type = usage.fixfunc_return_type;
+          fixfunc_goto_only_fix_term = usage.fixfunc_goto_only_fix_term;
+          fixfunc_outer_variables = List.rev outer;
+          fixfunc_top_call = usage.fixfunc_top_call;
+        }
+      done;
+      let env2 = EConstr.push_rec_types prec env in
+      Array.iter
+        (fun f ->
+          set_fixinfo_outer_variables fixinfo env2 sigma outer f)
+        fary
 
 let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
@@ -488,6 +536,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
   ignore (collect_fix_usage fixinfo env sigma term numargs);
+  set_fixinfo_outer_variables fixinfo env sigma [] term;
   detect_top_calls env sigma fixinfo name term;
   show_fixinfo env sigma fixinfo;
   fixinfo

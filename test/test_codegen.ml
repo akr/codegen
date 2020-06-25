@@ -1263,6 +1263,32 @@ let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
       assert(f(5) == 26);
     |}
 
+let test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f a b c :=
+	let d :=
+	  (fix g x y z :=
+	    match x with
+	    | O =>
+	      (fix h u v :=
+		match u with
+		| O => v
+		| S u' => S (h u' v)
+		end) y z
+	    | S x' =>
+	      g x' (S y) z
+	    end) a b c
+	in
+	S d.
+      CodeGen Function f.
+    |}) {|
+      assert(f(1,2,3) == 7);
+      assert(f(4,5,6) == 16);
+      assert(f(7,8,9) == 25);
+    |}
+
 let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -1330,6 +1356,7 @@ let suite : OUnit2.test =
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_mftest" >:: test_mftest;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
+    "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
   ]
 
