@@ -1,5 +1,15 @@
 open OUnit2
 
+let ounit_path (ctx : test_ctxt) =
+  String.concat ":"
+    (List.rev
+      (List.map
+        (fun n ->
+          (match n with
+          | OUnitTest.ListItem i -> string_of_int i
+          | OUnitTest.Label s -> s))
+        ctx.path))
+
 let escape_coq_str (str : string) : string =
   let buf = Buffer.create (String.length str + 2) in
   Buffer.add_char buf '"';
@@ -166,16 +176,20 @@ let codegen_test_template (ctx : test_ctxt)
     | Some _ -> make_temp_dir "codegen-test" ""
     | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
   in
+  let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
   let main_fn = d ^ "/main.c" in
   let exe_fn = d ^ "/exe" in
   write_file src_fn
-    ("From codegen Require codegen.\n" ^
+    ("(* " ^ test_path ^ " *)\n" ^
+    "From codegen Require codegen.\n" ^
+    "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
     "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   write_file main_fn
-    ("#include <assert.h>\n" ^
+    ("/* " ^ test_path ^ " */\n" ^
+    "#include <assert.h>\n" ^
     "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     add_n_indent 2 (delete_indent c_body) ^ "\n" ^
@@ -194,10 +208,13 @@ let assert_coq_exit
     | Some _ -> make_temp_dir "codegen-test" ""
     | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
   in
+  let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
   let gen_fn = d ^ "/gen.c" in
   write_file src_fn
-    ("From codegen Require codegen.\n" ^
+    ("(* " ^ test_path ^ " *)\n" ^
+    "From codegen Require codegen.\n" ^
+    "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
     "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
   let foutput stream =
