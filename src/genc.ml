@@ -1295,15 +1295,29 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
   let called_fixfuncs =
-    snd (Hashtbl.fold
-      (fun fixfunc_id info (i, fixfuncs) ->
+    Hashtbl.fold
+      (fun fixfunc_id info fixfuncs ->
         if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
            Option.is_empty info.fixfunc_top_call then
-          (i+1, (i,info) :: fixfuncs)
+          info :: fixfuncs
         else
-          (i, fixfuncs))
+          fixfuncs)
       fixinfo
-      (1, []))
+      []
+  in
+  let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
+  let func_index_prefix = "codegen_func_index_" in
+  let pp_enum =
+    hov 0 (
+      Pp.str "enum" +++
+      Pp.str func_index_type +++
+      hovbrace (
+        pp_join_list (Pp.str "," ++ Pp.spc ())
+          (Pp.str (func_index_prefix ^ cfunc_name) ::
+           List.map
+             (fun info -> Pp.str (func_index_prefix ^ info.fixfunc_c_name))
+             called_fixfuncs)) ++
+      Pp.str ";")
   in
   let pp_struct_args =
     let pr_fields args =
@@ -1315,7 +1329,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     in
     pp_sjoin_list
       (List.map
-        (fun (fixfunc_index, info) ->
+        (fun info ->
           hv 0 (
           Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
           hovbrace (
@@ -1342,10 +1356,10 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     hv 0 (
       Pp.str "static void" +++
       Pp.str ("codegen_functions_" ^ cfunc_name) ++
-      Pp.str "(int g, void *args, void *ret);")
+      Pp.str ("(enum " ^ func_index_type ^ " g, void *args, void *ret);"))
   in
   let pp_entry_functions =
-    let pr_entry_function c_name func_num formal_arguments return_type =
+    let pr_entry_function c_name func_index formal_arguments return_type =
       let pp_return_type =
         Pp.str "static" +++
         Pp.str return_type
@@ -1377,7 +1391,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
       let pp_call =
         Pp.str ("codegen_functions_" ^ cfunc_name) ++
         Pp.str "(" ++
-        Pp.int func_num ++ Pp.str "," +++
+        Pp.str func_index ++ Pp.str "," +++
         Pp.str "&args," +++
         Pp.str "&ret);"
       in
@@ -1396,14 +1410,14 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     in
     pp_sjoin_list
       (List.map
-        (fun (fixfunc_index, info) ->
-          pr_entry_function info.fixfunc_c_name fixfunc_index
+        (fun info ->
+          pr_entry_function info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
             (List.append
               info.fixfunc_outer_variables
               info.fixfunc_formal_arguments)
             info.fixfunc_return_type)
         called_fixfuncs) +++
-    pr_entry_function cfunc_name 0
+    pr_entry_function cfunc_name (func_index_prefix ^ cfunc_name)
       formal_arguments return_type
   in
   let bodies = obtain_function_bodies env sigma fixinfo whole_body in
@@ -1430,9 +1444,9 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   let pp_switch_cases =
     pp_sjoin_list
       (List.map
-        (fun (fixfunc_index, info) ->
+        (fun info ->
           let pp_case =
-            Pp.str "case" +++ Pp.int fixfunc_index ++ Pp.str ":"
+            Pp.str "case" +++ Pp.str (func_index_prefix ^ info.fixfunc_c_name) ++ Pp.str ":"
           in
           let pp_assign_outer =
             pp_sjoin_list
@@ -1483,7 +1497,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   in
   let pp_switch_body =
     pp_switch_cases +++
-    Pp.str "default:" ++ Pp.brk (1,2) ++
+    Pp.str "case" +++ Pp.str (func_index_prefix ^ cfunc_name) ++ Pp.str ":" ++ Pp.brk (1,2) ++
     v 0 pp_assign_args_default
   in
   let pp_switch =
@@ -1495,12 +1509,13 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   in
   (*Feedback.msg_debug (Pp.str "gen_func_sub:6");*)
   v 0 (
+    pp_enum +++
     pp_struct_args +++
     pp_forward_decl +++
     pp_entry_functions +++
     Pp.str "static void" +++
     Pp.str ("codegen_functions_" ^ cfunc_name) ++
-    Pp.str "(int g, void *args, void *ret)") +++
+    Pp.str ("(enum " ^ func_index_type ^ " g, void *args, void *ret)")) +++
     vbrace (
       pp_local_variables_decls +++
       pp_switch +++
