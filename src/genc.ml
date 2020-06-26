@@ -1484,6 +1484,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
         called_fixfuncs)
   in
   let num_cases = List.length called_fixfuncs in
+  let pp_switch_default = Pp.str "case" +++ Pp.str (func_index_prefix ^ cfunc_name) ++ Pp.str ":" in
   let pp_assign_args_default =
     pp_sjoin_list
       (List.map
@@ -1497,7 +1498,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   in
   let pp_switch_body =
     pp_switch_cases +++
-    Pp.str "case" +++ Pp.str (func_index_prefix ^ cfunc_name) ++ Pp.str ":" ++ Pp.brk (1,2) ++
+    hov 0 pp_switch_default ++ Pp.brk (1,2) ++
     v 0 pp_assign_args_default
   in
   let pp_switch =
