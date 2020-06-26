@@ -1113,6 +1113,48 @@ let test_merge (ctx : test_ctxt) : unit =
       assert(nth(8, s3, 999) == 999);
     |}
 
+let test_merge_nontailrec (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      Require Import List.
+      Definition merge_nontailrec :=
+        fix f (s1 : list nat) :=
+          fix g (s2 : list nat) :=
+            match s1 with
+            | nil => s2
+            | cons v1 s1' =>
+                match s2 with
+                | nil => s1
+                | cons v2 s2' =>
+                    if Nat.ltb v1 v2 then
+                      cons v1 (f s1' s2)
+                    else
+                      cons v2 (g s2')
+                end
+            end.
+      CodeGen Function nth nat => "nth".
+      CodeGen Function merge_nontailrec.
+    |}) {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      #define list4(v1, v2, v3, v4) cons(v1, cons(v2, cons(v3, cons(v4, NULL))))
+      list_nat s1 = list4(0,2,8,10);
+      list_nat s2 = list4(1,4,5,20);
+      list_nat s3 = merge_nontailrec(s1, s2);
+      assert(nth(0, s3, 999) == 0);
+      assert(nth(1, s3, 999) == 1);
+      assert(nth(2, s3, 999) == 2);
+      assert(nth(3, s3, 999) == 4);
+      assert(nth(4, s3, 999) == 5);
+      assert(nth(5, s3, 999) == 8);
+      assert(nth(6, s3, 999) == 10);
+      assert(nth(7, s3, 999) == 20);
+      assert(nth(8, s3, 999) == 999);
+    |}
+
 (* nested fix-term *)
 let test_sum_nested_fix (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1304,6 +1346,76 @@ let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
       assert(f(1) == 1);
     |}
 
+let test_outer_variables (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition test_outer_variables (a b c d e : nat) :=
+        let y :=
+          (fix g x :=
+            match x with
+            | O => a + c + e
+            | S x' => g x'
+            end) b
+        in
+        S y.
+      CodeGen Function test_outer_variables.
+    |}) {|
+      assert(test_outer_variables(1,2,3,4,5) == 10);
+    |}
+
+let test_outer_variables_nested_outer_used (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition test_outer_variables_nested_outer_used (a b c d e : nat) :=
+        let y :=
+          (fix g x :=
+            match x with
+            | O => a + c
+            | S x' =>
+              let z :=
+                (fix h u :=
+                  match u with
+                  | O => e
+                  | S u' => g x' + h u'
+                  end) x'
+              in
+              z + g x'
+            end) b
+        in
+        S y.
+      CodeGen Function test_outer_variables_nested_outer_used.
+    |}) {|
+      assert(test_outer_variables_nested_outer_used(1,2,3,4,5) == 24);
+    |}
+
+let test_outer_variables_nested_outer_unused (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition test_outer_variables_nested_outer_unused (a b c d e : nat) :=
+        let y :=
+          (fix g x :=
+            match x with
+            | O => a + c
+            | S x' =>
+              let z :=
+                (fix h u :=
+                  match u with
+                  | O => e
+                  | S u' => h u'
+                  end) x'
+              in
+              z + g x'
+            end) b
+        in
+        S y.
+      CodeGen Function test_outer_variables_nested_outer_unused.
+    |}) {|
+      assert(test_outer_variables_nested_outer_unused(1,2,3,4,5) == 15);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1350,6 +1462,7 @@ let suite : OUnit2.test =
     "test_nth" >:: test_nth;
     "test_rev_append" >:: test_rev_append;
     "test_merge" >:: test_merge;
+    "test_merge_nontailrec" >:: test_merge_nontailrec;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
@@ -1358,6 +1471,9 @@ let suite : OUnit2.test =
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
+    "test_outer_variables" >:: test_outer_variables;
+    "test_outer_variables_nested_outer_used" >:: test_outer_variables_nested_outer_used;
+    "test_outer_variables_nested_outer_unused" >:: test_outer_variables_nested_outer_unused;
   ]
 
 let () =

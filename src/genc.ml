@@ -214,7 +214,7 @@ type fixfunc_info = {
   fixfunc_formal_arguments: (string * string) list; (* [(varname1, vartype1); ...] *)
   fixfunc_return_type: string;
   fixfunc_goto_only_fix_term: bool;
-  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_outer_variables *)
+  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_naive_outer_variables and filter_fixinfo_outer_variables *)
   fixfunc_top_call: string option; (* by detect_top_calls *)
 }
 
@@ -228,11 +228,12 @@ let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t
         Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
         Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
         Pp.str "used_as_closure=" ++ Pp.bool info.fixfunc_used_as_closure +++
-        Pp.str "outer_variables=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables) ++ Pp.str ")" +++
         Pp.str "formal_arguments=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_formal_arguments) ++ Pp.str ")" +++
         Pp.str "return_type=" ++ Pp.str info.fixfunc_return_type ++ Pp.str ")" +++
+        Pp.str "goto_only_fix_term=" ++ Pp.bool info.fixfunc_goto_only_fix_term +++
+        Pp.str "outer_variables=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables) ++ Pp.str ")" +++
         Pp.str "top_call=" ++ (match info.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
-        Pp.str "goto_only_fix_term=" ++ Pp.bool info.fixfunc_goto_only_fix_term
+        mt ()
       )))
     fixinfo
 
@@ -423,7 +424,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
           fixfunc_formal_arguments = formal_arguments;
           fixfunc_return_type = return_type;
           fixfunc_goto_only_fix_term = goto_only_fix_term;
-          fixfunc_outer_variables = []; (* dummy. updated by set_fixinfo_outer_variables *)
+          fixfunc_outer_variables = []; (* dummy. updated by set_fixinfo_naive_outer_variables *)
           fixfunc_top_call = None; (* dummy. updated detect_top_calls *)
         }
       done;
@@ -440,12 +441,11 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.ev
       else
         (tailset_fs', nontailset_fs', argset_fs')
 
-(* xxx: reduce outer variables *)
-let rec set_fixinfo_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+let rec set_fixinfo_naive_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
-  let result = set_fixinfo_outer_variables1 fixinfo env sigma outer term in
+  let result = set_fixinfo_naive_outer_variables1 fixinfo env sigma outer term in
   result
-and set_fixinfo_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
+and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
@@ -458,25 +458,25 @@ and set_fixinfo_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigm
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
   | Proj (proj, e) -> ()
-  | Cast (e,ck,t) -> set_fixinfo_outer_variables fixinfo env sigma outer e
+  | Cast (e,ck,t) -> set_fixinfo_naive_outer_variables fixinfo env sigma outer e
   | App (f, args) ->
-      set_fixinfo_outer_variables fixinfo env sigma outer f
+      set_fixinfo_naive_outer_variables fixinfo env sigma outer f
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
       let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
-      set_fixinfo_outer_variables fixinfo env sigma outer e;
-      set_fixinfo_outer_variables fixinfo env2 sigma outer2 b
+      set_fixinfo_naive_outer_variables fixinfo env sigma outer e;
+      set_fixinfo_naive_outer_variables fixinfo env2 sigma outer2 b
   | Case (ci, p, item, branches) ->
       Array.iter
         (fun br ->
-          set_fixinfo_outer_variables fixinfo env sigma outer br)
+          set_fixinfo_naive_outer_variables fixinfo env sigma outer br)
         branches
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
-      set_fixinfo_outer_variables fixinfo env2 sigma outer2 b
+      set_fixinfo_naive_outer_variables fixinfo env2 sigma outer2 b
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let n = Array.length nary in
       for j = 0 to n - 1 do
@@ -497,8 +497,178 @@ and set_fixinfo_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigm
       let env2 = EConstr.push_rec_types prec env in
       Array.iter
         (fun f ->
-          set_fixinfo_outer_variables fixinfo env2 sigma outer f)
+          set_fixinfo_naive_outer_variables fixinfo env2 sigma outer f)
         fary
+
+let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (result : (Id.t, Id.Set.t) Hashtbl.t) (term : EConstr.t) : Id.Set.t =
+  match EConstr.kind sigma term with
+  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
+  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
+  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
+  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
+  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
+  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
+  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Rel i ->
+      let decl = Environ.lookup_rel i env in
+      let name = Context.Rel.Declaration.get_name decl in
+      Id.Set.singleton (id_of_name name)
+  | Int _ | Float _ | Const _ | Construct _ -> Id.Set.empty
+  | Proj (proj, e) -> fixterm_free_variables_rec env sigma result e
+  | Cast (e,ck,t) -> fixterm_free_variables_rec env sigma result e
+  | App (f, args) ->
+      let fv_f = fixterm_free_variables_rec env sigma result f in
+      let ids = Array.map
+        (fun arg ->
+          let i = destRel sigma arg in
+          let decl = Environ.lookup_rel i env in
+          let name = Context.Rel.Declaration.get_name decl in
+          id_of_name name)
+        args
+      in
+      Array.fold_right Id.Set.add ids fv_f
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let id = id_of_annotated_name x in
+      let fv_e = fixterm_free_variables_rec env sigma result e in
+      let fv_b = fixterm_free_variables_rec env2 sigma result b in
+      Id.Set.union fv_e (Id.Set.remove id fv_b)
+  | Case (ci, p, item, branches) ->
+      let item_id =
+        let i = destRel sigma item in
+        let decl = Environ.lookup_rel i env in
+        let name = Context.Rel.Declaration.get_name decl in
+        id_of_name name
+      in
+      let fv_branches =
+        Array.map (fixterm_free_variables_rec env sigma result) branches
+      in
+      Array.fold_right Id.Set.union fv_branches (Id.Set.singleton item_id)
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let id = id_of_annotated_name x in
+      let fv_b = fixterm_free_variables_rec env2 sigma result b in
+      Id.Set.remove id fv_b
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let ids = Array.map id_of_annotated_name nary in
+      let fv_fary =
+        Array.map (fixterm_free_variables_rec env2 sigma result) fary
+      in
+      let fv =
+        Id.Set.diff
+          (Array.fold_right Id.Set.union fv_fary Id.Set.empty)
+          (Array.fold_right Id.Set.add ids Id.Set.empty)
+      in
+      Hashtbl.add result (id_of_annotated_name nary.(i)) fv;
+      fv
+
+let fixterm_free_variables (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : (Id.t, Id.Set.t) Hashtbl.t =
+  let result = Hashtbl.create 0 in
+  ignore (fixterm_free_variables_rec env sigma result term);
+  result
+
+let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
+    (fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t)
+    (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
+  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
+  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
+  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
+  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
+  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
+  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Rel i -> ()
+  | Int _ | Float _ | Const _ | Construct _ -> ()
+  | Proj (proj, e) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
+  | Cast (e,ck,t) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
+  | App (f, args) ->
+      fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm f
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e;
+      fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm b
+  | Case (ci, p, item, branches) ->
+      Array.iter
+        (fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm)
+        branches
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm b
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let fixterm_id = id_of_annotated_name nary.(i) in
+      let fixfunc_ids = Array.map id_of_annotated_name nary in
+      for j = 0 to Array.length nary - 1 do
+        let fixfunc_id = fixfunc_ids.(j) in
+        Hashtbl.add fixfunc_to_fixterm fixfunc_id fixterm_id
+      done;
+      Hashtbl.add fixterm_to_fixfuncs fixterm_id
+	(Array.fold_right Id.Set.add fixfunc_ids Id.Set.empty);
+      let env2 = EConstr.push_rec_types prec env in
+      Array.iter
+        (fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm)
+        fary
+
+let fixterm_fixfunc_relation (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : (Id.t, Id.Set.t) Hashtbl.t * (Id.t, Id.t) Hashtbl.t =
+  let fixterm_to_fixfuncs = Hashtbl.create 0 in
+  let fixfunc_to_fixterm = Hashtbl.create 0 in
+  fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm term;
+  (fixterm_to_fixfuncs, fixfunc_to_fixterm)
+
+let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
+    (fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
+    (fixterm_free_variables : (Id.t, Id.Set.t) Hashtbl.t) :
+    ((*fixterm_id*)Id.t, (*outer_variables*)Id.Set.t) Hashtbl.t =
+  let fixfuncs =
+    Hashtbl.fold
+      (fun fixterm_id fixfunc_ids set ->
+        Id.Set.union fixfunc_ids set)
+      fixterm_to_fixfuncs
+      Id.Set.empty
+  in
+  let fixterm_outer_variables = Hashtbl.create 0 in
+  Hashtbl.iter
+    (fun fixterm_id fixterm_fv ->
+      let q = ref fixterm_fv in
+      let outer_variables = ref Id.Set.empty in
+      while not (Id.Set.is_empty !q) do
+        let id = Id.Set.choose !q in
+        q := Id.Set.remove id !q;
+        if not (Id.Set.mem id !outer_variables) then
+          (outer_variables := Id.Set.add id !outer_variables;
+          match Hashtbl.find_opt fixterm_free_variables id with
+          | None -> ()
+          | Some fv ->
+              q := Id.Set.union !q fv)
+      done;
+      Hashtbl.add fixterm_outer_variables fixterm_id
+        (Id.Set.diff !outer_variables fixfuncs))
+    fixterm_to_fixfuncs;
+  fixterm_outer_variables
+
+let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
+  let (fixterm_to_fixfuncs, fixfunc_to_fixterm) = fixterm_fixfunc_relation env sigma term in
+  let fixterm_free_variables = fixterm_free_variables env sigma term in
+  let outer_variables = compute_outer_variables env sigma fixterm_to_fixfuncs fixterm_free_variables in
+  Hashtbl.filter_map_inplace
+    (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
+      let fixterm_id = Hashtbl.find fixfunc_to_fixterm fixfunc_id in
+      let ov = List.filter
+        (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
+        info.fixfunc_outer_variables
+      in
+      Some { info with fixfunc_outer_variables = ov })
+    fixinfo
 
 let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
@@ -536,7 +706,8 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
   ignore (collect_fix_usage fixinfo env sigma term numargs);
-  set_fixinfo_outer_variables fixinfo env sigma [] term;
+  set_fixinfo_naive_outer_variables fixinfo env sigma [] term;
+  filter_fixinfo_outer_variables fixinfo env sigma term;
   detect_top_calls env sigma fixinfo name term;
   show_fixinfo env sigma fixinfo;
   fixinfo
@@ -1135,6 +1306,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
       (fun fixfunc_name info pp ->
         if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
            Option.is_empty info.fixfunc_top_call then
+          pp +++
           hv 0 (
           Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
           hovbrace (
@@ -1220,7 +1392,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
       (fun fixfunc_name info (i,pp) ->
         if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
            Option.is_empty info.fixfunc_top_call then
-          let pp_result = pr_entry_function info.fixfunc_c_name i
+          let pp_result = pp +++ pr_entry_function info.fixfunc_c_name i
             (List.append
               info.fixfunc_outer_variables
               info.fixfunc_formal_arguments)
@@ -1287,6 +1459,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
             Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
           in
           let pp_result =
+            pp +++
             hov 0 pp_case ++ Pp.brk (1,2) ++
             v 0 (
               pp_assign_outer +++
