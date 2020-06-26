@@ -1294,6 +1294,17 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
 let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
+  let called_fixfuncs =
+    snd (Hashtbl.fold
+      (fun fixfunc_id info (i, fixfuncs) ->
+        if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
+           Option.is_empty info.fixfunc_top_call then
+          (i+1, (i,info) :: fixfuncs)
+        else
+          (i, fixfuncs))
+      fixinfo
+      (1, []))
+  in
   let pp_struct_args =
     let pr_fields args =
       pp_sjoin_list
@@ -1302,11 +1313,9 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
             hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
           args)
     in
-    (Hashtbl.fold
-      (fun fixfunc_name info pp ->
-        if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
-           Option.is_empty info.fixfunc_top_call then
-          pp +++
+    pp_sjoin_list
+      (List.map
+        (fun (fixfunc_index, info) ->
           hv 0 (
           Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
           hovbrace (
@@ -1317,11 +1326,8 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
             (* empty struct is undefined behavior *)
             Pp.str "int" +++ Pp.str "dummy;"
           else
-            mt ())) ++ Pp.str ";")
-        else
-          pp)
-      fixinfo
-      (mt ())) +++
+            mt ())) ++ Pp.str ";"))
+      called_fixfuncs) +++
     hv 0 (
     Pp.str ("struct codegen_args_" ^ cfunc_name) +++
     hovbrace (
@@ -1388,20 +1394,15 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
           hov 0 pp_call +++
           hov 0 pp_return))
     in
-    snd (Hashtbl.fold
-      (fun fixfunc_name info (i,pp) ->
-        if (info.fixfunc_used_as_call || info.fixfunc_used_as_closure) &&
-           Option.is_empty info.fixfunc_top_call then
-          let pp_result = pp +++ pr_entry_function info.fixfunc_c_name i
+    pp_sjoin_list
+      (List.map
+        (fun (fixfunc_index, info) ->
+          pr_entry_function info.fixfunc_c_name fixfunc_index
             (List.append
               info.fixfunc_outer_variables
               info.fixfunc_formal_arguments)
-            info.fixfunc_return_type in
-          (i+1, pp_result)
-        else
-          (i, pp))
-      fixinfo
-      (1, mt ())) +++
+            info.fixfunc_return_type)
+        called_fixfuncs) +++
     pr_entry_function cfunc_name 0
       formal_arguments return_type
   in
@@ -1426,12 +1427,12 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
         (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
         local_vars)
   in
-  let (num_cases, pp_switch_cases) =
-    (Hashtbl.fold
-      (fun fixfunc_name info (i,pp) ->
-        if info.fixfunc_used_as_call || info.fixfunc_used_as_closure then
+  let pp_switch_cases =
+    pp_sjoin_list
+      (List.map
+        (fun (fixfunc_index, info) ->
           let pp_case =
-            Pp.str "case" +++ Pp.int i ++ Pp.str ":"
+            Pp.str "case" +++ Pp.int fixfunc_index ++ Pp.str ":"
           in
           let pp_assign_outer =
             pp_sjoin_list
@@ -1459,20 +1460,16 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
             Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
           in
           let pp_result =
-            pp +++
             hov 0 pp_case ++ Pp.brk (1,2) ++
             v 0 (
               pp_assign_outer +++
               pp_assign_args +++
               hov 0 pp_goto)
           in
-          (i+1, pp_result)
-        else
-          (i, pp))
-      fixinfo
-      (1, mt ()))
+          pp_result)
+        called_fixfuncs)
   in
-  let num_cases = num_cases - 1 in
+  let num_cases = List.length called_fixfuncs in
   let pp_assign_args_default =
     pp_sjoin_list
       (List.map
