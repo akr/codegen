@@ -1172,6 +1172,40 @@ let test_merge_nontailrec (ctx : test_ctxt) : unit =
       assert(nth(8, s3, 999) == 999);
     |}
 
+let test_ackermann (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint ack m :=
+        fix ackm n :=
+          match m with
+          | 0 => S n
+          | S m' =>
+            match n with
+            | 0 => ack m' 1
+            | S n' => ack m' (ackm n')
+            end
+          end.
+      CodeGen Function ack.
+    |}) {|
+      assert(ack(0, 0) == 1);
+      assert(ack(0, 1) == 2);
+      assert(ack(0, 2) == 3);
+      assert(ack(0, 3) == 4);
+      assert(ack(1, 0) == 2);
+      assert(ack(1, 1) == 3);
+      assert(ack(1, 2) == 4);
+      assert(ack(1, 3) == 5);
+      assert(ack(2, 0) == 3);
+      assert(ack(2, 1) == 5);
+      assert(ack(2, 2) == 7);
+      assert(ack(2, 3) == 9);
+      assert(ack(3, 0) == 5);
+      assert(ack(3, 1) == 13);
+      assert(ack(3, 2) == 29);
+      assert(ack(3, 3) == 61);
+    |}
+
 (* nested fix-term *)
 let test_sum_nested_fix (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1480,6 +1514,7 @@ let suite : OUnit2.test =
     "test_rev_append" >:: test_rev_append;
     "test_merge" >:: test_merge;
     "test_merge_nontailrec" >:: test_merge_nontailrec;
+    "test_ackermann" >:: test_ackermann;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
