@@ -229,7 +229,7 @@ let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t
         Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
         Pp.str "used_as_closure=" ++ Pp.bool info.fixfunc_used_as_closure +++
         Pp.str "formal_arguments=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_formal_arguments) ++ Pp.str ")" +++
-        Pp.str "return_type=" ++ Pp.str info.fixfunc_return_type ++ Pp.str ")" +++
+        Pp.str "return_type=" ++ Pp.str info.fixfunc_return_type +++
         Pp.str "goto_only_fix_term=" ++ Pp.bool info.fixfunc_goto_only_fix_term +++
         Pp.str "outer_variables=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables) ++ Pp.str ")" +++
         Pp.str "top_call=" ++ (match info.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
