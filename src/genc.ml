@@ -64,10 +64,8 @@ let global_gensym () : string =
   gensym_id := n + 1;
   "g" ^ string_of_int n
 
-let global_gensym_with_name (name : Name.t) : string =
-  match name with
-  | Names.Name.Anonymous -> global_gensym ()
-  | Names.Name.Name id -> global_gensym () ^ "_" ^ (c_id (Id.to_string id))
+let global_gensym_with_id (id : Id.t) : string =
+  global_gensym () ^ "_" ^ (c_id (Id.to_string id))
 
 let local_gensym_id : (int ref) list ref = ref []
 
@@ -212,9 +210,9 @@ type fixfunc_info = {
   fixfunc_used_as_goto: bool;
   fixfunc_formal_arguments: (string * string) list; (* [(varname1, vartype1); ...] *)
   fixfunc_return_type: string;
-  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_naive_outer_variables and filter_fixinfo_outer_variables *)
   fixfunc_top_call: string option; (* by detect_top_calls *)
-  fixfunc_c_name: string;
+  fixfunc_c_name: string; (* by determine_fixfunc_c_names *)
+  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_naive_outer_variables and filter_fixinfo_outer_variables *)
 }
 
 type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
@@ -559,19 +557,11 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
           (if j = i then need_function else false) ||
           IntSet.mem k nontailset_fs
         in
-        let gensym_with_name =
-          if used_as_call then
-            global_gensym_with_name
-          else
-            str_of_name
-        in
-        let c_name = gensym_with_name fname in
         let (formal_arguments, return_type) = c_args_and_ret_type env sigma tary.(j) in
         (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] fname=" ++ Names.Name.print fname);
         Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
         Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);*)
         Hashtbl.add fixinfo (id_of_name fname) {
-          fixfunc_c_name = c_name;
           fixfunc_used_as_call = used_as_call;
           fixfunc_used_as_goto = used_as_goto;
           fixfunc_formal_arguments = formal_arguments;
@@ -579,6 +569,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
           fixfunc_inlinable = inlinable;
           fixfunc_outer_variables = []; (* dummy. updated by set_fixinfo_naive_outer_variables *)
           fixfunc_top_call = None; (* dummy. updated detect_top_calls *)
+          fixfunc_c_name = "dummy"; (* dummy. updated by determine_fixfunc_c_names *)
         }
       done;
       let tailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
@@ -587,6 +578,37 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
           (IntSet.empty, IntSet.union tailset_fs' nontailset_fs')
         else
           (tailset_fs', nontailset_fs')
+
+let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (fixinfo : fixinfo_t)
+    (top_c_func_name : string) (outer_variables_rev : (string * string) list) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      detect_top_calls_rec env2 sigma fixinfo top_c_func_name ((str_of_annotated_name x, (c_typename env sigma t)) :: outer_variables_rev) e
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      detect_top_calls_rec env2 sigma fixinfo top_c_func_name outer_variables_rev fary.(i);
+      let key = id_of_annotated_name nary.(i) in
+      let usage = Hashtbl.find fixinfo key in
+      Hashtbl.replace fixinfo key {
+        fixfunc_c_name = usage.fixfunc_c_name;
+        fixfunc_used_as_call = usage.fixfunc_used_as_call;
+        fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
+        fixfunc_outer_variables = List.rev outer_variables_rev;
+        fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
+        fixfunc_return_type = usage.fixfunc_return_type;
+        fixfunc_top_call = Some top_c_func_name;
+        fixfunc_inlinable = usage.fixfunc_inlinable;
+      }
+  (* xxx: consider App *)
+  | _ -> ()
+
+let detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
+    (fixinfo : fixinfo_t)
+    (top_c_func_name : string) (term : EConstr.t) : unit =
+  detect_top_calls_rec env sigma fixinfo top_c_func_name [] term
 
 let rec set_fixinfo_naive_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
@@ -816,49 +838,7 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
       Some { info with fixfunc_outer_variables = ov })
     fixinfo
 
-let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t)
-    (top_c_func_name : string) (outer_variables_rev : (string * string) list) (term : EConstr.t) : unit =
-  match EConstr.kind sigma term with
-  | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      detect_top_calls_rec env2 sigma fixinfo top_c_func_name ((str_of_annotated_name x, (c_typename env sigma t)) :: outer_variables_rev) e
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      detect_top_calls_rec env2 sigma fixinfo top_c_func_name outer_variables_rev fary.(i);
-      let key = id_of_annotated_name nary.(i) in
-      let usage = Hashtbl.find fixinfo key in
-      Hashtbl.replace fixinfo key {
-        fixfunc_c_name = usage.fixfunc_c_name;
-        fixfunc_used_as_call = usage.fixfunc_used_as_call;
-        fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
-        fixfunc_outer_variables = List.rev outer_variables_rev;
-        fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
-        fixfunc_return_type = usage.fixfunc_return_type;
-        fixfunc_top_call = Some top_c_func_name;
-        fixfunc_inlinable = usage.fixfunc_inlinable;
-      }
-  (* xxx: consider App *)
-  | _ -> ()
-
-let detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t)
-    (top_c_func_name : string) (term : EConstr.t) : unit =
-  detect_top_calls_rec env sigma fixinfo top_c_func_name [] term
-
-let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
-  let fixinfo = Hashtbl.create 0 in
-  let numargs = numargs_of_exp env sigma term in
-  let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
-  ignore (collect_fix_usage fixinfo inlinable_fixterms env sigma term numargs true);
-  set_fixinfo_naive_outer_variables fixinfo env sigma [] term;
-  filter_fixinfo_outer_variables fixinfo env sigma term;
-  detect_top_calls env sigma fixinfo name term;
-  show_fixinfo env sigma fixinfo;
-  fixinfo
-
-let needs_multiple_functions (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
+let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
   Hashtbl.fold
     (fun name info b ->
       if b then
@@ -871,6 +851,40 @@ let needs_multiple_functions (fixinfo : fixinfo_t) (env : Environ.env) (sigma : 
         false)
     fixinfo
     false
+
+let determine_fixfunc_c_names (fixinfo : fixinfo_t) (need_multi : bool) : unit =
+  if need_multi then
+    Hashtbl.filter_map_inplace
+      (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
+        let c_name =
+          if Option.has_some info.fixfunc_top_call then
+            Id.to_string fixfunc_id
+          else if info.fixfunc_used_as_call then
+            global_gensym_with_id fixfunc_id
+          else
+            Id.to_string fixfunc_id
+        in
+        Some { info with fixfunc_c_name = c_name })
+      fixinfo
+  else
+    Hashtbl.filter_map_inplace
+      (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
+        let c_name = Id.to_string fixfunc_id in
+        Some { info with fixfunc_c_name = c_name })
+      fixinfo
+
+let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
+  let fixinfo = Hashtbl.create 0 in
+  let numargs = numargs_of_exp env sigma term in
+  let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
+  ignore (collect_fix_usage fixinfo inlinable_fixterms env sigma term numargs true);
+  detect_top_calls env sigma fixinfo name term;
+  let multi = needs_multiple_functions fixinfo in
+  determine_fixfunc_c_names fixinfo multi;
+  set_fixinfo_naive_outer_variables fixinfo env sigma [] term;
+  filter_fixinfo_outer_variables fixinfo env sigma term;
+  show_fixinfo env sigma fixinfo;
+  fixinfo
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   v 0 (
@@ -1726,7 +1740,7 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
   (*Feedback.msg_debug (Pp.str "gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
-  (if needs_multiple_functions fixinfo env sigma whole_body then
+  (if needs_multiple_functions fixinfo then
     gen_func_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used
   else
     gen_func_single cfunc_name env sigma whole_body return_type fixinfo used) ++
