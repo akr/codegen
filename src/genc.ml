@@ -412,9 +412,10 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
     (* variables at non-tail position *) IntSet.t =
   (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
-    Pp.str "numargs=" ++ Pp.int numargs);*)
+    Pp.str "numargs=" ++ Pp.int numargs +++
+    Pp.str "tail_position=" ++ Pp.bool tail_position);*)
   let result = collect_fix_usage1 fixinfo inlinable_fixterms env sigma term numargs tail_position in
-  (*let (tailset, nontailset, argset) = result in
+  (*let (tailset, nontailset) = result in
   Feedback.msg_debug (hov 2 (Pp.str "[codegen:collect_fix_usage] end:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs
@@ -436,14 +437,6 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
           let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
           Pp.int i ++ Pp.str "=" ++ Name.print name)
         (IntSet.elements nontailset)) ++
-    Pp.str "}" +++
-    Pp.str "argset={" ++
-    pp_join_list (Pp.str ",")
-      (List.map
-        (fun i ->
-          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-          Pp.int i ++ Pp.str "=" ++ Name.print name)
-        (IntSet.elements argset)) ++
     Pp.str "}"));*)
   result
 and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
@@ -472,7 +465,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let (tailset_e, nontailset_e) = collect_fix_usage fixinfo inlinable_fixterms env sigma e 0 tail_position in
+      let (tailset_e, nontailset_e) = collect_fix_usage fixinfo inlinable_fixterms env sigma e 0 false in
       let (tailset_b, nontailset_b) = collect_fix_usage fixinfo inlinable_fixterms env2 sigma b numargs tail_position in
       let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
       let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
@@ -559,6 +552,11 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
         in
         let (formal_arguments, return_type) = c_args_and_ret_type env sigma tary.(j) in
         (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] fname=" ++ Names.Name.print fname);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] tail_position=" ++ Pp.bool tail_position);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] inlinable=" ++ Pp.bool inlinable);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] i=" ++ Pp.int i);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] j=" ++ Pp.int j);
+        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] need_function=" ++ Pp.bool need_function);
         Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
         Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);*)
         Hashtbl.add fixinfo (id_of_name fname) {
