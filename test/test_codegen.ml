@@ -1534,6 +1534,25 @@ let test_outer_variables_nested_outer_unused (ctx : test_ctxt) : unit =
       assert(test_outer_variables_nested_outer_unused(1,2,3,4,5) == 15);
     |}
 
+let test_unused_argument (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f :=
+        fun (a : nat) =>
+        fix f (x : nat) :=
+          match x with
+          | O => 0
+          | S y => S (f y)
+          end.
+      CodeGen Function f.
+    |}) {|
+      assert(f(100, 0) == 0);
+      assert(f(100, 1) == 1);
+      assert(f(100, 2) == 2);
+      assert(f(100, 3) == 3);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1595,6 +1614,7 @@ let suite : OUnit2.test =
     "test_outer_variables" >:: test_outer_variables;
     "test_outer_variables_nested_outer_used" >:: test_outer_variables_nested_outer_used;
     "test_outer_variables_nested_outer_unused" >:: test_outer_variables_nested_outer_unused;
+    "test_unused_argument" >:: test_unused_argument;
   ]
 
 let () =

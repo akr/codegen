@@ -829,11 +829,14 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let fixterm_id = Hashtbl.find fixfunc_to_fixterm fixfunc_id in
-      let ov = List.filter
-        (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
-        info.fixfunc_outer_variables
-      in
-      Some { info with fixfunc_outer_variables = ov })
+      if Option.has_some info.fixfunc_top_call then
+        Some info
+      else
+        let ov = List.filter
+          (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
+          info.fixfunc_outer_variables
+        in
+        Some { info with fixfunc_outer_variables = ov })
     fixinfo
 
 let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
