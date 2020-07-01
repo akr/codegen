@@ -1558,21 +1558,21 @@ let test_inner_fixfunc_goto_outer_fixfunc (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition f :=
-	fun (a : nat) =>
-	fun (b : nat) =>
-	fix f (x : nat) :=
-	  match x with
-	  | O => 0
-	  | S y => let z :=
-		     (fix g (u : nat) := match u with
-					 | O => adda y
-					 | S v => S (g v)
-					 end) y
-		   in z + f y
-	  end
-	with adda (u : nat) :=
-	  a + u
-	for f.
+        fun (a : nat) =>
+        fun (b : nat) =>
+        fix f (x : nat) :=
+          match x with
+          | O => 0
+          | S y => let z :=
+                     (fix g (u : nat) := match u with
+                                         | O => adda y
+                                         | S v => S (g v)
+                                         end) y
+                   in z + f y
+          end
+        with adda (u : nat) :=
+          a + u
+        for f.
       CodeGen Function f.
     |}) {|
       assert(f(1, 2, 3) == 9);
