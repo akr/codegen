@@ -792,6 +792,7 @@ let fixterm_fixfunc_relation (env : Environ.env) (sigma : Evd.evar_map)
 
 let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
     (fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
+    (fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t)
     (fixterm_free_variables : (Id.t, Id.Set.t) Hashtbl.t) :
     ((*fixterm_id*)Id.t, (*outer_variables*)Id.Set.t) Hashtbl.t =
   let fixfuncs =
@@ -811,10 +812,13 @@ let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
         q := Id.Set.remove id !q;
         if not (Id.Set.mem id !outer_variables) then
           (outer_variables := Id.Set.add id !outer_variables;
-          match Hashtbl.find_opt fixterm_free_variables id with
+          match Hashtbl.find_opt fixfunc_to_fixterm id with
           | None -> ()
-          | Some fv ->
-              q := Id.Set.union !q fv)
+          | Some fixterm2_id ->
+            match Hashtbl.find_opt fixterm_free_variables fixterm2_id with
+            | None -> ()
+            | Some fv ->
+                q := Id.Set.union !q fv)
       done;
       Hashtbl.add fixterm_outer_variables fixterm_id
         (Id.Set.diff !outer_variables fixfuncs))
@@ -825,7 +829,7 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
   let (fixterm_to_fixfuncs, fixfunc_to_fixterm) = fixterm_fixfunc_relation env sigma term in
   let fixterm_free_variables = fixterm_free_variables env sigma term in
-  let outer_variables = compute_outer_variables env sigma fixterm_to_fixfuncs fixterm_free_variables in
+  let outer_variables = compute_outer_variables env sigma fixterm_to_fixfuncs fixfunc_to_fixterm fixterm_free_variables in
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let fixterm_id = Hashtbl.find fixfunc_to_fixterm fixfunc_id in

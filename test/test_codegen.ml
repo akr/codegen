@@ -1553,6 +1553,31 @@ let test_unused_argument (ctx : test_ctxt) : unit =
       assert(f(100, 3) == 3);
     |}
 
+let test_inner_fixfunc_goto_outer_fixfunc (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f :=
+	fun (a : nat) =>
+	fun (b : nat) =>
+	fix f (x : nat) :=
+	  match x with
+	  | O => 0
+	  | S y => let z :=
+		     (fix g (u : nat) := match u with
+					 | O => adda y
+					 | S v => S (g v)
+					 end) y
+		   in z + f y
+	  end
+	with adda (u : nat) :=
+	  a + u
+	for f.
+      CodeGen Function f.
+    |}) {|
+      assert(f(1, 2, 3) == 9);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1615,6 +1640,7 @@ let suite : OUnit2.test =
     "test_outer_variables_nested_outer_used" >:: test_outer_variables_nested_outer_used;
     "test_outer_variables_nested_outer_unused" >:: test_outer_variables_nested_outer_unused;
     "test_unused_argument" >:: test_unused_argument;
+    "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
   ]
 
 let () =
