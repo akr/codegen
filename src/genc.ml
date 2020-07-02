@@ -848,7 +848,7 @@ let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
   Hashtbl.fold
     (fun fixfunc_id info fixfuncs ->
       if info.fixfunc_used_as_call &&
-         Option.is_empty info.fixfunc_top_call then
+         info.fixfunc_top_call = None then
         info :: fixfuncs
       else
         fixfuncs)
@@ -859,9 +859,8 @@ let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let c_name =
-        if Option.has_some info.fixfunc_top_call then
-          Id.to_string fixfunc_id
-        else if info.fixfunc_used_as_call then
+        if info.fixfunc_used_as_call &&
+           info.fixfunc_top_call = None then
           global_gensym_with_id fixfunc_id
         else
           Id.to_string fixfunc_id
