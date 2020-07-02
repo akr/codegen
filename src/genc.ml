@@ -1448,7 +1448,6 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
 let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
-  let called_fixfuncs = compute_called_fixfuncs fixinfo in
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
   let func_index_prefix = "codegen_func_index_" in
   let pp_enum =
