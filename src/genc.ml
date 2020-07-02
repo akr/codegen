@@ -844,19 +844,19 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
         Some { info with fixfunc_outer_variables = ov })
     fixinfo
 
-let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
+let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
   Hashtbl.fold
-    (fun name info b ->
-      if b then
-        b
-      else if Option.has_some info.fixfunc_top_call then
-        false
-      else if info.fixfunc_used_as_call then
-        true
+    (fun fixfunc_id info fixfuncs ->
+      if info.fixfunc_used_as_call &&
+         Option.is_empty info.fixfunc_top_call then
+        info :: fixfuncs
       else
-        false)
+        fixfuncs)
     fixinfo
-    false
+    []
+
+let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
+  compute_called_fixfuncs fixinfo <> []
 
 let determine_fixfunc_c_names (fixinfo : fixinfo_t) (need_multi : bool) : unit =
   if need_multi then
@@ -1460,17 +1460,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
 let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
-  let called_fixfuncs =
-    Hashtbl.fold
-      (fun fixfunc_id info fixfuncs ->
-        if info.fixfunc_used_as_call &&
-           Option.is_empty info.fixfunc_top_call then
-          info :: fixfuncs
-        else
-          fixfuncs)
-      fixinfo
-      []
-  in
+  let called_fixfuncs = compute_called_fixfuncs fixinfo in
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
   let func_index_prefix = "codegen_func_index_" in
   let pp_enum =
