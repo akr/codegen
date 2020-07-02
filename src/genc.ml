@@ -855,9 +855,6 @@ let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
     fixinfo
     []
 
-let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
-  compute_called_fixfuncs fixinfo <> []
-
 let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
@@ -1451,7 +1448,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
 
 let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
-    (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
+    (fixinfo : fixinfo_t) (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
   let called_fixfuncs = compute_called_fixfuncs fixinfo in
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
   let func_index_prefix = "codegen_func_index_" in
@@ -1724,8 +1721,9 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
   (*Feedback.msg_debug (Pp.str "gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
-  (if needs_multiple_functions fixinfo then
-    gen_func_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used
+  let called_fixfuncs = compute_called_fixfuncs fixinfo in
+  (if called_fixfuncs <> [] then
+    gen_func_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used called_fixfuncs
   else
     gen_func_single cfunc_name env sigma whole_body return_type fixinfo used) ++
   Pp.fnl ()
