@@ -858,26 +858,19 @@ let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
 let needs_multiple_functions (fixinfo : fixinfo_t) : bool =
   compute_called_fixfuncs fixinfo <> []
 
-let determine_fixfunc_c_names (fixinfo : fixinfo_t) (need_multi : bool) : unit =
-  if need_multi then
-    Hashtbl.filter_map_inplace
-      (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
-        let c_name =
-          if Option.has_some info.fixfunc_top_call then
-            Id.to_string fixfunc_id
-          else if info.fixfunc_used_as_call then
-            global_gensym_with_id fixfunc_id
-          else
-            Id.to_string fixfunc_id
-        in
-        Some { info with fixfunc_c_name = c_name })
-      fixinfo
-  else
-    Hashtbl.filter_map_inplace
-      (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
-        let c_name = Id.to_string fixfunc_id in
-        Some { info with fixfunc_c_name = c_name })
-      fixinfo
+let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
+  Hashtbl.filter_map_inplace
+    (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
+      let c_name =
+        if Option.has_some info.fixfunc_top_call then
+          Id.to_string fixfunc_id
+        else if info.fixfunc_used_as_call then
+          global_gensym_with_id fixfunc_id
+        else
+          Id.to_string fixfunc_id
+      in
+      Some { info with fixfunc_c_name = c_name })
+    fixinfo
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
   let fixinfo = Hashtbl.create 0 in
@@ -885,8 +878,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   ignore (collect_fix_usage fixinfo inlinable_fixterms env sigma term numargs true);
   detect_top_calls env sigma fixinfo name term;
-  let multi = needs_multiple_functions fixinfo in
-  determine_fixfunc_c_names fixinfo multi;
+  determine_fixfunc_c_names fixinfo;
   set_fixinfo_naive_outer_variables fixinfo env sigma [] term;
   filter_fixinfo_outer_variables fixinfo env sigma term;
   show_fixinfo env sigma fixinfo;
