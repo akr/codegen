@@ -1504,7 +1504,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
           (if CList.is_empty info.fixfunc_outer_variables &&
               CList.is_empty info.fixfunc_formal_arguments then
             (* empty struct is undefined behavior *)
-            Pp.str "int" +++ Pp.str "dummy;"
+            Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
           else
             mt ())) ++ Pp.str ";"))
       called_fixfuncs) +++
@@ -1514,7 +1514,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     pr_fields formal_arguments +++
     (if CList.is_empty formal_arguments then
       (* empty struct is undefined behavior *)
-      Pp.str "int" +++ Pp.str "dummy;"
+      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
     else
       mt ())) ++ Pp.str ";")
   in
