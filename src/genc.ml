@@ -834,7 +834,7 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let fixterm_id = Hashtbl.find fixfunc_to_fixterm fixfunc_id in
-      if Option.has_some info.fixfunc_top_call then
+      if info.fixfunc_top_call <> None then
         Some info
       else
         let ov = List.filter
@@ -1130,7 +1130,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
               let nj_funcname = uj.fixfunc_c_name in
               let pp_label =
                 if uj.fixfunc_used_as_goto ||
-                   (uj.fixfunc_used_as_call && Option.is_empty uj.fixfunc_top_call) then
+                   (uj.fixfunc_used_as_call && uj.fixfunc_top_call = None) then
                   Pp.str ("entry_" ^ nj_funcname)  ++ Pp.str ":"
                 else
                   Pp.mt ()
@@ -1250,7 +1250,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
             let nj_formal_argvars = List.map fst nj_formal_arguments in
             let nj_funcname = uj.fixfunc_c_name in
             let pp_label =
-              if uj.fixfunc_used_as_goto || Option.is_empty uj.fixfunc_top_call then
+              if uj.fixfunc_used_as_goto || uj.fixfunc_top_call = None then
                 Pp.str ("entry_" ^ nj_funcname) ++ Pp.str ":"
               else
                 Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
@@ -1380,7 +1380,7 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
     CList.map_filter
       (fun fix_name ->
         let fix_usage = Hashtbl.find fixinfo (Id.of_string fix_name) in
-        if fix_usage.fixfunc_used_as_goto || Option.is_empty fix_usage.fixfunc_top_call then
+        if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call = None then
           Some ("entry_" ^ fix_usage.fixfunc_c_name)
         else
           None)

@@ -984,7 +984,7 @@ let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
   first_fv_rec sigma 0 term
 
 let has_fv sigma term : bool =
-  Stdlib.Option.is_some (first_fv sigma term)
+  first_fv sigma term <> None
 
 let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : EConstr.t option =
   (* Feedback.msg_info (Pp.str "replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
