@@ -184,9 +184,10 @@ let add_local_var (c_type : string) (c_var : string) : unit =
   let vars = List.hd !local_vars in
   match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
   | Some (c_type1, c_var1) ->
-      (if c_type1 <> c_type then
-        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable"));
-      ()
+      if c_type1 <> c_type then
+        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable")
+      else
+        ()
   | None -> vars := (c_type, c_var) :: !vars
 
 let id_of_name (name : Name.t) : Id.t =
