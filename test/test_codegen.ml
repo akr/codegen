@@ -1578,6 +1578,25 @@ let test_inner_fixfunc_goto_outer_fixfunc (ctx : test_ctxt) : unit =
       assert(f(1, 2, 3) == 9);
     |}
 
+let test_parallel_assignment (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint f (x y z : nat) :=
+        match x with
+        | O => y
+        | S x' => f x' z y
+        end.
+      CodeGen Function f.
+    |}) {|
+      assert(f(0, 1, 2) == 1);
+      assert(f(1, 1, 2) == 2);
+      assert(f(2, 1, 2) == 1);
+      assert(f(3, 1, 2) == 2);
+      assert(f(4, 1, 2) == 1);
+      assert(f(5, 1, 2) == 2);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1641,6 +1660,7 @@ let suite : OUnit2.test =
     "test_outer_variables_nested_outer_unused" >:: test_outer_variables_nested_outer_unused;
     "test_unused_argument" >:: test_unused_argument;
     "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
+    "test_parallel_assignment" >:: test_parallel_assignment;
   ]
 
 let () =
