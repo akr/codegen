@@ -386,7 +386,8 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let inlinable_fs' =
         if inlinable_fixterm then
           Id.Set.add (id_of_annotated_name nary.(i)) inlinable_fs
-        else inlinable_fs
+        else
+          inlinable_fs
       in
       let tailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
       let nontailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) nontailset_fs) in
@@ -1264,7 +1265,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
               if uj.fixfunc_used_as_goto || Option.is_empty uj.fixfunc_top_call then
                 Pp.str ("entry_" ^ nj_funcname) ++ Pp.str ":"
               else
-                Pp.mt ()
+                Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
             in
             pp_label +++ gen_tail fixinfo used gen_ret env2 sigma fj nj_formal_argvars)
           nary in
