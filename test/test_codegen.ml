@@ -1597,6 +1597,17 @@ let test_parallel_assignment (ctx : test_ctxt) : unit =
       assert(f(5, 1, 2) == 2);
     |}
 
+let test_unused_fixfunc (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint f (n : nat) := 0
+      with g (n : nat) := 0.
+      CodeGen Function f.
+    |}) {|
+      assert(f(0) == 0);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1661,6 +1672,7 @@ let suite : OUnit2.test =
     "test_unused_argument" >:: test_unused_argument;
     "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
+    "test_unused_fixfunc" >:: test_unused_fixfunc;
   ]
 
 let () =
