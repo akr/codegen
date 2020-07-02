@@ -1597,7 +1597,7 @@ let test_parallel_assignment (ctx : test_ctxt) : unit =
       assert(f(5, 1, 2) == 2);
     |}
 
-let test_unused_fixfunc (ctx : test_ctxt) : unit =
+let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
@@ -1672,7 +1672,7 @@ let suite : OUnit2.test =
     "test_unused_argument" >:: test_unused_argument;
     "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
-    "test_unused_fixfunc" >:: test_unused_fixfunc;
+    "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
   ]
 
 let () =
