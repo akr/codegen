@@ -29,6 +29,8 @@ open State
 open Linear
 open Specialize
 
+let abort (x : 'a) : 'a = assert false
+
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg -> ind_cfg
