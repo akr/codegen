@@ -155,15 +155,12 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   in
   let env = Global.env () in
   (*Feedback.msg_debug (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
-  let (ctnt, ty, body) =
-    let cdef = Environ.lookup_constant ctnt env in
-    let ty = cdef.Declarations.const_type in
-    match Global.body_of_constant_body Library.indirect_accessor cdef with
-    | None -> user_err (Pp.str "couldn't obtain the body:" +++
-                        Printer.pr_constant env ctnt)
-    | Some (body,_, _) -> (ctnt, ty, body)
-  in
-  (ctnt, ty, body)
+  let cdef = Environ.lookup_constant ctnt env in
+  let ty = cdef.Declarations.const_type in
+  match Global.body_of_constant_body Library.indirect_accessor cdef with
+  | None -> user_err (Pp.str "couldn't obtain the body:" +++
+                      Printer.pr_constant env ctnt)
+  | Some (body,_, _) -> (ctnt, ty, body)
 
 let hovbrace (pp : Pp.t) : Pp.t =
   hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
