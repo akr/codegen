@@ -24,7 +24,7 @@ let () = Mltop.add_known_plugin (fun () ->
   Feedback.msg_info Pp.(str"codegen 0.1"))
   "codegen"
 
-open Cgenutil
+(*open Cgenutil*)
 open State
 open Specialize
 open Linear
@@ -152,65 +152,50 @@ END
 
 VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
     | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
-      { codegen_print_inductive coq_type_list }
+      { command_print_inductive coq_type_list }
     | [ "Print" "CodeGen" "Specialization" ref_list(funcs)] ->
-      { codegen_print_specialization funcs }
-
-    (*
-    | [ "CodeGen" "ArgTest" constr(x) ] ->
-      { Feedback.msg_info (Pp.str (constr_expr_cstr_name x)) }
-    | [ "CodeGen" "ArgTest2" constr_or_underscore(x) ] ->
-      { Feedback.msg_info (Pp.str (match x with None -> "None" | Some _ -> "Some"))}
-    | [ "CodeGen" "ArgTest3" lconstr(term) "=>" ] ->
-      { let env = Global.env () in let sigma = Evd.from_env env in
-        Feedback.msg_info (Ppconstr.pr_constr_expr env sigma term) }
-    *)
-    | [ "CodeGen" "ArgTest4" lconstr(term) ] ->
-      { let env = Global.env () in let sigma = Evd.from_env env in
-        let (sigma, term) = Constrintern.interp_constr_evars env sigma term in
-        let term = abstract_evars env sigma term in
-        Feedback.msg_info (Printer.pr_econstr_env env sigma term) }
+      { command_print_specialization funcs }
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Inductive" "Type" lconstr(coq_type) "=>" string(c_type) ] ->
-      { register_ind_type coq_type c_type }
+      { command_ind_type coq_type c_type }
     | [ "CodeGen" "Inductive" "Match" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
-      { register_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+      { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
     | [ "CodeGen" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
-      { codegen_specialization_arguments func sd_list }
+      { command_arguments func sd_list }
     | [ "CodeGen" "AutoArguments" ref_list(func_list) ] ->
-      { codegen_specialization_auto_arguments func_list }
+      { command_auto_arguments func_list }
 
     | [ "CodeGen" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
-      { codegen_function func args names }
+      { command_function func args names }
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names(names) ] ->
-      { codegen_primitive func args names }
+      { command_primitive func args names }
     | [ "CodeGen" "Constant" ref(func) constr_list(args) sp_instance_names(names) ] ->
-      { codegen_constant func args names }
+      { command_constant func args names }
 
     | [ "CodeGen" "Snippet" string(str) ] ->
-      { codegen_snippet str }
+      { command_snippet str }
 
-    | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { gen cfunc_list }
+    | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
     | [ "CodeGen" "GenerateFile" string(fn) ] ->
-      { generate_file fn }
+      { command_generate_file fn }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
-      { codegen_global_inline funcs }
+      { command_global_inline funcs }
     | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
-      { codegen_local_inline func funcs }
+      { command_local_inline func funcs }
 
     | [ "CodeGen" "Specialize" string_list(cfuncs) ] ->
-      { codegen_specialization_specialize cfuncs }
+      { command_specialize cfuncs }
 
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
-      { register_linear_type ty }
+      { command_linear ty }
     | [ "CodeGen" "LinearCheck" ne_global_list(libref_list) ] ->
-      { linear_type_check_list libref_list }
+      { command_linear_check libref_list }
     | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
-      { linear_type_check_test t1 t2 }
+      { command_linear_test t1 t2 }
 
 END

@@ -1742,7 +1742,7 @@ let gen_function (cfunc_name : string) : Pp.t =
 
 (* Vernacular commands *)
 
-let gen (cfunc_list : string_or_qualid list) : unit =
+let command_gen (cfunc_list : string_or_qualid list) : unit =
   List.iter
     (fun cfunc_name ->
       match cfunc_name with
@@ -1757,7 +1757,7 @@ let gen (cfunc_list : string_or_qualid list) : unit =
           Feedback.msg_info (gen_function sp_inst.sp_cfunc_name))
     cfunc_list
 
-let codegen_snippet (str : string) : unit =
+let command_snippet (str : string) : unit =
   let len = String.length str in
   let str' =
     if 0 < len && str.[len - 1] <> '\n' then
@@ -1785,6 +1785,6 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Sys.rename temp_fn fn;
   Feedback.msg_info (str ("file generated: " ^ fn)))
 
-let generate_file (fn : string) =
+let command_generate_file (fn : string) =
   gen_file fn (List.rev !generation_list);
   generation_list := []

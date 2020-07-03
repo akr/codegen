@@ -37,7 +37,7 @@ let pr_s_or_d (sd : s_or_d) : Pp.t =
 let drop_trailing_d (sd_list : s_or_d list) : s_or_d list =
   List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
-let codegen_print_specialization (funcs : Libnames.qualid list) : unit =
+let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let pr_inst sp_inst =
@@ -113,7 +113,7 @@ let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma 
         pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_new)));
       sp_cfg
 
-let codegen_specialization_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
+let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let func = func_of_qualid env func in
@@ -153,7 +153,7 @@ let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.eva
   let func = func_of_qualid env func in
   ignore (codegen_specialization_auto_arguments_internal env sigma func)
 
-let codegen_specialization_auto_arguments (func_list : Libnames.qualid list) : unit =
+let command_auto_arguments (func_list : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
@@ -355,20 +355,20 @@ let codegen_function_internal
   ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
   specialization_instance_internal ~gen_constant:gen_constant env sigma func args (Some names)
 
-let codegen_function
+let command_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let sp_inst = codegen_function_internal func user_args names in
   generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
-let codegen_primitive
+let command_primitive
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   ignore (codegen_function_internal func user_args names)
 
-let codegen_constant
+let command_constant
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr list)
     (names : sp_instance_names) : unit =
@@ -385,14 +385,14 @@ let check_convertible phase (env : Environ.env) (sigma : Evd.evar_map) (t1 : ECo
       Pp.str "=/=>" ++ Pp.fnl () ++
       Printer.pr_econstr_env env sigma t2)
 
-let codegen_global_inline (func_qualids : Libnames.qualid list) : unit =
+let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let funcs = List.map (func_of_qualid env) func_qualids in
   let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
   let f pred ctnt = Cpred.add ctnt pred in
   specialize_global_inline := List.fold_left f !specialize_global_inline ctnts
 
-let codegen_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
+let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let func = func_of_qualid env func_qualid in
@@ -1611,7 +1611,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
   Feedback.msg_debug (Pp.str "[codegen:codegen_specialization_specialize1] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   declared_ctnt
 
-let codegen_specialization_specialize (cfuncs : string list) : unit =
+let command_specialize (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
       let declared_ctnt = codegen_specialization_specialize1 cfunc_name in

@@ -71,7 +71,7 @@ let codegen_print_inductive1 env sigma ind_cfg =
   codegen_print_inductive_type env sigma ind_cfg;
   codegen_print_inductive_match env sigma ind_cfg
 
-let codegen_print_inductive coq_type_list =
+let command_print_inductive coq_type_list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   if coq_type_list = [] then
@@ -136,7 +136,7 @@ let get_ind_config coq_type =
       user_err (Pp.str "inductive type not registered:" ++ Pp.spc () ++
       Printer.pr_constr_env env sigma coq_type)
 
-let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
@@ -155,7 +155,7 @@ let register_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string)
     cstr_configs=cstr_cfgs } in
   ind_config_map := ConstrMap.add coq_type ent !ind_config_map
 
-let register_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
+let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
     (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in

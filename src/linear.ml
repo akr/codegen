@@ -47,7 +47,7 @@ let rec is_concrete_inductive_type env sigma term =
   else
     false) (* "list" is not "concrete" inductive type because it has concrete parameter *)
 
-let register_linear_type (ty : Constrexpr.constr_expr) =
+let command_linear (ty : Constrexpr.constr_expr) =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
@@ -358,12 +358,12 @@ let linear_type_check_single libref =
       | _ -> user_err (str "constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
   | _ -> user_err (str "not constant")
 
-let linear_type_check_list libref_list =
+let command_linear_check libref_list =
   List.iter linear_type_check_single libref_list
 
 (* xxx test *)
 
-let linear_type_check_test t1 t2 =
+let command_linear_test t1 t2 =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, t1a) = Constrintern.interp_constr_evars env sigma t1 in
