@@ -178,7 +178,7 @@ let codegen_test_template (ctx : test_ctxt)
   in
   let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
-  let gen_fn = d ^ "/gen.c" in
+  (*let gen_fn = d ^ "/gen.c" in*)
   let main_fn = d ^ "/main.c" in
   let exe_fn = d ^ "/exe" in
   write_file src_fn
@@ -186,15 +186,15 @@ let codegen_test_template (ctx : test_ctxt)
     "From codegen Require codegen.\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
+    "CodeGen GenerateFile \"gen.c\".\n");
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
     "#include <assert.h>\n" ^
-    "#include " ^ (quote_C_header gen_fn) ^ "\n" ^
+    "#include \"gen.c\"\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     add_n_indent 2 (delete_indent c_body) ^ "\n" ^
     "}\n");
-  assert_command ctx coqc (List.append coq_opts [src_fn]);
+  assert_command ~chdir:d ~ctxt:ctx coqc (List.append coq_opts [src_fn]);
   assert_command ctx cc ["-o"; exe_fn; main_fn];
   assert_command ctx exe_fn []
 
@@ -210,13 +210,13 @@ let assert_coq_exit
   in
   let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
-  let gen_fn = d ^ "/gen.c" in
+  (*let gen_fn = d ^ "/gen.c" in*)
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile " ^ (escape_coq_str gen_fn) ^ ".\n");
+    "CodeGen GenerateFile \"gen.c\".\n");
   let foutput stream =
     let buf = Buffer.create 0 in
     Stream.iter (Buffer.add_char buf) stream;
@@ -231,6 +231,7 @@ let assert_coq_exit
           assert_bool "expected regexp not found" false
   in
   assert_command
+    ~chdir:d
     ~exit_code:exit_code
     ~use_stderr:true
     ~foutput:foutput
