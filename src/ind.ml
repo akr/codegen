@@ -25,7 +25,7 @@ open Cgenutil
 open State
 (*open Linear*)
 
-let quote_coq_string s =
+let quote_coq_string (s : string) : string =
   let buf = Buffer.create (String.length s + 2) in
   let rec f i =
     match String.index_from_opt s i '"' with
@@ -41,18 +41,18 @@ let quote_coq_string s =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let nf_interp_type env sigma t =
+let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
   let (sigma, t) = Constrintern.interp_type_evars env sigma t in
   let t = Reductionops.nf_all env sigma t in
   let t = EConstr.to_constr sigma t in
   (sigma, t)
 
-let codegen_print_inductive_type env sigma ind_cfg =
+let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   Feedback.msg_info (str "CodeGen Inductive Type" ++ spc () ++
     Printer.pr_constr_env env sigma ind_cfg.coq_type ++ spc () ++
     str (quote_coq_string ind_cfg.c_type) ++ str ".")
 
-let codegen_print_inductive_match env sigma ind_cfg =
+let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   let f cstr_cfg =
      Ppconstr.pr_id cstr_cfg.coq_cstr ++ spc () ++
      str (quote_coq_string cstr_cfg.c_caselabel) ++ pp_prejoin_ary (spc ())
@@ -67,11 +67,11 @@ let codegen_print_inductive_match env sigma ind_cfg =
           (Array.map f ind_cfg.cstr_configs))
   | None -> ()
 
-let codegen_print_inductive1 env sigma ind_cfg =
+let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   codegen_print_inductive_type env sigma ind_cfg;
   codegen_print_inductive_match env sigma ind_cfg
 
-let command_print_inductive coq_type_list =
+let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   if coq_type_list = [] then
@@ -84,7 +84,7 @@ let command_print_inductive coq_type_list =
           Pp.spc () ++ Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type env coq_type =
+let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (f, args) = Constr.decompose_app coq_type in
@@ -105,7 +105,7 @@ let get_ind_coq_type env coq_type =
  * - f has no arguments
  * - ...
  *)
-let check_ind_coq_type env sigma coq_type =
+let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
@@ -115,19 +115,19 @@ let check_ind_coq_type env sigma coq_type =
                  Printer.pr_constr_env env sigma coq_type));
   ignore oneind_body
 
-let ind_coq_type_registered_p coq_type =
+let ind_coq_type_registered_p (coq_type : Constr.t) : bool =
   match ConstrMap.find_opt coq_type !ind_config_map with
   | Some _ -> true
   | None -> false
 
-let check_ind_coq_type_not_registered coq_type =
+let check_ind_coq_type_not_registered (coq_type : Constr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "inductive type already registered:" ++ Pp.spc () ++
               Printer.pr_constr_env env sigma coq_type)
 
-let get_ind_config coq_type =
+let get_ind_config (coq_type : Constr.t) : ind_config =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   match ConstrMap.find_opt coq_type !ind_config_map with
