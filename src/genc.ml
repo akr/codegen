@@ -284,6 +284,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
     (* variables at non-tail position *) IntSet.t *
     (* inlinable fixterms *) Id.Set.t =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -296,7 +297,6 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
   | Proj (proj, e) ->
       (* e must be a Rel which type is inductive (non-function) type *)
       (IntSet.empty, IntSet.empty, Id.Set.empty)
-  | Cast (e,ck,t) -> detect_inlinable_fixterm_rec env sigma e numargs
   | App (f, args) ->
       let (tailset_f, nontailset_f, inlinable_f) = detect_inlinable_fixterm_rec env sigma f (Array.length args + numargs) in
       let nontailset = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) nontailset_f args in
@@ -446,6 +446,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
     (* variables at tail position *) IntSet.t *
     (* variables at non-tail position *) IntSet.t =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -458,7 +459,6 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
   | Proj (proj, e) ->
       (* e must be a Rel which type is inductive (non-function) type *)
       (IntSet.empty, IntSet.empty)
-  | Cast (e,ck,t) -> collect_fix_usage fixinfo inlinable_fixterms env sigma e numargs tail_position
   | App (f, args) ->
       let (tailset_f, nontailset_f) = collect_fix_usage fixinfo inlinable_fixterms env sigma f (Array.length args + numargs) tail_position in
       let nontailset = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) nontailset_f args in
@@ -616,6 +616,7 @@ let rec set_fixinfo_naive_outer_variables (fixinfo : fixinfo_t) (env : Environ.e
 and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -626,7 +627,6 @@ and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env)
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
   | Proj (proj, e) -> ()
-  | Cast (e,ck,t) -> set_fixinfo_naive_outer_variables fixinfo env sigma outer e
   | App (f, args) ->
       set_fixinfo_naive_outer_variables fixinfo env sigma outer f
   | LetIn (x,e,t,b) ->
@@ -670,6 +670,7 @@ and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env)
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
     (result : (Id.t, Id.Set.t) Hashtbl.t) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -683,7 +684,6 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       Id.Set.singleton (id_of_name name)
   | Int _ | Float _ | Const _ | Construct _ -> Id.Set.empty
   | Proj (proj, e) -> fixterm_free_variables_rec env sigma result e
-  | Cast (e,ck,t) -> fixterm_free_variables_rec env sigma result e
   | App (f, args) ->
       let fv_f = fixterm_free_variables_rec env sigma result f in
       let ids = Array.map
@@ -744,6 +744,7 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t)
     (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -754,7 +755,6 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
   | Proj (proj, e) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
-  | Cast (e,ck,t) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
   | App (f, args) ->
       fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm f
   | LetIn (x,e,t,b) ->
@@ -1273,6 +1273,7 @@ and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t) (is_tail_position : bool) (term : EConstr.t) (numargs : int)
     (result : top_fixterm_t list)  : top_fixterm_t list =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -1283,8 +1284,6 @@ and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
   | Rel i -> result
   | Int _ | Float _ | Const _ | Construct _ -> result
   | Proj _ -> result
-  | Cast (e,ck,t) ->
-      detect_top_fixterms_rec env sigma fixinfo is_tail_position e numargs result
   | App (f, args) ->
       detect_top_fixterms_rec env sigma fixinfo is_tail_position f
         (Array.length args + numargs) result
@@ -1663,6 +1662,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
 
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
+  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
   | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
@@ -1704,7 +1704,6 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           (fun set arg -> Id.Set.union set (used_variables env sigma arg))
           Id.Set.empty
           args)
-  | Cast (e,ck,ty) -> used_variables env sigma e
   | Proj (proj, e) -> used_variables env sigma e
 
 let gen_func_sub (cfunc_name : string) : Pp.t =
