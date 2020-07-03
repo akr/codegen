@@ -1372,6 +1372,14 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
       CodeGen Gen "swap_bb".
     |})
 
+let test_command_gen_qualid (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
+    (bool_src ^
+    {|
+      Definition id_bool (x : bool) : bool := x.
+      CodeGen Gen id_bool.
+    |})
+
 let test_mftest (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -1684,6 +1692,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
 
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
+    "test_command_gen_qualid" >:: test_command_gen_qualid;
     "test_tail_rel" >:: test_tail_rel;
     "test_tail_constructor_bool" >:: test_tail_constructor_bool;
     "test_tail_constructor_args" >:: test_tail_constructor_args;

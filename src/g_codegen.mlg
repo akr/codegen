@@ -32,7 +32,6 @@ open Genc
 open Ind
 
 open Stdarg (* for wit_string *)
-(*open Constrarg*) (* for wit_global *)
 
 (* for lconstr(...). lconstr accepts "Command 1 + 1" addition to "Command (1 + 1)"
   which is used for "CodeGen Linear", etc. *)
@@ -126,6 +125,11 @@ VERNAC ARGUMENT EXTEND id_or_underscore
 | [ "_" ] -> { None }
 END
 
+VERNAC ARGUMENT EXTEND string_or_qualid
+| [ string(s) ] -> { StrOrQid_Str s }
+| [ reference(qid) ] -> { StrOrQid_Qid qid }
+END
+
 (*
   The order of constr(term) and "_" is important to parse "_" as None,
   since "_" is valid expression as a constr,
@@ -189,7 +193,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Snippet" string(str) ] ->
       { codegen_snippet str }
 
-    | [ "CodeGen" "Gen" ne_string_list(cfunc_list) ] -> { gen cfunc_list }
+    | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { gen cfunc_list }
 
     | [ "CodeGen" "GenerateFile" string(fn) ] ->
       { generate_file fn }

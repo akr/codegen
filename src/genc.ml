@@ -1742,10 +1742,19 @@ let gen_function (cfunc_name : string) : Pp.t =
 
 (* Vernacular commands *)
 
-let gen (cfunc_list : string list) : unit =
+let gen (cfunc_list : string_or_qualid list) : unit =
   List.iter
     (fun cfunc_name ->
-      Feedback.msg_info (gen_function cfunc_name))
+      match cfunc_name with
+      | StrOrQid_Str str ->
+          Feedback.msg_info (gen_function str)
+      | StrOrQid_Qid qid ->
+          let sp_inst = codegen_function_internal qid []
+            { spi_cfunc_name = None;
+              spi_partapp_id = None;
+              spi_specialized_id = None }
+          in
+          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name))
     cfunc_list
 
 let codegen_snippet (str : string) : unit =

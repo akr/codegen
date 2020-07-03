@@ -85,6 +85,8 @@ let () = let open Goptions in declare_bool_option
 
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
+type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
+
 type cstr_config = {
   coq_cstr : Id.t;
   c_caselabel : string; (* meaningful if c_swfnc is not None *)
