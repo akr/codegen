@@ -1509,8 +1509,9 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                   (List.init ci.ci_cstr_nargs.(i) (fun _ -> Context.anonR))
                   vars))
             branches)
+    | Proj _ -> term
     | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
-    | CoFix _ | Proj (_, _) | Int _ | Float _ ->
+    | CoFix _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen:rename_vars] unexpected term:" +++
         Printer.pr_econstr_env env sigma term)
   in

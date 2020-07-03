@@ -917,7 +917,7 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   (*Feedback.msg_debug (Pp.str "gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
-  let item_cvar = carg_of_garg env (destRel sigma item) in
+  let item_cvar = carg_of_garg env item_relindex in
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
   (*Feedback.msg_debug (Pp.str "gen_match:2");*)
@@ -981,6 +981,14 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
           let (caselabel, accessors) = caselabel_accessors.(i) in
           (caselabel, gen_branch accessors br))
         branches))
+
+let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
+    (pr : Projection.t) (item : EConstr.t) : Pp.t =
+  let item_relindex = destRel sigma item in
+  let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
+  let item_cvar = carg_of_garg env item_relindex in
+  let accessor = case_cstrfield env sigma (EConstr.of_constr item_type) 1 (Projection.arg pr) in
+  str accessor ++ str "(" ++ str item_cvar ++ str ")"
 
 let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
   let assign = Array.to_list assignments in
@@ -1088,6 +1096,10 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
         | Some _ -> gen_switch_without_break
       in
       gen_match used gen_switch (gen_assign fixinfo used cont) env sigma ci predicate item branches cargs
+  | Proj (pr, item) ->
+      ((if cargs <> [] then
+        user_err (str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+      gen_assign_cont cont (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
@@ -1155,9 +1167,6 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
           let env2 = EConstr.push_rel decl env in
           gen_assign fixinfo used cont env2 sigma b rest)
 
-  | Proj _ ->
-      user_err (str "[codegen:gen_assign] not impelemented (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
-
 let rec gen_tail (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   (*Feedback.msg_debug (Pp.str "gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
@@ -1219,6 +1228,10 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
           gen_tail fixinfo used gen_ret env2 sigma b rest)
   | Case (ci,predicate,item,branches) ->
       gen_match used gen_switch_without_break (gen_tail fixinfo used gen_ret) env sigma ci predicate item branches cargs
+  | Proj (pr, item) ->
+      ((if cargs <> [] then
+        user_err (str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+      gen_ret (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
       add_local_var (c_typename env sigma t) c_var;
@@ -1261,7 +1274,6 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
       reordered_pp_bodies.(0) <- pp_bodies.(i);
       pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies
-  | Proj _ -> user_err (Pp.str "gen_tail: unsupported term Proj:" +++ Printer.pr_econstr_env env sigma term)
 
 type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
 

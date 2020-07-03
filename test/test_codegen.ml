@@ -1608,6 +1608,79 @@ let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
       assert(f(0) == 0);
     |}
 
+let test_primitive_projection (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "
+      typedef struct { bool fst; bool snd; } bool_pair;
+      #define make_bool_pair(fst, snd) ((bool_pair){ (fst), (snd) })
+      #define bool_pair_fst(x) ((x).fst)
+      #define bool_pair_snd(x) ((x).snd)
+      ".
+
+      Set Primitive Projections. (* enables Proj *)
+      Record bool_pair : Set := make_bool_pair { field1 : bool; field2 : bool }.
+
+      CodeGen Inductive Type bool_pair => "bool_pair".
+      CodeGen Inductive Match bool_pair => ""
+      | make_bool_pair => "" "bool_pair_fst" "bool_pair_snd".
+      CodeGen Primitive make_bool_pair => "make_bool_pair".
+
+      Definition make (x y : bool) := make_bool_pair x y.
+      Definition bbfst (x : bool_pair) := field1 x.
+      Definition bbsnd (x : bool_pair) := field2 x.
+      CodeGen Function make.
+      CodeGen Function bbfst.
+      CodeGen Function bbsnd.
+    |}) {|
+      assert(make(true,true).fst == true); assert(make(true,true).snd == true);
+      assert(make(true,false).fst == true); assert(make(true,false).snd == false);
+      assert(make(false,true).fst == false); assert(make(false,true).snd == true);
+      assert(make(false,false).fst == false); assert(make(false,false).snd == false);
+      assert(bbfst(make(true,true)) == true); assert(bbsnd(make(true,true)) == true);
+      assert(bbfst(make(true,false)) == true); assert(bbsnd(make(true,false)) == false);
+      assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
+      assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
+    |}
+
+let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "
+      typedef struct { bool fst; bool snd; } bool_pair;
+      #define make_bool_pair(fst, snd) ((bool_pair){ (fst), (snd) })
+      #define bool_pair_fst(x) ((x).fst)
+      #define bool_pair_snd(x) ((x).snd)
+      ".
+
+      Set Primitive Projections. (* enables Proj *)
+      Record bool_pair : Set := make_bool_pair { field1 : bool; field2 : bool }.
+
+      CodeGen Inductive Type bool_pair => "bool_pair".
+      CodeGen Inductive Match bool_pair => ""
+      | make_bool_pair => "" "bool_pair_fst" "bool_pair_snd".
+      CodeGen Primitive make_bool_pair => "make_bool_pair".
+
+      Definition make (x y : bool) := make_bool_pair x y.
+      Definition bbfst (x : bool_pair) := let y := field1 x in id y.
+      Definition bbsnd (x : bool_pair) := let y := field2 x in id y.
+      CodeGen Function id bool.
+      CodeGen Function make.
+      CodeGen Function bbfst.
+      CodeGen Function bbsnd.
+    |}) {|
+      assert(make(true,true).fst == true); assert(make(true,true).snd == true);
+      assert(make(true,false).fst == true); assert(make(true,false).snd == false);
+      assert(make(false,true).fst == false); assert(make(false,true).snd == true);
+      assert(make(false,false).fst == false); assert(make(false,false).snd == false);
+      assert(bbfst(make(true,true)) == true); assert(bbsnd(make(true,true)) == true);
+      assert(bbfst(make(true,false)) == true); assert(bbsnd(make(true,false)) == false);
+      assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
+      assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_tail_rel" >:: test_tail_rel;
@@ -1673,6 +1746,8 @@ let suite : OUnit2.test =
     "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
+    "test_primitive_projection" >:: test_primitive_projection;
+    "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
   ]
 
 let () =
