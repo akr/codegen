@@ -1813,6 +1813,33 @@ let test_auto_ind_match_cstrfield_with_arg (ctx : test_ctxt) : unit =
       assert(bbfst(3) == 1); assert(bbsnd(3) == 1);
     |}
 
+let test_auto_const (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      CodeGen Snippet "#define one() 1".
+      Definition one := 1.
+      Definition add1 x := x + one.
+      CodeGen Function add1.
+    |}) {|
+      assert(add1(0) == 1);
+      assert(add1(1) == 2);
+      assert(add1(2) == 3);
+    |}
+
+let test_auto_construct (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    ({|
+      CodeGen Snippet "
+      typedef int nat;
+      #define O() 0
+      #define S(x) ((x)+1)
+      ".
+      Definition one := 1.
+      CodeGen Function one.
+    |}) {|
+      assert(one() == 1);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -1887,6 +1914,8 @@ let suite : OUnit2.test =
     "test_auto_ind_type_with_arg" >:: test_auto_ind_type_with_arg;
     "test_auto_ind_match_cstrlabel_with_arg" >:: test_auto_ind_match_cstrlabel_with_arg;
     "test_auto_ind_match_cstrfield_with_arg" >:: test_auto_ind_match_cstrfield_with_arg;
+    "test_auto_const" >:: test_auto_const;
+    "test_auto_construct" >:: test_auto_construct;
   ]
 
 let () =

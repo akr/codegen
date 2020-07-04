@@ -991,7 +991,13 @@ let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (ar
   let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
-    user_err (Pp.str "[codegen] Not enough arguments for" ++ spc () ++ (Printer.pr_constr_env env sigma func)));
+    user_err (Pp.str "[codegen] Not enough arguments for" +++
+              Printer.pr_constr_env env sigma func +++
+              Pp.str "(needs" +++
+              Pp.int (List.length sd_list) +++
+              Pp.str "but" +++
+              Pp.int (Array.length args) ++
+              Pp.str ")"));
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let static_args = CArray.filter_with static_flags args in
@@ -1039,17 +1045,7 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Env
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Ind _ | Int _ | Float _
-  | Construct _
   | Proj _ | Cast _ -> (env, term)
-  | Const (ctnt, u) ->
-      (*
-      let f' = Constr.mkConst ctnt in
-      (match replace_app env sigma f' [| |] with
-      | (env, None) -> (env, term)
-      | (env, Some e) -> (env, e))
-      *)
-      (env, term)
-
   | Lambda (x, t, e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1077,18 +1073,23 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Env
         (fun e f -> replace e sigma f) env branches
       in
       (env', mkCase (ci, p, item, branches'))
+  | Const (ctnt, u) ->
+      let f' = Constr.mkConst ctnt in
+      replace_app env sigma f' [| |]
+  | Construct (cstr, u) ->
+      let f' = Constr.mkConstruct cstr in
+      replace_app env sigma f' [| |]
   | App (f, args) ->
-      let (env', f) = replace env sigma f in
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
-          (match replace_app env' sigma f' args with
-          | (env'', e) -> (env'', e))
+          replace_app env sigma f' args
       | Construct (cstr, u) ->
           let f' = Constr.mkConstruct cstr in
-          (match replace_app env' sigma f' args with
-          | (env'', e) -> (env'', e))
-      | _ -> (env', mkApp (f, args))
+          replace_app env sigma f' args
+      | _ ->
+          let (env', f) = replace env sigma f in
+          (env', mkApp (f, args))
 
 let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
   if n <= 0 then
