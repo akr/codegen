@@ -248,16 +248,16 @@ let pp_postjoin_list sep l =
     l
 
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
-  (*Feedback.msg_debug (Pp.str "numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in
-  (*Feedback.msg_debug (Pp.str "numargs_of_type nf_all: " ++ Printer.pr_econstr_env env sigma t);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type nf_all: " ++ Printer.pr_econstr_env env sigma t);*)
   let (args, result_type) = decompose_prod sigma t in
   List.length args
 
 let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int =
-  (*Feedback.msg_debug (Pp.str "numargs_of_exp arg: " ++ Printer.pr_econstr_env env sigma term);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_exp arg: " ++ Printer.pr_econstr_env env sigma term);*)
   let t = Retyping.get_type_of env sigma term in
-  (*Feedback.msg_debug (Pp.str "numargs_of_exp t=" ++ Printer.pr_econstr_env env sigma t);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_exp t=" ++ Printer.pr_econstr_env env sigma t);*)
   numargs_of_type env sigma t
 
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
@@ -344,7 +344,7 @@ let check_c_id (str : string) : unit =
   if valid_c_id_p str then
     ()
   else
-    user_err (Pp.str "invalid C name:" ++ Pp.spc () ++ Pp.str str)
+    user_err (Pp.str "[codegen] invalid C name:" ++ Pp.spc () ++ Pp.str str)
 
 let escape_as_coq_string str =
   let buf = Buffer.create (String.length str + 2) in
@@ -411,9 +411,9 @@ let abstract_evars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
         let ety = Retyping.get_type_of env sigma term in
         let ety = Reductionops.nf_all env sigma ety in
         (if not (Vars.closed0 sigma ety) then
-          user_err (Pp.str "type is not a closed term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ety));
+          user_err (Pp.str "[codegen] type is not a closed term:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ety));
         (if Evarutil.has_undefined_evars sigma ety then
-          user_err (Pp.str "type of a hole contains a existential variable:" ++ Pp.spc() ++
+          user_err (Pp.str "[codegen] type of a hole contains a existential variable:" ++ Pp.spc() ++
             Printer.pr_econstr_env env sigma term ++
             Pp.spc () ++ Pp.str ":" ++ Pp.spc () ++
             Printer.pr_econstr_env env sigma ety));
@@ -479,7 +479,7 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
   let sigma = Evd.from_env env in
   let modpath = KerName.modpath (Constant.canonical ctnt_i) in
   match Global.body_of_constant Library.indirect_accessor ctnt_i with
-  | None -> user_err (Pp.str "couldn't obtain the definition of" ++ Pp.spc () ++
+  | None -> user_err (Pp.str "[codegen] couldn't obtain the definition of" ++ Pp.spc () ++
                       Printer.pr_constant env ctnt_i)
   | Some (def_i,_,_) ->
       let def_i = EConstr.of_constr def_i in

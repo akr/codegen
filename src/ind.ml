@@ -80,7 +80,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
     coq_type_list |> List.iter (fun user_coq_type ->
       let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
       match ConstrMap.find_opt coq_type !ind_config_map with
-      | None -> user_err (Pp.str "inductive type not registered:" ++
+      | None -> user_err (Pp.str "[codegen] inductive type not registered:" ++
           Pp.spc () ++ Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
@@ -89,7 +89,7 @@ let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : Declarations.mu
   let sigma = Evd.from_env env in
   let (f, args) = Constr.decompose_app coq_type in
   (if not (Constr.isInd f) then
-    user_err (Pp.str "inductive type expected:" ++ Pp.spc () ++
+    user_err (Pp.str "[codegen] inductive type expected:" ++ Pp.spc () ++
     Printer.pr_constr_env env sigma coq_type));
   let ind = Univ.out_punivs (Constr.destInd f) in
   let (mutind, i) = ind in
@@ -111,7 +111,7 @@ let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
-       user_err (Pp.str "coinductive type not supported:" ++ Pp.spc () ++
+        user_err (Pp.str "[codegen] coinductive type not supported:" ++ Pp.spc () ++
                  Printer.pr_constr_env env sigma coq_type));
   ignore oneind_body
 
@@ -124,7 +124,7 @@ let check_ind_coq_type_not_registered (coq_type : Constr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   if ind_coq_type_registered_p coq_type then
-    user_err (Pp.str "inductive type already registered:" ++ Pp.spc () ++
+    user_err (Pp.str "[codegen] inductive type already registered:" ++ Pp.spc () ++
               Printer.pr_constr_env env sigma coq_type)
 
 let get_ind_config (coq_type : Constr.t) : ind_config =
@@ -133,7 +133,7 @@ let get_ind_config (coq_type : Constr.t) : ind_config =
   match ConstrMap.find_opt coq_type !ind_config_map with
   | Some ind_cfg -> ind_cfg
   | None ->
-      user_err (Pp.str "inductive type not registered:" ++ Pp.spc () ++
+      user_err (Pp.str "[codegen] inductive type not registered:" ++ Pp.spc () ++
       Printer.pr_constr_env env sigma coq_type)
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : string) : ind_config =
@@ -165,11 +165,11 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
   let ind_cfg = get_ind_config coq_type in
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (
-      Pp.str "inductive match configuration already registered:" ++ Pp.spc () ++
+      Pp.str "[codegen] inductive match configuration already registered:" ++ Pp.spc () ++
       Printer.pr_constr_env env sigma coq_type)
   | None -> ());
   (if List.length cstr_caselabel_accessors_list <> Array.length oneind_body.Declarations.mind_consnames then
-    user_err (Pp.str "inductive match: invalid number of constructors:" ++ Pp.spc () ++
+    user_err (Pp.str "[codegen] inductive match: invalid number of constructors:" ++ Pp.spc () ++
       Pp.str "needs" ++ Pp.spc () ++
       Pp.int (Array.length oneind_body.Declarations.mind_consnames) ++ Pp.spc () ++
       Pp.str "but" ++ Pp.spc () ++
@@ -180,11 +180,11 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
     let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
     let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
       | None -> user_err (
-        Pp.str "inductive match: constructor not found:" ++ Pp.spc () ++
+        Pp.str "[codegen] inductive match: constructor not found:" ++ Pp.spc () ++
         Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
     (if Array.get oneind_body.Declarations.mind_consnrealdecls j <> List.length accessors then
-      user_err (Pp.str "inductive match: invalid number of field accessors:" ++
+      user_err (Pp.str "[codegen] inductive match: invalid number of field accessors:" ++
       Pp.str "needs" ++ Pp.spc () ++
       Pp.int (Array.get oneind_body.Declarations.mind_consnrealdecls j) ++ Pp.spc () ++
       Pp.str "but" ++ Pp.spc () ++

@@ -147,7 +147,7 @@ let local_gensym () : string =
 
 let str_of_name (name : Name.t) : string =
   match name with
-  | Name.Anonymous -> user_err (Pp.str "str_of_name with anonymous name")
+  | Name.Anonymous -> user_err (Pp.str "[codegen] str_of_name with anonymous name")
   | Name.Name id -> Id.to_string id
 
 let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
@@ -186,9 +186,9 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
     | None ->
         (match EConstr.kind sigma f with
         | Constr.Const (ctnt, _) ->
-            user_err (Pp.str "C function name not configured:" +++ Printer.pr_constant env ctnt)
+            user_err (Pp.str "[codegen] C function name not configured:" +++ Printer.pr_constant env ctnt)
         | Constr.Construct (cstr, _) ->
-            user_err (Pp.str "C constructor name not configured:" +++ Printer.pr_constructor env cstr)
+            user_err (Pp.str "[codegen] C constructor name not configured:" +++ Printer.pr_constructor env cstr)
         | _ ->
             user_err (Pp.str "[codegen:bug] gen_app_const_construct expects Const or Construct"))
     | Some (sp_cfg, sp_inst) ->
@@ -205,7 +205,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
-        user_err (Pp.str "C function name not found:" +++
+        user_err (Pp.str "[codegen] C function name not found:" +++
                   Pp.str cfunc_name)
     | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
@@ -220,7 +220,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   let cdef = Environ.lookup_constant ctnt env in
   let ty = cdef.Declarations.const_type in
   match Global.body_of_constant_body Library.indirect_accessor cdef with
-  | None -> user_err (Pp.str "couldn't obtain the body:" +++
+  | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (ctnt, ty, body)
 
@@ -975,14 +975,14 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
     (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "gen_match:1");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:1");*)
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
-  (*Feedback.msg_debug (Pp.str "gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
   let item_cvar = carg_of_garg env item_relindex in
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
-  (*Feedback.msg_debug (Pp.str "gen_match:2");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:2");*)
   let gen_branch accessors br =
     let m = Array.length accessors in
     let (env2, branch_body) = decompose_lam_n_env env sigma m br in
@@ -1014,29 +1014,29 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
     c_field_access +++ c_branch_body
   in
-  (*Feedback.msg_debug (Pp.str "gen_match:3");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:3");*)
   let n = Array.length branches in
   let caselabel_accessors =
     Array.map
       (fun j ->
-        (*Feedback.msg_debug (Pp.str "gen_match:30");*)
+        (*Feedback.msg_debug (Pp.str "[codegen] gen_match:30");*)
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
            (case_cstrfield env sigma (EConstr.of_constr item_type) j)
            (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
       (iota_ary 1 n)
   in
-  (*Feedback.msg_debug (Pp.str "gen_match:4");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:4");*)
   if n = 1 then
-    ((*Feedback.msg_debug (Pp.str "gen_match:5");*)
+    ((*Feedback.msg_debug (Pp.str "[codegen] gen_match:5");*)
     let accessors = snd caselabel_accessors.(0) in
     let br = branches.(0) in
     gen_branch accessors br)
   else
-    ((*Feedback.msg_debug (Pp.str "gen_match:6");*)
+    ((*Feedback.msg_debug (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
-    (*Feedback.msg_debug (Pp.str "gen_match:7");*)
+    (*Feedback.msg_debug (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
       (Array.mapi
         (fun i br ->
@@ -1101,7 +1101,7 @@ let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
 
 let rec gen_assign (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 fixinfo used cont env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "gen_assign:" +++
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_assign:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
@@ -1220,7 +1220,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
 
   | Lambda (x,t,b) ->
       (match cargs with
-      | [] -> user_err (Pp.str "gen_assign: lambda term without argument (higher-order term not supported yet):" +++
+      | [] -> user_err (Pp.str "[codegen] gen_assign: lambda term without argument (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term)
       | arg :: rest ->
           (if Context.binder_name x <> Name.Name (Id.of_string arg) then
@@ -1230,13 +1230,13 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
           gen_assign fixinfo used cont env2 sigma b rest)
 
 let rec gen_tail (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "gen_tail start:" +++
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
     pp_join_list (Pp.spc ()) (List.map Pp.str cargs) ++
     Pp.str ")");*)
   let pp = gen_tail1 fixinfo used gen_ret env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "gen_tail return:" +++
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_tail return:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
@@ -1280,7 +1280,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
       gen_tail fixinfo used gen_ret env sigma f cargs2
   | Lambda (x,t,b) ->
       (match cargs with
-      | [] -> user_err (Pp.str "gen_tail: lambda term without argument (higher-order term not supported yet):" +++
+      | [] -> user_err (Pp.str "[codegen] gen_tail: lambda term without argument (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term)
       | arg :: rest ->
           (if Context.binder_name x <> Name.Name (Id.of_string arg) then
@@ -1503,7 +1503,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       | None -> true)
     local_vars
   in
-  (*Feedback.msg_debug (Pp.str "gen_func_sub:6");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
   hov 0 (str "static" +++
         str return_type) +++
@@ -1720,7 +1720,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     hov 0 (Pp.str "switch" +++ Pp.str "(g)") +++
     vbrace pp_switch_body
   in
-  (*Feedback.msg_debug (Pp.str "gen_func_sub:6");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
     pp_enum +++
     pp_struct_args +++
@@ -1788,9 +1788,9 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
-  (*Feedback.msg_debug (Pp.str "gen_func_sub:1");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:1");*)
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
-  (*Feedback.msg_debug (Pp.str "gen_func_sub:2");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixinfo in
   (if called_fixfuncs <> [] then
@@ -1845,7 +1845,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Format.pp_print_flush fmt ();
   close_out ch;
   Sys.rename temp_fn fn;
-  Feedback.msg_info (str ("file generated: " ^ fn)))
+  Feedback.msg_info (str ("[codegen] file generated: " ^ fn)))
 
 let command_generate_file (fn : string) =
   gen_file fn (List.rev !generation_list);
