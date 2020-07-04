@@ -247,6 +247,14 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
+let new_env_with_rels (env : Environ.env) : Environ.env =
+  let n = Environ.nb_rel env in
+  let r = ref (Global.env ()) in
+  for i = n downto 1 do
+    r := Environ.push_rel (Environ.lookup_rel i env) (!r)
+  done;
+  !r
+
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in
