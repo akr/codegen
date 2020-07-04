@@ -229,7 +229,7 @@ let specialization_instance_internal
     ?(gen_constant=false)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) (static_args : Constr.t list)
-    (names_opt : sp_instance_names option) : specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_instance =
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
@@ -319,13 +319,13 @@ let specialization_instance_internal
   let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
   let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
-  sp_inst
+  (Global.env (), sp_inst)
 
 let codegen_function_internal
     ?(gen_constant=false)
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) : specialization_instance =
+    (names : sp_instance_names) : Environ.env * specialization_instance =
   let sd_list = List.map
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     user_args
@@ -359,7 +359,7 @@ let command_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
-  let sp_inst = codegen_function_internal func user_args names in
+  let (env, sp_inst) = codegen_function_internal func user_args names in
   generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
 let command_primitive
@@ -1016,9 +1016,9 @@ let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (ar
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
   (*Feedback.msg_info (Pp.str "[codegen] replace partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
-  let sp_inst = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
+  let (env, sp_inst) = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal env sigma func nf_static_args None
-    | Some sp_inst -> sp_inst
+    | Some sp_inst -> (env, sp_inst)
   in
   let sp_ctnt = sp_inst.sp_partapp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
@@ -1530,7 +1530,7 @@ let debug_specialization (env : Environ.env) (sigma : Evd.evar_map) (step : stri
     Feedback.msg_debug (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term));
     specialization_time := now)
 
-let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
+let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant.t =
   init_debug_specialization ();
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
@@ -1607,15 +1607,14 @@ let codegen_specialization_specialize1 (cfunc : string) : Constant.t =
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    let m = !specialize_config_map in
    specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
-  (*let env = Global.env () in
-  Feedback.msg_debug (Pp.str "[codegen:codegen_specialization_specialize1] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
-  declared_ctnt
+  let env = Global.env () in
+  (*Feedback.msg_debug (Pp.str "[codegen:codegen_specialization_specialize1] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
+  (env, declared_ctnt)
 
 let command_specialize (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      let declared_ctnt = codegen_specialization_specialize1 cfunc_name in
-      let env = Global.env () in
+      let (env, declared_ctnt) = codegen_specialization_specialize1 cfunc_name in
       Feedback.msg_info (Pp.str "[codegen] Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
     cfuncs
 

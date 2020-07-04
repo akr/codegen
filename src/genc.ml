@@ -214,13 +214,12 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
                   Pp.str cfunc_name)
     | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
-  let ctnt =
+  let (env, ctnt) =
     match sp_inst.sp_specialization_name with
     | SpExpectedId id ->
         codegen_specialization_specialize1 cfunc_name (* modify global env *)
-    | SpDefinedCtnt ctnt -> ctnt
+    | SpDefinedCtnt ctnt -> (Global.env (), ctnt)
   in
-  let env = Global.env () in
   (*Feedback.msg_debug (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
   let ty = cdef.Declarations.const_type in
@@ -1816,7 +1815,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
       | StrOrQid_Str str ->
           Feedback.msg_info (gen_function str)
       | StrOrQid_Qid qid ->
-          let sp_inst = codegen_function_internal qid []
+          let (env, sp_inst) = codegen_function_internal qid []
             { spi_cfunc_name = None;
               spi_partapp_id = None;
               spi_specialized_id = None }
