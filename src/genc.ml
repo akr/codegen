@@ -26,15 +26,70 @@ open EConstr
 
 open Cgenutil
 open State
+open Ind
 open Linear
 open Specialize
 
 let abort (x : 'a) : 'a = assert false
 
+let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  let printed_type = string_of_ppcmds (Printer.pr_econstr_env env sigma t) in
+  let c_name = c_id (squeeze_white_spaces printed_type) in
+  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
+  Feedback.msg_info (hov 2
+    (Pp.str "[codegen] inductive type," +++
+     Printer.pr_econstr_env env sigma t ++ Pp.str "," +++
+     Pp.str "is compiled as a C type" +++
+     Pp.str (escape_as_coq_string c_name) ++
+     Pp.str ". (Use \"CodeGen Inductive Type\" for customization)"));
+  ind_cfg
+
+let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
+  let printed_type = string_of_ppcmds (Printer.pr_econstr_env env sigma t) in
+  let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
+  let numcons = Array.length oneind_body.Declarations.mind_consnames in
+  let cstr_caselabel_accessors_list =
+    List.init numcons
+      (fun i ->
+        let consname = oneind_body.Declarations.mind_consnames.(i) in
+        let s = Id.to_string consname in
+        let numargs = oneind_body.Declarations.mind_consnrealargs.(i) in
+        let caselabel = "case " ^ s ^ "_tag" in
+        let accessors =
+          List.init numargs
+            (fun j -> s ^ "_get_field_" ^ string_of_int j)
+        in
+        (consname, caselabel, accessors))
+  in
+  let msgs_defined = List.filter_map (fun x -> x)
+    [
+      Some (Pp.str "a switch function" +++ Pp.str (escape_as_coq_string swfunc));
+      if cstr_caselabel_accessors_list <> [] then
+        Some (Pp.str "case labels" +++
+              pp_sjoin_list (List.map (fun (_, caselabel, _) -> Pp.str (escape_as_coq_string caselabel)) cstr_caselabel_accessors_list))
+      else
+        None;
+      if List.exists (fun (_, _, accessors) -> accessors <> []) cstr_caselabel_accessors_list then
+         Some (Pp.str "field accessors" +++
+               pp_sjoin_list (List.concat (List.map (fun (_, _, accessors) -> List.map (fun access -> Pp.str (escape_as_coq_string access)) accessors) cstr_caselabel_accessors_list)))
+      else
+        None
+    ]
+  in
+  Feedback.msg_info (hov 2
+    (Pp.str "[codegen] match-expression of inductive type," +++
+     Printer.pr_econstr_env env sigma t ++ Pp.str "," +++
+     Pp.str "is compiled using" +++
+     Pp.pr_enum (fun x -> x) msgs_defined ++
+     Pp.str "." +++
+     Pp.str "(Use \"CodeGen Inductive Match\" for customization)"));
+  register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list
+
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
   | Some ind_cfg -> ind_cfg
-  | None -> user_err (Pp.str "[codegen:get_ind_config] C type not configured:" +++ Printer.pr_econstr_env env sigma t)
+  | None -> generate_ind_config env sigma t
 
 let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   match EConstr.kind sigma t with
@@ -45,21 +100,28 @@ let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) :
   let ind_cfg = get_ind_config env sigma t in
   match ind_cfg.c_swfunc with
   | Some c_swfunc -> c_swfunc
-  | None -> user_err (
-    Pp.str "inductive match configuration not registered:" +++
-    Printer.pr_lconstr_env env sigma ind_cfg.coq_type)
+  | None ->
+      match (generate_ind_match env sigma t).c_swfunc with
+      | Some c_swfunc -> c_swfunc
+      | None -> user_err (Pp.str "[codegen:bug] generate_ind_match doesn't generate c_swfunc")
 
 let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string =
   let ind_cfg = get_ind_config env sigma t in
-  match ind_cfg.c_swfunc with
-  | Some _ -> ind_cfg.cstr_configs.(j-1).c_caselabel
-  | None -> raise (CodeGenError "[bug] inductive match configuration not registered") (* should be called after case_swfunc *)
+  let ind_cfg =
+    match ind_cfg.c_swfunc with
+    | Some _ -> ind_cfg
+    | None -> generate_ind_match env sigma t
+  in
+  ind_cfg.cstr_configs.(j-1).c_caselabel
 
 let case_cstrfield (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) (k : int) : string =
   let ind_cfg = get_ind_config env sigma t in
-  match ind_cfg.c_swfunc with
-  | Some _ -> ind_cfg.cstr_configs.(j-1).c_accessors.(k)
-  | None -> raise (CodeGenError "[bug] inductive match configuration not registered") (* should be called after case_swfunc *)
+  let ind_cfg =
+    match ind_cfg.c_swfunc with
+    | Some _ -> ind_cfg
+    | None -> generate_ind_match env sigma t
+  in
+  ind_cfg.cstr_configs.(j-1).c_accessors.(k)
 
 let global_gensym () : string =
   let n = !gensym_id in

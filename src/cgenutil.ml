@@ -295,6 +295,22 @@ let rec mangle_type_buf (buf : Buffer.t) (ty : EConstr.t) : unit =
   | Int n -> user_err (Pp.str "mangle_type_buf:int:")
   | Float n -> user_err (Pp.str "mangle_type_buf:float:")
 
+let squeeze_white_spaces (str : string) : string =
+  let buf = Buffer.create 0 in
+  let after_space = ref true in
+  String.iter
+    (fun ch ->
+      match ch with
+      |' '|'\t'|'\n' ->
+          if not !after_space then
+            Buffer.add_char buf ' '
+      | _ -> Buffer.add_char buf ch)
+    str;
+  let n = Buffer.length buf in
+  if 0 < n && Buffer.nth buf (n - 1) = ' ' then
+    Buffer.truncate buf (n - 1 );
+  Buffer.contents buf
+
 let c_id str =
   let buf = Buffer.create 0 in
   String.iter

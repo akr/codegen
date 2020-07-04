@@ -136,10 +136,7 @@ let get_ind_config (coq_type : Constr.t) : ind_config =
       user_err (Pp.str "inductive type not registered:" ++ Pp.spc () ++
       Printer.pr_constr_env env sigma coq_type)
 
-let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : string) : ind_config =
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
@@ -148,18 +145,22 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) 
       coq_cstr = cstrname;
       c_caselabel = "";
       c_accessors = [||] }) in
-  let ent = {
+  let ind_cfg = {
     coq_type=coq_type;
     c_type=c_type;
     c_swfunc=None;
     cstr_configs=cstr_cfgs } in
-  ind_config_map := ConstrMap.add coq_type ent !ind_config_map
+  ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
+ind_cfg
 
-let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
-    (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  ignore (register_ind_type env sigma coq_type c_type)
+
+let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
+     (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
   let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   let ind_cfg = get_ind_config coq_type in
   (match ind_cfg.c_swfunc with
@@ -194,9 +195,18 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
       Printer.pr_constr_env env sigma coq_type));
     { cstr_cfg with c_caselabel = caselabel; c_accessors = Array.of_list accessors }
   in
-  ind_config_map := ConstrMap.add coq_type
+  let ind_cfg =
     { ind_cfg with
       c_swfunc = Some swfunc;
       cstr_configs = Array.mapi f ind_cfg.cstr_configs }
-    !ind_config_map
+  in
+  ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
+  ind_cfg
+
+let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
+    (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
 

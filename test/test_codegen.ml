@@ -87,9 +87,10 @@ let coqc : string =
 let topdir_opt : string option = search_topdir ()
 
 let coq_opts : string list =
-  match topdir_opt with
+  (match topdir_opt with
   | Some topdir -> ["-Q"; topdir ^ "/theories"; "codegen"; "-I"; topdir ^ "/src"]
-  | None -> []
+  | None -> []) @
+  ["-bt"]
 
 let min_indent (str : string) : int =
   let min = ref (String.length str + 1) in
@@ -1690,6 +1691,82 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
 
+let test_auto_ind_type (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "typedef bool mybool;".
+      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
+      Definition id_mybool (x : mybool) : mybool := x.
+      CodeGen Function id_mybool.
+    |}) {|
+      assert(id_mybool(true) == true);
+      assert(id_mybool(false) == false);
+    |}
+
+let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "
+      typedef bool mybool;
+      #define sw_mybool(x) (x)
+      #define mytrue_tag true
+      #define myfalse_tag false
+      ".
+      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
+      Definition bool_of_mybool (x : mybool) :=
+        match x with
+        | mytrue => true
+        | myfalse => false
+        end.
+      CodeGen Function bool_of_mybool.
+    |}) {|
+      assert(bool_of_mybool(true) == true);
+      assert(bool_of_mybool(false) == false);
+    |}
+
+let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
+      Inductive optionbool : Set := somebool : bool -> optionbool | nobool : optionbool.
+      Definition value_of_optionbool (default : bool) (x : optionbool) :=
+        match x with
+        | somebool x => x
+        | nobool => default
+        end.
+      CodeGen Gen value_of_optionbool.
+    |}) {|
+      assert(value_of_optionbool(true, true) == true);
+      assert(value_of_optionbool(true, true) == true);
+    |}
+
+let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
+
+      CodeGen Snippet "
+      typedef int bool_pair;
+      #define bpair(a,b) (((a) << 1) | (b))
+      #define bpair_get_field_0(x) ((x) >> 1)
+      #define bpair_get_field_1(x) ((x) & 1)
+      ".
+
+      Definition bbfst (x : bool_pair) := match x with bpair a b => a end.
+      Definition bbsnd (x : bool_pair) := match x with bpair a b => b end.
+
+      CodeGen Function bbfst.
+      CodeGen Function bbsnd.
+    |}) {|
+      assert(bbfst(0) == 0); assert(bbsnd(0) == 0);
+      assert(bbfst(1) == 0); assert(bbsnd(1) == 1);
+      assert(bbfst(2) == 1); assert(bbsnd(2) == 0);
+      assert(bbfst(3) == 1); assert(bbsnd(3) == 1);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -1758,6 +1835,9 @@ let suite : OUnit2.test =
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
+    "test_auto_ind_type" >:: test_auto_ind_type;
+    "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
+    "test_auto_ind_match_cstrfield" >:: test_auto_ind_match_cstrfield;
   ]
 
 let () =
