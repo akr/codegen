@@ -84,7 +84,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
           Pp.spc () ++ Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr list =
+let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (f, args) = Constr.decompose_app coq_type in
@@ -95,7 +95,7 @@ let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : Declarations.mu
   let (mutind, i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-  (mutind_body, i, oneind_body, args)
+  (mutind, mutind_body, i, oneind_body, args)
 
 (* check
  * - coq_type is f args1...argN
@@ -108,7 +108,7 @@ let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : Declarations.mu
 let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
         user_err (Pp.str "[codegen] coinductive type not supported:" ++ Pp.spc () ++
@@ -137,7 +137,7 @@ let get_ind_config (coq_type : Constr.t) : ind_config =
       Printer.pr_constr_env env sigma coq_type)
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : string) : ind_config =
-  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
   let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
@@ -161,7 +161,7 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) 
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
-  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   let ind_cfg = get_ind_config coq_type in
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (

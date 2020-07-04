@@ -260,6 +260,53 @@ let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_exp t=" ++ Printer.pr_econstr_env env sigma t);*)
   numargs_of_type env sigma t
 
+let out_punivs : 'a EConstr.puniverses -> 'a = fst
+
+let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer.t) (ty : EConstr.t) : unit =
+  match EConstr.kind sigma ty with
+  | Ind iu ->
+      let (mutind, i) = out_punivs iu in
+      let mutind_body = Environ.lookup_mind mutind env in
+      let s = Id.to_string mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename in
+      Buffer.add_string buf s
+  | Construct cu ->
+      let ((mutind, i), j) = out_punivs cu in
+      let mutind_body = Environ.lookup_mind mutind env in
+      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      let s = Id.to_string oneind_body.Declarations.mind_consnames.(j) in
+      Buffer.add_string buf s
+  | App (f, argsary) ->
+      mangle_term_buf env sigma buf f;
+      Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_term_buf env sigma buf arg) argsary
+  | Prod (x, t, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mangle_term_buf env sigma buf t;
+      Buffer.add_string buf "_to_";
+      mangle_term_buf env2 sigma buf b
+  | Rel i -> user_err (Pp.str "[codegen] mangle_term_buf:rel:")
+  | Var name -> user_err (Pp.str "[codegen] mangle_term_buf:var:")
+  | Meta i -> user_err (Pp.str "[codegen] mangle_term_buf:meta:")
+  | Evar (ekey, termary) -> user_err (Pp.str "[codegen] mangle_term_buf:evar:")
+  | Sort s -> user_err (Pp.str "[codegen] mangle_term_buf:sort:")
+  | Cast (expr, kind, ty) -> user_err (Pp.str "[codegen] mangle_term_buf:cast:")
+  | Lambda (name, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:lambda:")
+  | LetIn (name, expr, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:letin:")
+  | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
+  | Case (ci, tyf, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
+  | Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
+  | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
+  | Proj (proj, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
+  | Int n -> user_err (Pp.str "[codegen] mangle_term_buf:int:")
+  | Float n -> user_err (Pp.str "[codegen] mangle_term_buf:float:")
+
+let mangle_term (ty : EConstr.t) : string =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let buf = Buffer.create 0 in
+  mangle_term_buf env sigma buf ty;
+  Buffer.contents buf
+
 let squeeze_white_spaces (str : string) : string =
   let buf = Buffer.create 0 in
   let after_space = ref true in
@@ -268,8 +315,11 @@ let squeeze_white_spaces (str : string) : string =
       match ch with
       |' '|'\t'|'\n' ->
           if not !after_space then
-            Buffer.add_char buf ' '
-      | _ -> Buffer.add_char buf ch)
+            Buffer.add_char buf ' ';
+          after_space := true
+      | _ ->
+          Buffer.add_char buf ch;
+          after_space := false)
     str;
   let n = Buffer.length buf in
   if 0 < n && Buffer.nth buf (n - 1) = ' ' then

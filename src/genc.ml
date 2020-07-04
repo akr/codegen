@@ -33,7 +33,7 @@ open Specialize
 let abort (x : 'a) : 'a = assert false
 
 let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let printed_type = string_of_ppcmds (Printer.pr_econstr_env env sigma t) in
+  let printed_type = mangle_term t in
   let c_name = c_id (squeeze_white_spaces printed_type) in
   let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
   Feedback.msg_info (hov 2
@@ -45,20 +45,23 @@ let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.
   ind_cfg
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let (mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
-  let printed_type = string_of_ppcmds (Printer.pr_econstr_env env sigma t) in
+  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
+  let printed_type = mangle_term t in
   let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
   let cstr_caselabel_accessors_list =
     List.init numcons
-      (fun i ->
-        let consname = oneind_body.Declarations.mind_consnames.(i) in
-        let s = Id.to_string consname in
-        let numargs = oneind_body.Declarations.mind_consnrealargs.(i) in
+      (fun j ->
+        let consname = oneind_body.Declarations.mind_consnames.(j) in
+        let cstr = mkConstruct ((mutind, i), j) in
+        let args = CArray.map_of_list EConstr.of_constr args in
+        let consterm = mkApp (cstr, args) in
+        let s = mangle_term consterm in
+        let numargs = oneind_body.Declarations.mind_consnrealargs.(j) in
         let caselabel = "case " ^ s ^ "_tag" in
         let accessors =
           List.init numargs
-            (fun j -> s ^ "_get_field_" ^ string_of_int j)
+            (fun k -> s ^ "_get_field_" ^ string_of_int k)
         in
         (consname, caselabel, accessors))
   in

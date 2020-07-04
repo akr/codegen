@@ -1728,36 +1728,82 @@ let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
 
 let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (bool_src ^
-    {|
-      Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
-      Inductive optionbool : Set := somebool : bool -> optionbool | nobool : optionbool.
-      Definition value_of_optionbool (default : bool) (x : optionbool) :=
-        match x with
-        | somebool x => x
-        | nobool => default
-        end.
-      CodeGen Gen value_of_optionbool.
-    |}) {|
-      assert(value_of_optionbool(true, true) == true);
-      assert(value_of_optionbool(true, true) == true);
-    |}
-
-let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
-  codegen_test_template ctx
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
-
       CodeGen Snippet "
       typedef int bool_pair;
       #define bpair(a,b) (((a) << 1) | (b))
       #define bpair_get_field_0(x) ((x) >> 1)
       #define bpair_get_field_1(x) ((x) & 1)
       ".
-
       Definition bbfst (x : bool_pair) := match x with bpair a b => a end.
       Definition bbsnd (x : bool_pair) := match x with bpair a b => b end.
+      CodeGen Function bbfst.
+      CodeGen Function bbsnd.
+    |}) {|
+      assert(bbfst(0) == 0); assert(bbsnd(0) == 0);
+      assert(bbfst(1) == 0); assert(bbsnd(1) == 1);
+      assert(bbfst(2) == 1); assert(bbsnd(2) == 0);
+      assert(bbfst(3) == 1); assert(bbsnd(3) == 1);
+    |}
 
+let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "
+      typedef int prod_bool_bool;
+      #define pair(a,b) (((a) << 1) | (b))
+      #define pair_get_field_0(x) ((x) >> 1)
+      #define pair_get_field_1(x) ((x) & 1)
+      ".
+      Definition mypair (x y : bool) : bool*bool := (x, y).
+      CodeGen Function mypair.
+    |}) {|
+      assert(mypair(false, false) == 0);
+      assert(mypair(false, true) == 1);
+      assert(mypair(true, false) == 2);
+      assert(mypair(true, true) == 3);
+    |}
+
+let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Snippet "
+      typedef int option_bool;
+      enum option_bool_tag { None_bool_tag, Some_bool_tag };
+      #define sw_option_bool(x) ((enum option_bool_tag)((x) & 1))
+      #define Some_bool_get_field_0(x) ((bool)((x) >> 1))
+      ".
+      Definition value_of_optionbool (default : bool) (x : option bool) :=
+        match x with
+        | Some x => x
+        | None => default
+        end.
+      CodeGen Function value_of_optionbool.
+    |}) {|
+      assert(value_of_optionbool(true, 0) == true);
+      assert(value_of_optionbool(true, 1) == false);
+      assert(value_of_optionbool(true, 3) == true);
+      assert(value_of_optionbool(false, 0) == false);
+      assert(value_of_optionbool(false, 1) == false);
+      assert(value_of_optionbool(false, 3) == true);
+    |}
+
+let test_auto_ind_match_cstrfield_with_arg (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      CodeGen Snippet "
+      typedef int prod_bool_bool;
+      #define bpair(a,b) (((a) << 1) | (b))
+      enum { pair_bool_bool_tag };
+      #define sw_prod_bool_bool(x) pair_bool_bool_tag
+      #define pair_bool_bool_get_field_0(x) ((x) >> 1)
+      #define pair_bool_bool_get_field_1(x) ((x) & 1)
+      ".
+      Definition bbfst (x : bool*bool) := match x with (a,b) => a end.
+      Definition bbsnd (x : bool*bool) := match x with (a,b) => b end.
       CodeGen Function bbfst.
       CodeGen Function bbsnd.
     |}) {|
@@ -1838,6 +1884,9 @@ let suite : OUnit2.test =
     "test_auto_ind_type" >:: test_auto_ind_type;
     "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
     "test_auto_ind_match_cstrfield" >:: test_auto_ind_match_cstrfield;
+    "test_auto_ind_type_with_arg" >:: test_auto_ind_type_with_arg;
+    "test_auto_ind_match_cstrlabel_with_arg" >:: test_auto_ind_match_cstrlabel_with_arg;
+    "test_auto_ind_match_cstrfield_with_arg" >:: test_auto_ind_match_cstrfield_with_arg;
   ]
 
 let () =
