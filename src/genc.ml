@@ -57,8 +57,10 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         let args = CArray.map_of_list EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term consterm in
+        let caselabel =
+          if j = 0 then "default" else "case " ^ s ^ "_tag"
+        in
         let numargs = oneind_body.Declarations.mind_consnrealargs.(j) in
-        let caselabel = "case " ^ s ^ "_tag" in
         let accessors =
           List.init numargs
             (fun k -> s ^ "_get_field_" ^ string_of_int k)
