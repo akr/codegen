@@ -283,7 +283,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Used:" ++ spc () ++ Printer.pr_constr_env env sigma func);
+      Feedback.msg_info (Pp.str "[codegen] Used as non-specialized function:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       sp_inst
     else
       let (p_id, s_id) = match names_opt with
@@ -310,7 +310,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+      Feedback.msg_info (Pp.str "[codegen] Defined as non-specialized function:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
   in
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
@@ -1627,7 +1627,7 @@ let command_specialize (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
       let (env, declared_ctnt) = codegen_specialization_specialize1 cfunc_name in
-      Feedback.msg_info (Pp.str "[codegen] Defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
+      Feedback.msg_info (Pp.str "[codegen] Defined as specialized function:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
     cfuncs
 
 
