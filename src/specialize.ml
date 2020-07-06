@@ -269,7 +269,7 @@ let specialization_instance_internal
         Printer.pr_constr_env env sigma partapp));
   let sp_inst =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
-       (match names_opt with Some { spi_partapp_id = None } -> true | _ -> false) then
+       (match names_opt with Some { spi_partapp_id = None } -> true | None -> true | _ -> false) then
       let specialization_name = match names_opt with
         | Some { spi_specialized_id = Some id } -> SpExpectedId id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
@@ -283,7 +283,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Used as non-specialized function:" ++ spc () ++ Printer.pr_constr_env env sigma func);
+      Feedback.msg_info (Pp.str "[codegen] Non-specialized function not defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       sp_inst
     else
       let (p_id, s_id) = match names_opt with
@@ -310,7 +310,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Defined as non-specialized function:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+      Feedback.msg_info (Pp.str "[codegen] Non-specialized function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       sp_inst
   in
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
@@ -1607,6 +1607,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
+  Feedback.msg_info (Pp.str "[codegen] Specialized function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
@@ -1626,8 +1627,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
 let command_specialize (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      let (env, declared_ctnt) = codegen_specialization_specialize1 cfunc_name in
-      Feedback.msg_info (Pp.str "[codegen] Defined as specialized function:" ++ spc () ++ Printer.pr_constant env declared_ctnt))
+      ignore (codegen_specialization_specialize1 cfunc_name))
     cfuncs
 
 
