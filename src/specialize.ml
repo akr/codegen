@@ -243,38 +243,38 @@ let specialization_instance_internal
       Printer.pr_econstr_env env sigma partapp_type));
   (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
-  let cfunc_name = match names_opt with
-      | Some { spi_cfunc_name = Some name } ->
-          (* valid_c_id_p is too restrictive to specify "0". *)
-          (*
-          (if not (valid_c_id_p name) then
-            user_err (Pp.str "[codegen] Invalid C function name specified:" ++ spc () ++ str name));
-          *)
-          name
-      | _ ->
-          let name = label_name_of_constant_or_constructor func in
-          (if not (valid_c_id_p name) then
-            user_err (Pp.str "[codegen] Gallina function name is invalid in C:" ++ spc () ++ str name));
-          name
+  let check_cfunc_name_conflict cfunc_name =
+    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+    | None -> ()
+    | Some (sp_cfg, sp_inst) ->
+        user_err
+          (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
+          Pp.str cfunc_name ++ Pp.spc () ++
+          Pp.str "for" ++ Pp.spc () ++
+          Printer.pr_constr_env env sigma sp_inst.sp_partapp ++ Pp.spc () ++
+          Pp.str "but also for" ++ Pp.spc () ++
+          Printer.pr_constr_env env sigma partapp)
   in
-  (match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-  | None -> ()
-  | Some (sp_cfg, sp_inst) ->
-      user_err
-        (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
-        Pp.str cfunc_name ++ Pp.spc () ++
-        Pp.str "for" ++ Pp.spc () ++
-        Printer.pr_constr_env env sigma sp_inst.sp_partapp ++ Pp.spc () ++
-        Pp.str "but also for" ++ Pp.spc () ++
-        Printer.pr_constr_env env sigma partapp));
-  let sp_inst =
+  let (cfunc_name, sp_inst) =
     if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
-       (match names_opt with Some { spi_partapp_id = Some _ } -> false | _ -> false) then
+       (match names_opt with Some { spi_partapp_id = Some _ } -> false | _ -> true) then
       let specialization_name = match names_opt with
         | Some { spi_specialized_id = Some id } -> SpExpectedId id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
                SpExpectedId s_id
       in
+      let cfunc_name = match names_opt with
+          | Some { spi_cfunc_name = Some name } ->
+              (* We accept C's non-idetifier, such as "0" here. *)
+              name
+          | _ ->
+              (* We use Gallina function name as-is for functions without static arguments *)
+              let name = label_name_of_constant_or_constructor func in
+              (if not (valid_c_id_p name) then
+                user_err (Pp.str "[codegen] Gallina function name is invalid in C:" +++ Pp.str name));
+              name
+      in
+      check_cfunc_name_conflict cfunc_name;
       let sp_inst = {
         sp_partapp = partapp;
         sp_static_arguments = [];
@@ -284,7 +284,7 @@ let specialization_instance_internal
         sp_gen_constant = gen_constant; }
       in
       Feedback.msg_info (Pp.str "[codegen] Non-specialized function not defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
-      sp_inst
+      (cfunc_name, sp_inst)
     else
       let (p_id, s_id) = match names_opt with
         | Some { spi_partapp_id = Some p_id;
@@ -298,6 +298,15 @@ let specialization_instance_internal
               (Stdlib.Option.fold ~none:s_id ~some:(fun x -> x) s_id_opt)
             )
       in
+      let cfunc_name = match names_opt with
+          | Some { spi_cfunc_name = Some name } ->
+              (* We accept C's non-idetifier, such as "0" here. *)
+              name
+          | _ ->
+              (* We use partapp name for functions with static arguments *)
+              c_id (Id.to_string p_id)
+      in
+      check_cfunc_name_conflict cfunc_name;
       let univs = Evd.univ_entry ~poly:false sigma in
       let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
       let kind = Decls.IsDefinition Decls.Definition in
@@ -311,7 +320,7 @@ let specialization_instance_internal
         sp_gen_constant = gen_constant; }
       in
       Feedback.msg_info (Pp.str "[codegen] Non-specialized function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
-      sp_inst
+      (cfunc_name, sp_inst)
   in
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);

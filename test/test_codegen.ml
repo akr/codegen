@@ -1355,7 +1355,7 @@ let test_fully_dynamic_func_with_partapp_name (ctx : test_ctxt) : unit =
       CodeGen Function add1 => add1_p add1_s.
       Print add1_p.
       Fail Print add1_s.
-      CodeGen Specialize "add1".
+      CodeGen Specialize "add1_p".
       Print add1_s.
     |})
 
@@ -1751,6 +1751,7 @@ let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
+      CodeGen Primitive pair bool bool => "pair".
       CodeGen Snippet "
       typedef int prod_bool_bool;
       #define pair(a,b) (((a) << 1) | (b))
