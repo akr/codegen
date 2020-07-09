@@ -22,6 +22,8 @@ open CErrors
 open Constr
 open EConstr
 
+open State
+
 exception CodeGenError of string
 
 let array_rev a =
@@ -472,3 +474,10 @@ let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   | Constrexpr.CPrim _ -> "CPrim"
   | Constrexpr.CDelimiters _ -> "CDelimiters"
 
+let global_gensym () : string =
+  let n = !gensym_id in
+  gensym_id := n + 1;
+  "g" ^ string_of_int n
+
+let global_gensym_with_id (id : Id.t) : string =
+  global_gensym () ^ "_" ^ (c_id (Id.to_string id))

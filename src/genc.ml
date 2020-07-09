@@ -125,14 +125,6 @@ let case_cstrfield (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types
   in
   ind_cfg.cstr_configs.(j-1).c_accessors.(k)
 
-let global_gensym () : string =
-  let n = !gensym_id in
-  gensym_id := n + 1;
-  "g" ^ string_of_int n
-
-let global_gensym_with_id (id : Id.t) : string =
-  global_gensym () ^ "_" ^ (c_id (Id.to_string id))
-
 let local_gensym_id : (int ref) list ref = ref []
 
 let local_gensym_with (f : unit -> 'a) : 'a =
