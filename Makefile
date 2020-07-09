@@ -33,6 +33,7 @@ clean :
 	  theories/*.vok \
 	  theories/*.vos \
 	  theories/*.d \
+	  theories/.*.aux \
 	  test/*.cache \
 	  test/test_codegen \
 	  test/*.cmi \
@@ -45,5 +46,6 @@ clean :
 	  sample/*.vok \
 	  sample/*.vos \
 	  sample/*.glob \
+	  sample/.*.aux \
 	  oUnit-*
 
