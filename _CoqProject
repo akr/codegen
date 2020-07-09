@@ -4,13 +4,13 @@
 # required to install *.{cmi,cmx,cmxs,cmxa} when make install
 -Q src codegen
 
-src/cgenutil.ml
+src/codegen_plugin.mlpack
 src/state.ml
+src/cgenutil.ml
 src/ind.ml
-src/g_codegen.mlg
 src/specialize.ml
 src/linear.ml
 src/genc.ml
-src/codegen_plugin.mlpack
+src/g_codegen.mlg
 theories/codegen.v
 
