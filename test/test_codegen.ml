@@ -1841,6 +1841,46 @@ let test_auto_construct (ctx : test_ctxt) : unit =
       assert(one() == 1);
     |}
 
+let test_option_bool_struct (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      CodeGen Inductive Type option bool => "option_bool".
+      CodeGen Inductive Match option bool => "sw_option_bool"
+      | None => "case option_bool_None"
+      | Some => "case option_bool_Some" "option_bool_Some_field1".
+      CodeGen Primitive None bool => "None_bool".
+      CodeGen Primitive Some bool => "Some_bool".
+      CodeGen Snippet "
+      enum enum_option_bool { option_bool_None, option_bool_Some };
+      typedef struct {
+        enum enum_option_bool tag;
+        union {
+          struct {
+            bool field1;
+          } Some;
+        } as;
+      } option_bool;
+      #define None_bool() ((option_bool){ option_bool_None, })
+      #define Some_bool(field1) ((option_bool){ option_bool_Some, { .Some = { field1 }}})
+      #define sw_option_bool(x) ((x).tag)
+      #define option_bool_Some_field1(x) ((x).as.Some.field1)
+      ".
+      Definition value_of_optionbool (default : bool) (x : option bool) :=
+        match x with
+        | Some x => x
+        | None => default
+        end.
+      CodeGen Function value_of_optionbool.
+    |}) {|
+      assert(value_of_optionbool(true, None_bool()) == true);
+      assert(value_of_optionbool(true, Some_bool(false)) == false);
+      assert(value_of_optionbool(true, Some_bool(true)) == true);
+      assert(value_of_optionbool(false, None_bool()) == false);
+      assert(value_of_optionbool(false, Some_bool(false)) == false);
+      assert(value_of_optionbool(false, Some_bool(true)) == true);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -1917,6 +1957,7 @@ let suite : OUnit2.test =
     "test_auto_ind_match_cstrfield_with_arg" >:: test_auto_ind_match_cstrfield_with_arg;
     "test_auto_const" >:: test_auto_const;
     "test_auto_construct" >:: test_auto_construct;
+    "test_option_bool_struct" >:: test_option_bool_struct;
   ]
 
 let () =
