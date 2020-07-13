@@ -2055,7 +2055,15 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
       | GenFunc cfunc_name ->
           Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
-          Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
+          let terminator =
+            if str = "" then
+              Pp.mt ()
+            else if str.[String.length str - 1] = '\n' then
+              Pp.mt ()
+            else
+              Pp.fnl ()
+          in
+          Pp.pp_with fmt (Pp.str str ++ terminator ++ Pp.fnl ()))
     gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
