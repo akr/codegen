@@ -217,6 +217,9 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (ctnt, ty, body)
 
+let hbrace (pp : Pp.t) : Pp.t =
+  h 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+
 let hovbrace (pp : Pp.t) : Pp.t =
   hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
 
@@ -1821,6 +1824,225 @@ let command_snippet (str : string) : unit =
       str
   in
   generation_list := GenSnippet str' :: !generation_list
+
+let generate_ind_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
+    ((*ind*)inductive *
+     (*args*)EConstr.t list *
+     (*ind typename*)string *
+     (*enum typename*)string *
+     (*C switch function*)string *
+     ((*cstr ID*)Id.t *
+      (*cstr name*)string *
+      (*cstr tag*)string *
+      (*union field*)string *
+      ((*field type*)string *
+       (*field name*)string *
+       (*accessor name*)string) list) list) =
+  let global_prefix = global_gensym () in
+  let (f, args) = decompose_app sigma coq_type in
+  let (ind, _) = destInd sigma f in
+  let (mutind, i) = ind in
+  let mutind_body = Environ.lookup_mind mutind env in
+  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+  let ind_id = mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename in
+  let ind_typename = global_prefix ^ "_ind_" ^ Id.to_string ind_id in
+  let enum_tag = global_prefix ^ "_enum_" ^ Id.to_string ind_id in
+  let swfunc = global_prefix ^ "_sw_" ^ Id.to_string ind_id in
+  let numcstr = Array.length oneind_body.Declarations.mind_consnames in
+  let cstr_and_fields =
+    List.init numcstr
+      (fun j ->
+        (*Feedback.msg_debug (Printer.pr_econstr_env env sigma coq_type);*)
+        let cstrterm = mkApp ((mkConstruct (ind, (j+1))), CArray.rev_of_list args) in (* xxx: args should be parameters of inductive type *)
+        (*Feedback.msg_debug (Printer.pr_econstr_env env sigma cstrterm);*)
+        let cstrtype = Retyping.get_type_of env sigma cstrterm in
+        let (args, result_type) = decompose_prod sigma cstrtype in
+        let field_types = List.rev (List.map (fun (name, t) -> c_typename env sigma t) args) in
+        let cstrid = oneind_body.Declarations.mind_consnames.(j) in
+        let cstrname = global_prefix ^ "_cstr_" ^ (Id.to_string cstrid) in
+        let cstrtag = global_prefix ^ "_tag_" ^ (Id.to_string cstrid) in
+        let union_field = global_prefix ^ "_u_" ^ (Id.to_string cstrid) in
+        let fields_and_accessors =
+          List.mapi
+            (fun k field_type ->
+              let field_name = "field" ^ string_of_int (k+1) in
+              let accessor = global_prefix ^ "_get_" ^ (Id.to_string cstrid) ^ "_" ^ field_name in
+              (field_type, field_name, accessor))
+            field_types
+        in
+        (cstrid, cstrname, cstrtag, union_field, fields_and_accessors))
+  in
+  (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields)
+
+let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  (if ind_coq_type_registered_p coq_type then
+    user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_constr_env env sigma coq_type));
+  let coq_type = EConstr.of_constr coq_type in
+  let (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields) = generate_ind_names env sigma coq_type in
+  ignore (register_ind_type env sigma (EConstr.to_constr sigma coq_type) ind_typename);
+  let cstr_caselabel_accessors_list =
+    List.mapi
+      (fun j (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+        let caselabel = if j = 0 then "default" else "case " ^ cstrtag in
+        let accessors = List.map (fun (field_type, field_name, accessor) -> accessor) fields_and_accessors in
+        (cstrid, caselabel, accessors))
+      cstr_and_fields
+  in
+  ignore (register_ind_match env sigma (EConstr.to_constr sigma coq_type) swfunc cstr_caselabel_accessors_list);
+  let env =
+    CList.fold_left_i
+      (fun j env (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+        let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, (j+1))) in
+        let args' = List.rev_map (EConstr.to_constr sigma) args in
+        ignore (codegen_specialization_define_or_check_arguments env sigma cstrterm0 (List.init (List.length args) (fun _ -> SorD_S)));
+        let (env, sp_inst) = specialization_instance_internal env sigma cstrterm0 args' (Some { spi_cfunc_name = Some cstrname; spi_partapp_id = None; spi_specialized_id = None }) in
+        env)
+      0 env cstr_and_fields
+  in
+  ignore env;
+  let no_field =
+    List.for_all
+      (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+        fields_and_accessors = [])
+      cstr_and_fields
+  in
+  let singlecstr = List.length cstr_and_fields = 1 in
+  let pp_enum =
+    if singlecstr then
+      Pp.mt ()
+    else
+      Pp.hov 0 (
+        (Pp.str "enum" +++ Pp.str enum_tag +++
+        hovbrace (pp_join_list
+          (Pp.str "," ++ Pp.spc ())
+          (List.map (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) -> Pp.str cstrtag)
+            cstr_and_fields)) ++ Pp.str ";"))
+  in
+  let field_decls =
+    List.map
+      (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+        pp_sjoin_list
+          (List.map
+            (fun (field_type, field_name, accessor) ->
+              Pp.hov 0 (Pp.str field_type +++ Pp.str field_name ++ Pp.str ";"))
+            fields_and_accessors))
+      cstr_and_fields
+  in
+  let cstr_and_fields_with_decls =
+    List.map2
+      (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) field_def ->
+        (cstrid, cstrname, cstrtag, union_field, fields_and_accessors, field_def))
+      cstr_and_fields field_decls
+  in
+  let pp_typedef =
+    Pp.v 0 (
+      Pp.str "typedef struct" +++
+      vbrace (
+        (if singlecstr then
+          Pp.mt ()
+        else
+          Pp.hov 0 (Pp.str "enum" +++ Pp.str enum_tag +++ Pp.str "tag;")) +++
+        (if no_field then
+          Pp.mt ()
+        else if singlecstr then
+          Pp.v 0
+            (let (cstrid, cstrname, cstrtag, union_field, fields_and_accessors, field_decl) = List.hd cstr_and_fields_with_decls in
+            field_decl)
+        else
+          Pp.v 0 (Pp.str "union" +++
+                  vbrace (
+                    pp_sjoin_list
+                      (List.filter_map
+                        (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors, field_decl) ->
+                          if fields_and_accessors = [] then
+                            None
+                          else
+                            Some (
+                              Pp.str "struct" +++
+                              vbrace field_decl ++
+                              Pp.str (" " ^ union_field ^ ";")))
+                        cstr_and_fields_with_decls)) ++
+                  Pp.str " as;"))
+      ) ++ Pp.str (" " ^ ind_typename ^ ";"))
+  in
+  let pp_swfunc =
+    Pp.h 0 (
+      Pp.str "#define" +++
+      Pp.str swfunc ++ Pp.str "(x)" +++
+      (if singlecstr then
+        Pp.str "0"
+      else
+        Pp.str "((x).tag)"))
+  in
+  let pp_accessors =
+    pp_sjoin_list
+      (List.map
+        (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+          pp_sjoin_list
+            (List.map
+              (fun (field_type, field_name, accessor) ->
+                Pp.h 0 (Pp.str "#define" +++
+                        Pp.str accessor ++
+                        Pp.str "(x)" +++
+                        (if singlecstr then
+                          Pp.str ("((x)." ^ field_name ^ ")")
+                        else
+                          Pp.str ("((x).as." ^ union_field ^ "." ^ field_name ^ ")"))))
+              fields_and_accessors))
+        cstr_and_fields)
+  in
+  let pp_cstr =
+    pp_sjoin_list
+      (List.map
+        (fun (cstrid, cstrname, cstrtag, union_field, fields_and_accessors) ->
+          let args =
+            pp_join_list (Pp.str "," ++ Pp.spc ())
+              (List.map
+                (fun (field_type, field_name, accessor) -> Pp.str field_name)
+                fields_and_accessors)
+          in
+          Pp.h 0 (Pp.str "#define" +++
+                    Pp.str cstrname ++
+                    Pp.str "(" ++ args ++ Pp.str ")" +++
+                    Pp.str "(" ++
+                    Pp.str ("(" ^ ind_typename ^ ")") ++
+                    (if singlecstr then
+                      (hbrace args)
+                    else
+                      (hbrace (
+                        let union_init =
+                          Pp.str ("." ^ union_field) +++
+                          Pp.str "=" +++
+                          hbrace args
+                        in
+                        if List.length fields_and_accessors = 0 then
+                          Pp.str cstrtag
+                        else
+                          (Pp.str cstrtag ++ Pp.str "," +++ hbrace union_init)))) ++
+                    Pp.str ")"))
+        cstr_and_fields)
+  in
+  ignore pp_enum;
+  ignore pp_typedef;
+  ignore pp_accessors;
+  let pp =
+    Pp.v 0 (
+      pp_enum +++
+      pp_typedef +++
+      pp_swfunc +++
+      pp_accessors +++
+      pp_cstr +++
+      Pp.mt ()
+    )
+  in
+  (*Feedback.msg_debug (Pp.str (Pp.db_string_of_pp pp));*)
+  let str = Pp.string_of_ppcmds pp in
+  generation_list := GenSnippet str :: !generation_list;
+  (*Feedback.msg_info pp;*)
+  ()
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (* open in the standard permission, 0o666, which will be masked by umask. *)

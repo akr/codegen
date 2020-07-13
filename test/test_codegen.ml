@@ -1847,7 +1847,7 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
     {|
       CodeGen Inductive Type option bool => "option_bool".
       CodeGen Inductive Match option bool => "sw_option_bool"
-      | None => "case option_bool_None"
+      | None => "default"
       | Some => "case option_bool_Some" "option_bool_Some_field1".
       CodeGen Primitive None bool => "None_bool".
       CodeGen Primitive Some bool => "Some_bool".
@@ -1879,6 +1879,36 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
       assert(value_of_optionbool(false, None_bool()) == false);
       assert(value_of_optionbool(false, Some_bool(false)) == false);
       assert(value_of_optionbool(false, Some_bool(true)) == true);
+    |}
+
+let test_indimp_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+
+      Inductive yesno : Set := yes : yesno | no : yesno.
+
+      Definition yesno_of_bool (b : bool) : yesno :=
+        match b with
+        | true => yes
+        | false => no
+        end.
+
+      Definition bool_of_yesno (y : yesno) : bool :=
+        match y with
+        | yes => true
+        | no => false
+        end.
+
+      Definition id_bool (b : bool) : bool :=
+        bool_of_yesno (yesno_of_bool b).
+
+      CodeGen IndImp yesno.
+      CodeGen Function yesno_of_bool.
+      CodeGen Function bool_of_yesno.
+      CodeGen Function id_bool.
+    |}) {|
+      assert(id_bool(true) == true);
+      assert(id_bool(false) == false);
     |}
 
 let suite : OUnit2.test =
@@ -1958,6 +1988,7 @@ let suite : OUnit2.test =
     "test_auto_const" >:: test_auto_const;
     "test_auto_construct" >:: test_auto_construct;
     "test_option_bool_struct" >:: test_option_bool_struct;
+    "test_indimp_bool" >:: test_indimp_bool;
   ]
 
 let () =
