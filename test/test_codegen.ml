@@ -1884,24 +1884,19 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
 let test_indimp_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
-
       Inductive yesno : Set := yes : yesno | no : yesno.
-
       Definition yesno_of_bool (b : bool) : yesno :=
         match b with
         | true => yes
         | false => no
         end.
-
       Definition bool_of_yesno (y : yesno) : bool :=
         match y with
         | yes => true
         | no => false
         end.
-
       Definition id_bool (b : bool) : bool :=
         bool_of_yesno (yesno_of_bool b).
-
       CodeGen IndImp yesno.
       CodeGen Function yesno_of_bool.
       CodeGen Function bool_of_yesno.
@@ -1909,6 +1904,133 @@ let test_indimp_bool (ctx : test_ctxt) : unit =
     |}) {|
       assert(id_bool(true) == true);
       assert(id_bool(false) == false);
+    |}
+
+let test_indimp_bool_pair (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive yn : Set := yes : yn | no : yn.
+      Inductive ynpair : Set := yn2 : bool -> bool -> ynpair.
+      Definition ynpair_of_boolpair (bb : bool * bool) : ynpair :=
+        match bb with
+        | (true, true) => yn2 true true
+        | (true, false) => yn2 true false
+        | (false, true) => yn2 false true
+        | (false, false) => yn2 false false
+        end.
+      Definition boolpair_of_ynpair (yy : ynpair) : bool * bool :=
+        match yy with
+        | yn2 true true => (true, true)
+        | yn2 true false => (true, false)
+        | yn2 false true => (false, true)
+        | yn2 false false => (false, false)
+        end.
+      Definition id_boolpair (bb : bool * bool) : bool * bool :=
+        boolpair_of_ynpair (ynpair_of_boolpair bb).
+      CodeGen Inductive Type bool*bool => "prod_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Snippet "
+      typedef int prod_bool_bool;
+      #define pair_bool_bool(a,b) (((a) << 1) | (b))
+      #define pair_bool_bool_fst(x) ((x) >> 1)
+      #define pair_bool_bool_snd(x) ((x) & 1)
+      ".
+      CodeGen IndImp yn.
+      CodeGen IndImp ynpair.
+      CodeGen Function ynpair_of_boolpair.
+      CodeGen Function boolpair_of_ynpair.
+      CodeGen Function id_boolpair.
+    |}) {|
+      assert(id_boolpair(0) == 0);
+      assert(id_boolpair(1) == 1);
+      assert(id_boolpair(2) == 2);
+      assert(id_boolpair(3) == 3);
+    |}
+
+let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive yn : Set := yes : yn | no : yn.
+      Inductive ynpair (A B : Set) : Set := yn2 : A -> B -> ynpair A B.
+      Definition ynpair_of_boolpair (bb : bool * bool) : ynpair bool bool :=
+        match bb with
+        | (true, true) => yn2 bool bool true true
+        | (true, false) => yn2 bool bool true false
+        | (false, true) => yn2 bool bool false true
+        | (false, false) => yn2 bool bool false false
+        end.
+      Definition boolpair_of_ynpair (yy : ynpair bool bool) : bool * bool :=
+        match yy with
+        | yn2 _ _ true true => (true, true)
+        | yn2 _ _ true false => (true, false)
+        | yn2 _ _ false true => (false, true)
+        | yn2 _ _ false false => (false, false)
+        end.
+      Definition id_boolpair (bb : bool * bool) : bool * bool :=
+        boolpair_of_ynpair (ynpair_of_boolpair bb).
+      CodeGen Inductive Type bool*bool => "prod_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Snippet "
+      typedef int prod_bool_bool;
+      #define pair_bool_bool(a,b) (((a) << 1) | (b))
+      #define pair_bool_bool_fst(x) ((x) >> 1)
+      #define pair_bool_bool_snd(x) ((x) & 1)
+      ".
+      CodeGen IndImp yn.
+      CodeGen IndImp (ynpair bool bool).
+      CodeGen Function ynpair_of_boolpair.
+      CodeGen Function boolpair_of_ynpair.
+      CodeGen Function id_boolpair.
+    |}) {|
+      assert(id_boolpair(0) == 0);
+      assert(id_boolpair(1) == 1);
+      assert(id_boolpair(2) == 2);
+      assert(id_boolpair(3) == 3);
+    |}
+
+let test_indimp_option_bool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive myoption (T : Type) : Type := MySome : T -> myoption T | MyNone : myoption T.
+      Definition myopt_of_opt (ob : option bool) : myoption bool :=
+        match ob with
+        | Some true => MySome bool true
+        | Some false => MySome bool false
+        | None => MyNone bool
+        end.
+      Definition opt_of_myopt (mb : myoption bool) : option bool :=
+        match mb with
+        | MySome _ true => Some true
+        | MySome _ false => Some false
+        | MyNone _ => None
+        end.
+      Definition id_option_bool (ob : option bool) : option bool :=
+        opt_of_myopt (myopt_of_opt ob).
+      CodeGen Inductive Type option bool => "option_bool".
+      CodeGen Inductive Match option bool => "sw_option_bool"
+      | Some => "default" "option_bool_get_some"
+      | None => "case 0".
+      CodeGen Primitive Some bool => "some_bool".
+      CodeGen Constant None bool => "none_bool".
+      CodeGen Snippet "
+      typedef int option_bool;
+      #define sw_option_bool(x) ((x) & 1)
+      #define option_bool_get_some(x) ((bool)((x) >> 1))
+      #define some_bool(x) (((x) << 1) | 1)
+      #define none_bool 0
+      ".
+      CodeGen IndImp (myoption bool).
+      CodeGen Function myopt_of_opt.
+      CodeGen Function opt_of_myopt.
+      CodeGen Function id_option_bool.
+    |}) {|
+      assert(id_option_bool(0) == 0);
+      assert(id_option_bool(1) == 1);
+      assert(id_option_bool(3) == 3);
     |}
 
 let suite : OUnit2.test =
@@ -1989,6 +2111,9 @@ let suite : OUnit2.test =
     "test_auto_construct" >:: test_auto_construct;
     "test_option_bool_struct" >:: test_option_bool_struct;
     "test_indimp_bool" >:: test_indimp_bool;
+    "test_indimp_bool_pair" >:: test_indimp_bool_pair;
+    "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;
+    "test_indimp_option_bool" >:: test_indimp_option_bool;
   ]
 
 let () =

@@ -2010,9 +2010,9 @@ let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
                     Pp.str "(" ++
                     Pp.str ("(" ^ ind_typename ^ ")") ++
                     (if singlecstr then
-                      (hbrace args)
+                      hbrace args
                     else
-                      (hbrace (
+                      hbrace (
                         let union_init =
                           Pp.str ("." ^ union_field) +++
                           Pp.str "=" +++
@@ -2021,7 +2021,7 @@ let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
                         if List.length fields_and_accessors = 0 then
                           Pp.str cstrtag
                         else
-                          (Pp.str cstrtag ++ Pp.str "," +++ hbrace union_init)))) ++
+                          (Pp.str cstrtag ++ Pp.str "," +++ hbrace union_init))) ++
                     Pp.str ")"))
         cstr_and_fields)
   in
