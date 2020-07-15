@@ -1808,36 +1808,6 @@ let add_snippet (str : string) : unit =
   in
   generation_list := GenSnippet str' :: !generation_list
 
-let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
-  List.iter
-    (fun gen ->
-      match gen with
-      | GenFunc cfunc_name ->
-          f (gen_function cfunc_name ++ Pp.fnl ())
-      | GenSnippet str ->
-          f (Pp.str str ++ Pp.fnl ()))
-    gen_list
-
-(* Vernacular commands *)
-
-let command_gen (cfunc_list : string_or_qualid list) : unit =
-  List.iter
-    (fun cfunc_name ->
-      match cfunc_name with
-      | StrOrQid_Str str ->
-          Feedback.msg_info (gen_function str)
-      | StrOrQid_Qid qid ->
-          let (env, sp_inst) = codegen_function_internal qid []
-            { spi_cfunc_name = None;
-              spi_partapp_id = None;
-              spi_specialized_id = None }
-          in
-          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name))
-    cfunc_list
-
-let command_snippet (str : string) : unit =
-  add_snippet str
-
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
     ((*ind*)inductive *
      (*args*)EConstr.t list *
@@ -1892,7 +1862,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   in
   (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields)
 
-let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
+let generate_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
@@ -2061,6 +2031,39 @@ let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   add_snippet str;
   (*Feedback.msg_info pp;*)
   ()
+
+let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
+  List.iter
+    (fun gen ->
+      match gen with
+      | GenFunc cfunc_name ->
+          f (gen_function cfunc_name ++ Pp.fnl ())
+      | GenSnippet str ->
+          f (Pp.str str ++ Pp.fnl ()))
+    gen_list
+
+(* Vernacular commands *)
+
+let command_gen (cfunc_list : string_or_qualid list) : unit =
+  List.iter
+    (fun cfunc_name ->
+      match cfunc_name with
+      | StrOrQid_Str str ->
+          Feedback.msg_info (gen_function str)
+      | StrOrQid_Qid qid ->
+          let (env, sp_inst) = codegen_function_internal qid []
+            { spi_cfunc_name = None;
+              spi_partapp_id = None;
+              spi_specialized_id = None }
+          in
+          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name))
+    cfunc_list
+
+let command_snippet (str : string) : unit =
+  add_snippet str
+
+let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
+  generate_indimp user_coq_type
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (* open in the standard permission, 0o666, which will be masked by umask. *)
