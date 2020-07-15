@@ -1798,6 +1798,16 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
 let gen_function (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub cfunc_name)
 
+let add_snippet (str : string) : unit =
+  let len = String.length str in
+  let str' =
+    if 0 < len && str.[len - 1] <> '\n' then
+      str ^ "\n"
+    else
+      str
+  in
+  generation_list := GenSnippet str' :: !generation_list
+
 (* Vernacular commands *)
 
 let command_gen (cfunc_list : string_or_qualid list) : unit =
@@ -1816,14 +1826,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
     cfunc_list
 
 let command_snippet (str : string) : unit =
-  let len = String.length str in
-  let str' =
-    if 0 < len && str.[len - 1] <> '\n' then
-      str ^ "\n"
-    else
-      str
-  in
-  generation_list := GenSnippet str' :: !generation_list
+  add_snippet str
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
     ((*ind*)inductive *
@@ -2045,7 +2048,7 @@ let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   in
   (*Feedback.msg_debug (Pp.str (Pp.db_string_of_pp pp));*)
   let str = Pp.string_of_ppcmds pp in
-  generation_list := GenSnippet str :: !generation_list;
+  add_snippet str;
   (*Feedback.msg_info pp;*)
   ()
 
@@ -2060,15 +2063,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
       | GenFunc cfunc_name ->
           Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
-          let terminator =
-            if str = "" then
-              Pp.mt ()
-            else if str.[String.length str - 1] = '\n' then
-              Pp.mt ()
-            else
-              Pp.fnl ()
-          in
-          Pp.pp_with fmt (Pp.str str ++ terminator ++ Pp.fnl ()))
+          Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
     gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
