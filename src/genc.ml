@@ -1808,6 +1808,16 @@ let add_snippet (str : string) : unit =
   in
   generation_list := GenSnippet str' :: !generation_list
 
+let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
+  List.iter
+    (fun gen ->
+      match gen with
+      | GenFunc cfunc_name ->
+          f (gen_function cfunc_name ++ Pp.fnl ())
+      | GenSnippet str ->
+          f (Pp.str str ++ Pp.fnl ()))
+    gen_list
+
 (* Vernacular commands *)
 
 let command_gen (cfunc_list : string_or_qualid list) : unit =
@@ -2057,19 +2067,21 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (let (temp_fn, ch) = Filename.open_temp_file
     ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
   let fmt = Format.formatter_of_out_channel ch in
-  List.iter
-    (fun gen ->
-      match gen with
-      | GenFunc cfunc_name ->
-          Pp.pp_with fmt (gen_function cfunc_name ++ Pp.fnl ())
-      | GenSnippet str ->
-          Pp.pp_with fmt (Pp.str str ++ Pp.fnl ()))
-    gen_list;
+  gen_pp_iter (fun pp -> Pp.pp_with fmt pp) gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
   Sys.rename temp_fn fn;
   Feedback.msg_info (str ("[codegen] file generated: " ^ fn)))
 
-let command_generate_file (fn : string) =
+let gen_test (gen_list : code_generation list) : unit =
+  gen_pp_iter
+    (fun pp -> Feedback.msg_info pp)
+    gen_list
+
+let command_generate_file (fn : string) : unit =
   gen_file fn (List.rev !generation_list);
+  generation_list := []
+
+let command_generate_test () : unit =
+  gen_test (List.rev !generation_list);
   generation_list := []

@@ -183,8 +183,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
-    | [ "CodeGen" "GenerateFile" string(fn) ] ->
-      { command_generate_file fn }
+    | [ "CodeGen" "GenerateFile" string(fn) ] -> { command_generate_file fn }
+    | [ "CodeGen" "GenerateTest" ] -> { command_generate_test () }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
       { command_global_inline funcs }
