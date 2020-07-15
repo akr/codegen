@@ -2033,6 +2033,47 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
       assert(id_option_bool(3) == 3);
     |}
 
+let test_indimp_record (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Record bool2 : Set := mkbool2 { bool2_x : bool; bool2_y : bool }.
+      Definition bool2_of_boolpair (bb : bool * bool) : bool2 :=
+        match bb with
+        | (true, true) => mkbool2 true true
+        | (true, false) => mkbool2 true false
+        | (false, true) => mkbool2 false true
+        | (false, false) => mkbool2 false false
+        end.
+      Definition boolpair_of_bool2 (b2 : bool2) : bool * bool :=
+        match b2 with
+        | mkbool2 true true => (true, true)
+        | mkbool2 true false => (true, false)
+        | mkbool2 false true => (false, true)
+        | mkbool2 false false => (false, false)
+        end.
+      Definition id_boolpair (bb : bool * bool) : bool * bool :=
+        boolpair_of_bool2 (bool2_of_boolpair bb).
+      CodeGen Inductive Type bool*bool => "prod_bool_bool".
+      CodeGen Inductive Match bool*bool => ""
+      | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
+      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Snippet "
+      typedef int prod_bool_bool;
+      #define pair_bool_bool(a,b) (((a) << 1) | (b))
+      #define pair_bool_bool_fst(x) ((x) >> 1)
+      #define pair_bool_bool_snd(x) ((x) & 1)
+      ".
+      CodeGen IndImp bool2.
+      CodeGen Function bool2_of_boolpair.
+      CodeGen Function boolpair_of_bool2.
+      CodeGen Function id_boolpair.
+    |}) {|
+      assert(id_boolpair(0) == 0);
+      assert(id_boolpair(1) == 1);
+      assert(id_boolpair(2) == 2);
+      assert(id_boolpair(3) == 3);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2114,6 +2155,7 @@ let suite : OUnit2.test =
     "test_indimp_bool_pair" >:: test_indimp_bool_pair;
     "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;
     "test_indimp_option_bool" >:: test_indimp_option_bool;
+    "test_indimp_record" >:: test_indimp_record;
   ]
 
 let () =

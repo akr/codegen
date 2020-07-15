@@ -1825,7 +1825,7 @@ let command_snippet (str : string) : unit =
   in
   generation_list := GenSnippet str' :: !generation_list
 
-let generate_ind_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
     ((*ind*)inductive *
      (*args*)EConstr.t list *
      (*ind typename*)string *
@@ -1857,18 +1857,23 @@ let generate_ind_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
         (*Feedback.msg_debug (Printer.pr_econstr_env env sigma cstrterm);*)
         let cstrtype = Retyping.get_type_of env sigma cstrterm in
         let (args, result_type) = decompose_prod sigma cstrtype in
-        let field_types = List.rev (List.map (fun (name, t) -> c_typename env sigma t) args) in
         let cstrid = oneind_body.Declarations.mind_consnames.(j) in
         let cstrname = global_prefix ^ "_cstr_" ^ (Id.to_string cstrid) in
         let cstrtag = global_prefix ^ "_tag_" ^ (Id.to_string cstrid) in
         let union_field = global_prefix ^ "_u_" ^ (Id.to_string cstrid) in
         let fields_and_accessors =
           List.mapi
-            (fun k field_type ->
-              let field_name = "field" ^ string_of_int (k+1) in
-              let accessor = global_prefix ^ "_get_" ^ (Id.to_string cstrid) ^ "_" ^ field_name in
+            (fun k (arg_name, arg_type) ->
+              let field_type = c_typename env sigma arg_type in
+              let suffix =
+                match Context.binder_name arg_name with
+                | Name.Anonymous -> ""
+                | Name.Name id -> "_" ^ c_id (Id.to_string id)
+              in
+              let field_name = global_prefix ^ "_field" ^ (string_of_int (k+1)) ^ "_" ^ (Id.to_string cstrid) ^ suffix in
+              let accessor = global_prefix ^ "_get" ^ (string_of_int (k+1)) ^ "_" ^ (Id.to_string cstrid) ^ suffix in
               (field_type, field_name, accessor))
-            field_types
+            (List.rev args)
         in
         (cstrid, cstrname, cstrtag, union_field, fields_and_accessors))
   in
@@ -1881,7 +1886,7 @@ let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   (if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_constr_env env sigma coq_type));
   let coq_type = EConstr.of_constr coq_type in
-  let (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields) = generate_ind_names env sigma coq_type in
+  let (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields) = generate_indimp_names env sigma coq_type in
   ignore (register_ind_type env sigma (EConstr.to_constr sigma coq_type) ind_typename);
   let cstr_caselabel_accessors_list =
     List.mapi
