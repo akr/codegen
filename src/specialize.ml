@@ -188,7 +188,7 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
   let sd_list = drop_trailing_d sd_list in
   let t = aux env f f_type sd_list (List.map EConstr.of_constr static_args) in
   let (sigma, ty) = Typing.type_of env sigma t in
-  Pretyping.check_evars env sigma0 sigma t;
+  Pretyping.check_evars env ~initial:sigma0 sigma t;
   let t = Evarutil.flush_and_check_evars sigma t in
   (sigma, t, ty)
 
@@ -209,7 +209,7 @@ let interp_args (env : Environ.env) (sigma : Evd.evar_map)
                               else Constrintern.interp_constr_evars in
     let (sigma, arg) = interp env sigma user_arg in
     (* Feedback.msg_info (Printer.pr_econstr_env env sigma arg); *)
-    Pretyping.check_evars env sigma0 sigma arg;
+    Pretyping.check_evars env ~initial:sigma0 sigma arg;
     (sigma, arg)
   in
   CList.fold_left2_map interp_arg sigma istypearg_list user_args
@@ -619,7 +619,7 @@ let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) 
       else
         None
   | Evar (ev, es) ->
-      fv_range_array sigma numlocal es
+      fv_range_array sigma numlocal (Array.of_list es)
   | Proj (proj, e) ->
       fv_range_rec sigma numlocal e
   | Cast (e,ck,t) ->
@@ -957,7 +957,7 @@ let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) :
   | Const _ | Construct _ -> None
   | Rel i -> if numrels < i then Some i else None
   | Evar (ev, es) ->
-      array_option_exists (first_fv_rec sigma numrels) es
+      array_option_exists (first_fv_rec sigma numrels) (Array.of_list es)
   | Proj (proj, e) ->
       first_fv_rec sigma numrels e
   | Cast (e,ck,t) ->
@@ -1117,7 +1117,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
   | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ -> term
   | Evar (ev, es) ->
-      mkEvar (ev, Array.map (normalize_types env sigma) es)
+      mkEvar (ev, List.map (normalize_types env sigma) es)
   | Proj (proj, e) ->
       mkProj (proj, normalize_types env sigma e)
   | Cast (e,ck,t) ->
@@ -1210,8 +1210,8 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
       (List.nth refs (i-1)) := true;
       fun () -> mkRel (i - count_false_in_prefix (i-1) refs)
   | Evar (ev, es) ->
-      let fs = Array.map (delete_unused_let_rec env sigma refs) es in
-      fun () -> mkEvar (ev, Array.map (fun f -> f ()) fs)
+      let fs = List.map (delete_unused_let_rec env sigma refs) es in
+      fun () -> mkEvar (ev, List.map (fun f -> f ()) fs)
   | Proj (proj, e) ->
       let f = delete_unused_let_rec env sigma refs e in
       fun () -> mkProj (proj, f ())

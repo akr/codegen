@@ -24,7 +24,6 @@ module ConstrMap = HMap.Make(Constr)
 let opt_debug_specialization = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of specialization";
           optkey   = ["Debug";"CodeGen";"Specialization"];
           optread  = (fun () -> !opt_debug_specialization);
           optwrite = (:=) opt_debug_specialization }
@@ -33,7 +32,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_normalizeV = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of normalizeV";
           optkey   = ["Debug";"CodeGen";"NormalizeV"];
           optread  = (fun () -> !opt_debug_normalizeV);
           optwrite = (:=) opt_debug_normalizeV }
@@ -42,7 +40,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_reduction = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of reduction steps";
           optkey   = ["Debug";"CodeGen";"Reduction"];
           optread  = (fun () -> !opt_debug_reduction);
           optwrite = (:=) opt_debug_reduction }
@@ -51,7 +48,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_reduce_exp = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of reduce_exp";
           optkey   = ["Debug";"CodeGen";"ReduceExp"];
           optread  = (fun () -> !opt_debug_reduce_exp);
           optwrite = (:=) opt_debug_reduce_exp }
@@ -60,7 +56,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_replace = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of replacement of general function by specialized function";
           optkey   = ["Debug";"CodeGen";"Replace"];
           optread  = (fun () -> !opt_debug_replace);
           optwrite = (:=) opt_debug_replace }
@@ -69,7 +64,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_expand_eta = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of expand_eta";
           optkey   = ["Debug";"CodeGen";"ExpandEta"];
           optread  = (fun () -> !opt_debug_expand_eta);
           optwrite = (:=) opt_debug_expand_eta }
@@ -78,7 +72,6 @@ let () = let open Goptions in declare_bool_option
 let opt_debug_delete_let = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optname  = "Enables printing trace of delete_let";
           optkey   = ["Debug";"CodeGen";"DeleteLet"];
           optread  = (fun () -> !opt_debug_delete_let);
           optwrite = (:=) opt_debug_delete_let }

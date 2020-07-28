@@ -79,7 +79,7 @@ let rec hasRel sigma term =
   | Constr.Rel i -> true
   | Constr.Var name -> false
   | Constr.Meta i -> false
-  | Constr.Evar (ekey, termary) -> Array.exists (hasRel sigma) termary
+  | Constr.Evar (ekey, terms) -> List.exists (hasRel sigma) terms
   | Constr.Sort s -> false
   | Constr.Cast (expr, kind, ty) -> hasRel sigma expr || hasRel sigma ty
   | Constr.Prod (name, ty, body) -> hasRel sigma ty || hasRel sigma body
