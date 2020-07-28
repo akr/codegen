@@ -11,8 +11,8 @@ https://github.com/akr/codegen
 
 You need Coq and OCaml.
 
-- Coq 8.11 (Coq 8.10 doesn't work)
-- OCaml 4.09.0
+- Coq 8.12 (Coq 8.11 doesn't work)
+- OCaml 4.10.0
 
 You also need following to test codegen.
 
