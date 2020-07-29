@@ -1808,6 +1808,43 @@ let add_snippet (str : string) : unit =
   in
   generation_list := GenSnippet str' :: !generation_list
 
+let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
+  let (f, params) = decompose_app sigma coq_type in
+  let (ind, _) = destInd sigma f in
+  let (mutind, _) = ind in
+  let mutind_body = Environ.lookup_mind mutind env in
+  let ntypes = mutind_body.Declarations.mind_ntypes in
+  let exception RecursionFound in
+  try
+    for i = 0 to ntypes - 1 do
+      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      let numcstr = Array.length oneind_body.Declarations.mind_consnames in
+      for j = 0 to numcstr - 1 do
+        let (ctxt, rettype) = oneind_body.Declarations.mind_nf_lc.(j) in
+        ignore
+          (Context.Rel.fold_outside
+            (fun decl k ->
+              (match decl with
+              | Context.Rel.Declaration.LocalAssum (name, ty) ->
+                  let ty = EConstr.of_constr ty in
+                  if Array.mem true (free_variables_without sigma ntypes k ty) then
+                    raise RecursionFound
+              | Context.Rel.Declaration.LocalDef (name, expr, ty) ->
+                  let expr = EConstr.of_constr expr in
+                  let ty = EConstr.of_constr ty in
+                  if Array.mem true (free_variables_without sigma ntypes k expr) then
+                    raise RecursionFound;
+                  if Array.mem true (free_variables_without sigma ntypes k ty) then
+                    raise RecursionFound);
+              k+1)
+            ctxt
+            ~init:0)
+      done
+    done;
+    false
+  with RecursionFound ->
+    true
+
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) :
     ((*ind*)inductive *
      (*args*)EConstr.t list *
@@ -2063,7 +2100,13 @@ let command_snippet (str : string) : unit =
   add_snippet str
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
-  generate_indimp user_coq_type
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  if ind_recursive_p env sigma (EConstr.of_constr coq_type) then
+    user_err (Pp.str "[codegen] recursive inductive type:" +++ Printer.pr_constr_env env sigma coq_type)
+  else
+    generate_indimp user_coq_type
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (* open in the standard permission, 0o666, which will be masked by umask. *)

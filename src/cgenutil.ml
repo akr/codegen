@@ -428,6 +428,49 @@ let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : E
   | [] -> b
   | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
 
+let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
+  | Const _ | Construct _ -> ()
+  | Rel i ->
+      if numlocal < i then
+        fv.(i-numlocal-1) <- true
+  | Evar (ev, es) ->
+      List.iter (free_variables_rec sigma numlocal fv) es
+  | Proj (proj, e) ->
+      free_variables_rec sigma numlocal fv e
+  | Cast (e,ck,t) ->
+      free_variables_rec sigma numlocal fv e;
+      free_variables_rec sigma numlocal fv t
+  | App (f, args) ->
+      free_variables_rec sigma numlocal fv f;
+      Array.iter (free_variables_rec sigma numlocal fv) args
+  | LetIn (x,e,t,b) ->
+      free_variables_rec sigma numlocal fv e;
+      free_variables_rec sigma numlocal fv t;
+      free_variables_rec sigma (numlocal+1) fv b
+  | Case (ci, p, item, branches) ->
+      free_variables_rec sigma numlocal fv p;
+      free_variables_rec sigma numlocal fv item;
+      Array.iter (free_variables_rec sigma numlocal fv) branches
+  | Prod (x,t,b) | Lambda (x,t,b) ->
+      free_variables_rec sigma numlocal fv t;
+      free_variables_rec sigma (numlocal+1) fv b
+  | Fix (_, (nary, tary, fary)) | CoFix (_, (nary, tary, fary)) ->
+      Array.iter (free_variables_rec sigma numlocal fv) tary;
+      let numlocal2 = numlocal + Array.length fary in
+      Array.iter (free_variables_rec sigma numlocal2 fv) fary
+
+(* nb_rel + nb_local should be Environ.nb_rel env *)
+let free_variables_without (sigma : Evd.evar_map) (nb_rel : int) (nb_local : int) (term : EConstr.t) : bool array =
+  let fv = Array.make nb_rel false in
+  free_variables_rec sigma nb_local fv term;
+  fv
+
+(* nb_rel should be Environ.nb_rel env *)
+let free_variables (sigma : Evd.evar_map) (nb_rel : int) (term : EConstr.t) : bool array =
+  free_variables_without sigma nb_rel 0 term
+
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with
   | Rel _ -> "Rel"
