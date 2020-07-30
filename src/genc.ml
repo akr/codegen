@@ -1958,6 +1958,22 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
         (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors, field_def))
       cstr_and_fields field_decls
   in
+  let pp_cstr_struct_defs =
+    if no_field || singlecstr then
+      Pp.mt ()
+    else
+      pp_sjoin_list
+        (List.filter_map
+          (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors, field_decl) ->
+            if fields_and_accessors = [] then
+              None
+            else
+              Some (
+                Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
+                vbrace field_decl ++
+                Pp.str ";"))
+          cstr_and_fields_with_decls)
+  in
   let pp_typedef =
     Pp.v 0 (
       Pp.str "typedef struct" +++
@@ -1982,10 +1998,10 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
                             None
                           else
                             Some (
-                              Pp.str "struct" +++
-                              Pp.str cstr_struct +++
-                              vbrace field_decl ++
-                              Pp.str (" " ^ cstr_ufield ^ ";")))
+                              Pp.hov 0 (Pp.str "struct" +++
+                                        Pp.str cstr_struct +++
+                                        Pp.str cstr_ufield ++
+                                        Pp.str ";")))
                         cstr_and_fields_with_decls)) ++
                   Pp.str " as;"))
       ) ++ Pp.str (" " ^ ind_typename ^ ";"))
@@ -2047,12 +2063,10 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
                     Pp.str ")"))
         cstr_and_fields)
   in
-  ignore pp_enum;
-  ignore pp_typedef;
-  ignore pp_accessors;
   let pp =
     Pp.v 0 (
       pp_enum +++
+      pp_cstr_struct_defs +++
       pp_typedef +++
       pp_swfunc +++
       pp_accessors +++
