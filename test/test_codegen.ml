@@ -354,6 +354,15 @@ let list_bool_src = {|
         ret->tail = s;
         return ret;
       }
+      static inline bool list_bool_eq(list_bool s1, list_bool s2) {
+        while (s1 && s2) {
+          if (s1->head != s2->head) return false;
+          s1 = s1->tail;
+          s2 = s2->tail;
+        }
+        return !(s1 || s2);
+      }
+
       ".
 |}
 
@@ -2101,6 +2110,59 @@ let test_indimp_nat (ctx : test_ctxt) : unit =
       assert(id_nat(3) == 3);
     |}
 
+let test_indimp_mutual (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ list_bool_src ^
+    {|
+      Inductive even_list : Set :=
+      | even_nil : even_list
+      | even_cons : bool -> odd_list -> even_list
+      with odd_list : Set :=
+      | odd_cons : bool -> even_list -> odd_list.
+      Fixpoint list_of_even_list (el : even_list) : list bool :=
+        match el with
+        | even_nil => nil
+        | even_cons b ol => cons b (list_of_odd_list ol)
+        end
+      with list_of_odd_list (ol : odd_list) : list bool :=
+        match ol with
+        | odd_cons b el => cons b (list_of_even_list el)
+        end.
+      Fixpoint even_list_of_list (l : list bool) : even_list :=
+        match l with
+        | nil => even_nil
+        | cons b nil => even_cons b (odd_cons false even_nil)
+        | cons b1 (cons b2 l2) => even_cons b1 (odd_cons b2 (even_list_of_list l2))
+        end.
+      Fixpoint odd_list_of_list (l : list bool) : odd_list :=
+        match l with
+        | nil => odd_cons false even_nil
+        | cons b nil => odd_cons b even_nil
+        | cons b1 (cons b2 l2) => odd_cons b1 (even_cons b2 (odd_list_of_list l2))
+        end.
+      Definition id_list_even (l : list bool) : list bool :=
+        list_of_even_list (even_list_of_list l).
+      Definition id_list_odd (l : list bool) : list bool :=
+        list_of_odd_list (odd_list_of_list l).
+      CodeGen IndImp even_list.
+      CodeGen Function list_of_even_list.
+      CodeGen Function list_of_odd_list.
+      CodeGen Function even_list_of_list.
+      CodeGen Function odd_list_of_list.
+      CodeGen Function id_list_even.
+      CodeGen Function id_list_odd.
+    |}) {|
+      #define cons(h,t) list_bool_cons(h,t)
+      list_bool s = NULL;
+      assert(list_bool_eq(s, id_list_even(s)));
+      s = cons(false, s);
+      assert(list_bool_eq(s, id_list_odd(s)));
+      s = cons(true, s);
+      assert(list_bool_eq(s, id_list_even(s)));
+      s = cons(true, s);
+      assert(list_bool_eq(s, id_list_odd(s)));
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2184,6 +2246,7 @@ let suite : OUnit2.test =
     "test_indimp_option_bool" >:: test_indimp_option_bool;
     "test_indimp_record" >:: test_indimp_record;
     "test_indimp_nat" >:: test_indimp_nat;
+    "test_indimp_mutual" >:: test_indimp_mutual;
   ]
 
 let () =
