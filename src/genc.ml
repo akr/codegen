@@ -1875,7 +1875,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
   let ind_id = mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename in
-  let ind_typename = global_prefix ^ "_ind_" ^ Id.to_string ind_id in
+  let ind_typename = global_prefix ^ "_type_" ^ Id.to_string ind_id in
   ignore (register_ind_type env sigma (EConstr.to_constr sigma coq_type) ind_typename);
   let enum_tag = global_prefix ^ "_enum_" ^ Id.to_string ind_id in
   let swfunc = global_prefix ^ "_sw_" ^ Id.to_string ind_id in
@@ -1889,21 +1889,23 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let cstrtype = Retyping.get_type_of env sigma cstrterm in
         let (args, result_type) = decompose_prod sigma cstrtype in
         let cstrid = oneind_body.Declarations.mind_consnames.(j) in
-        let cstrname = global_prefix ^ "_cstr_" ^ (Id.to_string cstrid) in
-        let cstr_enum_name = global_prefix ^ "_tag_" ^ (Id.to_string cstrid) in
-        let cstr_struct = global_prefix ^ "_struct_" ^ (Id.to_string cstrid) in
-        let cstr_ufield = global_prefix ^ "_ufield_" ^ (Id.to_string cstrid) in
+        let j_suffix = string_of_int (j+1) ^ "_" ^ Id.to_string cstrid in
+        let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
+        let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
+        let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
+        let cstr_ufield = global_prefix ^ "_ufield" ^ j_suffix in
         let fields_and_accessors =
           List.mapi
             (fun k (arg_name, arg_type) ->
               let field_type = c_typename env sigma arg_type in
-              let suffix =
+              let k_suffix =
+                string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
                 match Context.binder_name arg_name with
                 | Name.Anonymous -> ""
                 | Name.Name id -> "_" ^ c_id (Id.to_string id)
               in
-              let field_name = global_prefix ^ "_field" ^ (string_of_int (k+1)) ^ "_" ^ (Id.to_string cstrid) ^ suffix in
-              let accessor = global_prefix ^ "_get" ^ (string_of_int (k+1)) ^ "_" ^ (Id.to_string cstrid) ^ suffix in
+              let field_name = global_prefix ^ "_field" ^ k_suffix in
+              let accessor = global_prefix ^ "_get" ^ k_suffix in
               (field_type, field_name, accessor))
             (List.rev args)
         in
