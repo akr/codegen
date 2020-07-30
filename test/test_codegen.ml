@@ -190,6 +190,7 @@ let codegen_test_template (ctx : test_ctxt)
     "CodeGen GenerateFile \"gen.c\".\n");
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
+    "#include <stdlib.h> /* for abort and malloc */\n" ^
     "#include <assert.h>\n" ^
     "#include \"gen.c\"\n" ^
     "int main(int argc, char *argv[]) {\n" ^
@@ -2074,6 +2075,32 @@ let test_indimp_record (ctx : test_ctxt) : unit =
       assert(id_boolpair(3) == 3);
     |}
 
+let test_indimp_nat (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Inductive mynat : Set := myO : mynat | myS : mynat -> mynat.
+      Fixpoint mynat_of_nat (n : nat) : mynat :=
+        match n with
+        | O => myO
+        | S m => myS (mynat_of_nat m)
+        end.
+      Fixpoint nat_of_mynat (n : mynat) : nat :=
+        match n with
+        | myO => O
+        | myS m => S (nat_of_mynat m)
+        end.
+      Definition id_nat n := nat_of_mynat (mynat_of_nat n).
+      CodeGen IndImp mynat.
+      CodeGen Function mynat_of_nat.
+      CodeGen Function nat_of_mynat.
+      CodeGen Function id_nat.
+    |}) {|
+      assert(id_nat(0) == 0);
+      assert(id_nat(1) == 1);
+      assert(id_nat(2) == 2);
+      assert(id_nat(3) == 3);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2156,6 +2183,7 @@ let suite : OUnit2.test =
     "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;
     "test_indimp_option_bool" >:: test_indimp_option_bool;
     "test_indimp_record" >:: test_indimp_record;
+    "test_indimp_nat" >:: test_indimp_nat;
   ]
 
 let () =
