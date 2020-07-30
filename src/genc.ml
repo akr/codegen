@@ -1854,7 +1854,8 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
      ((*cstr ID*)Id.t *
       (*cstr function name*)string *
       (*cstr tag (enum constant) *)string *
-      (*union field*)string *
+      (*cstr struct tag*)string *
+      (*union field name for cstr struct*)string *
       ((*field type*)string *
        (*field name*)string *
        (*accessor name*)string) list) list) =
@@ -1881,6 +1882,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let cstrname = global_prefix ^ "_cstr_" ^ (Id.to_string cstrid) in
         let cstrtag = global_prefix ^ "_tag_" ^ (Id.to_string cstrid) in
         let cstr_struct = global_prefix ^ "_struct_" ^ (Id.to_string cstrid) in
+        let cstr_ufield = global_prefix ^ "_ufield_" ^ (Id.to_string cstrid) in
         let fields_and_accessors =
           List.mapi
             (fun k (arg_name, arg_type) ->
@@ -1895,7 +1897,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               (field_type, field_name, accessor))
             (List.rev args)
         in
-        (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors))
+        (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors))
   in
   (ind, args, ind_typename, enum_tag, swfunc, cstr_and_fields)
 
@@ -1904,7 +1906,7 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   ignore (register_ind_type env sigma (EConstr.to_constr sigma coq_type) ind_typename);
   let cstr_caselabel_accessors_list =
     List.mapi
-      (fun j (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+      (fun j (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
         let caselabel = if j = 0 then "default" else "case " ^ cstrtag in
         let accessors = List.map (fun (field_type, field_name, accessor) -> accessor) fields_and_accessors in
         (cstrid, caselabel, accessors))
@@ -1913,7 +1915,7 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   ignore (register_ind_match env sigma (EConstr.to_constr sigma coq_type) swfunc cstr_caselabel_accessors_list);
   let env =
     CList.fold_left_i
-      (fun j env (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+      (fun j env (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
         let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, (j+1))) in
         let args' = List.rev_map (EConstr.to_constr sigma) args in
         ignore (codegen_specialization_define_or_check_arguments env sigma cstrterm0 (List.init (List.length args) (fun _ -> SorD_S)));
@@ -1924,7 +1926,7 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   ignore env;
   let no_field =
     List.for_all
-      (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+      (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
         fields_and_accessors = [])
       cstr_and_fields
   in
@@ -1937,12 +1939,12 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
         (Pp.str "enum" +++ Pp.str enum_tag +++
         hovbrace (pp_join_list
           (Pp.str "," ++ Pp.spc ())
-          (List.map (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) -> Pp.str cstrtag)
+          (List.map (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) -> Pp.str cstrtag)
             cstr_and_fields)) ++ Pp.str ";"))
   in
   let field_decls =
     List.map
-      (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+      (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
         pp_sjoin_list
           (List.map
             (fun (field_type, field_name, accessor) ->
@@ -1952,8 +1954,8 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   in
   let cstr_and_fields_with_decls =
     List.map2
-      (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) field_def ->
-        (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors, field_def))
+      (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) field_def ->
+        (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors, field_def))
       cstr_and_fields field_decls
   in
   let pp_typedef =
@@ -1968,21 +1970,22 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
           Pp.mt ()
         else if singlecstr then
           Pp.v 0
-            (let (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors, field_decl) = List.hd cstr_and_fields_with_decls in
+            (let (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors, field_decl) = List.hd cstr_and_fields_with_decls in
             field_decl)
         else
           Pp.v 0 (Pp.str "union" +++
                   vbrace (
                     pp_sjoin_list
                       (List.filter_map
-                        (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors, field_decl) ->
+                        (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors, field_decl) ->
                           if fields_and_accessors = [] then
                             None
                           else
                             Some (
                               Pp.str "struct" +++
+                              Pp.str cstr_struct +++
                               vbrace field_decl ++
-                              Pp.str (" " ^ cstr_struct ^ ";")))
+                              Pp.str (" " ^ cstr_ufield ^ ";")))
                         cstr_and_fields_with_decls)) ++
                   Pp.str " as;"))
       ) ++ Pp.str (" " ^ ind_typename ^ ";"))
@@ -1999,7 +2002,7 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   let pp_accessors =
     pp_sjoin_list
       (List.map
-        (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+        (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
           pp_sjoin_list
             (List.map
               (fun (field_type, field_name, accessor) ->
@@ -2009,14 +2012,14 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
                         (if singlecstr then
                           Pp.str ("((x)." ^ field_name ^ ")")
                         else
-                          Pp.str ("((x).as." ^ cstr_struct ^ "." ^ field_name ^ ")"))))
+                          Pp.str ("((x).as." ^ cstr_ufield ^ "." ^ field_name ^ ")"))))
               fields_and_accessors))
         cstr_and_fields)
   in
   let pp_cstr =
     pp_sjoin_list
       (List.map
-        (fun (cstrid, cstrname, cstrtag, cstr_struct, fields_and_accessors) ->
+        (fun (cstrid, cstrname, cstrtag, cstr_struct, cstr_ufield, fields_and_accessors) ->
           let args =
             pp_join_list (Pp.str "," ++ Pp.spc ())
               (List.map
@@ -2033,7 +2036,7 @@ let generate_indimp (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
                     else
                       hbrace (
                         let union_init =
-                          Pp.str ("." ^ cstr_struct) +++
+                          Pp.str ("." ^ cstr_ufield) +++
                           Pp.str "=" +++
                           hbrace args
                         in
