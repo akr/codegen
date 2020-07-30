@@ -2192,15 +2192,19 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
       (List.map
         (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_ufield, fields_and_accessors) ->
           let fargs =
-            pp_join_list (Pp.str "," ++ Pp.spc ())
-              (List.map
-                (fun (field_type, field_name, accessor) -> Pp.hov 0 (Pp.str field_type +++ Pp.str field_name))
-                fields_and_accessors)
+            if fields_and_accessors = [] then
+              Pp.str "void"
+            else
+              pp_join_list (Pp.str "," ++ Pp.spc ())
+                (List.map
+                  (fun (field_type, field_name, accessor) -> Pp.hov 0 (Pp.str field_type +++ Pp.str field_name))
+                  fields_and_accessors)
           in
-          Pp.v 0 (Pp.str "static" +++
-	          Pp.str ind_typename +++
-		  Pp.str cstrname ++
-		  Pp.str "(" ++ fargs ++ Pp.str ")" +++
+          Pp.v 0 (Pp.hov 2 (
+                    Pp.str "static" +++
+                    Pp.str ind_typename +++
+                    Pp.str cstrname ++
+                    Pp.str "(" ++ fargs ++ Pp.str ")") +++
 		  vbrace (
                     Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct +++ Pp.str "*p;") +++
                     Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
