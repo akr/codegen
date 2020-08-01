@@ -1,7 +1,9 @@
 .PHONY: check checker
 
+SHARDS?=4
+
 check: checker
-	./test_codegen
+	./test_codegen -shards $(SHARDS)
 
 checker: test_codegen
 
