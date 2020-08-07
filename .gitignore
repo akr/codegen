@@ -5,6 +5,7 @@ test/test_codegen
 sample/pow
 sample/rank
 oUnit-*
+.merlin
 *.bak
 *.swp
 *.a
