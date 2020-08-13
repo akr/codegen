@@ -1,1 +1,2 @@
+# Merlin needs -bin-annot
 CAMLFLAGS += -bin-annot
