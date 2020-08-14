@@ -27,6 +27,7 @@ clean :
 	  src/*.cmo \
 	  src/*.cmx \
 	  src/*.cma \
+	  src/*.cmt \
 	  src/*.cmxa \
 	  src/*.cmxs \
 	  src/*.a \
