@@ -1,4 +1,4 @@
-.PHONY: all install plugin check checker clean
+.PHONY: all install plugin check checker clean no-install-development
 
 -include Makefile.coq.conf
 
@@ -8,6 +8,12 @@ all : Makefile.coq
 install : Makefile.coq
 	test ! theories -ef $(COQMF_COQLIB)/user-contrib/codegen || ( echo "$(COQMF_COQLIB)/user-contrib/codegen is linked to theories.  No need to install."; false )
 	$(MAKE) -f Makefile.coq $@
+
+no-install-development :
+	rm -f $(COQMF_COQLIB)/user-contrib/codegen
+	rm -f $(COQMF_COQLIB)/user-contrib/codegen_src
+	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
+	ln -s `pwd`/src $(COQMF_COQLIB)/user-contrib/codegen_src
 
 plugin : Makefile.coq
 	$(MAKE) -f Makefile.coq src/codegen_plugin.cmxs
