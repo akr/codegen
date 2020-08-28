@@ -9,28 +9,26 @@ install : Makefile.coq
 	test ! theories -ef $(COQMF_COQLIB)/user-contrib/codegen || ( echo "$(COQMF_COQLIB)/user-contrib/codegen is linked to theories.  No need to install."; false )
 	$(MAKE) -f Makefile.coq $@
 
-no-install-development : revert-no-install-development
 ifdef COQMF_COQLIB
+no-install-development : revert-no-install-development
 	ln -s ../src/codegen_plugin.cmi theories
 	ln -s ../src/codegen_plugin.cmxs theories
 	ln -s ../src/codegen_plugin.cmxa theories
 	ln -s ../src/codegen_plugin.cmx theories
 	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
-else
-	-echo COQMF_COQLIB not defined.  run "make" first.
-endif
 
 revert-no-install-development :
-ifdef COQMF_COQLIB
 	rm -f theories/codegen_plugin.cmi
 	rm -f theories/codegen_plugin.cmxs
 	rm -f theories/codegen_plugin.cmxa
 	rm -f theories/codegen_plugin.cmx
 	rm -f $(COQMF_COQLIB)/user-contrib/codegen
 else
-	-echo COQMF_COQLIB not defined.  run "make" first.
+no-install-development :
+	@echo 'COQMF_COQLIB not defined.  run "make" first.'
+revert-no-install-development :
+	@echo 'COQMF_COQLIB not defined.  run "make" first.'
 endif
-
 
 plugin : Makefile.coq
 	$(MAKE) -f Makefile.coq src/codegen_plugin.cmxs
