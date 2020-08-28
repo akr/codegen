@@ -45,8 +45,6 @@ check checker:
 
 clean :
 	rm -f \
-	  Makefile.coq \
-	  Makefile.coq.conf \
 	  .Makefile.coq.d \
 	  src/g_codegen.ml \
 	  src/*.o \ \
@@ -80,3 +78,7 @@ clean :
 	  sample/.*.aux \
 	  oUnit-*
 
+distclean : clean
+	rm -f \
+	  Makefile.coq \
+	  Makefile.coq.conf
