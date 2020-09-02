@@ -1,10 +1,10 @@
 #include <stdbool.h> /* for bool, true and false */
-#include <stdint.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <assert.h>
-#include <inttypes.h>
+#include <stdint.h> /* uint64_t */
+#include <stddef.h> /* size_t */
+#include <stdlib.h> /* malloc */
+#include <stdio.h> /* perror */
+#include <assert.h> /* assert */
+#include <inttypes.h> /* PRIu64 */
 
 typedef uint64_t nat;
 #define nat_succ(n) ((n)+1)
