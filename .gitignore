@@ -4,6 +4,7 @@ src/g_codegen.ml
 test/test_codegen
 sample/pow
 sample/rank
+sample/sprintf
 oUnit-*
 .merlin
 *.bak

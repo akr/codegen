@@ -39,6 +39,12 @@ rank algorithm of succinct data structure:
     gcc -g -Wall sample/rank.c -o sample/rank
     sample/rank rand
 
+sprintf function:
+
+    coqc sample/sprintf.v # generates sample/sprintf_proved.c
+    gcc -g -Wall sample/sprintf.c -o sample/sprintf
+    sample/sprintf
+
 ## Authors
 
 - Tanaka Akira
