@@ -127,10 +127,10 @@ and is_linear_app env sigma ty f argsary =
       (type_linearity_list := (ty, Investigating) :: !type_linearity_list;
       if isInd sigma f then
         if is_linear_ind env sigma ty (destInd sigma f) argsary then
-          (Feedback.msg_info (str "[codegen] linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
+          (Feedback.msg_info (str "[codegen] Linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
           type_linearity_list := (ty, Linear) :: !type_linearity_list; true)
         else
-          (Feedback.msg_info (str "[codegen] unrestricted type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
+          (Feedback.msg_info (str "[codegen] Non-linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
           type_linearity_list := (ty, Unrestricted) :: !type_linearity_list; false)
       else
         user_err (str "[codegen] is_linear_app: unexpected type application:" ++ spc () ++ Printer.pr_econstr_env env sigma f))
