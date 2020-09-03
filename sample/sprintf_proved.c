@@ -1,8 +1,6 @@
 static buffer
-add_mesg(nat v1_a, nat v2_b)
+codegen_p14_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
 {
-  nat v3_n;
-  buffer v4_b;
   bool v5_b;
   bool v6_b;
   bool v7_b;
@@ -66,7 +64,7 @@ add_mesg(nat v1_a, nat v2_b)
   bool v65_b;
   bool v66_b;
   unsigned char v67_a;
-  nat v68_n;
+  buffer v68_b;
   buffer v69_b;
   buffer v70_b;
   buffer v71_b;
@@ -75,9 +73,6 @@ add_mesg(nat v1_a, nat v2_b)
   buffer v74_b;
   buffer v75_b;
   buffer v76_b;
-  buffer v77_b;
-  v3_n = 0;
-  v4_b = make_buffer(v3_n);
   v5_b = false;
   v6_b = false;
   v7_b = false;
@@ -141,16 +136,27 @@ add_mesg(nat v1_a, nat v2_b)
   v65_b = false;
   v66_b = false;
   v67_a = make_char(v59_b, v60_b, v61_b, v62_b, v63_b, v64_b, v65_b, v66_b);
-  v68_n = nat_add(v1_a, v2_b);
-  v69_b = buf_addnat(v4_b, v1_a);
-  v70_b = buf_addch(v69_b, v13_a);
-  v71_b = buf_addch(v70_b, v22_a);
-  v72_b = buf_addch(v71_b, v31_a);
-  v73_b = buf_addnat(v72_b, v2_b);
-  v74_b = buf_addch(v73_b, v40_a);
-  v75_b = buf_addch(v74_b, v49_a);
-  v76_b = buf_addch(v75_b, v58_a);
-  v77_b = buf_addch(v76_b, v67_a);
-  return buf_addnat(v77_b, v68_n);
+  v68_b = buf_addnat(v1_buf, v2_n);
+  v69_b = buf_addch(v68_b, v13_a);
+  v70_b = buf_addch(v69_b, v22_a);
+  v71_b = buf_addch(v70_b, v31_a);
+  v72_b = buf_addnat(v71_b, v3_n);
+  v73_b = buf_addch(v72_b, v40_a);
+  v74_b = buf_addch(v73_b, v49_a);
+  v75_b = buf_addch(v74_b, v58_a);
+  v76_b = buf_addch(v75_b, v67_a);
+  return buf_addnat(v76_b, v4_n);
+}
+
+static buffer
+add_mesg(nat v1_a, nat v2_b)
+{
+  nat v3_n;
+  buffer v4_b;
+  nat v5_n;
+  v3_n = 0;
+  v4_b = make_buffer(v3_n);
+  v5_n = nat_add(v1_a, v2_b);
+  return codegen_p14_sprintf(v4_b, v1_a, v2_b, v5_n);
 }
 

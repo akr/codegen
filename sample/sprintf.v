@@ -111,8 +111,7 @@ Definition add_mesg a b := sprintf (mkbuf 0) "%d + %d is %d" a b (a + b).
 Check add_mesg.
 
 CodeGen Linear buffer.
-(*CodeGen Arguments sprintf d s.*)
-CodeGen Global Inline sprintf.
+CodeGen Function sprintf _ "%d + %d is %d".
 CodeGen Function add_mesg.
 
 CodeGen GenerateFile "sample/sprintf_proved.c".
