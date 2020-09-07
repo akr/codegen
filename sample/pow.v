@@ -62,4 +62,4 @@ CodeGen Snippet "
 CodeGen Function fastpow_iter.
 CodeGen Function fastpow.
 
-CodeGen GenerateFile "sample/pow_proved.c".
+CodeGen GenerateFile "sample/pow_generated.c".

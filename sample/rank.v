@@ -166,7 +166,7 @@ CodeGen Function buildDir.
 CodeGen Function rank_init.
 CodeGen Function rank_lookup.
 
-CodeGen GenerateFile "sample/rank_proved.c".
+CodeGen GenerateFile "sample/rank_generated.c".
 
 (* GenCFile checks them internaly
 CodeGen LinearCheck _pred _neq0.
@@ -178,7 +178,7 @@ CodeGen LinearCheck _rank_lookup.
 *)
 
 (*
-CodeGen GenCFile "sample/rank_proved.c"
+CodeGen GenCFile "sample/rank_generated.c"
   _pred
   _neq0
   _buildDir2

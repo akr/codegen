@@ -198,7 +198,7 @@ typedef struct {
 #define aux_dir1(aux) ((aux).dir1)
 #define aux_dir2(aux) ((aux).dir2)
 
-#include "rank_proved.c"
+#include "rank_generated.c"
 
 /* main routine */
 

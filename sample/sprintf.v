@@ -114,7 +114,7 @@ CodeGen Linear buffer.
 CodeGen Function sprintf _ "%d + %d is %d".
 CodeGen Function add_mesg.
 
-CodeGen GenerateFile "sample/sprintf_proved.c".
+CodeGen GenerateFile "sample/sprintf_generated.c".
 
 
 

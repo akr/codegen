@@ -85,7 +85,7 @@ buffer buf_addnat(buffer buf, nat n)
   return buf;
 }
 
-#include "sprintf_proved.c"
+#include "sprintf_generated.c"
 
 int main(int argc, char *argv[])
 {

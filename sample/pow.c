@@ -2,7 +2,7 @@
 #include <stdint.h>
 #include <stdio.h>
 
-#include "pow_proved.c"
+#include "pow_generated.c"
 
 uint64_t ipow(uint64_t a, uint64_t k)
 {
