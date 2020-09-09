@@ -1171,7 +1171,7 @@ let rec reduce_function (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           (* We don't copy match expression because
              it increase computation.
-             When this variable is only one reference,
+             When this variable is only one reference and not in a lambda body,
              it doesn't increase, though.  *)
           if isCase sigma (fst (decompose_app sigma e)) then
             term
