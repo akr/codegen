@@ -1169,7 +1169,14 @@ let rec reduce_function (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       (match EConstr.lookup_rel i env with
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
-          Vars.lift i e)
+          (* We don't copy match expression because
+             it increase computation.
+             When this variable is only one reference,
+             it doesn't increase, though.  *)
+          if isCase sigma (fst (decompose_app sigma e)) then
+            term
+          else
+            Vars.lift i e)
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
   | Cast (e,ck,t) -> reduce_function env sigma e
