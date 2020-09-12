@@ -1188,7 +1188,8 @@ let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
             term
           else
             (* delta-fun *)
-            Vars.lift i e)
+            Vars.lift i e
+      )
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
   | Cast (e,ck,t) -> reduce_funpos env sigma e
@@ -1298,10 +1299,15 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
+(*
+  - "term" is evaluated with p+q arguments at runtime.
+  - complete_args_fun transforms "term" to begin with p lambdas.
+    (fix can be inserted in the lambdas.)
+*)
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
   let result = complete_args_fun1 env sigma term p q in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);
   check_convertible "complete_args_fun" env sigma term result;
   result
 and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
@@ -1335,10 +1341,16 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let term'' = complete_args_exp env sigma term' vs q in
       compose_lam fargs' term''
 
+(*
+  complete_args_branch is similar to complete_args_fun
+  but it doesn't permit fix between lambdas.
+  This is because code generation for match-expression needs
+  a lambda-expression for each assignment of constructor arguments.
+*)
 and complete_args_branch (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
   let result = complete_args_branch1 env sigma term p q in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result);*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result);
   check_convertible "complete_args_branch" env sigma term result;
   result
 and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
@@ -1363,12 +1375,25 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
       let term'' = complete_args_exp env sigma term' vs q in
       compose_lam fargs' term''
 
+(*
+  - "term" is evaluated with argument variables denoted by vs and q unknown values.
+  - p = |vs|
+  - r = number of arguments of "term" minus p + q
+    (term : x1 -> ... -> xp -> y1 -> ... -> yq -> z1 -> ... -> zr -> inductive-type)
+  - complete_args_exp transforms "term vs" to
+    - a lambda-expression for closure creation, or
+    - retain as-is for non-closure creation
+  - Note that v (with empty vs) is not closure creation but
+    c and C (with empty vs) is closure creation.
+    Because local variable (v) is already bound to a closure but
+    constant (c) and constructor (C) has no corresponding closure.
+*)
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
   let result = complete_args_exp1 env sigma term vs q in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);
   check_convertible "complete_args_exp" env sigma term' result;
   result
 and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
@@ -1382,7 +1407,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   let mkClosure () =
     let lazy fargs = fargs in
     let lazy r = r in
-    let fargs' = CList.skipn r fargs in
+    let fargs' = CList.firstn (q+r) fargs in
     let term' = Vars.lift (q+r) term in
     let args =
       Array.append
@@ -1417,7 +1442,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         let lazy r = r in
         mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1) 0)
       else if p > 0 then
-        let term' = Vars.subst1 (mkRel vs.(0)) e in
+        let term' = Vars.subst1 (mkRel vs.(0)) e in (* beta *)
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
       else (* p = 0 and q > 0 *)
@@ -1464,9 +1489,9 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         Printer.pr_econstr_env env sigma term)
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);
   let result = complete_args_fun env sigma term (numargs_of_exp env sigma term) 0 in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
+  Feedback.msg_debug (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);
   result
 
 let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
