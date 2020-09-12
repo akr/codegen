@@ -1186,7 +1186,8 @@ let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
              it increase computation.
              When this variable is only one reference and not in a lambda body,
              it doesn't increase, though.  *)
-          if isCase sigma (fst (decompose_app sigma e)) then
+          let funpos = (fst (decompose_app sigma e)) in
+          if isCase sigma funpos || isProj sigma funpos then
             term
           else
             (* reduction: delta-fun *)
@@ -1255,6 +1256,7 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
         let ft = delete_unused_let_rec env sigma refs t in
         fun () -> mkLetIn (x, fe (), ft (), fb ())
       else
+        (* reduction: zeta-del *)
         fb
   | Case (ci, p, item, branches) ->
       let fp = delete_unused_let_rec env sigma refs p in
