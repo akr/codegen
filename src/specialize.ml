@@ -1188,8 +1188,7 @@ let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
             term
           else
             (* delta-fun *)
-            Vars.lift i e
-      )
+            Vars.lift i e)
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
   | Cast (e,ck,t) -> reduce_funpos env sigma e
