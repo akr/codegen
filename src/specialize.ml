@@ -1304,9 +1304,9 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
     (fix can be inserted in the lambdas.)
 *)
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_fun1 env sigma term p q in
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_fun" env sigma term result;
   result
 and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
@@ -1347,9 +1347,9 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   a lambda-expression for each assignment of constructor arguments.
 *)
 and complete_args_branch (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_branch1 env sigma term p q in
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_branch" env sigma term result;
   result
 and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
@@ -1388,11 +1388,11 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
     constant (c) and constructor (C) has no corresponding closure.
 *)
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_exp1 env sigma term vs q in
-  Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_exp" env sigma term' result;
   result
 and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
@@ -1488,9 +1488,9 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         Printer.pr_econstr_env env sigma term)
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  Feedback.msg_debug (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
   let result = complete_args_fun env sigma term (numargs_of_exp env sigma term) 0 in
-  Feedback.msg_debug (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
   result
 
 let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
