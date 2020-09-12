@@ -867,11 +867,13 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
       | Context.Rel.Declaration.LocalDef (x,e,t) ->
           (* We don't inline Case expression at function position because
              it can duplicate computation.
+             If f_content = match ... end args,
+             app-app inline the match-expression.
              Proj should be supported after we support downward funargs
              (restricted closures).  *)
           match EConstr.kind sigma (fst (decompose_app sigma e)) with
           | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
-              (* delta-fun *)
+              (* This is internal delta-fun in reduce_app. *)
               Vars.lift m e
           | _ ->
               f
