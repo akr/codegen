@@ -601,7 +601,7 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           (match Constr.kind e with
-          | Rel j -> mkRel (i + j)
+          | Rel j -> mkRel (i + j)      (* delta-var *)
           | _ -> term))
   | _ -> term
 
@@ -775,6 +775,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | LetIn (x,e,t,b) ->
       let e' = reduce_exp env sigma e in (* xxx: we don't want to reduce function? *)
       if isLetIn sigma e' then
+        (* zeta-flat *)
         let (defs, body) = decompose_lets sigma e' in
         let n = List.length defs in
         let t' = Vars.lift n t in
@@ -806,6 +807,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           let (f, args) = decompose_app sigma e in
           (match EConstr.kind sigma f with
           | Construct ((ind, j), _) ->
+              (* iota-match *)
               let branch = branches.(j-1) in
               let args = (Array.of_list (CList.skipn ci.ci_npar args)) in
               let args = Array.map (Vars.lift i) args in
@@ -833,6 +835,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           let (f, args) = decompose_app sigma e in
           (match EConstr.kind sigma f with
           | Construct _ ->
+              (* iota-proj *)
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
               debug_reduction "proj" (fun () ->
@@ -867,8 +870,11 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
              Proj should be supported after we support downward funargs
              (restricted closures).  *)
           match EConstr.kind sigma (fst (decompose_app sigma e)) with
-          | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ -> Vars.lift m e
-          | _ -> f
+          | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
+              (* delta-fun *)
+              Vars.lift m e
+          | _ ->
+              f
     else
       f
   in
@@ -877,6 +883,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
   let term1 = mkApp (f_content, args_nf) in
   match EConstr.kind sigma f_content with
   | Lambda _ ->
+      (* beta *)
       let term2 = Reductionops.beta_applist sigma (f_content, (Array.to_list args_nf)) in
       debug_reduction "beta" (fun () ->
         Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
@@ -885,9 +892,11 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
       check_convertible "reduction(beta)" env sigma term1 term2;
       reduce_exp env sigma term2
   | App (f_f, f_args) ->
+      (* app-app *)
       let f_args_nf = Array.map (reduce_arg env sigma) f_args in
       reduce_app env sigma f_f (Array.append f_args_nf args_nf)
   | LetIn (x,e,t,b) ->
+      (* app-let *)
       let args_nf_lifted = Array.map (Vars.lift 1) args_nf in
       let term2 = mkLetIn (x,e,t, mkApp (b, args_nf_lifted)) in
       debug_reduction "app-let" (fun () ->
@@ -909,6 +918,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
               let fi = fary.(i) in
               match find_bounded_fix env sigma ia prec with
               | Some bounded_fix ->
+                  (* iota-fix' *)
                   (*Feedback.msg_info (Pp.str "[codegen] bounded_fix: " ++ Printer.pr_rel_decl (Environ.pop_rel_context bounded_fix env) sigma (Environ.lookup_rel bounded_fix env));*)
                   let fi_subst = Vars.substl (List.map (fun j -> mkRel j) (iota_list (bounded_fix-n+1) n)) fi in
                   let term2 = mkApp (fi_subst, args_nf) in
@@ -925,6 +935,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
                   check_convertible "reduction(fix-reuse-let)" env sigma term1 term2;
                   reduce_app env sigma fi_subst args_nf
               | None ->
+                  (* iota-fix *)
                   let args_nf_lifted = Array.map (Vars.lift n) args_nf in
                   let (_, defs) = CArray.fold_left2_map
                     (fun j x t -> (j+1, (x, Vars.lift j (mkFix ((ia,j), prec)), Vars.lift j t)))
@@ -1176,6 +1187,7 @@ let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
           if isCase sigma (fst (decompose_app sigma e)) then
             term
           else
+            (* delta-fun *)
             Vars.lift i e)
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
