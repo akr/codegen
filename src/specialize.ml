@@ -1526,26 +1526,30 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   let rec r (env : Environ.env) (term : EConstr.t) (vars : Name.t Context.binder_annot list) =
     match EConstr.kind sigma term with
     | Lambda (x,t,e) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
         (match vars with
         | [] ->
             let x2 = make_new_var x in
+            let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
+            let env2 = EConstr.push_rel decl env in
             mkLambda (x2, t, r env2 e vars)
         | var :: rest ->
             if Name.is_anonymous (Context.binder_name var) then
               let x2 = make_new_var x in
+              let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
+              let env2 = EConstr.push_rel decl env in
               mkLambda (x2, t, r env2 e rest)
             else
+              let decl = Context.Rel.Declaration.LocalAssum (var, t) in
+              let env2 = EConstr.push_rel decl env in
               mkLambda (var, t, r env2 e rest))
     | LetIn (x,e,t,b) ->
-        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-        let env2 = EConstr.push_rel decl env in
         let x2 = make_new_var x in
+        let decl = Context.Rel.Declaration.LocalDef (x2, e, t) in
+        let env2 = EConstr.push_rel decl env in
         mkLetIn (x2, r env e [], t, r env2 b vars)
-    | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-        let env2 = push_rec_types prec env in
+    | Fix ((ia, i), (nary, tary, fary)) ->
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
+        let env2 = push_rec_types (nary2, tary, fary) env in
         let fary2 = Array.map (fun e -> r env2 e []) fary in
         let tary2 = Array.mapi (fun i t ->
             let f = fary2.(i) in
