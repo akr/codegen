@@ -1342,7 +1342,8 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let fargs' = CList.lastn p fargs in
       let term' = Vars.lift p term in
       let vs = array_rev (iota_ary 1 p) in
-      let term'' = complete_args_exp env sigma term' vs q in
+      let env2 = EConstr.push_rel_context (List.map (fun (x, t) -> Context.Rel.Declaration.LocalAssum (x,t)) fargs') env in
+      let term'' = complete_args_exp env2 sigma term' vs q in
       compose_lam fargs' term''
 
 (*
@@ -1381,9 +1382,8 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
       compose_lam fargs' term''
 
 (*
-  - complete_args_exp transforms "term vs" to
-    - a lambda-expression for closure creation, or
-    - retain as-is for non-closure creation
+  - complete_args_exp transforms closure creation expressions in "term vs" to
+    lambda-expressions with all arguments. (fix-term is permitted.)
   - "term" is evaluated with argument variables denoted by vs and q unknown values.
   - p = |vs|
   - r = number of arguments of "term" minus p + q
@@ -1394,9 +1394,9 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
     constant (c) and constructor (C) has no corresponding closure.
 *)
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg0:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(" ++ pp_sjoin_ary (Array.map Pp.int vs) ++ Pp.str ")" +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
+  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++
+    Printer.pr_econstr_env env sigma term +++ Pp.str "[" ++ pp_sjoin_ary (Array.map (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) ++ Pp.str "(" ++ Pp.int i ++ Pp.str ")") vs) ++ Pp.str "]" +++ Pp.str "(p=" ++ Pp.int (Array.length vs) ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
-  (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++ Printer.pr_econstr_env env sigma term' +++ Pp.str "(q=" ++ Pp.int q ++ Pp.str ")");*)
   let result = complete_args_exp1 env sigma term vs q in
   (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);*)
   check_convertible "complete_args_exp" env sigma term' result;
@@ -1444,7 +1444,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      if p = 0 && q = 0 then
+      if p = 0 && q = 0 then (* closure creation found *)
         let lazy r = r in
         mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1) 0)
       else if p > 0 then
@@ -1452,7 +1452,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
       else (* p = 0 and q > 0 *)
-        mkLambda (x, t, complete_args_fun env2 sigma e 0 (q-1))
+        mkLambda (x, t, complete_args_exp env2 sigma e [||] (q-1))
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
