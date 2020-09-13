@@ -1378,7 +1378,8 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
       let fargs' = CList.lastn p fargs in
       let term' = Vars.lift p term in
       let vs = array_rev (iota_ary 1 p) in
-      let term'' = complete_args_exp env sigma term' vs q in
+      let env2 = EConstr.push_rel_context (List.map (fun (x, t) -> Context.Rel.Declaration.LocalAssum (x,t)) fargs') env in
+      let term'' = complete_args_exp env2 sigma term' vs q in
       compose_lam fargs' term''
 
 (*
