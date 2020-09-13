@@ -1303,9 +1303,9 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   result
 
 (*
-  - "term" is evaluated with p+q arguments at runtime.
   - complete_args_fun transforms "term" to begin with p lambdas.
-    (fix can be inserted in the lambdas.)
+    (fix can be mixed in the lambdas.)
+  - "term" is evaluated with p+q arguments at runtime.
 *)
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
   (*Feedback.msg_debug (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
@@ -1335,6 +1335,7 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       in
       mkFix ((ia, i), (nary, tary, fary2))
   | _ ->
+      (* reduction/expansion: eta-expansion if p > 0 *)
       let t = Retyping.get_type_of env sigma term in
       let t = Reductionops.nf_all env sigma t in
       let (fargs, result_type) = decompose_prod sigma t in
@@ -1369,6 +1370,7 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
         let p' = numargs_of_exp env2 sigma e in
         mkLambda (x, t, complete_args_branch env2 sigma e p' 0)
   | _ ->
+      (* reduction/expansion: eta-expansion if p > 0 *)
       let t = Retyping.get_type_of env sigma term in
       let t = Reductionops.nf_all env sigma t in
       let (fargs, result_type) = decompose_prod sigma t in
@@ -1379,13 +1381,13 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
       compose_lam fargs' term''
 
 (*
+  - complete_args_exp transforms "term vs" to
+    - a lambda-expression for closure creation, or
+    - retain as-is for non-closure creation
   - "term" is evaluated with argument variables denoted by vs and q unknown values.
   - p = |vs|
   - r = number of arguments of "term" minus p + q
     (term : x1 -> ... -> xp -> y1 -> ... -> yq -> z1 -> ... -> zr -> inductive-type)
-  - complete_args_exp transforms "term vs" to
-    - a lambda-expression for closure creation, or
-    - retain as-is for non-closure creation
   - Note that v (with empty vs) is not closure creation but
     c and C (with empty vs) is closure creation.
     Because local variable (v) is already bound to a closure but
@@ -1417,6 +1419,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         (Array.map (fun j -> mkRel (j+q+r)) vs)
         (Array.map (fun j -> mkRel j) (array_rev (iota_ary 1 (q+r))))
     in
+    (* reduction/expansion: eta-expansion *)
     compose_lam fargs' (mkApp (term', args))
   in
   let mkAppOrClosure () =
@@ -1445,7 +1448,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         let lazy r = r in
         mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1) 0)
       else if p > 0 then
-        let term' = Vars.subst1 (mkRel vs.(0)) e in (* beta *)
+        let term' = Vars.subst1 (mkRel vs.(0)) e in (* reduction/expansion: beta *)
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
       else (* p = 0 and q > 0 *)
