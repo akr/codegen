@@ -757,11 +757,12 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Rel i ->
       let term2 = reduce_arg env sigma term in
       if destRel sigma term2 <> i then
-        (debug_reduction "rel" (fun () ->
+        (* reduction: delta-var *)
+        (debug_reduction "delta-var" (fun () ->
           Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
-        check_convertible "reduction(rel)" env sigma term term2;
+        check_convertible "reduction(delta-var)" env sigma term term2;
         term2)
       else
         term
@@ -781,11 +782,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let t' = Vars.lift n t in
         let b' = Vars.liftn n 2 b in
         let term2 = compose_lets defs (mkLetIn (x, body, t', b')) in
-        debug_reduction "letin" (fun () ->
+        debug_reduction "zeta-flat" (fun () ->
           Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
-        check_convertible "reduction(letin)" env sigma term term2;
+        check_convertible "reduction(zeta-flat)" env sigma term term2;
         let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
         let env2 = EConstr.push_rel_context ctx env in
         let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
@@ -812,14 +813,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let args = (Array.of_list (CList.skipn ci.ci_npar args)) in
               let args = Array.map (Vars.lift i) args in
               let term2 = mkApp (branch, args) in
-              debug_reduction "match" (fun () ->
+              debug_reduction "iota-match" (fun () ->
                 Pp.str "match-item = " ++
                 Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
-              check_convertible "reduction(match)" env sigma term term2;
+              check_convertible "reduction(iota-match)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
   | Proj (pr,item) ->
@@ -838,14 +839,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               (* reduction: iota-proj *)
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
-              debug_reduction "proj" (fun () ->
+              debug_reduction "iota-proj" (fun () ->
                 Pp.str "proj-item = " ++
                 Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
-              check_convertible "reduction(proj)" env sigma term term2;
+              check_convertible "reduction(iota-proj)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
@@ -898,14 +899,14 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
       let f_args_nf = Array.map (reduce_arg env sigma) f_args in
       reduce_app env sigma f_f (Array.append f_args_nf args_nf)
   | LetIn (x,e,t,b) ->
-      (* reduction: app-let *)
+      (* reduction: zeta-app *)
       let args_nf_lifted = Array.map (Vars.lift 1) args_nf in
       let term2 = mkLetIn (x,e,t, mkApp (b, args_nf_lifted)) in
-      debug_reduction "app-let" (fun () ->
+      debug_reduction "zeta-app" (fun () ->
         Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
         Pp.str "->" ++ Pp.fnl () ++
         Printer.pr_econstr_env env sigma term2);
-      check_convertible "reduction(app-let)" env sigma term1 term2;
+      check_convertible "reduction(zeta-app)" env sigma term1 term2;
       reduce_exp env sigma term2
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
       if ia.(i) < Array.length args_nf then
@@ -924,7 +925,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
                   (*Feedback.msg_info (Pp.str "[codegen] bounded_fix: " ++ Printer.pr_rel_decl (Environ.pop_rel_context bounded_fix env) sigma (Environ.lookup_rel bounded_fix env));*)
                   let fi_subst = Vars.substl (List.map (fun j -> mkRel j) (iota_list (bounded_fix-n+1) n)) fi in
                   let term2 = mkApp (fi_subst, args_nf) in
-                  debug_reduction "fix-reuse-let" (fun () ->
+                  debug_reduction "iota-fix-reuse" (fun () ->
                     let env2 = Environ.pop_rel_context (destRel sigma decarg_var) env in
                     let nf_decarg_val = Reductionops.nf_all env2 sigma decarg_val in
                     Pp.str "decreasing-argument = " ++
@@ -934,7 +935,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
                     Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
-                  check_convertible "reduction(fix-reuse-let)" env sigma term1 term2;
+                  check_convertible "reduction(iota-fix-reuse)" env sigma term1 term2;
                   reduce_app env sigma fi_subst args_nf
               | None ->
                   (* reduction: iota-fix *)
@@ -945,14 +946,14 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
                   in
                   let defs = Array.to_list (array_rev defs) in
                   let term2 = compose_lets defs (mkApp (fi, args_nf_lifted)) in
-                  debug_reduction "fix-new-let" (fun () ->
+                  debug_reduction "iota-fix" (fun () ->
                     Pp.str "decreasing-argument = " ++
                     Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
                     Printer.pr_econstr_env (Environ.pop_rel_context (destRel sigma decarg_var) env) sigma decarg_val ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
-                  check_convertible "reduction(fix-new-let)" env sigma term1 term2;
+                  check_convertible "reduction(iota-fix)" env sigma term1 term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
                   let b = reduce_app env2 sigma fi args_nf_lifted in
