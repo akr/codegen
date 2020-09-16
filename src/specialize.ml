@@ -1188,11 +1188,12 @@ let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
              When this variable is only one reference and not in a lambda body,
              it doesn't increase, though.  *)
           let funpos = (fst (decompose_app sigma e)) in
-          if isCase sigma funpos || isProj sigma funpos then
-            term
-          else
-            (* reduction: delta-fun *)
-            Vars.lift i e)
+          match EConstr.kind sigma funpos with
+          | Const _ | Construct _ | Fix _ ->
+              (* reduction: delta-fun *)
+              Vars.lift i e
+          | _ ->
+              term)
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
   | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
   | Cast (e,ck,t) -> reduce_funpos env sigma e
