@@ -1008,6 +1008,25 @@ let test_let_match_let (ctx : test_ctxt) : unit =
       assert(tst(true) == 2);
     |}
 
+(* gen_assign LetIn, cargs != [] *)
+let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Definition f x y :=
+	let v :=
+	  match x with
+	  | true => let z := 1 in Nat.add z
+	  | false => let z := 2 in Nat.add z
+	  end y
+	in
+	v.
+      CodeGen Function f.
+    |}) {|
+      assert(f(true, 3) == 4);
+      assert(f(false, 3) == 5);
+    |}
+
 let test_add_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2203,6 +2222,7 @@ let suite : OUnit2.test =
     "test_let_add" >:: test_let_add;
     "test_let_match" >:: test_let_match;
     "test_let_match_let" >:: test_let_match_let;
+    "test_let_match_let_nonempty_cargs" >:: test_let_match_let_nonempty_cargs;
     "test_add_tailrec" >:: test_add_tailrec;
     "test_add_nontailrec" >:: test_add_nontailrec;
     "test_map_succ" >:: test_map_succ;
