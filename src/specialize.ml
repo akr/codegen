@@ -744,7 +744,7 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ia : int array)
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let t1 = Unix.times () in
-  (if !opt_debug_reduce_exp then
+  (if !opt_debug_reduce_exp then (* Set Debug CodeGen ReduceExp. *)
     Feedback.msg_debug (Pp.str "[codegen] reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term));
   let result = reduce_exp1 env sigma term in
   (if !opt_debug_reduce_exp then
@@ -860,34 +860,36 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let args_nf = Array.map (reduce_arg env sigma) args in
       reduce_app env sigma f args_nf
 and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
-  let f_content =
-    if isRel sigma f then
-      let m = destRel sigma f in
-      match EConstr.lookup_rel m env with
-      | Context.Rel.Declaration.LocalAssum _ -> f
-      | Context.Rel.Declaration.LocalDef (x,e,t) ->
-          (* We don't inline Case expression at function position because
-             it can duplicate computation.
-             If f_content = match ... end args,
-             app-app inline the match-expression.
-             Proj should be supported after we support downward funargs
-             (restricted closures).  *)
-          match EConstr.kind sigma (fst (decompose_app sigma e)) with
-          | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
-              (* This is internal delta-fun in reduce_app. *)
-              Vars.lift m e
-          | _ ->
-              f
-    else
-      f
-  in
+  if isRel sigma f then
+    let m = destRel sigma f in
+    match EConstr.lookup_rel m env with
+    | Context.Rel.Declaration.LocalAssum _ -> reduce_app2 env sigma f args_nf
+    | Context.Rel.Declaration.LocalDef (x,e,t) ->
+        (* We don't inline Case expression at function position because
+           it can duplicate computation.
+           If f_content = match ... end args,
+           app-app inline the match-expression.
+           Proj should be supported after we support downward funargs
+           (restricted closures).  *)
+        let (f_f, f_args) = decompose_app sigma e in
+        match EConstr.kind sigma f_f with
+        | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
+            (* reduction: delta-fun *)
+            reduce_app env sigma
+              (Vars.lift m f_f)
+              (Array.append (CArray.map_of_list (Vars.lift m) f_args) args_nf)
+        | _ ->
+            reduce_app2 env sigma f args_nf
+  else
+    reduce_app2 env sigma f args_nf
+and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
   (*Feedback.msg_info (Pp.str "[codegen] reduce_app f_content:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f_content);*)
   let default () = mkApp (reduce_exp env sigma f, args_nf) in
-  let term1 = mkApp (f_content, args_nf) in
-  match EConstr.kind sigma f_content with
+  let term1 = mkApp (f, args_nf) in
+  match EConstr.kind sigma f with
   | Lambda _ ->
       (* reduction: beta *)
-      let term2 = Reductionops.beta_applist sigma (f_content, (Array.to_list args_nf)) in
+      let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args_nf)) in
       debug_reduction "beta" (fun () ->
         Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
         Pp.str "->" ++ Pp.fnl () ++
@@ -895,7 +897,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
       check_convertible "reduction(beta)" env sigma term1 term2;
       reduce_exp env sigma term2
   | App (f_f, f_args) ->
-      (* reduction: app-app *)
+      (* reduction: delta-app *)
       let f_args_nf = Array.map (reduce_arg env sigma) f_args in
       reduce_app env sigma f_f (Array.append f_args_nf args_nf)
   | LetIn (x,e,t,b) ->
@@ -1176,52 +1178,6 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
       let funary' = Array.map (normalize_types env2 sigma) funary in
       mkCoFix (i, (nameary, tyary', funary'))
-
-let rec reduce_funpos (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Rel i ->
-      (match EConstr.lookup_rel i env with
-      | Context.Rel.Declaration.LocalAssum _ -> term
-      | Context.Rel.Declaration.LocalDef (n,e,t) ->
-          (* We don't copy match expression because
-             it increase computation.
-             When this variable is only one reference and not in a lambda body,
-             it doesn't increase, though.  *)
-          let funpos = (fst (decompose_app sigma e)) in
-          match EConstr.kind sigma funpos with
-          | Const _ | Construct _ | Fix _ ->
-              (* reduction: delta-fun *)
-              Vars.lift i e
-          | _ ->
-              term)
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
-  | Const _ | Construct _ | Evar _ | Proj _ | Prod _ -> term
-  | Cast (e,ck,t) -> reduce_funpos env sigma e
-  | App (f, args) ->
-      let f' = reduce_funpos env sigma f in
-      mkApp (f', args)
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      let e' = reduce_funpos env sigma e in
-      let b' = reduce_funpos env2 sigma b in
-      mkLetIn (x, e', t, b')
-  | Case (ci, p, item, branches) ->
-      let branches' = Array.map (reduce_funpos env sigma) branches in
-      mkCase (ci, p, item, branches')
-  | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let e' = reduce_funpos env2 sigma e in
-      mkLambda (x, t, e')
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let fary' = Array.map (reduce_funpos env2 sigma) fary in
-      mkFix ((ia, i), (nary, tary, fary'))
-  | CoFix (i, ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let fary' = Array.map (reduce_funpos env2 sigma) fary in
-      mkCoFix (i, (nary, tary, fary'))
 
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
@@ -1649,8 +1605,6 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   debug_specialization env sigma "replace" term;
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
-  let term = reduce_funpos env sigma term in
-  debug_specialization env sigma "reduce_funpos" term;
   let term = delete_unused_let env sigma term in
   debug_specialization env sigma "delete_unused_let" term;
   let term = complete_args env sigma term in

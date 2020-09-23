@@ -930,6 +930,22 @@ let test_delta_fun_lambda (ctx : test_ctxt) : unit =
       assert(succ(2) == 3);
     |}
 
+let test_delta_fun_nested_let (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Definition f (x : nat) :=
+        let f := S in
+        let one := f 0 in
+        match one with
+        | O => false
+        | S _ => true
+        end.
+      CodeGen Function f.
+    |}) {|
+      assert(f(0) == true);
+    |}
+
 (* test_delta_fun_rel *)
 (* test_delta_fun_fix *)
 
@@ -1014,13 +1030,13 @@ let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
     (bool_src ^ nat_src ^
     {|
       Definition f x y :=
-	let v :=
-	  match x with
-	  | true => let z := 1 in Nat.add z
-	  | false => let z := 2 in Nat.add z
-	  end y
-	in
-	v.
+        let v :=
+          match x with
+          | true => let z := 1 in Nat.add z
+          | false => let z := 2 in Nat.add z
+          end y
+        in
+        v.
       CodeGen Function f.
     |}) {|
       assert(f(true, 3) == 4);
@@ -2215,6 +2231,7 @@ let suite : OUnit2.test =
     "test_delta_fun_constant" >:: test_delta_fun_constant;
     "test_delta_fun_constructor" >:: test_delta_fun_constructor;
     "test_delta_fun_lambda" >:: test_delta_fun_lambda;
+    "test_delta_fun_nested_let" >:: test_delta_fun_nested_let;
     "test_reduce_proj" >:: test_reduce_proj;
     "test_nil_nat" >:: test_nil_nat;
     "test_singleton_list" >:: test_singleton_list;
