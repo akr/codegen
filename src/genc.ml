@@ -954,18 +954,6 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
         (caselabel, pp_branch +++ str "break;"))
       branches)
 
-let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Environ.env * EConstr.t) =
-  if n = 0 then
-    (env, term)
-  else
-    match EConstr.kind sigma term with
-    | Lambda (x,t,e) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
-        decompose_lam_n_env env2 sigma (n-1) e
-    | _ ->
-      user_err (str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term: " ++ Printer.pr_econstr_env env sigma term)
-
 let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
     (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)

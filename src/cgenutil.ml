@@ -257,6 +257,18 @@ let new_env_with_rels (env : Environ.env) : Environ.env =
   done;
   !r
 
+let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Environ.env * EConstr.t) =
+  if n = 0 then
+    (env, term)
+  else
+    match EConstr.kind sigma term with
+    | Lambda (x,t,e) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        decompose_lam_n_env env2 sigma (n-1) e
+    | _ ->
+      user_err (str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term: " ++ Printer.pr_econstr_env env sigma term)
+
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in
