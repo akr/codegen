@@ -1174,7 +1174,16 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
         let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
         let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
         let exit_label = "exit_" ^ ni_funcname in
-        let pp_exit = Pp.hov 0 (Pp.str exit_label ++ Pp.str ":") in
+        let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
+                      assign_cont_exit_label =
+                        match cont.assign_cont_exit_label with
+                        | None -> Some exit_label
+                        | Some _ -> cont.assign_cont_exit_label } in
+        let pp_exit =
+          match cont.assign_cont_exit_label with
+          | None -> Pp.hov 0 (Pp.str exit_label ++ Pp.str ":")
+          | Some _ -> Pp.mt ()
+        in
         let pp_bodies =
           Array.mapi
             (fun j nj ->
@@ -1193,11 +1202,6 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
                 else
                   Pp.mt ()
               in
-              let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
-                            assign_cont_exit_label =
-                              match cont.assign_cont_exit_label with
-                              | None -> Some exit_label
-                              | Some _ -> cont.assign_cont_exit_label } in
               pp_label +++ gen_assign fixinfo used cont2 env2 sigma fj nj_formal_argvars)
             nary in
         let reordered_pp_bodies = Array.copy pp_bodies in
