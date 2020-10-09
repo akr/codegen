@@ -1455,6 +1455,26 @@ let test_mftest (ctx : test_ctxt) : unit =
       assert(mftest(5) == 2);
     |}
 
+let test_multifunc_noargument (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f0 := 0.
+      Definition f1 :=
+	let g := fix id_nat x :=
+		  match x with
+		  | O => O
+		  | S y => S (id_nat y)
+		  end
+	in
+	S (g f0).
+      CodeGen Function f0.
+      CodeGen Function f1.
+    |}) {|
+      assert(f0() == 0);
+      assert(f1() == 1);
+    |}
+
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2284,6 +2304,7 @@ let suite : OUnit2.test =
     "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_mftest" >:: test_mftest;
+    "test_multifunc_noargument" >:: test_multifunc_noargument;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;

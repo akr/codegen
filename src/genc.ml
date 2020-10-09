@@ -1686,17 +1686,20 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
           pp_result)
         called_fixfuncs)
   in
-  let pp_switch_default = Pp.str "case" +++ Pp.str (func_index_prefix ^ cfunc_name) ++ Pp.str ":" in
+  let pp_switch_default = Pp.str "default:" in
   let pp_assign_args_default =
-    pp_sjoin_list
-      (List.map
-        (fun (c_arg, t) ->
-          hov 0 (
-            Pp.str c_arg +++
-            Pp.str "=" +++
-            Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
-            Pp.str ";"))
-        formal_arguments)
+    if formal_arguments = [] then
+      Pp.str ";"
+    else
+      pp_sjoin_list
+        (List.map
+          (fun (c_arg, t) ->
+            hov 0 (
+              Pp.str c_arg +++
+              Pp.str "=" +++
+              Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
+              Pp.str ";"))
+          formal_arguments)
   in
   let pp_switch_body =
     pp_switch_cases +++
