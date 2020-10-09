@@ -1194,7 +1194,10 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
                   Pp.mt ()
               in
               let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
-                            assign_cont_exit_label = Some exit_label; } in
+                            assign_cont_exit_label =
+                              match cont.assign_cont_exit_label with
+                              | None -> Some exit_label
+                              | Some _ -> cont.assign_cont_exit_label } in
               pp_label +++ gen_assign fixinfo used cont2 env2 sigma fj nj_formal_argvars)
             nary in
         let reordered_pp_bodies = Array.copy pp_bodies in

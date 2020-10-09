@@ -1663,6 +1663,34 @@ let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
       assert(f(0) == 0);
     |}
 
+let test_unused_fixfunc_in_external_fixterm (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f a :=
+        let gh := fix g x :=
+                    (fix h y n :=
+                      match y with
+                      | O =>
+                        match x with
+                        | O => n
+                        | S x2 => g x2 x (S n)
+                        end
+                      | S y2 => h y2 (S n)
+                      end)
+                  with dummy y := match y with O => 1 | S y2 => dummy y2 end
+                  for g
+        in
+        S (gh a 0 0).
+      CodeGen Function f.
+    |}) {|
+      assert(f(0) == 1);
+      assert(f(1) == 3);
+      assert(f(2) == 6);
+      assert(f(3) == 10);
+      assert(f(4) == 15);
+    |}
+
 let test_primitive_projection (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -2266,6 +2294,7 @@ let suite : OUnit2.test =
     "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
+    "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
     "test_auto_ind_type" >:: test_auto_ind_type;
