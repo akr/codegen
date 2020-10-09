@@ -1461,13 +1461,13 @@ let test_multifunc_noargument (ctx : test_ctxt) : unit =
     {|
       Definition f0 := 0.
       Definition f1 :=
-	let g := fix id_nat x :=
-		  match x with
-		  | O => O
-		  | S y => S (id_nat y)
-		  end
-	in
-	S (g f0).
+        let g := fix id_nat x :=
+                  match x with
+                  | O => O
+                  | S y => S (id_nat y)
+                  end
+        in
+        S (g f0).
       CodeGen Function f0.
       CodeGen Function f1.
     |}) {|
