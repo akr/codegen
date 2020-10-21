@@ -1174,11 +1174,10 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
         let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
         let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
         let exit_label = "exit_" ^ ni_funcname in
-        let cont2 = { assign_cont_ret_var = cont.assign_cont_ret_var ;
-                      assign_cont_exit_label =
-                        match cont.assign_cont_exit_label with
-                        | None -> Some exit_label
-                        | Some _ -> cont.assign_cont_exit_label } in
+        let cont2 = match cont.assign_cont_exit_label with
+                    | None -> { cont with assign_cont_exit_label = Some exit_label }
+                    | Some _ -> cont
+        in
         let pp_exit =
           match cont.assign_cont_exit_label with
           | None -> Pp.hov 0 (Pp.str exit_label ++ Pp.str ":")
