@@ -1723,7 +1723,7 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       ".
 
       Set Primitive Projections. (* enables Proj *)
-      Record bool_pair : Set := make_bool_pair { field1 : bool; field2 : bool }.
+      Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
       CodeGen Inductive Type bool_pair => "bool_pair".
       CodeGen Inductive Match bool_pair => ""
@@ -1731,8 +1731,8 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       CodeGen Primitive make_bool_pair => "make_bool_pair".
 
       Definition make (x y : bool) := make_bool_pair x y.
-      Definition bbfst (x : bool_pair) := field1 x.
-      Definition bbsnd (x : bool_pair) := field2 x.
+      Definition bbfst (x : bool_pair) := member1 x.
+      Definition bbsnd (x : bool_pair) := member2 x.
       CodeGen Function make.
       CodeGen Function bbfst.
       CodeGen Function bbsnd.
@@ -1759,7 +1759,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       ".
 
       Set Primitive Projections. (* enables Proj *)
-      Record bool_pair : Set := make_bool_pair { field1 : bool; field2 : bool }.
+      Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
       CodeGen Inductive Type bool_pair => "bool_pair".
       CodeGen Inductive Match bool_pair => ""
@@ -1767,8 +1767,8 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       CodeGen Primitive make_bool_pair => "make_bool_pair".
 
       Definition make (x y : bool) := make_bool_pair x y.
-      Definition bbfst (x : bool_pair) := let y := field1 x in id y.
-      Definition bbsnd (x : bool_pair) := let y := field2 x in id y.
+      Definition bbfst (x : bool_pair) := let y := member1 x in id y.
+      Definition bbsnd (x : bool_pair) := let y := member2 x in id y.
       CodeGen Function id bool.
       CodeGen Function make.
       CodeGen Function bbfst.
@@ -1819,7 +1819,7 @@ let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
       assert(bool_of_mybool(false) == false);
     |}
 
-let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
+let test_auto_ind_match_cstrmember (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
@@ -1885,7 +1885,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
       assert(value_of_optionbool(false, 3) == true);
     |}
 
-let test_auto_ind_match_cstrfield_with_arg (ctx : test_ctxt) : unit =
+let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       CodeGen Snippet "
@@ -1941,7 +1941,7 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
       CodeGen Inductive Type option bool => "option_bool".
       CodeGen Inductive Match option bool => "sw_option_bool"
       | None => "default"
-      | Some => "case option_bool_Some" "option_bool_Some_field1".
+      | Some => "case option_bool_Some" "option_bool_Some_member1".
       CodeGen Primitive None bool => "None_bool".
       CodeGen Primitive Some bool => "Some_bool".
       CodeGen Snippet "
@@ -1950,14 +1950,14 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
         enum enum_option_bool tag;
         union {
           struct {
-            bool field1;
+            bool member1;
           } Some;
         } as;
       } option_bool;
       #define None_bool() ((option_bool){ option_bool_None, })
-      #define Some_bool(field1) ((option_bool){ option_bool_Some, { .Some = { field1 }}})
+      #define Some_bool(member1) ((option_bool){ option_bool_Some, { .Some = { member1 }}})
       #define sw_option_bool(x) ((x).tag)
-      #define option_bool_Some_field1(x) ((x).as.Some.field1)
+      #define option_bool_Some_member1(x) ((x).as.Some.member1)
       ".
       Definition value_of_optionbool (default : bool) (x : option bool) :=
         match x with
@@ -2320,10 +2320,10 @@ let suite : OUnit2.test =
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
     "test_auto_ind_type" >:: test_auto_ind_type;
     "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
-    "test_auto_ind_match_cstrfield" >:: test_auto_ind_match_cstrfield;
+    "test_auto_ind_match_cstrmember" >:: test_auto_ind_match_cstrmember;
     "test_auto_ind_type_with_arg" >:: test_auto_ind_type_with_arg;
     "test_auto_ind_match_cstrlabel_with_arg" >:: test_auto_ind_match_cstrlabel_with_arg;
-    "test_auto_ind_match_cstrfield_with_arg" >:: test_auto_ind_match_cstrfield_with_arg;
+    "test_auto_ind_match_cstrmember_with_arg" >:: test_auto_ind_match_cstrmember_with_arg;
     "test_auto_const" >:: test_auto_const;
     "test_auto_construct" >:: test_auto_construct;
     "test_option_bool_struct" >:: test_option_bool_struct;

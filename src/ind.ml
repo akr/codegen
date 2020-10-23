@@ -184,7 +184,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
         Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
     (if Array.get oneind_body.Declarations.mind_consnrealdecls j <> List.length accessors then
-      user_err (Pp.str "[codegen] inductive match: invalid number of field accessors:" ++
+      user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" ++
       Pp.str "needs" ++ Pp.spc () ++
       Pp.int (Array.get oneind_body.Declarations.mind_consnrealdecls j) ++ Pp.spc () ++
       Pp.str "but" ++ Pp.spc () ++
