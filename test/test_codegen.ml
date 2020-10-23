@@ -1826,8 +1826,8 @@ let test_auto_ind_match_cstrfield (ctx : test_ctxt) : unit =
       CodeGen Snippet "
       typedef int bool_pair;
       #define bpair(a,b) (((a) << 1) | (b))
-      #define bpair_get_field_0(x) ((x) >> 1)
-      #define bpair_get_field_1(x) ((x) & 1)
+      #define bpair_get_member_0(x) ((x) >> 1)
+      #define bpair_get_member_1(x) ((x) & 1)
       ".
       Definition bbfst (x : bool_pair) := match x with bpair a b => a end.
       Definition bbsnd (x : bool_pair) := match x with bpair a b => b end.
@@ -1848,8 +1848,8 @@ let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
       CodeGen Snippet "
       typedef int prod_bool_bool;
       #define pair(a,b) (((a) << 1) | (b))
-      #define pair_get_field_0(x) ((x) >> 1)
-      #define pair_get_field_1(x) ((x) & 1)
+      #define pair_get_member_0(x) ((x) >> 1)
+      #define pair_get_member_1(x) ((x) & 1)
       ".
       Definition mypair (x y : bool) : bool*bool := (x, y).
       CodeGen Function mypair.
@@ -1868,7 +1868,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
       typedef int option_bool;
       enum option_bool_tag { None_bool_tag, Some_bool_tag };
       #define sw_option_bool(x) ((enum option_bool_tag)((x) & 1))
-      #define Some_bool_get_field_0(x) ((bool)((x) >> 1))
+      #define Some_bool_get_member_0(x) ((bool)((x) >> 1))
       ".
       Definition value_of_optionbool (default : bool) (x : option bool) :=
         match x with
@@ -1893,8 +1893,8 @@ let test_auto_ind_match_cstrfield_with_arg (ctx : test_ctxt) : unit =
       #define bpair(a,b) (((a) << 1) | (b))
       enum { pair_bool_bool_tag };
       #define sw_prod_bool_bool(x) pair_bool_bool_tag
-      #define pair_bool_bool_get_field_0(x) ((x) >> 1)
-      #define pair_bool_bool_get_field_1(x) ((x) & 1)
+      #define pair_bool_bool_get_member_0(x) ((x) >> 1)
+      #define pair_bool_bool_get_member_1(x) ((x) & 1)
       ".
       Definition bbfst (x : bool*bool) := match x with (a,b) => a end.
       Definition bbsnd (x : bool*bool) := match x with (a,b) => b end.

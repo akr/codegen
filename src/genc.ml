@@ -62,7 +62,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         let numargs = oneind_body.Declarations.mind_consnrealargs.(j) in
         let accessors =
           List.init numargs
-            (fun k -> s ^ "_get_field_" ^ string_of_int k)
+            (fun k -> s ^ "_get_member_" ^ string_of_int k)
         in
         (consname, caselabel, accessors))
   in
