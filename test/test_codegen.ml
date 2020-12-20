@@ -900,6 +900,36 @@ let test_cast (ctx : test_ctxt) : unit =
       assert(nat_id(4) == 4);
     |}
 
+let bool_matchcount_src = {|
+      CodeGen Inductive Type bool => "bool".
+      CodeGen Inductive Match bool => "sw_bool"
+      | true => "default"
+      | false => "case 0".
+      CodeGen Constant true => "true".
+      CodeGen Constant false => "false".
+
+      CodeGen Snippet "
+      #include <stdbool.h> /* for bool, true and false */
+      static int bool_match_count = 0;
+      #define sw_bool(x) ((bool_match_count++), (x))
+      ".
+|}
+
+let test_beta_var_partapp (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_matchcount_src ^ nat_src ^
+    {|
+      Definition f (b : bool) : nat :=
+        let g := (fun (b2 : bool) => if b2 then Nat.add else Nat.sub) b in
+        g 1 1 + g 2 2.
+      CodeGen Function f.
+    |}) {|
+      assert(f(true) == 6);
+      assert(bool_match_count == 2);
+      assert(f(false) == 0);
+      assert(bool_match_count == 4);
+    |}
+
 let test_delta_fun_constant (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2276,6 +2306,7 @@ let suite : OUnit2.test =
     "test_app_let" >:: test_app_let;
     "test_app_match" >:: test_app_match;
     "test_cast" >:: test_cast;
+    "test_beta_var_partapp" >:: test_beta_var_partapp;
     "test_delta_fun_constant" >:: test_delta_fun_constant;
     "test_delta_fun_constructor" >:: test_delta_fun_constructor;
     "test_delta_fun_lambda" >:: test_delta_fun_lambda;
