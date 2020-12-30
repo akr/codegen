@@ -162,52 +162,27 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type sd_list static_args =
-    let f_type = Reductionops.whd_all env sigma f_type in
-    (match EConstr.kind sigma f_type with
-    | Prod (x,t,c) ->
-        let (sd, sd_list') =
-          match sd_list with
-          | [] -> (SorD_D, [])
-          | sd :: sd_list' -> (sd, sd_list')
-        in
-        (match sd with
-        | SorD_S ->
-            (match static_args with
-            | [] -> user_err (Pp.str "[codegen] needs more static argument")
-            | arg :: static_args' ->
-                let f' = mkApp (f, [| arg |]) in
-                let f_type' = Termops.prod_applist sigma f_type [arg] in
-                aux env f' f_type' sd_list' static_args')
-        | SorD_D ->
-            (let f1 = EConstr.Vars.lift 1 f in
-            let f1app = mkApp (f1, [| mkRel 1 |]) in
-            let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-            let env2 = EConstr.push_rel decl env in
-            let x =
-              if Name.is_anonymous (Context.binder_name x) then
-                Context.nameR (Id.of_string (Namegen.hdchar env sigma t))
-              else
-                x
-            in
-            mkLambda (x, t, aux env2 f1app c sd_list' static_args)))
-    | Ind _ ->
-        ((if sd_list <> [] then
-          user_err (Pp.str "[codegen] too many static arguments"));
-        (if static_args <> [] then
-          user_err (Pp.str "[codegen] too many static arguments"));
-        f)
-    | App (ty_f, ty_args) ->
-        (match EConstr.kind sigma ty_f with
-        | Ind _ ->
-            ((if sd_list <> [] then
-              user_err (Pp.str "[codegen] too many static arguments"));
-            (if static_args <> [] then
-              user_err (Pp.str "[codegen] too many static arguments"));
-            f)
-        | _ ->
-            user_err (Pp.str "[codegen] unexpected result type"))
-    | _ ->
-        user_err (Pp.str "[codegen] unexpected result type"))
+    match sd_list with
+    | [] -> f
+    | sd :: sd_list' ->
+        let f_type = Reductionops.whd_all env sigma f_type in
+        (match EConstr.kind sigma f_type with
+        | Prod (x,t,c) ->
+            (match sd with
+            | SorD_S ->
+                (match static_args with
+                | [] -> user_err (Pp.str "[codegen] needs more argument")
+                | arg :: static_args' ->
+                    let f' = mkApp (f, [| arg |]) in
+                    let f_type' = Termops.prod_applist sigma f_type [arg] in
+                    aux env f' f_type' sd_list' static_args')
+            | SorD_D ->
+                (let f1 = EConstr.Vars.lift 1 f in
+                let f1app = mkApp (f1, [| mkRel 1 |]) in
+                let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+                let env = EConstr.push_rel decl env in
+                mkLambda (x, t, aux env f1app c sd_list' static_args)))
+        | _ -> user_err (Pp.str "[codegen] needs a function type"))
   in
   let sigma0 = sigma in
   let sd_list = drop_trailing_d sd_list in
@@ -920,9 +895,10 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
   let default () = mkApp (reduce_exp env sigma f, args_nf) in
   let term1 = mkApp (f, args_nf) in
   match EConstr.kind sigma f with
-  | Lambda _ ->
-      let app_ty = Retyping.get_type_of env sigma (mkApp (f, args_nf)) in
-      if is_ind_type env sigma app_ty then
+  | Lambda (x,t,b) ->
+      if isLambda sigma b || isFix sigma b ||
+         let app_ty = Retyping.get_type_of env sigma (mkApp (f, args_nf)) in
+         is_ind_type env sigma app_ty then
         (* reduction: beta-var *)
         (let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args_nf)) in
         debug_reduction "beta-var" (fun () ->
