@@ -29,19 +29,19 @@ You also need following to test codegen.
 
 power function:
 
-    coqc sample/pow.v # generates sample/pow_generated.c
+    coqc -Q theories codegen -I src sample/pow.v # generates sample/pow_generated.c
     gcc -g -Wall sample/pow.c -o sample/pow
     sample/pow
 
 rank algorithm of succinct data structure:
 
-    coqc sample/rank.v # generates sample/rank_generated.c
+    coqc -Q theories codegen -I src sample/rank.v # generates sample/rank_generated.c
     gcc -g -Wall sample/rank.c -o sample/rank
     sample/rank rand
 
 sprintf function:
 
-    coqc sample/sprintf.v # generates sample/sprintf_generated.c
+    coqc -Q theories codegen -I src sample/sprintf.v # generates sample/sprintf_generated.c
     gcc -g -Wall sample/sprintf.c -o sample/sprintf
     sample/sprintf
 
