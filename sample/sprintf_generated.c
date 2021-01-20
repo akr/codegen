@@ -73,6 +73,7 @@ codegen_p14_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
   buffer v74_b;
   buffer v75_b;
   buffer v76_b;
+  buffer v77_b;
   v5_b = false;
   v6_b = false;
   v7_b = false;
@@ -145,7 +146,8 @@ codegen_p14_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
   v74_b = buf_addch(v73_b, v49_a);
   v75_b = buf_addch(v74_b, v58_a);
   v76_b = buf_addch(v75_b, v67_a);
-  return buf_addnat(v76_b, v4_n);
+  v77_b = buf_addnat(v76_b, v4_n);
+  return v77_b;
 }
 
 static buffer

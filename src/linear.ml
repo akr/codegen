@@ -29,6 +29,7 @@ let term_kind sigma term =
   | Constr.Proj _ -> "Proj"
   | Constr.Int _ -> "Int"
   | Constr.Float _ -> "Float"
+  | Constr.Array _ -> "Array"
 
 let whd_all env sigma term = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
 let nf_all env sigma term = Reductionops.nf_all env sigma term
@@ -89,12 +90,13 @@ let rec hasRel sigma term =
   | Constr.Const ctntu -> false
   | Constr.Ind iu -> false
   | Constr.Construct cstru -> false
-  | Constr.Case (ci, tyf, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
+  | Constr.Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
   | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
   | Constr.CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
   | Constr.Proj (proj, expr) -> hasRel sigma expr
   | Constr.Int n -> false
   | Constr.Float n -> false
+  | Constr.Array (u,t,def,ty) -> Array.exists (hasRel sigma) t || hasRel sigma def || hasRel sigma ty
 
 let rec destProdX_rec sigma term =
   match EConstr.kind sigma term with
@@ -297,7 +299,7 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
   | Constr.Const ctntu -> ()
   | Constr.Ind iu -> ()
   | Constr.Construct cstru -> ()
-  | Constr.Case (ci, tyf, expr, brs) ->
+  | Constr.Case (ci, tyf, iv, expr, brs) ->
       ((* tyf is not checked because it is not a target of code generation.
           check tyf is (fun _ -> termty) ? *)
       check_linear_valexp env sigma linear_refs num_innermost_locals expr;
@@ -319,6 +321,9 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
   | Constr.Proj (proj, expr) ->
       check_linear_valexp env sigma linear_refs num_innermost_locals expr
+  | Constr.Array (u,t,def,ty) ->
+      Array.iter (check_linear_valexp env sigma linear_refs num_innermost_locals) t;
+      check_linear_valexp env sigma linear_refs num_innermost_locals def
   | Constr.Int n -> ()
   | Constr.Float n -> ())
 and check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br =

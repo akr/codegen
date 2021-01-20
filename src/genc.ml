@@ -18,6 +18,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 module IntSet = Set.Make(Int)
 
+open Ind (* Conflict with Names.Ind which is introduced by Coq 8.13.0 *)
+
 open Names
 open Pp
 open CErrors
@@ -26,7 +28,6 @@ open EConstr
 
 open Cgenutil
 open State
-open Ind
 open Linear
 open Specialize
 
@@ -218,7 +219,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   | Some (body,_, _) -> (ctnt, ty, body)
 
 let hbrace (pp : Pp.t) : Pp.t =
-  h 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+  h (str "{" +++ pp ++ brk (1,-2) ++ str "}")
 
 let hovbrace (pp : Pp.t) : Pp.t =
   hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
@@ -350,6 +351,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> (IntSet.singleton i, IntSet.empty, Id.Set.empty)
   | Int _ | Float _ | Const _ | Construct _ -> (IntSet.empty, IntSet.empty, Id.Set.empty)
   | Proj (proj, e) ->
@@ -372,7 +374,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       in
       let inlinable = Id.Set.union inlinable_e inlinable_b in
       (tailset_b, nontailset, inlinable)
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
       let branches_result = Array.mapi
         (fun i br -> detect_inlinable_fixterm_rec env sigma br
@@ -512,6 +514,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> (IntSet.singleton i, IntSet.empty)
   | Int _ | Float _ | Const _ | Construct _ -> (IntSet.empty, IntSet.empty)
   | Proj (proj, e) ->
@@ -533,7 +536,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
         nontailset_b
       in
       (tailset_b, nontailset)
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
       let branches_result = Array.mapi
         (fun i br -> collect_fix_usage fixinfo inlinable_fixterms env sigma br
@@ -682,6 +685,7 @@ and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
   | Proj (proj, e) -> ()
@@ -693,7 +697,7 @@ and set_fixinfo_naive_outer_variables1 (fixinfo : fixinfo_t) (env : Environ.env)
       let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
       set_fixinfo_naive_outer_variables fixinfo env sigma outer e;
       set_fixinfo_naive_outer_variables fixinfo env2 sigma outer2 b
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       Array.iter
         (fun br ->
           set_fixinfo_naive_outer_variables fixinfo env sigma outer br)
@@ -736,6 +740,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i ->
       let decl = Environ.lookup_rel i env in
       let name = Context.Rel.Declaration.get_name decl in
@@ -760,7 +765,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       let fv_e = fixterm_free_variables_rec env sigma result e in
       let fv_b = fixterm_free_variables_rec env2 sigma result b in
       Id.Set.union fv_e (Id.Set.remove id fv_b)
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       let item_id =
         let i = destRel sigma item in
         let decl = Environ.lookup_rel i env in
@@ -810,6 +815,7 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
   | Proj (proj, e) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
@@ -820,7 +826,7 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rel decl env in
       fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e;
       fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm b
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       Array.iter
         (fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm)
         branches
@@ -1094,7 +1100,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
   | Evar _ | Prod _
-  | Int _ | Float _
+  | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
       user_err (str "[codegen:gen_assign] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
@@ -1135,7 +1141,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
           cargs
       in
       gen_assign fixinfo used cont env sigma f cargs2
-  | Case (ci,predicate,item,branches) ->
+  | Case (ci,predicate,iv,item,branches) ->
       let gen_switch =
         match cont.assign_cont_exit_label with
         | None -> gen_switch_with_break
@@ -1235,7 +1241,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
   | Evar _ | Prod _
-  | Int _ | Float _
+  | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
       user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
@@ -1278,7 +1284,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail fixinfo used gen_ret env2 sigma b rest)
-  | Case (ci,predicate,item,branches) ->
+  | Case (ci,predicate,iv,item,branches) ->
       gen_match used gen_switch_without_break (gen_tail fixinfo used gen_ret) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
@@ -1345,6 +1351,7 @@ and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> result
   | Int _ | Float _ | Const _ | Construct _ -> result
   | Proj _ -> result
@@ -1356,7 +1363,7 @@ and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rel decl env in
       let result1 = detect_top_fixterms_rec env sigma fixinfo false e 0 result in
       detect_top_fixterms_rec env2 sigma fixinfo is_tail_position b numargs result1
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       let acc = ref result in
       for i = 0 to Array.length branches - 1 do
         let br = branches.(i) in
@@ -1737,6 +1744,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
+  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Const _ | Construct _ | Int _ | Float _ -> Id.Set.empty
   | Rel i ->
       let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
@@ -1757,7 +1765,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       Id.Set.union
         (used_variables env sigma e)
         (used_variables env2 sigma b)
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       Id.Set.union
         (used_variables env sigma item)
         (Array.fold_left
@@ -2070,7 +2078,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
       ) ++ Pp.str (" " ^ ind_typename ^ ";"))
   in
   let pp_swfunc =
-    Pp.h 0 (
+    Pp.h (
       Pp.str "#define" +++
       Pp.str swfunc ++ Pp.str "(x)" +++
       (if single_constructor then
@@ -2085,13 +2093,13 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
           pp_sjoin_list
             (List.map
               (fun (member_type, member_name, accessor) ->
-                Pp.h 0 (Pp.str "#define" +++
-                        Pp.str accessor ++
-                        Pp.str "(x)" +++
-                        (if single_constructor then
-                          Pp.str ("((x)." ^ member_name ^ ")")
-                        else
-                          Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
+                Pp.h (Pp.str "#define" +++
+                      Pp.str accessor ++
+                      Pp.str "(x)" +++
+                      (if single_constructor then
+                        Pp.str ("((x)." ^ member_name ^ ")")
+                      else
+                        Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
               members_and_accessors))
         cstr_and_members)
   in
@@ -2105,25 +2113,25 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
                 (fun (member_type, member_name, accessor) -> Pp.str member_name)
                 members_and_accessors)
           in
-          Pp.h 0 (Pp.str "#define" +++
-                    Pp.str cstrname ++
-                    Pp.str "(" ++ args ++ Pp.str ")" +++
-                    Pp.str "(" ++
-                    Pp.str ("(" ^ ind_typename ^ ")") ++
-                    (if single_constructor then
-                      hbrace args
-                    else
-                      hbrace (
-                        let union_init =
-                          Pp.str ("." ^ cstr_umember) +++
-                          Pp.str "=" +++
-                          hbrace args
-                        in
-                        if List.length members_and_accessors = 0 then
-                          Pp.str cstr_enum_name
-                        else
-                          (Pp.str cstr_enum_name ++ Pp.str "," +++ hbrace union_init))) ++
-                    Pp.str ")"))
+          Pp.h (Pp.str "#define" +++
+                  Pp.str cstrname ++
+                  Pp.str "(" ++ args ++ Pp.str ")" +++
+                  Pp.str "(" ++
+                  Pp.str ("(" ^ ind_typename ^ ")") ++
+                  (if single_constructor then
+                    hbrace args
+                  else
+                    hbrace (
+                      let union_init =
+                        Pp.str ("." ^ cstr_umember) +++
+                        Pp.str "=" +++
+                        hbrace args
+                      in
+                      if List.length members_and_accessors = 0 then
+                        Pp.str cstr_enum_name
+                      else
+                        (Pp.str cstr_enum_name ++ Pp.str "," +++ hbrace union_init))) ++
+                  Pp.str ")"))
         cstr_and_members)
   in
   let pp =
@@ -2200,7 +2208,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
       (List.map
         (fun (ind_typename, enum_tag, swfunc, cstr_and_members) ->
           let pp_swfunc =
-            Pp.h 0 (
+            Pp.h (
               Pp.str "#define" +++
               Pp.str swfunc ++ Pp.str "(x)" +++
               Pp.str "(*(x))")
@@ -2239,10 +2247,10 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                   pp_sjoin_list
                     (List.map
                       (fun (member_type, member_name, accessor) ->
-                        Pp.h 0 (Pp.str "#define" +++
-                                Pp.str accessor ++
-                                Pp.str "(x)" +++
-                                Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
+                        Pp.h (Pp.str "#define" +++
+                              Pp.str accessor ++
+                              Pp.str "(x)" +++
+                              Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
                       members_and_accessors))
                 cstr_and_members)
           in

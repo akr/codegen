@@ -315,12 +315,13 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Lambda (name, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:lambda:")
   | LetIn (name, expr, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:letin:")
   | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
-  | Case (ci, tyf, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
+  | Case (ci, tyf, iv, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
   | Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
   | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
   | Proj (proj, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
   | Int n -> user_err (Pp.str "[codegen] mangle_term_buf:int:")
   | Float n -> user_err (Pp.str "[codegen] mangle_term_buf:float:")
+  | Array _ -> user_err (Pp.str "[codegen] mangle_term_buf:array:")
 
 let mangle_term (ty : EConstr.t) : string =
   let env = Global.env () in
@@ -442,7 +443,7 @@ let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : E
 
 let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _
+  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
   | Const _ | Construct _ -> ()
   | Rel i ->
       if numlocal < i then
@@ -461,7 +462,7 @@ let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool ar
       free_variables_rec sigma numlocal fv e;
       free_variables_rec sigma numlocal fv t;
       free_variables_rec sigma (numlocal+1) fv b
-  | Case (ci, p, item, branches) ->
+  | Case (ci, p, iv, item, branches) ->
       free_variables_rec sigma numlocal fv p;
       free_variables_rec sigma numlocal fv item;
       Array.iter (free_variables_rec sigma numlocal fv) branches
@@ -504,6 +505,7 @@ let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   | Proj _ -> "Proj"
   | Int _ -> "Int"
   | Float _ -> "Float"
+  | Array _ -> "Array"
 
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
@@ -528,6 +530,7 @@ let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   | Constrexpr.CGeneralization _ -> "CGeneralization"
   | Constrexpr.CPrim _ -> "CPrim"
   | Constrexpr.CDelimiters _ -> "CDelimiters"
+  | Constrexpr.CArray _ -> "CArray"
 
 let global_gensym ?(prefix : string = "g") () : string =
   let n = !gensym_id in

@@ -151,7 +151,7 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
     c_swfunc=None;
     cstr_configs=cstr_cfgs } in
   ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
-ind_cfg
+  ind_cfg
 
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
