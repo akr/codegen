@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 module IntSet = Set.Make(Int)
 
-open Ind (* Conflict with Names.Ind which is introduced by Coq 8.13.0 *)
 
 open Names
 open Pp
@@ -28,6 +27,7 @@ open EConstr
 
 open Cgenutil
 open State
+open Induc
 open Linear
 open Specialize
 

@@ -7,7 +7,7 @@
 src/codegen_plugin.mlpack
 src/state.ml
 src/cgenutil.ml
-src/ind.ml
+src/induc.ml
 src/specialize.ml
 src/linear.ml
 src/genc.ml
