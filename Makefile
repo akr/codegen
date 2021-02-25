@@ -57,6 +57,7 @@ clean :
 	  src/*.cmxs \
 	  src/*.a \
 	  src/*.d \
+	  src/*.annot \
 	  theories/*.glob \
 	  theories/*.vo \
 	  theories/*.vok \
