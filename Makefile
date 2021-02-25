@@ -1,4 +1,4 @@
-.PHONY: all install plugin check checker clean no-install-development revert-no-install-development
+.PHONY: all install plugin check checker clean development-without-install revert-development-without-install
 
 -include Makefile.coq.conf
 
@@ -10,23 +10,23 @@ install : Makefile.coq
 	$(MAKE) -f Makefile.coq $@
 
 ifdef COQMF_COQLIB
-no-install-development : revert-no-install-development
+development-without-install : revert-development-without-install
 	ln -s ../src/codegen_plugin.cmi theories
 	ln -s ../src/codegen_plugin.cmxs theories
 	ln -s ../src/codegen_plugin.cmxa theories
 	ln -s ../src/codegen_plugin.cmx theories
 	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
 
-revert-no-install-development :
+revert-development-without-install :
 	rm -f theories/codegen_plugin.cmi
 	rm -f theories/codegen_plugin.cmxs
 	rm -f theories/codegen_plugin.cmxa
 	rm -f theories/codegen_plugin.cmx
 	rm -f $(COQMF_COQLIB)/user-contrib/codegen
 else
-no-install-development :
+development-without-install :
 	@echo 'COQMF_COQLIB not defined.  run "make" first.'
-revert-no-install-development :
+revert-development-without-install :
 	@echo 'COQMF_COQLIB not defined.  run "make" first.'
 endif
 
