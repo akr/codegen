@@ -283,7 +283,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Non-specialized function not defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
+      Feedback.msg_info (Pp.str "[codegen] Don't need pre-simplified function:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       (cfunc_name, sp_inst)
     else
       let (p_id, s_id) = match names_opt with
@@ -319,7 +319,7 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Non-specialized function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+      Feedback.msg_info (Pp.str "[codegen] Pre-simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       (cfunc_name, sp_inst)
   in
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
@@ -1637,7 +1637,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
-  Feedback.msg_info (Pp.str "[codegen] Specialized function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+  Feedback.msg_info (Pp.str "[codegen] Simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
