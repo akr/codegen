@@ -99,10 +99,7 @@ let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.eva
 let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   match ConstrMap.find_opt func !specialize_config_map with
   | None ->
-      let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
-      specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-      Feedback.msg_info (Pp.str "[codegen] Specialization arguments defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
-      sp_cfg
+      codegen_specialization_define_arguments env sigma func sd_list
   | Some sp_cfg ->
       let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
       let sd_list_new = drop_trailing_d sd_list in
