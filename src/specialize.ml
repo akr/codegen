@@ -93,7 +93,10 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
 let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-  Feedback.msg_info (Pp.str "[codegen] Specialization arguments defined:" ++ spc () ++ Printer.pr_constr_env env sigma func);
+  Feedback.msg_info (Pp.str "[codegen] [auto] CodeGen Arguments" +++
+    Printer.pr_constr_env env sigma func +++
+    pp_sjoin_list (List.map (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list) ++
+    Pp.str ".");
   sp_cfg
 
 let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
