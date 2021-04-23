@@ -285,6 +285,7 @@ let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
 let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer.t) (ty : EConstr.t) : unit =
+  (*Feedback.msg_debug (Pp.str "mangle_term_buf:" +++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Ind iu ->
       let (mutind, i) = out_punivs iu in
@@ -306,7 +307,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
       mangle_term_buf env sigma buf t;
       Buffer.add_string buf "_to_";
       mangle_term_buf env2 sigma buf b
-  | Rel i -> user_err (Pp.str "[codegen] mangle_term_buf:rel:")
+  | Rel i -> user_err (Pp.str "[codegen] mangle_term_buf:rel:" +++ Printer.pr_econstr_env env sigma ty)
   | Var name -> user_err (Pp.str "[codegen] mangle_term_buf:var:")
   | Meta i -> user_err (Pp.str "[codegen] mangle_term_buf:meta:")
   | Evar (ekey, termary) -> user_err (Pp.str "[codegen] mangle_term_buf:evar:")
@@ -323,9 +324,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Float n -> user_err (Pp.str "[codegen] mangle_term_buf:float:")
   | Array _ -> user_err (Pp.str "[codegen] mangle_term_buf:array:")
 
-let mangle_term (ty : EConstr.t) : string =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
+let mangle_term (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : string =
   let buf = Buffer.create 0 in
   mangle_term_buf env sigma buf ty;
   Buffer.contents buf

@@ -34,7 +34,7 @@ open Specialize
 let abort (x : 'a) : 'a = assert false
 
 let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let printed_type = mangle_term t in
+  let printed_type = mangle_term env sigma t in
   let c_name = c_id (squeeze_white_spaces printed_type) in
   let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
   Feedback.msg_info (v 2
@@ -46,7 +46,7 @@ let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
-  let printed_type = mangle_term t in
+  let printed_type = mangle_term env sigma t in
   let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
   let cstr_caselabel_accessors_list =
@@ -56,7 +56,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         let cstr = mkConstruct ((mutind, i), j) in
         let args = CArray.map_of_list EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
-        let s = mangle_term consterm in
+        let s = mangle_term env sigma consterm in
         let caselabel =
           if j = 0 then "default" else "case " ^ s ^ "_tag"
         in
