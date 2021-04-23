@@ -164,7 +164,11 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type sd_list static_args =
     match sd_list with
-    | [] -> f (* xxx: check static_args is empty *)
+    | [] ->
+        if static_args = [] then
+          f
+        else
+          user_err (Pp.str "[codegen] too many static arguments")
     | sd :: sd_list' ->
         let f_type = Reductionops.whd_all env sigma f_type in
         (match EConstr.kind sigma f_type with
