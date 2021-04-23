@@ -315,10 +315,14 @@ let specialization_instance_internal
               c_id (Id.to_string p_id)
       in
       check_cfunc_name_conflict cfunc_name;
-      let univs = Evd.univ_entry ~poly:false sigma in
-      let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs partapp) in
-      let kind = Decls.IsDefinition Decls.Definition in
-      let declared_ctnt = Declare.declare_constant ~name:p_id ~kind:kind defent in
+      let globref = Declare.declare_definition
+        ~info:(Declare.Info.make ())
+        ~cinfo:(Declare.CInfo.make ~name:p_id ~typ:(Some partapp_type) ())
+        ~opaque:false
+        ~body:(EConstr.of_constr partapp)
+        sigma
+      in
+      let declared_ctnt = Globnames.destConstRef globref in
       let sp_inst = {
         sp_partapp = partapp;
         sp_static_arguments = static_args;
@@ -1653,10 +1657,14 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   debug_specialization env sigma "complete_args" term;
   let term = rename_vars env sigma term in
   debug_specialization env sigma "rename_vars" term;
-  let univs = Evd.univ_entry ~poly:false sigma in
-  let defent = Declare.DefinitionEntry (Declare.definition_entry ~univs:univs (EConstr.to_constr sigma term)) in
-  let kind = Decls.IsDefinition Decls.Definition in
-  let declared_ctnt = Declare.declare_constant ~name:name ~kind:kind defent in
+  let globref = Declare.declare_definition
+    ~info:(Declare.Info.make ())
+    ~cinfo:(Declare.CInfo.make ~name:name ~typ:None ())
+    ~opaque:false
+    ~body:term
+    sigma
+  in
+  let declared_ctnt = Globnames.destConstRef globref in
   let sp_inst2 = {
     sp_partapp = sp_inst.sp_partapp;
     sp_static_arguments = sp_inst.sp_static_arguments;
