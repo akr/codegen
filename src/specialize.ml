@@ -107,10 +107,11 @@ let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma 
       let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
       let sd_list_new = drop_trailing_d sd_list in
       (if sd_list_old <> sd_list_new then
-        user_err (Pp.str "[codegen] inconsistent specialization configuration for" ++ spc () ++
-        Printer.pr_constr_env env sigma func ++ Pp.str ":" ++
-        pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_old) ++ spc () ++ Pp.str "expected but" ++
-        pp_prejoin_list (spc ()) (List.map pr_s_or_d sd_list_new)));
+        user_err (Pp.str "[codegen] inconsistent specialization configuration for" +++
+        Printer.pr_constr_env env sigma func ++ Pp.str ":" +++
+        Pp.str "[" ++ pp_sjoin_list (List.map pr_s_or_d sd_list_old) ++ Pp.str "]" +++
+        Pp.str "expected but" +++
+        Pp.str "[" ++ pp_sjoin_list (List.map pr_s_or_d sd_list_new) ++ Pp.str "]"));
       sp_cfg
 
 let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
