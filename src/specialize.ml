@@ -164,7 +164,7 @@ let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type sd_list static_args =
     match sd_list with
-    | [] -> f
+    | [] -> f (* xxx: check static_args is empty *)
     | sd :: sd_list' ->
         let f_type = Reductionops.whd_all env sigma f_type in
         (match EConstr.kind sigma f_type with
@@ -257,12 +257,15 @@ let specialization_instance_internal
           Printer.pr_constr_env env sigma partapp)
   in
   let (cfunc_name, sp_inst) =
-    if List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
-       (match names_opt with Some { spi_partapp_id = Some _ } -> false | _ -> true) then
-      let specialization_name = match names_opt with
-        | Some { spi_specialized_id = Some id } -> SpExpectedId id
+    let dont_need_presimplified_ctnt =
+      List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
+      (match names_opt with Some { spi_partapp_id = Some _ } -> false | _ -> true)
+    in
+    if dont_need_presimplified_ctnt then
+      let s_id = match names_opt with
+        | Some { spi_specialized_id = Some id } -> id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
-               SpExpectedId s_id
+               s_id
       in
       let cfunc_name = match names_opt with
           | Some { spi_cfunc_name = Some name } ->
@@ -280,7 +283,7 @@ let specialization_instance_internal
         sp_partapp = partapp;
         sp_static_arguments = [];
         sp_partapp_constr = func; (* use the original function for fully dynamic function *)
-        sp_specialization_name = specialization_name;
+        sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
@@ -323,6 +326,26 @@ let specialization_instance_internal
       Feedback.msg_info (Pp.str "[codegen] Pre-simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       (cfunc_name, sp_inst)
   in
+  Feedback.msg_info (Pp.str "[codegen] [auto] CodeGen Function" +++
+    Printer.pr_constr_env env sigma func +++
+    (pp_sjoin_list (snd (List.fold_right
+           (fun sd (args, res) ->
+             match sd with
+             | SorD_S ->
+                 (List.tl args, (Printer.pr_constr_env env sigma (List.hd args) :: res))
+             | SorD_D ->
+                 (args, (Pp.str "_" :: res)))
+           sp_cfg.sp_sd_list (static_args, [])))) +++
+    Pp.str "=>" +++
+    Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
+    (if sp_inst.sp_partapp_constr = func then
+      Pp.str "_"
+    else
+      Printer.pr_constr_env env sigma sp_inst.sp_partapp_constr) +++
+    (match sp_inst.sp_specialization_name with
+    | SpExpectedId s_id -> Id.print s_id
+    | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
+    Pp.str ".");
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
