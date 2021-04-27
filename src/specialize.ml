@@ -1637,6 +1637,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     | Construct _ -> user_err (Pp.str "[codegen] constructor is not specializable")
     | _ -> user_err (Pp.str "[codegen] non-constant and non-constructor specialization")
   in
+  Feedback.msg_info (Pp.str "[codegen] Start simplification:" +++ Id.print name);
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
     let global_pred = !specialize_global_inline in
@@ -1679,7 +1680,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
-  Feedback.msg_info (Pp.str "[codegen] Simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
+  Feedback.msg_info (Pp.str "[codegen] End simplification:" +++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
