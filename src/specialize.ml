@@ -94,7 +94,7 @@ let codegen_specialization_define_arguments ?(caller:string option) (env : Envir
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
   Feedback.msg_info (Pp.str "[codegen]" +++
-    (match caller with Some f -> Pp.str "[caller:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
+    (match caller with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen Arguments" +++
     Printer.pr_constr_env env sigma func +++
     pp_sjoin_list (List.map (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list) ++
@@ -339,7 +339,7 @@ let specialization_instance_internal
       (cfunc_name, sp_inst)
   in
   Feedback.msg_info (Pp.str "[codegen]" +++
-    (match caller with Some f -> Pp.str "[caller:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
+    (match caller with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen Function" +++
     Printer.pr_constr_env env sigma func +++
     (pp_sjoin_list (snd (List.fold_right
@@ -1637,7 +1637,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     | Construct _ -> user_err (Pp.str "[codegen] constructor is not specializable")
     | _ -> user_err (Pp.str "[codegen] non-constant and non-constructor specialization")
   in
-  Feedback.msg_info (Pp.str "[codegen] Start simplification:" +++ Id.print name);
+  Feedback.msg_info (Pp.str "[codegen]" +++
+    Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
+    Pp.str "Start simplification");
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
     let global_pred = !specialize_global_inline in
@@ -1680,7 +1682,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
-  Feedback.msg_info (Pp.str "[codegen] End simplification:" +++ Printer.pr_constant env declared_ctnt);
+  Feedback.msg_info (Pp.str "[codegen]" +++
+    Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
+    Pp.str "Simplification finished:" +++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
