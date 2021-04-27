@@ -295,7 +295,6 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Don't need pre-simplified function:" ++ spc () ++ Printer.pr_constr_env env sigma func);
       (cfunc_name, sp_inst)
     else
       let (p_id, s_id) = match names_opt with
@@ -335,7 +334,6 @@ let specialization_instance_internal
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
-      Feedback.msg_info (Pp.str "[codegen] Pre-simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       (cfunc_name, sp_inst)
   in
   Feedback.msg_info (Pp.str "[codegen]" +++
