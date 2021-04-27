@@ -93,12 +93,12 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
 let codegen_specialization_define_arguments ?(caller:string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-  Feedback.msg_info (Pp.str "[codegen]" +++
+  Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match caller with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen Arguments" +++
     Printer.pr_constr_env env sigma func +++
     pp_sjoin_list (List.map (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list) ++
-    Pp.str ".");
+    Pp.str "."));
   sp_cfg
 
 let codegen_specialization_define_or_check_arguments ?(caller:string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
@@ -336,7 +336,7 @@ let specialization_instance_internal
       in
       (cfunc_name, sp_inst)
   in
-  Feedback.msg_info (Pp.str "[codegen]" +++
+  Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match caller with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen Function" +++
     Printer.pr_constr_env env sigma func +++
@@ -357,7 +357,7 @@ let specialization_instance_internal
     (match sp_inst.sp_specialization_name with
     | SpExpectedId s_id -> Id.print s_id
     | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
-    Pp.str ".");
+    Pp.str "."));
   gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
@@ -1637,7 +1637,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   in
   Feedback.msg_info (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
-    Pp.str "Start simplification");
+    Pp.str "Start simplification:" +++ Id.print name);
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
     let global_pred = !specialize_global_inline in
