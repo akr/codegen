@@ -90,19 +90,21 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
     | ConstructRef cstr -> Constr.mkConstruct cstr
     | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
 
-let codegen_specialization_define_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
+let codegen_specialization_define_arguments ?(caller:string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-  Feedback.msg_info (Pp.str "[codegen] [auto] CodeGen Arguments" +++
+  Feedback.msg_info (Pp.str "[codegen]" +++
+    (match caller with Some f -> Pp.str "[caller:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
+    Pp.str "CodeGen Arguments" +++
     Printer.pr_constr_env env sigma func +++
     pp_sjoin_list (List.map (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list) ++
     Pp.str ".");
   sp_cfg
 
-let codegen_specialization_define_or_check_arguments (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
+let codegen_specialization_define_or_check_arguments ?(caller:string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   match ConstrMap.find_opt func !specialize_config_map with
   | None ->
-      codegen_specialization_define_arguments env sigma func sd_list
+      codegen_specialization_define_arguments ?caller env sigma func sd_list
   | Some sp_cfg ->
       let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
       let sd_list_new = drop_trailing_d sd_list in
@@ -140,6 +142,7 @@ let determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t
     (determine_type_arguments env sigma ty)
 
 let codegen_specialization_auto_arguments_internal
+    ?(caller : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : specialization_config =
   match ConstrMap.find_opt func !specialize_config_map with
@@ -147,7 +150,7 @@ let codegen_specialization_auto_arguments_internal
   | None ->
       let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       let sd_list = (determine_sd_list env sigma ty) in
-      codegen_specialization_define_arguments env sigma func sd_list
+      codegen_specialization_define_arguments ?caller env sigma func sd_list
 
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) : unit =
@@ -231,6 +234,7 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
 
 let specialization_instance_internal
+    ?(caller : string option)
     ?(gen_constant=false)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) (static_args : Constr.t list)
@@ -334,7 +338,9 @@ let specialization_instance_internal
       Feedback.msg_info (Pp.str "[codegen] Pre-simplified function defined:" ++ spc () ++ Printer.pr_constant env declared_ctnt);
       (cfunc_name, sp_inst)
   in
-  Feedback.msg_info (Pp.str "[codegen] [auto] CodeGen Function" +++
+  Feedback.msg_info (Pp.str "[codegen]" +++
+    (match caller with Some f -> Pp.str "[caller:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
+    Pp.str "CodeGen Function" +++
     Printer.pr_constr_env env sigma func +++
     (pp_sjoin_list (snd (List.fold_right
            (fun sd (args, res) ->
@@ -1057,9 +1063,9 @@ let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
 let has_fv sigma term : bool =
   first_fv sigma term <> None
 
-let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t =
+let replace_app ~(caller : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t =
   (* Feedback.msg_info (Pp.str "[codegen] replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
-  let sp_cfg = codegen_specialization_auto_arguments_internal env sigma func in
+  let sp_cfg = codegen_specialization_auto_arguments_internal ~caller env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
     user_err (Pp.str "[codegen] Not enough arguments for" +++
@@ -1094,7 +1100,7 @@ let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (ar
   let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
   (*Feedback.msg_info (Pp.str "[codegen] replace partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
   let (env, sp_inst) = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
-    | None -> specialization_instance_internal env sigma func nf_static_args None
+    | None -> specialization_instance_internal ~caller env sigma func nf_static_args None
     | Some sp_inst -> (env, sp_inst)
   in
   let sp_ctnt = sp_inst.sp_partapp_constr in
@@ -1104,15 +1110,15 @@ let replace_app (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (ar
 (* This function assumes S-normal form.
    So this function doesn't traverse subterms of Proj, Cast,
    arguments of App and item of Case. *)
-let rec replace (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
+let rec replace ~(caller : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "[codegen] replace arg: " ++ Printer.pr_econstr_env env sigma term));
-  let (env, result) = replace1 env sigma term in
+  let (env, result) = replace1 ~caller env sigma term in
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "[codegen] replace ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "replace" env sigma term result;
   (env, result)
-and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
+and replace1 ~(caller : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Ind _ | Int _ | Float _ | Array _
@@ -1120,46 +1126,46 @@ and replace1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Env
   | Lambda (x, t, e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let (env2', e') = replace env2 sigma e in
+      let (env2', e') = replace ~caller env2 sigma e in
       let env' = Environ.pop_rel_context 1 env2' in
       (env', mkLambda (x, t, e'))
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let (env2', fary') = CArray.fold_left_map
-        (fun e f -> replace e sigma f) env2 fary
+        (fun e f -> replace ~caller e sigma f) env2 fary
       in
       let env' = Environ.pop_rel_context (Array.length nary) env2' in
       (env', mkFix ((ia, i), (nary, tary, fary')))
   | CoFix _ ->
       user_err (Pp.str "[codegen] codegen doesn't support CoFix.")
   | LetIn (x, e, t, b) ->
-      let (env', e') = replace env sigma e in
+      let (env', e') = replace ~caller env sigma e in
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env' in
-      let (env2', b') = replace env2 sigma b in
+      let (env2', b') = replace ~caller env2 sigma b in
       let env'' = Environ.pop_rel_context 1 env2' in
       (env'', mkLetIn (x, e', t, b'))
   | Case (ci, p, iv, item, branches) ->
       let (env', branches') = CArray.fold_left_map
-        (fun e f -> replace e sigma f) env branches
+        (fun e f -> replace ~caller e sigma f) env branches
       in
       (env', mkCase (ci, p, iv, item, branches'))
   | Const (ctnt, u) ->
       let f' = Constr.mkConst ctnt in
-      replace_app env sigma f' [| |]
+      replace_app ~caller env sigma f' [| |]
   | Construct (cstr, u) ->
       let f' = Constr.mkConstruct cstr in
-      replace_app env sigma f' [| |]
+      replace_app ~caller env sigma f' [| |]
   | App (f, args) ->
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
-          replace_app env sigma f' args
+          replace_app ~caller env sigma f' args
       | Construct (cstr, u) ->
           let f' = Constr.mkConstruct cstr in
-          replace_app env sigma f' args
+          replace_app ~caller env sigma f' args
       | _ ->
-          let (env', f) = replace env sigma f in
+          let (env', f) = replace ~caller env sigma f in
           (env', mkApp (f, args))
 
 let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
@@ -1647,7 +1653,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   debug_specialization env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_specialization env sigma "reduce_exp" term;
-  let (env, term) = replace env sigma term in (* "replace" modifies global env *)
+  let (env, term) = replace ~caller:cfunc env sigma term in (* "replace" modifies global env *)
   debug_specialization env sigma "replace" term;
   let term = normalize_types env sigma term in
   debug_specialization env sigma "normalize_types" term;
