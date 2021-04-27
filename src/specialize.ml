@@ -1682,7 +1682,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   in
   Feedback.msg_info (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
-    Pp.str "Simplification finished:" +++ Printer.pr_constant env declared_ctnt);
+    Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
