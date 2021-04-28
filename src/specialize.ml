@@ -236,6 +236,7 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
 let specialization_instance_internal
     ?(cfunc : string option)
     ?(gen_constant=false)
+    ?(primitive=false)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) (static_args : Constr.t list)
     (names_opt : sp_instance_names option) : Environ.env * specialization_instance =
@@ -338,7 +339,11 @@ let specialization_instance_internal
   in
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
-    Pp.str "CodeGen Function" +++
+    Pp.str "CodeGen" +++
+    (match gen_constant, primitive with
+    | true, _ -> Pp.str "Constant"
+    | false, true -> Pp.str "Primitive"
+    | _ -> Pp.str "Function") +++
     Printer.pr_constr_env env sigma func +++
     (pp_sjoin_list (snd (List.fold_right
            (fun sd (args, res) ->
@@ -368,6 +373,7 @@ let specialization_instance_internal
 
 let codegen_function_internal
     ?(gen_constant=false)
+    ?(primitive=false)
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : Environ.env * specialization_instance =
@@ -398,7 +404,7 @@ let codegen_function_internal
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
-  specialization_instance_internal ~gen_constant:gen_constant env sigma func args (Some names)
+  specialization_instance_internal ~gen_constant ~primitive env sigma func args (Some names)
 
 let command_function
     (func : Libnames.qualid)
@@ -411,14 +417,14 @@ let command_primitive
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
-  ignore (codegen_function_internal func user_args names)
+  ignore (codegen_function_internal ~primitive:true func user_args names)
 
 let command_constant
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr list)
     (names : sp_instance_names) : unit =
   let user_args = List.map (fun arg -> Some arg) user_args in
-  ignore (codegen_function_internal ~gen_constant:true func user_args names)
+  ignore (codegen_function_internal ~gen_constant:true ~primitive:true func user_args names)
 
 let check_convertible phase (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
   if Reductionops.is_conv env sigma t1 t2 then
