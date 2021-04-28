@@ -39,9 +39,8 @@ let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.
   let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
   Feedback.msg_info (v 2
     (Pp.str "[codegen] inductive type translation automatically configured:" +++
-     (hv 2 (Pp.str "inductive type:" +++ Printer.pr_econstr_env env sigma t)) +++
-     (hv 2 (Pp.str "C type:" +++ Pp.str (escape_as_coq_string c_name))) +++
-     Pp.str "(Use \"CodeGen Inductive Type\" for customization)"));
+     (hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
+     Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
   ind_cfg
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
@@ -67,26 +66,22 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         in
         (consname, caselabel, accessors))
   in
-  let msgs_defined = List.filter_map (fun x -> x)
-    [
-      Some (hv 2 (Pp.str "inductive type:" +++ Printer.pr_econstr_env env sigma t));
-      Some (hv 2 (Pp.str "switch function:" +++ Pp.str (escape_as_coq_string swfunc)));
-      if cstr_caselabel_accessors_list <> [] then
-        Some (hv 2 (Pp.str "case labels:" +++
-                    pp_sjoin_list (List.map (fun (_, caselabel, _) -> Pp.str (escape_as_coq_string caselabel)) cstr_caselabel_accessors_list)))
-      else
-        None;
-      if List.exists (fun (_, _, accessors) -> accessors <> []) cstr_caselabel_accessors_list then
-         Some (hv 2 (Pp.str "member accessors:" +++
-                     pp_sjoin_list (List.concat (List.map (fun (_, _, accessors) -> List.map (fun access -> Pp.str (escape_as_coq_string access)) accessors) cstr_caselabel_accessors_list))))
-      else
-        None
-    ]
-  in
   Feedback.msg_info (v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
-     pp_sjoin_list msgs_defined +++
-     Pp.str "(Use \"CodeGen Inductive Match\" for customization)"));
+     hv 0 (hv 2 (Pp.str "CodeGen Inductive Match" +++
+                 hv 2 (
+                   Printer.pr_econstr_env env sigma t +++
+                   Pp.str "=>" +++
+                   Pp.str (escape_as_coq_string swfunc))) +++
+           pp_sjoin_list (
+             List.map
+               (fun (consname, caselabel, accessors) ->
+                 hv 2 (
+                   Pp.str "|" +++
+                   Pp.str (escape_as_coq_string caselabel) +++
+                   pp_sjoin_list (List.map (fun access -> Pp.str (escape_as_coq_string access)) accessors)))
+               cstr_caselabel_accessors_list) ++
+          Pp.str ".")));
   register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list
 
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
