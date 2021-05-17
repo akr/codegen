@@ -44,7 +44,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     let pr_names =
       Pp.str "=>" ++ spc () ++
       Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
-      Printer.pr_constr_env env sigma sp_inst.sp_partapp_constr ++ spc () ++
+      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr ++ spc () ++
       (match sp_inst.sp_specialization_name with
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
       | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
@@ -162,7 +162,7 @@ let command_auto_arguments (func_list : Libnames.qualid list) : unit =
   let sigma = Evd.from_env env in
   List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
 
-let build_partapp (env : Environ.env) (sigma : Evd.evar_map)
+let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type sd_list static_args =
@@ -246,13 +246,13 @@ let specialization_instance_internal
   in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (sigma, partapp, partapp_type) = build_partapp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
-  (if gen_constant && not (isInd sigma (fst (decompose_app sigma partapp_type))) then
+  let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
+  (if gen_constant && not (isInd sigma (fst (decompose_app sigma presimp_type))) then
     user_err (Pp.str "[codegen] CodeGen Constant needs a constant:" ++ spc () ++
-      Printer.pr_constr_env env sigma partapp ++ spc () ++ str ":" ++ spc () ++
-      Printer.pr_econstr_env env sigma partapp_type));
-  (if ConstrMap.mem partapp sp_cfg.sp_instance_map then
-    user_err (Pp.str "[codegen] specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma partapp));
+      Printer.pr_constr_env env sigma presimp ++ spc () ++ str ":" ++ spc () ++
+      Printer.pr_econstr_env env sigma presimp_type));
+  (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
+    user_err (Pp.str "[codegen] specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma presimp));
   let check_cfunc_name_conflict cfunc_name =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None -> ()
@@ -261,14 +261,14 @@ let specialization_instance_internal
           (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
           Pp.str cfunc_name ++ Pp.spc () ++
           Pp.str "for" ++ Pp.spc () ++
-          Printer.pr_constr_env env sigma sp_inst.sp_partapp ++ Pp.spc () ++
+          Printer.pr_constr_env env sigma sp_inst.sp_presimp ++ Pp.spc () ++
           Pp.str "but also for" ++ Pp.spc () ++
-          Printer.pr_constr_env env sigma partapp)
+          Printer.pr_constr_env env sigma presimp)
   in
   let (cfunc_name, sp_inst) =
     let dont_need_presimplified_ctnt =
       List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
-      (match names_opt with Some { spi_partapp_id = Some _ } -> false | _ -> true)
+      (match names_opt with Some { spi_presimp_id = Some _ } -> false | _ -> true)
     in
     if dont_need_presimplified_ctnt then
       let s_id = match names_opt with
@@ -289,9 +289,9 @@ let specialization_instance_internal
       in
       check_cfunc_name_conflict cfunc_name;
       let sp_inst = {
-        sp_partapp = partapp;
+        sp_presimp = presimp;
         sp_static_arguments = [];
-        sp_partapp_constr = func; (* use the original function for fully dynamic function *)
+        sp_presimp_constr = func; (* use the original function for fully dynamic function *)
         sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
@@ -299,11 +299,11 @@ let specialization_instance_internal
       (cfunc_name, sp_inst)
     else
       let (p_id, s_id) = match names_opt with
-        | Some { spi_partapp_id = Some p_id;
+        | Some { spi_presimp_id = Some p_id;
                  spi_specialized_id = Some s_id } -> (p_id, s_id)
         | _ ->
             let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
-            let p_id_opt = (match names_opt with | Some { spi_partapp_id = Some p_id } -> Some p_id | _ -> None) in
+            let p_id_opt = (match names_opt with | Some { spi_presimp_id = Some p_id } -> Some p_id | _ -> None) in
             let s_id_opt = (match names_opt with | Some { spi_specialized_id = Some s_id } -> Some s_id | _ -> None) in
             (
               (Stdlib.Option.fold ~none:p_id ~some:(fun x -> x) p_id_opt),
@@ -315,22 +315,22 @@ let specialization_instance_internal
               (* We accept C's non-idetifier, such as "0" here. *)
               name
           | _ ->
-              (* We use partapp name for functions with static arguments *)
+              (* We use presimp name for functions with static arguments *)
               c_id (Id.to_string p_id)
       in
       check_cfunc_name_conflict cfunc_name;
       let globref = Declare.declare_definition
         ~info:(Declare.Info.make ())
-        ~cinfo:(Declare.CInfo.make ~name:p_id ~typ:(Some partapp_type) ())
+        ~cinfo:(Declare.CInfo.make ~name:p_id ~typ:(Some presimp_type) ())
         ~opaque:false
-        ~body:(EConstr.of_constr partapp)
+        ~body:(EConstr.of_constr presimp)
         sigma
       in
       let declared_ctnt = Globnames.destConstRef globref in
       let sp_inst = {
-        sp_partapp = partapp;
+        sp_presimp = presimp;
         sp_static_arguments = static_args;
-        sp_partapp_constr = Constr.mkConst declared_ctnt;
+        sp_presimp_constr = Constr.mkConst declared_ctnt;
         sp_specialization_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
@@ -355,18 +355,18 @@ let specialization_instance_internal
            sp_cfg.sp_sd_list (static_args, [])))) +++
     Pp.str "=>" +++
     Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
-    (if sp_inst.sp_partapp_constr = func then
+    (if sp_inst.sp_presimp_constr = func then
       Pp.str "_"
     else
-      Printer.pr_constr_env env sigma sp_inst.sp_partapp_constr) +++
+      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
     (match sp_inst.sp_specialization_name with
     | SpExpectedId s_id -> Id.print s_id
     | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
     Pp.str "."));
-  gallina_instance_map := (ConstrMap.add sp_inst.sp_partapp_constr (sp_cfg, sp_inst) !gallina_instance_map);
-  gallina_instance_map := (ConstrMap.add partapp (sp_cfg, sp_inst) !gallina_instance_map);
+  gallina_instance_map := (ConstrMap.add sp_inst.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map);
+  gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
-  let inst_map = ConstrMap.add partapp sp_inst sp_cfg.sp_instance_map in
+  let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
   let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
   (new_env_with_rels env, sp_inst)
@@ -1101,13 +1101,13 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (_, partapp, _) = build_partapp env sigma efunc efunc_type sd_list nf_static_args in
-  (*Feedback.msg_info (Pp.str "[codegen] replace partapp: " ++ Printer.pr_constr_env env sigma partapp);*)
-  let (env, sp_inst) = match ConstrMap.find_opt partapp sp_cfg.sp_instance_map with
+  let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args in
+  (*Feedback.msg_info (Pp.str "[codegen] replace presimp: " ++ Printer.pr_constr_env env sigma presimp);*)
+  let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None -> specialization_instance_internal ~cfunc env sigma func nf_static_args None
     | Some sp_inst -> (env, sp_inst)
   in
-  let sp_ctnt = sp_inst.sp_partapp_constr in
+  let sp_ctnt = sp_inst.sp_presimp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
   (env, (mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args)))
 
@@ -1633,8 +1633,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     | SpExpectedId id -> id
     | SpDefinedCtnt _ -> user_err (Pp.str "[codegen] specialization already defined"))
   in
-  let partapp = sp_inst.sp_partapp in
-  let epartapp = EConstr.of_constr partapp in
+  let presimp = sp_inst.sp_presimp in
+  let epresimp = EConstr.of_constr presimp in
   let ctnt =
     match Constr.kind sp_cfg.sp_func with
     | Const (ctnt,_) -> ctnt
@@ -1652,8 +1652,8 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
   in
-  debug_specialization env sigma "partial-application" epartapp;
-  let term = inline env sigma inline_pred epartapp in
+  debug_specialization env sigma "partial-application" epresimp;
+  let term = inline env sigma inline_pred epresimp in
   debug_specialization env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
   let term = normalizeV env sigma term in
@@ -1679,9 +1679,9 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   in
   let declared_ctnt = Globnames.destConstRef globref in
   let sp_inst2 = {
-    sp_partapp = sp_inst.sp_partapp;
+    sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
-    sp_partapp_constr = sp_inst.sp_partapp_constr;
+    sp_presimp_constr = sp_inst.sp_presimp_constr;
     sp_specialization_name = SpDefinedCtnt declared_ctnt;
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
@@ -1690,14 +1690,14 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
   (let m = !gallina_instance_map in
-    let m = ConstrMap.set sp_inst.sp_partapp_constr (sp_cfg, sp_inst2) m in
-    let m = ConstrMap.set partapp (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.set sp_inst.sp_presimp_constr (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.set presimp (sp_cfg, sp_inst2) m in
     let m = ConstrMap.add (Constr.mkConst declared_ctnt) (sp_cfg, sp_inst2) m in
     gallina_instance_map := m);
   (let m = !cfunc_instance_map in
     let m = CString.Map.set sp_inst.sp_cfunc_name (sp_cfg, sp_inst2) m in
     cfunc_instance_map := m);
-  (let inst_map = ConstrMap.add partapp sp_inst2 sp_cfg.sp_instance_map in
+  (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    let m = !specialize_config_map in
    specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);

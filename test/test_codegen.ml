@@ -915,7 +915,7 @@ let bool_matchcount_src = {|
       ".
 |}
 
-let test_beta_var_partapp (ctx : test_ctxt) : unit =
+let test_beta_var_presimp (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_matchcount_src ^ nat_src ^
     {|
@@ -1422,7 +1422,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
       assert(head(map_succ(cons(1, NULL))) == 2);
     |}
 
-let test_fully_dynamic_func_with_partapp_name (ctx : test_ctxt) : unit =
+let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
   assert_coq_success ctx
     (nat_src ^
     {|
@@ -2306,7 +2306,7 @@ let suite : OUnit2.test =
     "test_app_let" >:: test_app_let;
     "test_app_match" >:: test_app_match;
     "test_cast" >:: test_cast;
-    "test_beta_var_partapp" >:: test_beta_var_partapp;
+    "test_beta_var_presimp" >:: test_beta_var_presimp;
     "test_delta_fun_constant" >:: test_delta_fun_constant;
     "test_delta_fun_constructor" >:: test_delta_fun_constructor;
     "test_delta_fun_lambda" >:: test_delta_fun_lambda;
@@ -2332,7 +2332,7 @@ let suite : OUnit2.test =
     "test_uphalf" >:: test_uphalf;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
-    "test_fully_dynamic_func_with_partapp_name" >:: test_fully_dynamic_func_with_partapp_name;
+    "test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_mftest" >:: test_mftest;
     "test_multifunc_noargument" >:: test_multifunc_noargument;

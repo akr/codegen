@@ -102,7 +102,7 @@ type constr_or_underscore = Constrexpr.constr_expr option
 
 type sp_instance_names = {
   spi_cfunc_name : string option;
-  spi_partapp_id : Id.t option;
+  spi_presimp_id : Id.t option;
   spi_specialized_id : Id.t option
 }
 
@@ -122,9 +122,9 @@ type specialization_instance_name_status =
 
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
-  sp_partapp_constr : Constr.t; (* constant or constructor *)
+  sp_presimp_constr : Constr.t; (* constant or constructor *)
   sp_specialization_name : specialization_instance_name_status;
-  sp_partapp : Constr.t;
+  sp_presimp : Constr.t;
   sp_cfunc_name : string;
   sp_gen_constant : bool; (* Generate C constant "foo",
                              instead of function call "foo()".
@@ -136,15 +136,15 @@ type specialization_instance = {
 type specialization_config = {
   sp_func : Constr.t; (* constant or constructor *)
   sp_sd_list : s_or_d list;
-  sp_instance_map : specialization_instance ConstrMap.t; (* key is partapp *)
+  sp_instance_map : specialization_instance ConstrMap.t; (* key is presimp *)
 }
 
 (* key is constant or constructor which is the target of specialization *)
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
 
 (*
-  key is a constant to refer a partapp (codegen_pN_foo),
-  the partapp itself (@cons bool) and
+  key is a constant to refer a presimp (codegen_pN_foo),
+  the presimp itself (@cons bool) and
   a constant to refer the specialized definition (codegen_sN_foo).
 *)
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
