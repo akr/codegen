@@ -1067,6 +1067,7 @@ let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
 let has_fv sigma term : bool =
   first_fv sigma term <> None
 
+(* func must be a constant or constructor *)
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t =
   (* Feedback.msg_info (Pp.str "[codegen] replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_auto_arguments_internal ~cfunc env sigma func in
