@@ -123,7 +123,7 @@ type simplified_name_status =
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
   sp_presimp_constr : Constr.t; (* constant or constructor *)
-  sp_specialization_name : simplified_name_status;
+  sp_simplified_name : simplified_name_status;
   sp_presimp : Constr.t;
   sp_cfunc_name : string;
   sp_gen_constant : bool; (* Generate C constant "foo",

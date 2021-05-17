@@ -45,7 +45,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
       Pp.str "=>" ++ spc () ++
       Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr ++ spc () ++
-      (match sp_inst.sp_specialization_name with
+      (match sp_inst.sp_simplified_name with
       | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
       | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
     in
@@ -292,7 +292,7 @@ let specialization_instance_internal
         sp_presimp = presimp;
         sp_static_arguments = [];
         sp_presimp_constr = func; (* use the original function for fully dynamic function *)
-        sp_specialization_name = SpExpectedId s_id;
+        sp_simplified_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
@@ -331,7 +331,7 @@ let specialization_instance_internal
         sp_presimp = presimp;
         sp_static_arguments = static_args;
         sp_presimp_constr = Constr.mkConst declared_ctnt;
-        sp_specialization_name = SpExpectedId s_id;
+        sp_simplified_name = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
@@ -359,7 +359,7 @@ let specialization_instance_internal
       Pp.str "_"
     else
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
-    (match sp_inst.sp_specialization_name with
+    (match sp_inst.sp_simplified_name with
     | SpExpectedId s_id -> Id.print s_id
     | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
     Pp.str "."));
@@ -1629,7 +1629,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let name = (match sp_inst.sp_specialization_name with
+  let name = (match sp_inst.sp_simplified_name with
     | SpExpectedId id -> id
     | SpDefinedCtnt _ -> user_err (Pp.str "[codegen] specialization already defined"))
   in
@@ -1682,7 +1682,7 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_presimp_constr = sp_inst.sp_presimp_constr;
-    sp_specialization_name = SpDefinedCtnt declared_ctnt;
+    sp_simplified_name = SpDefinedCtnt declared_ctnt;
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
