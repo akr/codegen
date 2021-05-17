@@ -76,11 +76,25 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
 (*
   CodeGen Arguments FUNCTION SorD*.
+  CodeGen AutoArguments FUNCTION*.
   CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PARTAPP_NAME SPECIALIZED_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PARTAPP_NAME SPECIALIZED_NAME..
 
-  CodeGen GenerateFile "FILENAME"
+  CodeGen Snippet "...".
+  CodeGen IndImp COQ_TYPE.
+
+  CodeGen GenerateFile "FILENAME".
+  CodeGen GenerateTest.
+  CodeGen Gen FUNCTION_OR_C_FUNCNAME+.
+
+  CodeGen Global Inline QUALID...
+  CodeGen Local Inline QUALID QUALID...
+
+  CodeGen Specialize C_FUNCNAME*.
+
+  CodeGen Linear COQ_TYPE.
+  CodeGen LinearCheck FUNCTION*.
 
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
@@ -105,9 +119,10 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
   Print CodeGen Specialization id.
 
-  CodeGen Global Inline QUALID...
-  CodeGen Local Inline QUALID QUALID...
+*)
 
+(*
+  CodeGen IndImp COQ_TYPE.
 *)
 
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
