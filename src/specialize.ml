@@ -1109,7 +1109,8 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   in
   let sp_ctnt = sp_inst.sp_presimp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
-  (env, (mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args)))
+  let newexp = mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args) in
+  (env, newexp)
 
 (* This function assumes S-normal form.
    So this function doesn't traverse subterms of Proj, Cast,
