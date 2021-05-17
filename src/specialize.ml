@@ -1609,19 +1609,19 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
 
 let specialization_time = ref (Unix.times ())
 
-let init_debug_specialization () : unit =
-  if !opt_debug_specialization then
+let init_debug_simplification () : unit =
+  if !opt_debug_simplification then
     specialization_time := Unix.times ()
 
-let debug_specialization (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
-  if !opt_debug_specialization then
+let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
+  if !opt_debug_simplification then
     (let old = !specialization_time in
     let now = Unix.times () in
     Feedback.msg_debug (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term));
     specialization_time := now)
 
-let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant.t =
-  init_debug_specialization ();
+let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
+  init_debug_simplification ();
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None ->
@@ -1654,24 +1654,24 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
   in
-  debug_specialization env sigma "partial-application" epresimp;
+  debug_simplification env sigma "partial-application" epresimp;
   let term = inline env sigma inline_pred epresimp in
-  debug_specialization env sigma "inline" term;
+  debug_simplification env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
   let term = normalizeV env sigma term in
-  debug_specialization env sigma "normalizeV" term;
+  debug_simplification env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
-  debug_specialization env sigma "reduce_exp" term;
+  debug_simplification env sigma "reduce_exp" term;
   let (env, term) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
-  debug_specialization env sigma "replace" term;
+  debug_simplification env sigma "replace" term;
   let term = normalize_types env sigma term in
-  debug_specialization env sigma "normalize_types" term;
+  debug_simplification env sigma "normalize_types" term;
   let term = delete_unused_let env sigma term in
-  debug_specialization env sigma "delete_unused_let" term;
+  debug_simplification env sigma "delete_unused_let" term;
   let term = complete_args env sigma term in
-  debug_specialization env sigma "complete_args" term;
+  debug_simplification env sigma "complete_args" term;
   let term = rename_vars env sigma term in
-  debug_specialization env sigma "rename_vars" term;
+  debug_simplification env sigma "rename_vars" term;
   let globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:name ~typ:None ())
@@ -1704,13 +1704,13 @@ let codegen_specialization_specialize1 (cfunc : string) : Environ.env * Constant
    let m = !specialize_config_map in
    specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
   let env = Global.env () in
-  (*Feedback.msg_debug (Pp.str "[codegen:codegen_specialization_specialize1] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
+  (*Feedback.msg_debug (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt)
 
-let command_specialize (cfuncs : string list) : unit =
+let command_simplify (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
-      ignore (codegen_specialization_specialize1 cfunc_name))
+      ignore (codegen_simplify cfunc_name))
     cfuncs
 
 

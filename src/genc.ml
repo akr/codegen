@@ -202,7 +202,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   let (env, ctnt) =
     match sp_inst.sp_simplified_name with
     | SpExpectedId id ->
-        codegen_specialization_specialize1 cfunc_name (* modify global env *)
+        codegen_simplify cfunc_name (* modify global env *)
     | SpDefinedCtnt ctnt -> (Global.env (), ctnt)
   in
   (*Feedback.msg_debug (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)

@@ -20,13 +20,13 @@ open Names
 
 module ConstrMap = HMap.Make(Constr)
 
-(* Set/Unset Debug CodeGen Specialization. *)
-let opt_debug_specialization = ref false
+(* Set/Unset Debug CodeGen Simplification. *)
+let opt_debug_simplification = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
-          optkey   = ["Debug";"CodeGen";"Specialization"];
-          optread  = (fun () -> !opt_debug_specialization);
-          optwrite = (:=) opt_debug_specialization }
+          optkey   = ["Debug";"CodeGen";"Simplification"];
+          optread  = (fun () -> !opt_debug_simplification);
+          optwrite = (:=) opt_debug_simplification }
 
 (* Set/Unset Debug CodeGen NormalizeV. *)
 let opt_debug_normalizeV = ref false
