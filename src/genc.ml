@@ -1984,7 +1984,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
       (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
         let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, (j+1))) in
         let params' = Array.map (EConstr.to_constr sigma) params in
-        ignore (codegen_specialization_define_or_check_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
+        ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
         let (env, sp_inst) = specialization_instance_internal env sigma cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
         env)
       0 env cstr_and_members
@@ -2167,7 +2167,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
         CList.fold_left_i
           (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
             let cstrterm0 = Constr.mkConstruct (ind, j) in
-            ignore (codegen_specialization_define_or_check_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
+            ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
             let (env, sp_inst) = specialization_instance_internal env sigma cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
             env)
           1 env cstr_and_members)

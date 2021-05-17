@@ -90,7 +90,7 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
     | ConstructRef cstr -> Constr.mkConstruct cstr
     | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
 
-let codegen_specialization_define_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
+let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
@@ -101,10 +101,10 @@ let codegen_specialization_define_arguments ?(cfunc : string option) (env : Envi
     Pp.str "."));
   sp_cfg
 
-let codegen_specialization_define_or_check_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
+let codegen_define_or_check_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   match ConstrMap.find_opt func !specialize_config_map with
   | None ->
-      codegen_specialization_define_arguments ?cfunc env sigma func sd_list
+      codegen_define_static_arguments ?cfunc env sigma func sd_list
   | Some sp_cfg ->
       let sd_list_old = drop_trailing_d sp_cfg.sp_sd_list in
       let sd_list_new = drop_trailing_d sd_list in
@@ -122,7 +122,7 @@ let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let func = func_of_qualid env func in
   (if ConstrMap.mem func !specialize_config_map then
     user_err (Pp.str "[codegen] specialization already configured:" ++ spc () ++ Printer.pr_constr_env env sigma func));
-  ignore (codegen_specialization_define_arguments env sigma func sd_list)
+  ignore (codegen_define_static_arguments env sigma func sd_list)
 
 let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
   (* Feedback.msg_info (Printer.pr_econstr_env env sigma ty); *)
@@ -150,7 +150,7 @@ let codegen_specialization_auto_arguments_internal
   | None ->
       let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       let sd_list = (determine_sd_list env sigma ty) in
-      codegen_specialization_define_arguments ?cfunc env sigma func sd_list
+      codegen_define_static_arguments ?cfunc env sigma func sd_list
 
 let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) : unit =
@@ -403,7 +403,7 @@ let codegen_function_internal
   let (sigma, args) = interp_args env sigma func_istypearg_list static_args in
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  ignore (codegen_specialization_define_or_check_arguments env sigma func sd_list);
+  ignore (codegen_define_or_check_static_arguments env sigma func sd_list);
   specialization_instance_internal ~gen_constant ~primitive env sigma func args (Some names)
 
 let command_function
