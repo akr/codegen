@@ -141,7 +141,7 @@ let determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t
     (function true -> SorD_S | false -> SorD_D)
     (determine_type_arguments env sigma ty)
 
-let codegen_specialization_auto_arguments_internal
+let codegen_auto_arguments_internal
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : specialization_config =
@@ -152,15 +152,15 @@ let codegen_specialization_auto_arguments_internal
       let sd_list = (determine_sd_list env sigma ty) in
       codegen_define_static_arguments ?cfunc env sigma func sd_list
 
-let codegen_specialization_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
+let codegen_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) : unit =
   let func = func_of_qualid env func in
-  ignore (codegen_specialization_auto_arguments_internal env sigma func)
+  ignore (codegen_auto_arguments_internal env sigma func)
 
 let command_auto_arguments (func_list : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  List.iter (codegen_specialization_auto_arguments_1 env sigma) func_list
+  List.iter (codegen_auto_arguments_1 env sigma) func_list
 
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
@@ -1069,7 +1069,7 @@ let has_fv sigma term : bool =
 
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t =
   (* Feedback.msg_info (Pp.str "[codegen] replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
-  let sp_cfg = codegen_specialization_auto_arguments_internal ~cfunc env sigma func in
+  let sp_cfg = codegen_auto_arguments_internal ~cfunc env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
     user_err (Pp.str "[codegen] Not enough arguments for" +++
