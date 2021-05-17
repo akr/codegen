@@ -426,7 +426,7 @@ let command_constant
   let user_args = List.map (fun arg -> Some arg) user_args in
   ignore (codegen_function_internal ~gen_constant:true ~primitive:true func user_args names)
 
-let check_convertible phase (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
+let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
   if Reductionops.is_conv env sigma t1 t2 then
     ()
   else
