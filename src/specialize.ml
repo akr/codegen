@@ -272,7 +272,7 @@ let specialization_instance_internal
     in
     if dont_need_presimplified_ctnt then
       let s_id = match names_opt with
-        | Some { spi_specialized_id = Some id } -> id
+        | Some { spi_simplified_id = Some id } -> id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
                s_id
       in
@@ -300,11 +300,11 @@ let specialization_instance_internal
     else
       let (p_id, s_id) = match names_opt with
         | Some { spi_presimp_id = Some p_id;
-                 spi_specialized_id = Some s_id } -> (p_id, s_id)
+                 spi_simplified_id = Some s_id } -> (p_id, s_id)
         | _ ->
             let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
             let p_id_opt = (match names_opt with | Some { spi_presimp_id = Some p_id } -> Some p_id | _ -> None) in
-            let s_id_opt = (match names_opt with | Some { spi_specialized_id = Some s_id } -> Some s_id | _ -> None) in
+            let s_id_opt = (match names_opt with | Some { spi_simplified_id = Some s_id } -> Some s_id | _ -> None) in
             (
               (Stdlib.Option.fold ~none:p_id ~some:(fun x -> x) p_id_opt),
               (Stdlib.Option.fold ~none:s_id ~some:(fun x -> x) s_id_opt)

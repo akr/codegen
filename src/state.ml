@@ -103,7 +103,7 @@ type constr_or_underscore = Constrexpr.constr_expr option
 type sp_instance_names = {
   spi_cfunc_name : string option;
   spi_presimp_id : Id.t option;
-  spi_specialized_id : Id.t option
+  spi_simplified_id : Id.t option
 }
 
 type ind_constructor = {
@@ -145,7 +145,7 @@ let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config
 (*
   key is a constant to refer a presimp (codegen_pN_foo),
   the presimp itself (@cons bool) and
-  a constant to refer the specialized definition (codegen_sN_foo).
+  a constant to refer the simplified definition (codegen_sN_foo).
 *)
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
