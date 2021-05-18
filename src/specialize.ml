@@ -1654,7 +1654,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
   in
-  debug_simplification env sigma "partial-application" epresimp;
+  debug_simplification env sigma "pre-simplified" epresimp;
   let term = inline env sigma inline_pred epresimp in
   debug_simplification env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
