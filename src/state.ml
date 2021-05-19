@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 open Names
 
 module ConstrMap = HMap.Make(Constr)
+module StringSet = CSet.Make(String)
 
 (* Set/Unset Debug CodeGen Simplification. *)
 let opt_debug_simplification = ref false
@@ -117,13 +118,14 @@ type type_linearity = Linear | Unrestricted | Investigating
 let type_linearity_list_empty : (EConstr.t * type_linearity) list = []
 let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
 
-type simplified_name_status =
-  SpExpectedId of Id.t | SpDefinedCtnt of Constant.t
+type simplified_status =
+  SpExpectedId of Id.t
+| SpDefined of (Constant.t * StringSet.t) (* (defined-constant, referred-cfuncs) *)
 
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
   sp_presimp_constr : Constr.t; (* constant or constructor *)
-  sp_simplified_name : simplified_name_status;
+  sp_simplified_status : simplified_status;
   sp_presimp : Constr.t;
   sp_cfunc_name : string;
   sp_gen_constant : bool; (* Generate C constant "foo",

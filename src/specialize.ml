@@ -45,9 +45,9 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
       Pp.str "=>" ++ spc () ++
       Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr ++ spc () ++
-      (match sp_inst.sp_simplified_name with
-      | SpExpectedId id -> Pp.str "(" ++ Id.print id ++ Pp.str ")"
-      | SpDefinedCtnt ctnt -> Printer.pr_constant env ctnt)
+      (match sp_inst.sp_simplified_status with
+      | SpExpectedId id -> Id.print id +++ Pp.str "(before-simplification)"
+      | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt +++ Pp.str "(after-simplification)")
     in
     let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
                                 sp_inst.sp_static_arguments in
@@ -62,7 +62,15 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     let feedback_instance sp_inst =
       Feedback.msg_info (Pp.str "Instance" ++ spc () ++
         Printer.pr_constr_env env sigma func ++
-        pr_inst sp_inst ++ Pp.str ".")
+        pr_inst sp_inst ++ Pp.str ".");
+      match sp_inst.sp_simplified_status with
+      | SpExpectedId id -> ()
+      | SpDefined (ctnt, referred_cfuncs) ->
+          Feedback.msg_info (Pp.str "Dependency" +++
+            Pp.str sp_inst.sp_cfunc_name +++
+            Pp.str "=>" +++
+            pp_sjoin_list (List.map Pp.str (StringSet.elements referred_cfuncs)) ++
+            Pp.str ".")
     in
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
   in
@@ -292,7 +300,7 @@ let specialization_instance_internal
         sp_presimp = presimp;
         sp_static_arguments = [];
         sp_presimp_constr = func; (* use the original function for fully dynamic function *)
-        sp_simplified_name = SpExpectedId s_id;
+        sp_simplified_status = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
@@ -331,7 +339,7 @@ let specialization_instance_internal
         sp_presimp = presimp;
         sp_static_arguments = static_args;
         sp_presimp_constr = Constr.mkConst declared_ctnt;
-        sp_simplified_name = SpExpectedId s_id;
+        sp_simplified_status = SpExpectedId s_id;
         sp_cfunc_name = cfunc_name;
         sp_gen_constant = gen_constant; }
       in
@@ -359,7 +367,7 @@ let specialization_instance_internal
       Pp.str "_"
     else
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
-    (match sp_inst.sp_simplified_name with
+    (match sp_inst.sp_simplified_status with
     | SpExpectedId s_id -> Id.print s_id
     | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
     Pp.str "."));
@@ -1068,7 +1076,7 @@ let has_fv sigma term : bool =
   first_fv sigma term <> None
 
 (* func must be a constant or constructor *)
-let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t =
+let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t * string =
   (* Feedback.msg_info (Pp.str "[codegen] replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_auto_arguments_internal ~cfunc env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
@@ -1111,68 +1119,79 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let sp_ctnt = sp_inst.sp_presimp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
   let newexp = mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args) in
-  (env, newexp)
+  (env, newexp, sp_inst.sp_cfunc_name)
 
 (* This function assumes S-normal form.
    So this function doesn't traverse subterms of Proj, Cast,
    arguments of App and item of Case. *)
-let rec replace ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
+let rec replace ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t * StringSet.t =
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "[codegen] replace arg: " ++ Printer.pr_econstr_env env sigma term));
-  let (env, result) = replace1 ~cfunc env sigma term in
+  let (env, result, referred_cfuncs) = replace1 ~cfunc env sigma term in
   (if !opt_debug_replace then
     Feedback.msg_debug (Pp.str "[codegen] replace ret: " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "replace" env sigma term result;
-  (env, result)
-and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t =
+  (env, result, referred_cfuncs)
+and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t * StringSet.t =
   match EConstr.kind sigma term with
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Ind _ | Int _ | Float _ | Array _
-  | Proj _ | Cast _ -> (env, term)
+  | Proj _ | Cast _ -> (env, term, StringSet.empty)
   | Lambda (x, t, e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let (env2', e') = replace ~cfunc env2 sigma e in
+      let (env2', e', referred_cfuncs) = replace ~cfunc env2 sigma e in
       let env' = Environ.pop_rel_context 1 env2' in
-      (env', mkLambda (x, t, e'))
+      (env', mkLambda (x, t, e'), referred_cfuncs)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let (env2', fary') = CArray.fold_left_map
-        (fun e f -> replace ~cfunc e sigma f) env2 fary
+      let ((env2', referred_cfuncs), fary') = CArray.fold_left_map
+        (fun (env3, referred_cfuncs) f ->
+          let (env4, f', referred_cfuncs') = replace ~cfunc env3 sigma f in
+          ((env4, StringSet.union referred_cfuncs referred_cfuncs'), f'))
+        (env2, StringSet.empty) fary
       in
       let env' = Environ.pop_rel_context (Array.length nary) env2' in
-      (env', mkFix ((ia, i), (nary, tary, fary')))
+      (env', mkFix ((ia, i), (nary, tary, fary')), referred_cfuncs)
   | CoFix _ ->
       user_err (Pp.str "[codegen] codegen doesn't support CoFix.")
   | LetIn (x, e, t, b) ->
-      let (env', e') = replace ~cfunc env sigma e in
+      let (env', e', referred_cfuncs1) = replace ~cfunc env sigma e in
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env' in
-      let (env2', b') = replace ~cfunc env2 sigma b in
+      let (env2', b', referred_cfuncs2) = replace ~cfunc env2 sigma b in
       let env'' = Environ.pop_rel_context 1 env2' in
-      (env'', mkLetIn (x, e', t, b'))
+      let referred_cfuncs = StringSet.union referred_cfuncs1 referred_cfuncs2 in
+      (env'', mkLetIn (x, e', t, b'), referred_cfuncs)
   | Case (ci, p, iv, item, branches) ->
-      let (env', branches') = CArray.fold_left_map
-        (fun e f -> replace ~cfunc e sigma f) env branches
+      let ((env', referred_cfuncs), branches') = CArray.fold_left_map
+        (fun (env2, referred_cfuncs) f ->
+          let (env3, f', referred_cfuncs') = replace ~cfunc env2 sigma f in
+          ((env3, StringSet.union referred_cfuncs referred_cfuncs'), f'))
+        (env, StringSet.empty) branches
       in
-      (env', mkCase (ci, p, iv, item, branches'))
+      (env', mkCase (ci, p, iv, item, branches'), referred_cfuncs)
   | Const (ctnt, u) ->
       let f' = Constr.mkConst ctnt in
-      replace_app ~cfunc env sigma f' [| |]
+      let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
+      (env2, f'', StringSet.singleton referred_cfunc)
   | Construct (cstr, u) ->
       let f' = Constr.mkConstruct cstr in
-      replace_app ~cfunc env sigma f' [| |]
+      let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
+      (env2, f'', StringSet.singleton referred_cfunc)
   | App (f, args) ->
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
           let f' = Constr.mkConst ctnt in
-          replace_app ~cfunc env sigma f' args
+          let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' args in
+          (env2, f'', StringSet.singleton referred_cfunc)
       | Construct (cstr, u) ->
           let f' = Constr.mkConstruct cstr in
-          replace_app ~cfunc env sigma f' args
+          let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' args in
+          (env2, f'', StringSet.singleton referred_cfunc)
       | _ ->
-          let (env', f) = replace ~cfunc env sigma f in
-          (env', mkApp (f, args))
+          let (env', f, referred_cfuncs) = replace ~cfunc env sigma f in
+          (env', mkApp (f, args), referred_cfuncs)
 
 let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
   if n <= 0 then
@@ -1631,9 +1650,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let name = (match sp_inst.sp_simplified_name with
+  let name = (match sp_inst.sp_simplified_status with
     | SpExpectedId id -> id
-    | SpDefinedCtnt _ -> user_err (Pp.str "[codegen] specialization already defined"))
+    | SpDefined _ -> user_err (Pp.str "[codegen] specialization already defined"))
   in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
@@ -1662,7 +1681,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
   debug_simplification env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_simplification env sigma "reduce_exp" term;
-  let (env, term) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
+  let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
   debug_simplification env sigma "replace" term;
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
@@ -1684,7 +1703,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_presimp_constr = sp_inst.sp_presimp_constr;
-    sp_simplified_name = SpDefinedCtnt declared_ctnt;
+    sp_simplified_status = SpDefined (declared_ctnt, referred_cfuncs);
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_gen_constant = sp_inst.sp_gen_constant; }
   in
