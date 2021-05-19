@@ -2318,12 +2318,18 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
       | StrOrQid_Str str ->
           Feedback.msg_info (gen_function str)
       | StrOrQid_Qid qid ->
-          let (env, sp_inst) = codegen_function_internal qid []
-            { spi_cfunc_name = None;
-              spi_presimp_id = None;
-              spi_simplified_id = None }
+          (let env = Global.env () in
+          let sigma = Evd.from_env env in
+          let func = func_of_qualid env qid in
+          let sp_cfg = codegen_auto_arguments_internal env sigma func in
+          (if List.mem SorD_S sp_cfg.sp_sd_list then
+            user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));
+          let (env, sp_inst) =
+            match ConstrMap.find_opt func sp_cfg.sp_instance_map with
+            | None -> specialization_instance_internal env sigma func [] None
+            | Some sp_inst -> (env, sp_inst)
           in
-          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name))
+          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name)))
     cfunc_list
 
 let command_snippet (str : string) : unit =
