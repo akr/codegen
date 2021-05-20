@@ -1659,8 +1659,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
   let ctnt =
     match Constr.kind sp_cfg.sp_func with
     | Const (ctnt,_) -> ctnt
-    | Construct _ -> user_err (Pp.str "[codegen] constructor is not specializable")
-    | _ -> user_err (Pp.str "[codegen] non-constant and non-constructor specialization")
+    | Construct _ -> user_err (Pp.str "[codegen] constructor is not simplifiable")
+    | _ -> user_err (Pp.str "[codegen] non-constant and non-constructor simplification")
   in
   Feedback.msg_info (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
