@@ -936,7 +936,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   determine_fixfunc_c_names fixinfo;
   set_fixinfo_naive_outer_variables fixinfo env sigma [] term;
   filter_fixinfo_outer_variables fixinfo env sigma term;
-  show_fixinfo env sigma fixinfo;
+  (*show_fixinfo env sigma fixinfo;*)
   fixinfo
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
