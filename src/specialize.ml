@@ -274,11 +274,11 @@ let specialization_instance_internal
           Printer.pr_constr_env env sigma presimp)
   in
   let (cfunc_name, sp_inst) =
-    let dont_need_presimplified_ctnt =
-      List.for_all (fun sd -> sd = SorD_D) sp_cfg.sp_sd_list &&
-      (match names_opt with Some { spi_presimp_id = Some _ } -> false | _ -> true)
+    let need_presimplified_ctnt =
+      List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
+      (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
     in
-    if dont_need_presimplified_ctnt then
+    if not need_presimplified_ctnt then
       let s_id = match names_opt with
         | Some { spi_simplified_id = Some id } -> id
         | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
