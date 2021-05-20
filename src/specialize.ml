@@ -274,6 +274,17 @@ let specialization_instance_internal
           Printer.pr_constr_env env sigma presimp)
   in
   let (cfunc_name, sp_inst) =
+    let generated_ps_syms = ref None in
+    let lazy_gensym_ps suffix =
+      match !generated_ps_syms with
+      | Some ps_ids -> ps_ids
+      | None ->
+          let ps_ids = gensym_ps suffix in
+          generated_ps_syms := Some ps_ids;
+          ps_ids
+    in
+    let lazy_gensym_p suffix = fst (lazy_gensym_ps suffix) in
+    let lazy_gensym_s suffix = snd (lazy_gensym_ps suffix) in
     let need_presimplified_ctnt =
       List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
       (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
@@ -281,8 +292,7 @@ let specialization_instance_internal
     if not need_presimplified_ctnt then
       let s_id = match names_opt with
         | Some { spi_simplified_id = Some id } -> id
-        | _ -> let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
-               s_id
+        | _ -> lazy_gensym_s (label_name_of_constant_or_constructor func)
       in
       let cfunc_name = match names_opt with
           | Some { spi_cfunc_name = Some name } ->
@@ -296,6 +306,7 @@ let specialization_instance_internal
               name
       in
       check_cfunc_name_conflict cfunc_name;
+      assert (static_args = []);
       let sp_inst = {
         sp_presimp = presimp;
         sp_static_arguments = [];
@@ -306,17 +317,15 @@ let specialization_instance_internal
       in
       (cfunc_name, sp_inst)
     else
-      let (p_id, s_id) = match names_opt with
-        | Some { spi_presimp_id = Some p_id;
-                 spi_simplified_id = Some s_id } -> (p_id, s_id)
-        | _ ->
-            let (p_id, s_id) = gensym_ps (label_name_of_constant_or_constructor func) in
-            let p_id_opt = (match names_opt with | Some { spi_presimp_id = Some p_id } -> Some p_id | _ -> None) in
-            let s_id_opt = (match names_opt with | Some { spi_simplified_id = Some s_id } -> Some s_id | _ -> None) in
-            (
-              (Stdlib.Option.fold ~none:p_id ~some:(fun x -> x) p_id_opt),
-              (Stdlib.Option.fold ~none:s_id ~some:(fun x -> x) s_id_opt)
-            )
+      let p_id =
+        match names_opt with
+        | Some { spi_presimp_id = Some p_id } -> p_id
+        | _ -> lazy_gensym_p (label_name_of_constant_or_constructor func)
+      in
+      let s_id =
+        match names_opt with
+        | Some { spi_simplified_id = Some s_id } -> s_id
+        | _ -> lazy_gensym_s (label_name_of_constant_or_constructor func)
       in
       let cfunc_name = match names_opt with
           | Some { spi_cfunc_name = Some name } ->
