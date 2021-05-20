@@ -261,19 +261,19 @@ let specialization_instance_internal
       Printer.pr_econstr_env env sigma presimp_type));
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma presimp));
-  let check_cfunc_name_conflict cfunc_name =
-    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-    | None -> ()
-    | Some (sp_cfg, sp_inst) ->
-        user_err
-          (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
-          Pp.str cfunc_name ++ Pp.spc () ++
-          Pp.str "for" ++ Pp.spc () ++
-          Printer.pr_constr_env env sigma sp_inst.sp_presimp ++ Pp.spc () ++
-          Pp.str "but also for" ++ Pp.spc () ++
-          Printer.pr_constr_env env sigma presimp)
-  in
-  let (cfunc_name, sp_inst) =
+  let sp_inst =
+    let check_cfunc_name_conflict cfunc_name =
+      match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+      | None -> ()
+      | Some (sp_cfg, sp_inst) ->
+          user_err
+            (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
+            Pp.str cfunc_name ++ Pp.spc () ++
+            Pp.str "for" ++ Pp.spc () ++
+            Printer.pr_constr_env env sigma sp_inst.sp_presimp ++ Pp.spc () ++
+            Pp.str "but also for" ++ Pp.spc () ++
+            Printer.pr_constr_env env sigma presimp)
+    in
     let generated_ps_syms = ref None in
     let lazy_gensym_ps suffix =
       match !generated_ps_syms with
@@ -289,71 +289,56 @@ let specialization_instance_internal
       List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
       (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
     in
-    if not need_presimplified_ctnt then
-      let s_id = match names_opt with
-        | Some { spi_simplified_id = Some id } -> id
-        | _ -> lazy_gensym_s (label_name_of_constant_or_constructor func)
-      in
-      let cfunc_name = match names_opt with
-          | Some { spi_cfunc_name = Some name } ->
-              (* We accept C's non-idetifier, such as "0" here. *)
-              name
-          | _ ->
-              (* We use Gallina function name as-is for functions without static arguments *)
-              let name = label_name_of_constant_or_constructor func in
-              (if not (valid_c_id_p name) then
-                user_err (Pp.str "[codegen] Gallina function name is invalid in C:" +++ Pp.str name));
-              name
-      in
-      check_cfunc_name_conflict cfunc_name;
-      assert (static_args = []);
-      let sp_inst = {
-        sp_presimp = presimp;
-        sp_static_arguments = [];
-        sp_presimp_constr = func; (* use the original function for fully dynamic function *)
-        sp_simplified_status = SpExpectedId s_id;
-        sp_cfunc_name = cfunc_name;
-        sp_gen_constant = gen_constant; }
-      in
-      (cfunc_name, sp_inst)
-    else
-      let p_id =
-        match names_opt with
-        | Some { spi_presimp_id = Some p_id } -> p_id
-        | _ -> lazy_gensym_p (label_name_of_constant_or_constructor func)
-      in
-      let s_id =
-        match names_opt with
-        | Some { spi_simplified_id = Some s_id } -> s_id
-        | _ -> lazy_gensym_s (label_name_of_constant_or_constructor func)
-      in
-      let cfunc_name = match names_opt with
-          | Some { spi_cfunc_name = Some name } ->
-              (* We accept C's non-idetifier, such as "0" here. *)
-              name
-          | _ ->
-              (* We use presimp name for functions with static arguments *)
-              c_id (Id.to_string p_id)
-      in
-      check_cfunc_name_conflict cfunc_name;
-      let globref = Declare.declare_definition
-        ~info:(Declare.Info.make ())
-        ~cinfo:(Declare.CInfo.make ~name:p_id ~typ:(Some presimp_type) ())
-        ~opaque:false
-        ~body:(EConstr.of_constr presimp)
-        sigma
-      in
-      let declared_ctnt = Globnames.destConstRef globref in
-      let sp_inst = {
-        sp_presimp = presimp;
-        sp_static_arguments = static_args;
-        sp_presimp_constr = Constr.mkConst declared_ctnt;
-        sp_simplified_status = SpExpectedId s_id;
-        sp_cfunc_name = cfunc_name;
-        sp_gen_constant = gen_constant; }
-      in
-      (cfunc_name, sp_inst)
+    let func_name = label_name_of_constant_or_constructor func in
+    let s_id = match names_opt with
+      | Some { spi_simplified_id = Some s_id } -> s_id
+      | _ -> lazy_gensym_s func_name
+    in
+    let p_id () = match names_opt with
+      | Some { spi_presimp_id = Some p_id } -> p_id
+      | _ -> lazy_gensym_p func_name
+    in
+    let cfunc_name = match names_opt with
+      | Some { spi_cfunc_name = Some name } ->
+          (* We accept C's non-idetifier, such as "0" here. *)
+          name
+      | _ ->
+          if not need_presimplified_ctnt then
+            (* We use Gallina function name as-is for functions without static arguments *)
+            if valid_c_id_p func_name then
+              func_name
+            else
+              user_err (Pp.str "[codegen] Gallina function name is invalid in C:" +++ Pp.str func_name)
+          else
+            (* We use presimp name for functions with static arguments *)
+            c_id (Id.to_string (p_id ()))
+    in
+    check_cfunc_name_conflict cfunc_name;
+    let presimp_constr =
+      if not need_presimplified_ctnt then
+        func (* use the original function for fully dynamic function *)
+      else
+        let globref = Declare.declare_definition
+          ~info:(Declare.Info.make ())
+          ~cinfo:(Declare.CInfo.make ~name:(p_id ()) ~typ:(Some presimp_type) ())
+          ~opaque:false
+          ~body:(EConstr.of_constr presimp)
+          sigma
+        in
+        let declared_ctnt = Globnames.destConstRef globref in
+        Constr.mkConst declared_ctnt
+    in
+    let sp_inst = {
+      sp_presimp = presimp;
+      sp_static_arguments = static_args;
+      sp_presimp_constr = presimp_constr;
+      sp_simplified_status = SpExpectedId s_id;
+      sp_cfunc_name = cfunc_name;
+      sp_gen_constant = gen_constant; }
+    in
+    sp_inst
   in
+  let cfunc_name = sp_inst.sp_cfunc_name in
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen" +++
@@ -371,7 +356,7 @@ let specialization_instance_internal
                  (args, (Pp.str "_" :: res)))
            sp_cfg.sp_sd_list (static_args, [])))) +++
     Pp.str "=>" +++
-    Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
+    Pp.str (escape_as_coq_string cfunc_name) +++
     (if sp_inst.sp_presimp_constr = func then
       Pp.str "_"
     else
