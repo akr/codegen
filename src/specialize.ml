@@ -43,9 +43,10 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let pr_inst sp_inst =
     let pr_names =
       Pp.str "=>" ++ spc () ++
-      Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) ++ spc () ++
-      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr ++ spc () ++
+      Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
+      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr +++
       (match sp_inst.sp_simplified_status with
+      | SpNoSimplification -> Pp.str "(no-simplification)"
       | SpExpectedId id -> Id.print id +++ Pp.str "(before-simplification)"
       | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt +++ Pp.str "(after-simplification)")
     in
@@ -64,6 +65,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
         Printer.pr_constr_env env sigma func ++
         pr_inst sp_inst ++ Pp.str ".");
       match sp_inst.sp_simplified_status with
+      | SpNoSimplification -> ()
       | SpExpectedId id -> ()
       | SpDefined (ctnt, referred_cfuncs) ->
           Feedback.msg_info (Pp.str "Dependency" +++
@@ -252,6 +254,13 @@ let specialization_instance_internal
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
+  let func_is_cstr =
+    match Constr.kind func with
+    | Const _ -> false
+    | Construct _ -> true
+    | _ -> user_err (Pp.str "[codegen] specialization_instance_internal needs constant or constructor for func:" +++
+                     Printer.pr_constr_env env sigma func)
+  in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
@@ -290,7 +299,7 @@ let specialization_instance_internal
       (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
     in
     let func_name = label_name_of_constant_or_constructor func in
-    let s_id = match names_opt with
+    let s_id () = match names_opt with
       | Some { spi_simplified_id = Some s_id } -> s_id
       | _ -> lazy_gensym_s func_name
     in
@@ -328,11 +337,17 @@ let specialization_instance_internal
         let declared_ctnt = Globnames.destConstRef globref in
         Constr.mkConst declared_ctnt
     in
+    let simplified_status =
+      if func_is_cstr || primitive  then
+        SpNoSimplification
+      else
+        SpExpectedId (s_id ())
+    in
     let sp_inst = {
       sp_presimp = presimp;
       sp_static_arguments = static_args;
       sp_presimp_constr = presimp_constr;
-      sp_simplified_status = SpExpectedId s_id;
+      sp_simplified_status = simplified_status;
       sp_cfunc_name = cfunc_name;
       sp_gen_constant = gen_constant; }
     in
@@ -342,7 +357,7 @@ let specialization_instance_internal
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen" +++
-    (match gen_constant, primitive with
+    (match gen_constant, (func_is_cstr || primitive) with
     | true, _ -> Pp.str "Constant"
     | false, true -> Pp.str "Primitive"
     | _ -> Pp.str "Function") +++
@@ -362,8 +377,9 @@ let specialization_instance_internal
     else
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
     (match sp_inst.sp_simplified_status with
+    | SpNoSimplification -> Pp.mt ()
     | SpExpectedId s_id -> Id.print s_id
-    | _ -> user_err (Pp.str "[codegen] SpExpectedId expected")) ++
+    | SpDefined _ -> user_err (Pp.str "[codegen] SpNoSimplification or SpExpectedId expected")) ++
     Pp.str "."));
   gallina_instance_map := (ConstrMap.add sp_inst.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
@@ -1645,8 +1661,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let name = (match sp_inst.sp_simplified_status with
+    | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
     | SpExpectedId id -> id
-    | SpDefined _ -> user_err (Pp.str "[codegen] specialization already defined"))
+    | SpDefined _ -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
   in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
