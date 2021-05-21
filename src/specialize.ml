@@ -261,6 +261,7 @@ let specialization_instance_internal
     | _ -> user_err (Pp.str "[codegen] specialization_instance_internal needs constant or constructor for func:" +++
                      Printer.pr_constr_env env sigma func)
   in
+  let needs_simplification = not (primitive || func_is_cstr) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
@@ -338,10 +339,10 @@ let specialization_instance_internal
         Constr.mkConst declared_ctnt
     in
     let simplified_status =
-      if func_is_cstr || primitive  then
-        SpNoSimplification
-      else
+      if needs_simplification then
         SpExpectedId (s_id ())
+      else
+        SpNoSimplification
     in
     let sp_inst = {
       sp_presimp = presimp;
@@ -357,9 +358,9 @@ let specialization_instance_internal
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen" +++
-    (match gen_constant, (func_is_cstr || primitive) with
+    (match gen_constant, needs_simplification with
     | true, _ -> Pp.str "Constant"
-    | false, true -> Pp.str "Primitive"
+    | false, false -> Pp.str "Primitive"
     | _ -> Pp.str "Function") +++
     Printer.pr_constr_env env sigma func +++
     (pp_sjoin_list (snd (List.fold_right
