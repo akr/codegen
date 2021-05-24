@@ -123,17 +123,27 @@ type simplified_status =
 | SpExpectedId of Id.t
 | SpDefined of (Constant.t * StringSet.t) (* (defined-constant, referred-cfuncs) *)
 
+(*
+- CodeGenFunction
+  Codegen-generated function.  Gallina function only.  Any dynamic argument.
+- CodeGenPrimitive
+  User-defined function.  Function or constructor.  Any dynamic argument.
+- CodeGenConstant
+  User-defined function.  Function or constructor.  No dynamic argument.
+  Generate C constant "foo", instead of function call "foo()".
+*)
+type instance_command =
+| CodeGenFunction
+| CodeGenPrimitive
+| CodeGenConstant
+
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
   sp_presimp_constr : Constr.t; (* constant or constructor *)
   sp_simplified_status : simplified_status;
   sp_presimp : Constr.t;
   sp_cfunc_name : string;
-  sp_gen_constant : bool; (* Generate C constant "foo",
-                             instead of function call "foo()".
-                             true for CodeGen Constant.
-                             false for CodeGen Function and Primitive.
-                            *)
+  sp_icommand : instance_command;
 }
 
 type specialization_config = {

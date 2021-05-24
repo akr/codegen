@@ -185,7 +185,7 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
         sp_inst
   in
   let c_fname = sp_inst.sp_cfunc_name in
-  let gen_constant = Array.length argvars = 0 && sp_inst.sp_gen_constant in
+  let gen_constant = Array.length argvars = 0 && sp_inst.sp_icommand = CodeGenConstant in
   if gen_constant then
     str c_fname
   else
@@ -1986,7 +1986,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
         let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, (j+1))) in
         let params' = Array.map (EConstr.to_constr sigma) params in
         ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
-        let (env, sp_inst) = specialization_instance_internal env sigma cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
+        let (env, sp_inst) = specialization_instance_internal env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
         env)
       0 env cstr_and_members
   in
@@ -2169,7 +2169,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
           (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
             let cstrterm0 = Constr.mkConstruct (ind, j) in
             ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
-            let (env, sp_inst) = specialization_instance_internal env sigma cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
+            let (env, sp_inst) = specialization_instance_internal env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
             env)
           1 env cstr_and_members)
       0 env ind_names
@@ -2327,7 +2327,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
             user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));
           let (env, sp_inst) =
             match ConstrMap.find_opt func sp_cfg.sp_instance_map with
-            | None -> specialization_instance_internal env sigma func [] None
+            | None -> specialization_instance_internal env sigma CodeGenFunction func [] None
             | Some sp_inst -> (env, sp_inst)
           in
           Feedback.msg_info (gen_function sp_inst.sp_cfunc_name)))
