@@ -101,7 +101,19 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
     | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
 
 let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
-  let sp_cfg = { sp_func=func; sp_sd_list=sd_list; sp_instance_map = ConstrMap.empty } in
+  let func_is_cstr =
+    match Constr.kind func with
+    | Const _ -> false
+    | Construct _ -> true
+    | _ -> user_err (Pp.str "[codegen] codegen_define_static_arguments needs constant or constructor for func:" +++
+                     Printer.pr_constr_env env sigma func)
+  in
+  let sp_cfg = {
+    sp_func=func;
+    sp_is_cstr=func_is_cstr;
+    sp_sd_list=sd_list;
+    sp_instance_map = ConstrMap.empty
+  } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
   Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
@@ -254,14 +266,7 @@ let specialization_instance_internal
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
-  let func_is_cstr =
-    match Constr.kind func with
-    | Const _ -> false
-    | Construct _ -> true
-    | _ -> user_err (Pp.str "[codegen] specialization_instance_internal needs constant or constructor for func:" +++
-                     Printer.pr_constr_env env sigma func)
-  in
-  let needs_simplification = not (primitive || func_is_cstr) in
+  let needs_simplification = not (primitive || sp_cfg.sp_is_cstr) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in

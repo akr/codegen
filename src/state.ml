@@ -138,6 +138,7 @@ type specialization_instance = {
 
 type specialization_config = {
   sp_func : Constr.t; (* constant or constructor *)
+  sp_is_cstr : bool; (* sp_func is constructor *)
   sp_sd_list : s_or_d list;
   sp_instance_map : specialization_instance ConstrMap.t; (* key is presimp *)
 }
