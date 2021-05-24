@@ -266,7 +266,13 @@ let specialization_instance_internal
     | Some sp_cfg -> sp_cfg
   in
   (if (icommand = CodeGenFunction) && sp_cfg.sp_is_cstr then
-    user_err (Pp.str "[codegen] CodeGenFunction is used for a constructor:" +++ Printer.pr_constr_env env sigma func));
+    user_err (Pp.str "[codegen] CodeGenFunction is used for a constructor:" +++
+              Printer.pr_constr_env env sigma func));
+  (if (icommand <> CodeGenFunction) &&
+       match names_opt with Some { spi_simplified_id = Some _ } -> true
+                          | _ -> false then
+    user_err (Pp.str "[codegen] simplified id is specified for CodeGenPrimitive or CodeGenConstant:" +++
+              Printer.pr_constr_env env sigma func));
   let needs_simplification = (icommand = CodeGenFunction) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
