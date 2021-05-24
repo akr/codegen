@@ -61,7 +61,11 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
       pp_prejoin_list (spc ()) (List.map pr_s_or_d sp_cfg.sp_sd_list) ++
       Pp.str ".");
     let feedback_instance sp_inst =
-      Feedback.msg_info (Pp.str "Instance" ++ spc () ++
+      Feedback.msg_info (
+        (match sp_inst.sp_icommand with
+        | CodeGenFunction -> Pp.str "Function"
+        | CodeGenPrimitive -> Pp.str "Primitive"
+        | CodeGenConstant -> Pp.str "Constant") +++
         Printer.pr_constr_env env sigma func ++
         pr_inst sp_inst ++ Pp.str ".");
       match sp_inst.sp_simplified_status with
