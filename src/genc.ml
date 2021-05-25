@@ -278,11 +278,11 @@ let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t
         Pp.str "inlinable=" ++ Pp.bool info.fixfunc_inlinable +++
         Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
         Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
-        Pp.str "formal_arguments=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_formal_arguments) ++ Pp.str ")" +++
+        Pp.str "formal_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_formal_arguments ++ Pp.str ")" +++
         Pp.str "return_type=" ++ Pp.str info.fixfunc_return_type +++
         Pp.str "top_call=" ++ (match info.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
         Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
-        Pp.str "outer_variables=(" ++ pp_join_list (Pp.str ",") (List.map (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables) ++ Pp.str ")" +++
+        Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables ++ Pp.str ")" +++
         mt ()
       )))
     fixinfo
@@ -311,22 +311,20 @@ let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) 
     Pp.str "numargs=" ++ Pp.int numargs
     +++
     Pp.str "tailset={" ++
-    pp_join_list (Pp.str ",")
-      (List.map
-        (fun i ->
-          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-          Pp.int i ++ Pp.str "=" ++ Name.print name
-          )
-        (IntSet.elements tailset)) ++
+    pp_joinmap_list (Pp.str ",")
+      (fun i ->
+        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        Pp.int i ++ Pp.str "=" ++ Name.print name
+        )
+      (IntSet.elements tailset) ++
     Pp.str "}"
     +++
     Pp.str "nontailset={" ++
-    pp_join_list (Pp.str ",")
-      (List.map
-        (fun i ->
-          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-          Pp.int i ++ Pp.str "=" ++ Name.print name)
-        (IntSet.elements nontailset)) ++
+    pp_joinmap_list (Pp.str ",")
+      (fun i ->
+        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        Pp.int i ++ Pp.str "=" ++ Name.print name)
+      (IntSet.elements nontailset) ++
     Pp.str "}" +++
     Pp.str "inlinable-fixterms={" ++
     xxx
@@ -477,22 +475,20 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
     Pp.str "numargs=" ++ Pp.int numargs
     +++
     Pp.str "tailset={" ++
-    pp_join_list (Pp.str ",")
-      (List.map
-        (fun i ->
-          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-          Pp.int i ++ Pp.str "=" ++ Name.print name
-          )
-        (IntSet.elements tailset)) ++
+    pp_joinmap_list (Pp.str ",")
+      (fun i ->
+        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        Pp.int i ++ Pp.str "=" ++ Name.print name
+        )
+      (IntSet.elements tailset) ++
     Pp.str "}"
     +++
     Pp.str "nontailset={" ++
-    pp_join_list (Pp.str ",")
-      (List.map
-        (fun i ->
-          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-          Pp.int i ++ Pp.str "=" ++ Name.print name)
-        (IntSet.elements nontailset)) ++
+    pp_joinmap_list (Pp.str ",")
+      (fun i ->
+        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+        Pp.int i ++ Pp.str "=" ++ Name.print name)
+      (IntSet.elements nontailset) ++
     Pp.str "}"));*)
   result
 and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
@@ -1568,11 +1564,10 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
       in
       let pp_parameters =
         Pp.str "(" ++
-        (pp_join_list (Pp.str "," ++ Pp.spc ())
-          (List.map
-            (fun (c_arg, t) ->
-              hov 0 (Pp.str t +++ Pp.str c_arg))
-            formal_arguments)) ++
+        (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+          (fun (c_arg, t) ->
+            hov 0 (Pp.str t +++ Pp.str c_arg))
+          formal_arguments) ++
         Pp.str ")"
       in
       let pp_vardecl_args =
@@ -1580,10 +1575,9 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
         Pp.str "args" +++
         Pp.str "=" +++
         hovbrace (
-          (pp_join_list (Pp.str "," ++ Pp.spc ())
-            (List.map
-              (fun (c_arg, t) -> Pp.str c_arg)
-            formal_arguments))) ++
+          (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+            (fun (c_arg, t) -> Pp.str c_arg)
+            formal_arguments)) ++
         Pp.str ";"
       in
       let pp_vardecl_ret =
@@ -1990,10 +1984,9 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     else
       Pp.hov 0 (
         (Pp.str "enum" +++ Pp.str enum_tag +++
-        hovbrace (pp_join_list
-          (Pp.str "," ++ Pp.spc ())
-          (List.map (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
-            cstr_and_members)) ++ Pp.str ";"))
+        hovbrace (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+          (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
+          cstr_and_members) ++ Pp.str ";"))
   in
   let member_decls =
     List.map
@@ -2086,10 +2079,9 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     pp_sjoinmap_list
       (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
         let args =
-          pp_join_list (Pp.str "," ++ Pp.spc ())
-            (List.map
-              (fun (member_type, member_name, accessor) -> Pp.str member_name)
-              members_and_accessors)
+          pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+            (fun (member_type, member_name, accessor) -> Pp.str member_name)
+            members_and_accessors
         in
         Pp.h (Pp.str "#define" +++
                 Pp.str cstrname ++
@@ -2163,10 +2155,9 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
         let pp_enum =
           Pp.hov 0 (
             (Pp.str "enum" +++ Pp.str enum_tag +++
-            hovbrace (pp_join_list
-              (Pp.str "," ++ Pp.spc ())
-              (List.map (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
-                cstr_and_members)) ++ Pp.str ";"))
+            hovbrace (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+              (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
+              cstr_and_members) ++ Pp.str ";"))
         in
         let pp_typedef =
           Pp.hov 0 (
@@ -2243,10 +2234,9 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                 if members_and_accessors = [] then
                   Pp.str "void"
                 else
-                  pp_join_list (Pp.str "," ++ Pp.spc ())
-                    (List.map
-                      (fun (member_type, member_name, accessor) -> Pp.hov 0 (Pp.str member_type +++ Pp.str member_name))
-                      members_and_accessors)
+                  pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+                    (fun (member_type, member_name, accessor) -> Pp.hov 0 (Pp.str member_type +++ Pp.str member_name))
+                    members_and_accessors
               in
               Pp.v 0 (Pp.hov 2 (
                         Pp.str "static" +++

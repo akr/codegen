@@ -218,7 +218,7 @@ let pp_sjoinmap_list (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
     (mt ())
     l
 
-let pp_join_ary sep ary =
+let pp_join_ary (sep : Pp.t) (ary : Pp.t array) : Pp.t =
   if Array.length ary = 0 then
     mt ()
   else
@@ -227,7 +227,7 @@ let pp_join_ary sep ary =
       ary.(0)
       (Array.sub ary 1 (Array.length ary - 1))
 
-let pp_join_list sep l =
+let pp_join_list (sep : Pp.t) (l : Pp.t list) : Pp.t =
   match l with
   | [] ->
     mt ()
@@ -235,6 +235,25 @@ let pp_join_list sep l =
     List.fold_left
       (fun pp elt -> pp ++ sep ++ elt)
       elt
+      rest
+
+let pp_joinmap_ary (sep : Pp.t) (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
+  if Array.length ary = 0 then
+    mt ()
+  else
+    Array.fold_left
+      (fun pp elt -> pp ++ sep ++ f elt)
+      ary.(0)
+      (Array.sub ary 1 (Array.length ary - 1))
+
+let pp_joinmap_list (sep : Pp.t) (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
+  match l with
+  | [] ->
+    mt ()
+  | elt :: rest ->
+    List.fold_left
+      (fun pp elt -> pp ++ sep ++ f elt)
+      (f elt)
       rest
 
 let pp_prejoin_ary sep ary =
