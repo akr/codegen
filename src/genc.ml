@@ -943,11 +943,10 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   v 0 (
   hov 0 (str "switch" +++ str "(" ++ swexpr ++ str ")") +++
-  vbrace (pp_join_ary (spc ())
-    (Array.map
-      (fun (caselabel, pp_branch) ->
-        str caselabel ++ str ":" ++ Pp.brk (1,2) ++ v 0 pp_branch)
-      branches)))
+  vbrace (pp_sjoinmap_ary
+    (fun (caselabel, pp_branch) ->
+      str caselabel ++ str ":" ++ Pp.brk (1,2) ++ v 0 pp_branch)
+    branches))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   gen_switch_without_break swexpr
@@ -1208,7 +1207,7 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
         let reordered_pp_bodies = Array.copy pp_bodies in
         Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
         reordered_pp_bodies.(0) <- pp_bodies.(i);
-        pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies +++ pp_exit
+        pp_assignments +++ pp_sjoin_ary reordered_pp_bodies +++ pp_exit
 
   | Lambda (x,t,b) ->
       (match cargs with
@@ -1225,7 +1224,7 @@ let rec gen_tail (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t
   (*Feedback.msg_debug (Pp.str "[codegen] gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
-    pp_join_list (Pp.spc ()) (List.map Pp.str cargs) ++
+    pp_sjoinmap_list Pp.str cargs ++
     Pp.str ")");*)
   let pp = gen_tail1 fixinfo used gen_ret env sigma term cargs in
   (*Feedback.msg_debug (Pp.str "[codegen] gen_tail return:" +++
@@ -1327,7 +1326,7 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
       reordered_pp_bodies.(0) <- pp_bodies.(i);
-      pp_assignments +++ pp_join_ary (Pp.spc ()) reordered_pp_bodies
+      pp_assignments +++ pp_sjoin_ary reordered_pp_bodies
 
 type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
 
@@ -1475,15 +1474,14 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
   let bodies = obtain_function_bodies env sigma fixinfo whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
-      pp_join_ary (spc ()) (Array.map
+      pp_sjoinmap_ary
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             (List.rev args);
-          pp_join_list (spc ())
-            (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
+          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
           gen_tail fixinfo used gen_return env2 sigma body [])
-        bodies))
+        bodies)
   in
   let c_fargs =
     let (first_args, _, _, _) = bodies.(0) in
@@ -1504,11 +1502,10 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
   hov 0 (gen_fargs c_fargs) ++
   str ")" +++
   vbrace (
-    pp_postjoin_list (spc ())
-      (List.map
-        (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
-        local_vars)
-    ++
+    pp_sjoinmap_list
+      (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
+      local_vars
+    +++
     pp_body))
 
 let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
@@ -1633,22 +1630,20 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
-      pp_join_ary (spc ()) (Array.map
+      pp_sjoinmap_ary
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             (List.rev args);
           v 0 (
-            pp_join_list (spc ())
-              (List.map (fun l -> Pp.str (l ^ ":")) labels) +++
+            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
             gen_tail fixinfo used gen_ret env2 sigma body []))
-        bodies))
+        bodies)
   in
   let pp_local_variables_decls =
-    pp_join_list (spc ())
-      (List.map
-        (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
-        local_vars)
+    pp_sjoinmap_list
+      (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
+      local_vars
   in
   let pp_switch_cases =
     pp_sjoin_list

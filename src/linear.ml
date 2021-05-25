@@ -55,9 +55,9 @@ let command_linear (ty : Constrexpr.constr_expr) =
   let ty3 = ty2 in
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
-    user_err (str "[codegen] linear: concrete inductive type expected:" ++ spc () ++ Printer.pr_econstr_env env sigma ty4));
+    user_err (str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
-  Feedback.msg_info (str "[codegen] linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty3)
+  Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty3)
 
 let rec is_registered_linear_type env sigma ty l =
   match l with
@@ -118,7 +118,7 @@ let rec is_linear_type env sigma ty =
       false (* function (closure) must not reference outside linear variables *)
   | Constr.Ind iu -> is_linear_app env sigma ty ty [| |]
   | Constr.App (f, argsary) -> is_linear_app env sigma ty f argsary
-  | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" ++ spc () ++ Printer.pr_econstr_env env sigma ty)
+  | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" +++ Printer.pr_econstr_env env sigma ty)
 and is_linear_app env sigma ty f argsary =
   (*Feedback.msg_debug (str "[codegen] is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match is_registered_linear_type env sigma ty !type_linearity_list with
@@ -129,21 +129,21 @@ and is_linear_app env sigma ty f argsary =
       (type_linearity_list := (ty, Investigating) :: !type_linearity_list;
       if isInd sigma f then
         if is_linear_ind env sigma ty (destInd sigma f) argsary then
-          (Feedback.msg_info (str "[codegen] Linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
+          (Feedback.msg_info (str "[codegen] Linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
           type_linearity_list := (ty, Linear) :: !type_linearity_list; true)
         else
-          (Feedback.msg_info (str "[codegen] Non-linear type registered:" ++ spc() ++ Printer.pr_econstr_env env sigma ty);
+          (Feedback.msg_info (str "[codegen] Non-linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
           type_linearity_list := (ty, Unrestricted) :: !type_linearity_list; false)
       else
-        user_err (str "[codegen] is_linear_app: unexpected type application:" ++ spc () ++ Printer.pr_econstr_env env sigma f))
+        user_err (str "[codegen] is_linear_app: unexpected type application:" +++ Printer.pr_econstr_env env sigma f))
 and is_linear_ind env sigma ty ie argsary =
   (*Feedback.msg_debug (str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   let ((mutind, i), _) = ie in (* strip EInstance.t *)
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
-    user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" ++ spc () ++ Printer.pr_econstr_env env sigma (mkIndU ie))
+    user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
   else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
-    user_err (str "[codegen] is_linear_ind: non-sort type binder:" ++ spc () ++ Printer.pr_econstr_env env sigma (mkIndU ie))
+    user_err (str "[codegen] is_linear_ind: non-sort type binder:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
   else
     let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
         (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
@@ -163,11 +163,11 @@ and is_linear_ind env sigma ty ie argsary =
         let user_lc = nf_all env sigma (prod_appvect sigma user_lc argsary) in (* apply type arguments *)
         (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (term_kind sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
         (if hasRel sigma user_lc then
-          user_err (str "[codegen] is_linear_ind: constractor type has has local reference:" ++ spc () ++ Printer.pr_econstr_env env sigma user_lc));
+          user_err (str "[codegen] is_linear_ind: constractor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
         (* cparam_tys and body can be interpreted under env because they have no Rel *)
         let (cparam_names, cparam_tys, body) = destProdX sigma user_lc in
         (if not (eq_constr sigma body ty) then
-          user_err (str "[codegen] unexpected constructor body type:" ++ spc () ++ Printer.pr_econstr_env env sigma body ++ spc () ++ str (term_kind sigma body)));
+          user_err (str "[codegen] unexpected constructor body type:" +++ Printer.pr_econstr_env env sigma body +++ str (term_kind sigma body)));
         (if Array.exists (isSort sigma) cparam_tys then
           user_err (str "[codegen] is_linear_ind: constractor has type argument"));
         let consarg_is_linear = Array.map (is_linear_type env sigma) cparam_tys in
@@ -243,12 +243,12 @@ let with_local_var env sigma decl linear_refs num_innermost_locals f =
     let linear_refs2 = Some r :: linear_refs in
     f env2 linear_refs2 num_innermost_locals2;
     if !r <> 1 then
-      user_err (str "[codegen] linear var not lineary used:" ++ spc () ++ Names.Name.print (Context.binder_name name) ++ spc () ++ str "(" ++ int !r ++ spc () ++ str "times used)")
+      user_err (str "[codegen] linear var not lineary used:" +++ Names.Name.print (Context.binder_name name) +++ str "(" ++ int !r +++ str "times used)")
     else
       ()
 
 let rec check_outermost_lambdas env sigma linear_refs num_innermost_locals term =
-  ((*Feedback.msg_debug (str "[codegen] check_outermost_lambdas:" ++ spc() ++ Printer.pr_econstr_env env sigma term);*)
+  ((*Feedback.msg_debug (str "[codegen] check_outermost_lambdas:" +++ Printer.pr_econstr_env env sigma term);*)
   match EConstr.kind sigma term with
   | Constr.Lambda (name, ty, body) ->
       (check_type_linearity env sigma ty;
@@ -257,7 +257,7 @@ let rec check_outermost_lambdas env sigma linear_refs num_innermost_locals term 
         (fun env2 linear_refs2 num_innermost_locals2 -> check_outermost_lambdas env2 sigma linear_refs2 num_innermost_locals2 body))
   | _ -> check_linear_valexp env sigma linear_refs num_innermost_locals term)
 and check_linear_valexp env sigma linear_refs num_innermost_locals term =
-  ((*Feedback.msg_debug (str "[codegen] check_linear_valexp:" ++ spc() ++ Printer.pr_econstr_env env sigma term);*)
+  ((*Feedback.msg_debug (str "[codegen] check_linear_valexp:" +++ Printer.pr_econstr_env env sigma term);*)
   let termty = Retyping.get_type_of env sigma term in
   match EConstr.kind sigma term with
   | Constr.Rel i ->
@@ -269,9 +269,9 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
             if !cell = 0 then
               cell := 1
             else
-              user_err (str "[codegen] second reference to a linear variable:" ++ spc () ++ Printer.pr_econstr_env env sigma term)
+              user_err (str "[codegen] second reference to a linear variable:" +++ Printer.pr_econstr_env env sigma term)
           else
-            user_err (str "[codegen] linear variable reference outside of a function:" ++ spc () ++ Printer.pr_econstr_env env sigma term))
+            user_err (str "[codegen] linear variable reference outside of a function:" +++ Printer.pr_econstr_env env sigma term))
   | Constr.Var name -> ()
   | Constr.Meta i -> ()
   | Constr.Evar (ekey, termary) -> ()
@@ -295,7 +295,7 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
       if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
                        is_linear env sigma ty) argsary &&
          isProd sigma termty then
-           user_err (str "[codegen] application with linear argument cannot return function value:" ++ spc () ++ Printer.pr_econstr_env env sigma term))
+           user_err (str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term))
   | Constr.Const ctntu -> ()
   | Constr.Ind iu -> ()
   | Constr.Construct cstru -> ()
@@ -358,7 +358,7 @@ let linear_type_check_single libref =
       | (Some term, termty, uconstraints) ->
         let eterm = EConstr.of_constr term in
         check_linear_valexp env sigma [] 0 eterm;
-        Feedback.msg_info (str "[codegen] linearity check passed:" ++ spc() ++ Printer.pr_constant env ctnt);
+        Feedback.msg_info (str "[codegen] linearity check passed:" +++ Printer.pr_constant env ctnt);
         ()
       | _ -> user_err (str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
       | _ -> user_err (str "[codegen] not constant")
@@ -373,10 +373,10 @@ let command_linear_test t1 t2 =
   let sigma = Evd.from_env env in
   let (sigma, t1a) = Constrintern.interp_constr_evars env sigma t1 in
   let (sigma, t2a) = Constrintern.interp_constr_evars env sigma t2 in
-  Feedback.msg_debug (str "[codegen] linear_type_check_test t1:" ++ spc() ++ Printer.pr_econstr_env env sigma t1a);
-  Feedback.msg_debug (str "[codegen] linear_type_check_test t2:" ++ spc() ++ Printer.pr_econstr_env env sigma t2a);
-  Feedback.msg_debug (str "[codegen] linear_type_check_test is_conv:" ++ spc() ++ bool (Reductionops.is_conv env sigma t1a t2a));
-  Feedback.msg_debug (str "[codegen] linear_type_check_test is_conv_leq:" ++ spc() ++ bool (Reductionops.is_conv_leq env sigma t1a t2a));
+  Feedback.msg_debug (str "[codegen] linear_type_check_test t1:" +++ Printer.pr_econstr_env env sigma t1a);
+  Feedback.msg_debug (str "[codegen] linear_type_check_test t2:" +++ Printer.pr_econstr_env env sigma t2a);
+  Feedback.msg_debug (str "[codegen] linear_type_check_test is_conv:" +++ bool (Reductionops.is_conv env sigma t1a t2a));
+  Feedback.msg_debug (str "[codegen] linear_type_check_test is_conv_leq:" +++ bool (Reductionops.is_conv_leq env sigma t1a t2a));
   (match Reductionops.infer_conv env sigma t1a t2a with
   | Some _ -> Feedback.msg_debug (str "[codegen] linear_type_check_test infer_conv succeed")
   | None -> Feedback.msg_debug (str "[codegen] linear_type_check_test infer_conv failed"));

@@ -42,7 +42,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let sigma = Evd.from_env env in
   let pr_inst sp_inst =
     let pr_names =
-      Pp.str "=>" ++ spc () ++
+      Pp.str "=>" +++
       Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
       Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr +++
       (match sp_inst.sp_simplified_status with
@@ -52,13 +52,13 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     in
     let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
                                 sp_inst.sp_static_arguments in
-    pp_prejoin_list (spc ()) pr_inst_list ++ spc () ++
+    pp_sjoin_list pr_inst_list +++
     pr_names
   in
   let pr_cfg (func, sp_cfg) =
-    Feedback.msg_info (Pp.str "Arguments" ++ spc () ++
-      Printer.pr_constr_env env sigma func ++
-      pp_prejoin_list (spc ()) (List.map pr_s_or_d sp_cfg.sp_sd_list) ++
+    Feedback.msg_info (Pp.str "Arguments" +++
+      Printer.pr_constr_env env sigma func +++
+      pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
       Pp.str ".");
     let feedback_instance sp_inst =
       Feedback.msg_info (
@@ -66,7 +66,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
         | CodeGenFunction -> Pp.str "Function"
         | CodeGenPrimitive -> Pp.str "Primitive"
         | CodeGenConstant -> Pp.str "Constant") +++
-        Printer.pr_constr_env env sigma func ++
+        Printer.pr_constr_env env sigma func +++
         pr_inst sp_inst ++ Pp.str ".");
       match sp_inst.sp_simplified_status with
       | SpNoSimplification -> ()
@@ -75,7 +75,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
           Feedback.msg_info (Pp.str "Dependency" +++
             Pp.str sp_inst.sp_cfunc_name +++
             Pp.str "=>" +++
-            pp_sjoin_list (List.map Pp.str (StringSet.elements referred_cfuncs)) ++
+            pp_sjoinmap_list Pp.str (StringSet.elements referred_cfuncs) ++
             Pp.str ".")
     in
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
@@ -89,12 +89,12 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
               let func = match gref with
                 | ConstRef ctnt -> Constr.mkConst ctnt
                 | ConstructRef cstr -> Constr.mkConstruct cstr
-                | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" ++ spc () ++
+                | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++
                                  Printer.pr_global gref)
               in
               (func, ConstrMap.get func !specialize_config_map)
   in
-  Feedback.msg_info (Pp.str "Number of source functions:" ++ spc () ++ Pp.int (ConstrMap.cardinal !specialize_config_map));
+  Feedback.msg_info (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
 
 let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
@@ -102,7 +102,7 @@ let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
   match gref with
     | ConstRef ctnt -> Constr.mkConst ctnt
     | ConstructRef cstr -> Constr.mkConstruct cstr
-    | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" ++ spc () ++ Printer.pr_global gref)
+    | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++ Printer.pr_global gref)
 
 let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let func_is_cstr =
@@ -147,7 +147,7 @@ let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let sigma = Evd.from_env env in
   let func = func_of_qualid env func in
   (if ConstrMap.mem func !specialize_config_map then
-    user_err (Pp.str "[codegen] specialization already configured:" ++ spc () ++ Printer.pr_constr_env env sigma func));
+    user_err (Pp.str "[codegen] specialization already configured:" +++ Printer.pr_constr_env env sigma func));
   ignore (codegen_define_static_arguments env sigma func sd_list)
 
 let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
@@ -283,22 +283,22 @@ let specialization_instance_internal
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
   (if (icommand = CodeGenConstant) &&
       not (isInd sigma (fst (decompose_app sigma presimp_type))) then
-    user_err (Pp.str "[codegen] CodeGen Constant needs a constant:" ++ spc () ++
-      Printer.pr_constr_env env sigma presimp ++ spc () ++ str ":" ++ spc () ++
+    user_err (Pp.str "[codegen] CodeGen Constant needs a constant:" +++
+      Printer.pr_constr_env env sigma presimp +++ str ":" +++
       Printer.pr_econstr_env env sigma presimp_type));
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
-    user_err (Pp.str "[codegen] specialization instance already configured:" ++ spc () ++ Printer.pr_constr_env env sigma presimp));
+    user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));
   let sp_inst =
     let check_cfunc_name_conflict cfunc_name =
       match CString.Map.find_opt cfunc_name !cfunc_instance_map with
       | None -> ()
       | Some (sp_cfg, sp_inst) ->
           user_err
-            (Pp.str "[codegen] C function name already used:" ++ Pp.spc () ++
-            Pp.str cfunc_name ++ Pp.spc () ++
-            Pp.str "for" ++ Pp.spc () ++
-            Printer.pr_constr_env env sigma sp_inst.sp_presimp ++ Pp.spc () ++
-            Pp.str "but also for" ++ Pp.spc () ++
+            (Pp.str "[codegen] C function name already used:" +++
+            Pp.str cfunc_name +++
+            Pp.str "for" +++
+            Printer.pr_constr_env env sigma sp_inst.sp_presimp +++
+            Pp.str "but also for" +++
             Printer.pr_constr_env env sigma presimp)
     in
     let generated_ps_syms = ref None in
@@ -426,8 +426,8 @@ let codegen_function_internal
   let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
   let func_istypearg_list = determine_type_arguments env sigma func_type in
   (if List.length func_istypearg_list < List.length sd_list then
-    user_err (Pp.str "[codegen] too many arguments:" ++ Pp.spc () ++
-      Printer.pr_constr_env env sigma func ++ Pp.spc () ++
+    user_err (Pp.str "[codegen] too many arguments:" +++
+      Printer.pr_constr_env env sigma func +++
       Pp.str "(" ++
       Pp.int (List.length sd_list) ++ Pp.str " for " ++
       Pp.int (List.length func_istypearg_list) ++ Pp.str ")"));
@@ -465,7 +465,7 @@ let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map
   if Reductionops.is_conv env sigma t1 t2 then
     ()
   else
-    user_err (Pp.str "[codegen] translation inconvertible:" ++ spc () ++ Pp.str phase ++
+    user_err (Pp.str "[codegen] translation inconvertible:" +++ Pp.str phase ++
       Pp.fnl () ++
       Printer.pr_econstr_env env sigma t1 ++ Pp.fnl () ++
       Pp.str "=/=>" ++ Pp.fnl () ++
@@ -485,7 +485,7 @@ let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
   let ctnt =
     match Constr.kind func with
     | Const (ctnt, _) -> ctnt
-    | _ -> user_err (Pp.str "[codegen] constant expected:" ++ Pp.spc () ++ Printer.pr_constr_env env sigma func)
+    | _ -> user_err (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
   in
   let funcs = List.map (func_of_qualid env) func_qualids in
   let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
@@ -745,7 +745,7 @@ let fv_range (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
 let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
     (lift : int -> EConstr.t -> EConstr.t) (ia : int array)
     (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) =
-  (*Feedback.msg_info (Pp.str "test_bounded_fix: k=" ++ Pp.int k ++ Pp.spc () ++
+  (*Feedback.msg_info (Pp.str "test_bounded_fix: k=" ++ Pp.int k +++
     Printer.pr_econstr_env env sigma (mkFix ((ia,0),prec)));*)
   let n = Array.length ia in
   let vals_opt =
@@ -786,7 +786,7 @@ let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
 let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ia : int array)
     (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) :
     int option =
-      (*Feedback.msg_info (Pp.str "[codegen] find_bounded_fix:" ++ Pp.spc () ++
+      (*Feedback.msg_info (Pp.str "[codegen] find_bounded_fix:" +++
         Printer.pr_econstr_env env sigma (mkFix ((ia,0),prec)));*)
   let (nary, tary, fary) = prec in
   let n = Array.length fary in
@@ -942,7 +942,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let env2 = push_rec_types prec env in
       mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
   | App (f,args) ->
-      (*Feedback.msg_info (Pp.str "[codegen] reduce_exp App f1:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f);*)
+      (*Feedback.msg_info (Pp.str "[codegen] reduce_exp App f1:" +++ Printer.pr_econstr_env env sigma f);*)
       let args_nf = Array.map (reduce_arg env sigma) args in
       reduce_app env sigma f args_nf
 and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
@@ -969,7 +969,7 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
   else
     reduce_app2 env sigma f args_nf
 and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
-  (*Feedback.msg_info (Pp.str "[codegen] reduce_app f_content:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma f_content);*)
+  (*Feedback.msg_info (Pp.str "[codegen] reduce_app f_content:" +++ Printer.pr_econstr_env env sigma f_content);*)
   let default () = mkApp (reduce_exp env sigma f, args_nf) in
   let term1 = mkApp (f, args_nf) in
   match EConstr.kind sigma f with
@@ -1125,13 +1125,13 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
     match fv_opt with
     | None -> ()
     | Some k ->
-        user_err (Pp.str "[codegen] Free variable found in a static argument:" ++ spc () ++
+        user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
           Printer.pr_constr_env env sigma func ++
-          Pp.str "'s" ++ spc () ++
-          Pp.str (CString.ordinal (i+1)) ++ spc () ++
-          Pp.str "static argument" ++ spc () ++
-          Printer.pr_econstr_env env sigma arg ++ spc () ++
-          Pp.str "refer" ++ spc () ++
+          Pp.str "'s" +++
+          Pp.str (CString.ordinal (i+1)) +++
+          Pp.str "static argument" +++
+          Printer.pr_econstr_env env sigma arg +++
+          Pp.str "refer" +++
           Printer.pr_econstr_env env sigma (mkRel k)))
     nf_static_args);
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
@@ -1673,8 +1673,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None ->
-        user_err (Pp.str "[codegen] specialization instance not defined:" ++
-                  Pp.spc () ++ Pp.str (escape_as_coq_string cfunc))
+        user_err (Pp.str "[codegen] specialization instance not defined:" +++
+                  Pp.str (escape_as_coq_string cfunc))
     | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
   let env = Global.env () in

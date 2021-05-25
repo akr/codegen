@@ -206,6 +206,18 @@ let pp_sjoin_list (l : Pp.t list) : Pp.t =
     (mt ())
     l
 
+let pp_sjoinmap_ary (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
+  Array.fold_left
+    (fun pp elt -> pp +++ f elt)
+    (mt ())
+    ary
+
+let pp_sjoinmap_list (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
+  List.fold_left
+    (fun pp elt -> pp +++ f elt)
+    (mt ())
+    l
+
 let pp_join_ary sep ary =
   if Array.length ary = 0 then
     mt ()
@@ -315,7 +327,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Cast (expr, kind, ty) -> user_err (Pp.str "[codegen] mangle_term_buf:cast:")
   | Lambda (name, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:lambda:")
   | LetIn (name, expr, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:letin:")
-  | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" ++ Pp.spc () ++ Printer.pr_econstr_env env sigma ty)
+  | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" +++ Printer.pr_econstr_env env sigma ty)
   | Case (ci, tyf, iv, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
   | Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
   | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
@@ -381,7 +393,7 @@ let check_c_id (str : string) : unit =
   if valid_c_id_p str then
     ()
   else
-    user_err (Pp.str "[codegen] invalid C name:" ++ Pp.spc () ++ Pp.str str)
+    user_err (Pp.str "[codegen] invalid C name:" +++ Pp.str str)
 
 let escape_as_coq_string str =
   let buf = Buffer.create (String.length str + 2) in
@@ -400,7 +412,7 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
   let sigma = Evd.from_env env in
   let modpath = KerName.modpath (Constant.canonical ctnt_i) in
   match Global.body_of_constant Library.indirect_accessor ctnt_i with
-  | None -> user_err (Pp.str "[codegen] couldn't obtain the definition of" ++ Pp.spc () ++
+  | None -> user_err (Pp.str "[codegen] couldn't obtain the definition of" +++
                       Printer.pr_constant env ctnt_i)
   | Some (def_i,_,_) ->
       let def_i = EConstr.of_constr def_i in
