@@ -280,6 +280,12 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
+let msg_info_hov pp =
+  Feedback.msg_info (Pp.hov 2 pp)
+
+let msg_debug_hov pp =
+  Feedback.msg_debug (Pp.hov 2 pp)
+
 let new_env_with_rels (env : Environ.env) : Environ.env =
   let n = Environ.nb_rel env in
   let r = ref (Global.env ()) in

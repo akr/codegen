@@ -205,7 +205,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
         codegen_simplify cfunc_name (* modify global env *)
     | SpDefined (ctnt, _) -> (Global.env (), ctnt)
   in
-  (*Feedback.msg_debug (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
+  (*msg_debug_hov (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
   let ty = cdef.Declarations.const_type in
   match Global.body_of_constant_body Library.indirect_accessor cdef with
@@ -274,7 +274,7 @@ type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
 let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t) : unit =
   Hashtbl.iter
     (fun fixfunc info ->
-      Feedback.msg_debug (hv 2 (Pp.str (Id.to_string fixfunc) ++ Pp.str ":" +++
+      msg_debug_hov (Pp.str (Id.to_string fixfunc) ++ Pp.str ":" +++
         Pp.str "inlinable=" ++ Pp.bool info.fixfunc_inlinable +++
         Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
         Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
@@ -284,7 +284,7 @@ let show_fixinfo (env : Environ.env) (sigma : Evd.evar_map) (fixinfo : fixinfo_t
         Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
         Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables ++ Pp.str ")" +++
         mt ()
-      )))
+      ))
     fixinfo
 
 let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * string) list) * string =
@@ -301,12 +301,12 @@ let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) 
     (* variables at tail position *) IntSet.t *
     (* variables at non-tail position *) IntSet.t *
     (* inlinable fixterms *) Id.Set.t =
-  (*Feedback.msg_debug (Pp.str "[codegen:detect_inlinable_fixterm_rec] start:" +++
+  (*msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs);*)
   let result = detect_inlinable_fixterm_rec1 env sigma term numargs in
   (*let (tailset, nontailset, argset) = result in
-  Feedback.msg_debug (hov 2 (Pp.str "[codegen:detect_inlinable_fixterm_rec] end:" +++
+  msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] end:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs
     +++
@@ -328,7 +328,7 @@ let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) 
     Pp.str "}" +++
     Pp.str "inlinable-fixterms={" ++
     xxx
-    Pp.str "}"));
+    Pp.str "}");
     *)
   result
 and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) :
@@ -464,13 +464,13 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
     (term : EConstr.t) (numargs : int) (tail_position : bool) :
     (* variables at tail position *) IntSet.t *
     (* variables at non-tail position *) IntSet.t =
-  (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage] start:" +++
+  (*msg_debug_hov (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs +++
     Pp.str "tail_position=" ++ Pp.bool tail_position);*)
   let result = collect_fix_usage1 fixinfo inlinable_fixterms env sigma term numargs tail_position in
   (*let (tailset, nontailset) = result in
-  Feedback.msg_debug (hov 2 (Pp.str "[codegen:collect_fix_usage] end:" +++
+  msg_debug_hov (Pp.str "[codegen:collect_fix_usage] end:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs
     +++
@@ -489,7 +489,7 @@ let rec collect_fix_usage (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
         let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
         Pp.int i ++ Pp.str "=" ++ Name.print name)
       (IntSet.elements nontailset) ++
-    Pp.str "}"));*)
+    Pp.str "}");*)
   result
 and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -604,14 +604,14 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : Id.Set.t)
           IntSet.mem k nontailset_fs
         in
         let (formal_arguments, return_type) = c_args_and_ret_type env sigma tary.(j) in
-        (*Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] fname=" ++ Names.Name.print fname);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] tail_position=" ++ Pp.bool tail_position);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] inlinable=" ++ Pp.bool inlinable);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] i=" ++ Pp.int i);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] j=" ++ Pp.int j);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] need_function=" ++ Pp.bool need_function);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
-        Feedback.msg_debug (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);*)
+        (*msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] fname=" ++ Names.Name.print fname);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] tail_position=" ++ Pp.bool tail_position);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] inlinable=" ++ Pp.bool inlinable);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] i=" ++ Pp.int i);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] j=" ++ Pp.int j);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] need_function=" ++ Pp.bool need_function);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
+        msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);*)
         Hashtbl.add fixinfo (id_of_name fname) {
           fixfunc_inlinable = inlinable;
           fixfunc_used_as_call = used_as_call;
@@ -955,14 +955,14 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
     (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:1");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
   let item_cvar = carg_of_garg env item_relindex in
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:2");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
   let gen_branch accessors br =
     let m = Array.length accessors in
     let (env2, branch_body) = decompose_lam_n_env env sigma m br in
@@ -994,29 +994,29 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
     c_member_access +++ c_branch_body
   in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:3");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_match:3");*)
   let n = Array.length branches in
   let caselabel_accessors =
     Array.map
       (fun j ->
-        (*Feedback.msg_debug (Pp.str "[codegen] gen_match:30");*)
+        (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
            (case_cstrmember env sigma (EConstr.of_constr item_type) j)
            (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
       (iota_ary 1 n)
   in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_match:4");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_match:4");*)
   if n = 1 then
-    ((*Feedback.msg_debug (Pp.str "[codegen] gen_match:5");*)
+    ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
     let accessors = snd caselabel_accessors.(0) in
     let br = branches.(0) in
     gen_branch accessors br)
   else
-    ((*Feedback.msg_debug (Pp.str "[codegen] gen_match:6");*)
+    ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
-    (*Feedback.msg_debug (Pp.str "[codegen] gen_match:7");*)
+    (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
       (Array.mapi
         (fun i br ->
@@ -1081,7 +1081,7 @@ let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
 
 let rec gen_assign (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_assign1 fixinfo used cont env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_assign:" +++
+  (*msg_debug_hov (Pp.str "[codegen] gen_assign:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
@@ -1216,13 +1216,13 @@ and gen_assign1 (fixinfo : fixinfo_t) (used : Id.Set.t) (cont : assign_cont) (en
           gen_assign fixinfo used cont env2 sigma b rest)
 
 let rec gen_tail (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_tail start:" +++
+  (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
     pp_sjoinmap_list Pp.str cargs ++
     Pp.str ")");*)
   let pp = gen_tail1 fixinfo used gen_ret env sigma term cargs in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_tail return:" +++
+  (*msg_debug_hov (Pp.str "[codegen] gen_tail return:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
@@ -1489,7 +1489,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
       | None -> true)
     local_vars
   in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:6");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
   hov 0 (str "static" +++
         str return_type) +++
@@ -1696,7 +1696,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
     hov 0 (Pp.str "switch" +++ Pp.str "(g)") +++
     vbrace pp_switch_body
   in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:6");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
     pp_enum +++
     pp_struct_args +++
@@ -1765,9 +1765,9 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:1");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixinfo = collect_fix_info env sigma cfunc_name whole_body in
-  (*Feedback.msg_debug (Pp.str "[codegen] gen_func_sub:2");*)
+  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixinfo in
   (if called_fixfuncs <> [] then
@@ -1790,7 +1790,7 @@ let add_snippet (str : string) : unit =
   generation_list := GenSnippet str' :: !generation_list
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
-  (*Feedback.msg_info (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
+  (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
   let (f, params) = decompose_app sigma coq_type in
   let (ind, _) = destInd sigma f in
@@ -1803,7 +1803,7 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
       let oneind_body = mutind_body.mind_packets.(i) in
       let numcstr = Array.length oneind_body.mind_consnames in
       for j = 0 to numcstr - 1 do
-        (*Feedback.msg_info (Pp.str "[codegen] ind_recursive_p i=" ++
+        (*msg_info_hov (Pp.str "[codegen] ind_recursive_p i=" ++
                            Pp.int i ++
                            Pp.str "(" ++ Id.print oneind_body.mind_typename ++ Pp.str ")" +++
                            Pp.str "j=" ++ Pp.int j ++
@@ -1829,14 +1829,14 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
             ~init:0)
       done
     done;
-    (*Feedback.msg_info (Pp.str "[codegen] ind_recursive_p: recursion not found");*)
+    (*msg_info_hov (Pp.str "[codegen] ind_recursive_p: recursion not found");*)
     false
   with RecursionFound ->
-    (*Feedback.msg_info (Pp.str "[codegen] ind_recursive_p: recursion found");*)
+    (*msg_info_hov (Pp.str "[codegen] ind_recursive_p: recursion found");*)
     true
 
 let ind_mutual_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
-  (*Feedback.msg_info (Pp.str "[codegen] ind_mutual_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
+  (*msg_info_hov (Pp.str "[codegen] ind_mutual_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
   let (f, params) = decompose_app sigma coq_type in
   let (ind, _) = destInd sigma f in
@@ -1911,9 +1911,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let cstr_and_members =
           List.init numcstr
             (fun j ->
-              (*Feedback.msg_debug (Printer.pr_econstr_env env sigma coq_type);*)
+              (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
               let cstrterm = mkApp ((mkConstruct (ind, (j+1))), params) in
-              (*Feedback.msg_debug (Printer.pr_econstr_env env sigma cstrterm);*)
+              (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
               let cstrtype = Retyping.get_type_of env sigma cstrterm in
               let (args, result_type) = decompose_prod sigma cstrtype in
               let cstrid = oneind_body.mind_consnames.(j) in
@@ -1945,7 +1945,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   (mutind, params, ind_names)
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
-  Feedback.msg_info (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
+  msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
   let (mutind, params, ind_names) = generate_indimp_names env sigma coq_type in
   if List.length ind_names <> 1 then
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
@@ -2115,14 +2115,14 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
       Pp.mt ()
     )
   in
-  (*Feedback.msg_debug (Pp.str (Pp.db_string_of_pp pp));*)
+  (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
   let str = Pp.string_of_ppcmds pp in
   add_snippet str;
-  (*Feedback.msg_info pp;*)
+  (*msg_info_hov pp;*)
   ()
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
-  Feedback.msg_info (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
+  msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
   let (mutind, params, ind_names) = generate_indimp_names env sigma coq_type in
   let env =
     CList.fold_left_i
@@ -2258,10 +2258,10 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
     ind_names
   in
   let pp = Pp.v 0 (pp_ind_types +++ pp_ind_imps) in
-  (*Feedback.msg_debug (Pp.str (Pp.db_string_of_pp pp));*)
+  (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
   let str = Pp.string_of_ppcmds pp in
   add_snippet str;
-  (*Feedback.msg_info pp;*)
+  (*msg_info_hov pp;*)
   ()
 
 let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
@@ -2321,7 +2321,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Format.pp_print_flush fmt ();
   close_out ch;
   Sys.rename temp_fn fn;
-  Feedback.msg_info (str ("[codegen] file generated: " ^ fn)))
+  msg_info_hov (str ("[codegen] file generated: " ^ fn)))
 
 let gen_test (gen_list : code_generation list) : unit =
   gen_pp_iter
