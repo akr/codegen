@@ -123,7 +123,7 @@ let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env)
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen Arguments" +++
     Printer.pr_constr_env env sigma func +++
-    pp_sjoin_list (List.map (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list) ++
+    pp_sjoinmap_list (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list ++
     Pp.str "."));
   sp_cfg
 
@@ -137,9 +137,9 @@ let codegen_define_or_check_static_arguments ?(cfunc : string option) (env : Env
       (if sd_list_old <> sd_list_new then
         user_err (Pp.str "[codegen] inconsistent specialization configuration for" +++
         Printer.pr_constr_env env sigma func ++ Pp.str ":" +++
-        Pp.str "[" ++ pp_sjoin_list (List.map pr_s_or_d sd_list_old) ++ Pp.str "]" +++
+        Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_old ++ Pp.str "]" +++
         Pp.str "expected but" +++
-        Pp.str "[" ++ pp_sjoin_list (List.map pr_s_or_d sd_list_new) ++ Pp.str "]"));
+        Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_new ++ Pp.str "]"));
       sp_cfg
 
 let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
@@ -1456,7 +1456,7 @@ and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : ECo
 *)
 and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
   (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp arg:" +++
-    Printer.pr_econstr_env env sigma term +++ Pp.str "[" ++ pp_sjoin_ary (Array.map (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) ++ Pp.str "(" ++ Pp.int i ++ Pp.str ")") vs) ++ Pp.str "]" +++ Pp.str "(p=" ++ Pp.int (Array.length vs) ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
+    Printer.pr_econstr_env env sigma term +++ Pp.str "[" ++ pp_sjoinmap_ary (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) ++ Pp.str "(" ++ Pp.int i ++ Pp.str ")") vs ++ Pp.str "]" +++ Pp.str "(p=" ++ Pp.int (Array.length vs) ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
   let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
   let result = complete_args_exp1 env sigma term vs q in
   (*Feedback.msg_debug (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result);*)

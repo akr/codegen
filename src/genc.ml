@@ -73,14 +73,13 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
                    Printer.pr_econstr_env env sigma t +++
                    Pp.str "=>" +++
                    Pp.str (escape_as_coq_string swfunc))) +++
-           pp_sjoin_list (
-             List.map
-               (fun (consname, caselabel, accessors) ->
-                 hv 2 (
-                   Pp.str "|" +++
-                   Pp.str (escape_as_coq_string caselabel) +++
-                   pp_sjoin_list (List.map (fun access -> Pp.str (escape_as_coq_string access)) accessors)))
-               cstr_caselabel_accessors_list) ++
+           pp_sjoinmap_list
+             (fun (consname, caselabel, accessors) ->
+               hv 2 (
+                 Pp.str "|" +++
+                 Pp.str (escape_as_coq_string caselabel) +++
+                 pp_sjoinmap_list (fun access -> Pp.str (escape_as_coq_string access)) accessors))
+             cstr_caselabel_accessors_list ++
           Pp.str ".")));
   register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list
 
@@ -1527,27 +1526,24 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   in
   let pp_struct_args =
     let pr_members args =
-      pp_sjoin_list
-        (List.map
-          (fun (c_arg, t) ->
-            hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
-          args)
+      pp_sjoinmap_list
+        (fun (c_arg, t) -> hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
+        args
     in
-    pp_sjoin_list
-      (List.map
-        (fun info ->
-          hv 0 (
-          Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
-          hovbrace (
-          pr_members info.fixfunc_outer_variables +++
-          pr_members info.fixfunc_formal_arguments +++
-          (if CList.is_empty info.fixfunc_outer_variables &&
-              CList.is_empty info.fixfunc_formal_arguments then
-            (* empty struct is undefined behavior *)
-            Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
-          else
-            mt ())) ++ Pp.str ";"))
-      called_fixfuncs) +++
+    pp_sjoinmap_list
+      (fun info ->
+        hv 0 (
+        Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
+        hovbrace (
+        pr_members info.fixfunc_outer_variables +++
+        pr_members info.fixfunc_formal_arguments +++
+        (if CList.is_empty info.fixfunc_outer_variables &&
+            CList.is_empty info.fixfunc_formal_arguments then
+          (* empty struct is undefined behavior *)
+          Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
+        else
+          mt ())) ++ Pp.str ";"))
+      called_fixfuncs +++
     hv 0 (
     Pp.str ("struct codegen_args_" ^ cfunc_name) +++
     hovbrace (
@@ -1614,15 +1610,14 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
           hov 0 pp_call +++
           hov 0 pp_return))
     in
-    pp_sjoin_list
-      (List.map
-        (fun info ->
-          pr_entry_function info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
-            (List.append
-              info.fixfunc_outer_variables
-              info.fixfunc_formal_arguments)
-            info.fixfunc_return_type)
-        called_fixfuncs) +++
+    pp_sjoinmap_list
+      (fun info ->
+        pr_entry_function info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
+          (List.append
+            info.fixfunc_outer_variables
+            info.fixfunc_formal_arguments)
+          info.fixfunc_return_type)
+      called_fixfuncs +++
     pr_entry_function cfunc_name (func_index_prefix ^ cfunc_name)
       formal_arguments return_type
   in
@@ -1646,61 +1641,57 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
       local_vars
   in
   let pp_switch_cases =
-    pp_sjoin_list
-      (List.map
-        (fun info ->
-          let pp_case =
-            Pp.str "case" +++ Pp.str (func_index_prefix ^ info.fixfunc_c_name) ++ Pp.str ":"
-          in
-          let pp_assign_outer =
-            pp_sjoin_list
-              (List.map
-                (fun (c_arg, t) ->
-                  hov 0 (
-                    Pp.str c_arg +++
-                    Pp.str "=" +++
-                    Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
-                    Pp.str ";"))
-                info.fixfunc_outer_variables)
-          in
-          let pp_assign_args =
-            pp_sjoin_list
-              (List.map
-                (fun (c_arg, t) ->
-                  hov 0 (
-                    Pp.str c_arg +++
-                    Pp.str "=" +++
-                    Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
-                    Pp.str ";"))
-                info.fixfunc_formal_arguments)
-          in
-          let pp_goto =
-            Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
-          in
-          let pp_result =
-            hov 0 pp_case ++ Pp.brk (1,2) ++
-            v 0 (
-              pp_assign_outer +++
-              pp_assign_args +++
-              hov 0 pp_goto)
-          in
-          pp_result)
-        called_fixfuncs)
+    pp_sjoinmap_list
+      (fun info ->
+        let pp_case =
+          Pp.str "case" +++ Pp.str (func_index_prefix ^ info.fixfunc_c_name) ++ Pp.str ":"
+        in
+        let pp_assign_outer =
+          pp_sjoinmap_list
+            (fun (c_arg, t) ->
+              hov 0 (
+                Pp.str c_arg +++
+                Pp.str "=" +++
+                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
+                Pp.str ";"))
+            info.fixfunc_outer_variables
+        in
+        let pp_assign_args =
+          pp_sjoinmap_list
+            (fun (c_arg, t) ->
+              hov 0 (
+                Pp.str c_arg +++
+                Pp.str "=" +++
+                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
+                Pp.str ";"))
+            info.fixfunc_formal_arguments
+        in
+        let pp_goto =
+          Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
+        in
+        let pp_result =
+          hov 0 pp_case ++ Pp.brk (1,2) ++
+          v 0 (
+            pp_assign_outer +++
+            pp_assign_args +++
+            hov 0 pp_goto)
+        in
+        pp_result)
+      called_fixfuncs
   in
   let pp_switch_default = Pp.str "default:" in
   let pp_assign_args_default =
     if formal_arguments = [] then
       Pp.str ";"
     else
-      pp_sjoin_list
-        (List.map
-          (fun (c_arg, t) ->
-            hov 0 (
-              Pp.str c_arg +++
-              Pp.str "=" +++
-              Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
-              Pp.str ";"))
-          formal_arguments)
+      pp_sjoinmap_list
+        (fun (c_arg, t) ->
+          hov 0 (
+            Pp.str c_arg +++
+            Pp.str "=" +++
+            Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
+            Pp.str ";"))
+        formal_arguments
   in
   let pp_switch_body =
     pp_switch_cases +++
@@ -2007,11 +1998,10 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let member_decls =
     List.map
       (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-        pp_sjoin_list
-          (List.map
-            (fun (member_type, member_name, accessor) ->
-              Pp.hov 0 (Pp.str member_type +++ Pp.str member_name ++ Pp.str ";"))
-            members_and_accessors))
+        pp_sjoinmap_list
+          (fun (member_type, member_name, accessor) ->
+            Pp.hov 0 (Pp.str member_type +++ Pp.str member_name ++ Pp.str ";"))
+          members_and_accessors)
       cstr_and_members
   in
   let cstr_and_members_with_decls =
@@ -2078,52 +2068,49 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
         Pp.str "((x).tag)"))
   in
   let pp_accessors =
-    pp_sjoin_list
-      (List.map
-        (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-          pp_sjoin_list
-            (List.map
-              (fun (member_type, member_name, accessor) ->
-                Pp.h (Pp.str "#define" +++
-                      Pp.str accessor ++
-                      Pp.str "(x)" +++
-                      (if single_constructor then
-                        Pp.str ("((x)." ^ member_name ^ ")")
-                      else
-                        Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
-              members_and_accessors))
-        cstr_and_members)
+    pp_sjoinmap_list
+      (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
+        pp_sjoinmap_list
+          (fun (member_type, member_name, accessor) ->
+            Pp.h (Pp.str "#define" +++
+                  Pp.str accessor ++
+                  Pp.str "(x)" +++
+                  (if single_constructor then
+                    Pp.str ("((x)." ^ member_name ^ ")")
+                  else
+                    Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
+          members_and_accessors)
+      cstr_and_members
   in
   let pp_cstr =
-    pp_sjoin_list
-      (List.map
-        (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-          let args =
-            pp_join_list (Pp.str "," ++ Pp.spc ())
-              (List.map
-                (fun (member_type, member_name, accessor) -> Pp.str member_name)
-                members_and_accessors)
-          in
-          Pp.h (Pp.str "#define" +++
-                  Pp.str cstrname ++
-                  Pp.str "(" ++ args ++ Pp.str ")" +++
-                  Pp.str "(" ++
-                  Pp.str ("(" ^ ind_typename ^ ")") ++
-                  (if single_constructor then
-                    hbrace args
-                  else
-                    hbrace (
-                      let union_init =
-                        Pp.str ("." ^ cstr_umember) +++
-                        Pp.str "=" +++
-                        hbrace args
-                      in
-                      if List.length members_and_accessors = 0 then
-                        Pp.str cstr_enum_name
-                      else
-                        (Pp.str cstr_enum_name ++ Pp.str "," +++ hbrace union_init))) ++
-                  Pp.str ")"))
-        cstr_and_members)
+    pp_sjoinmap_list
+      (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
+        let args =
+          pp_join_list (Pp.str "," ++ Pp.spc ())
+            (List.map
+              (fun (member_type, member_name, accessor) -> Pp.str member_name)
+              members_and_accessors)
+        in
+        Pp.h (Pp.str "#define" +++
+                Pp.str cstrname ++
+                Pp.str "(" ++ args ++ Pp.str ")" +++
+                Pp.str "(" ++
+                Pp.str ("(" ^ ind_typename ^ ")") ++
+                (if single_constructor then
+                  hbrace args
+                else
+                  hbrace (
+                    let union_init =
+                      Pp.str ("." ^ cstr_umember) +++
+                      Pp.str "=" +++
+                      hbrace args
+                    in
+                    if List.length members_and_accessors = 0 then
+                      Pp.str cstr_enum_name
+                    else
+                      (Pp.str cstr_enum_name ++ Pp.str "," +++ hbrace union_init))) ++
+                Pp.str ")"))
+      cstr_and_members
   in
   let pp =
     Pp.v 0 (
@@ -2171,122 +2158,114 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   in
   ignore env;
   let pp_ind_types =
-    pp_sjoin_list
-      (List.map
-        (fun (ind_typename, enum_tag, swfunc, cstr_and_members) ->
-          let pp_enum =
-            Pp.hov 0 (
-              (Pp.str "enum" +++ Pp.str enum_tag +++
-              hovbrace (pp_join_list
-                (Pp.str "," ++ Pp.spc ())
-                (List.map (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
-                  cstr_and_members)) ++ Pp.str ";"))
-          in
-          let pp_typedef =
-            Pp.hov 0 (
-              Pp.str "typedef" +++
-              Pp.str "enum" +++
-              Pp.str enum_tag +++
-              Pp.str "*" ++
-              Pp.str ind_typename ++
-              Pp.str ";")
-          in
-          pp_enum +++ pp_typedef)
-        ind_names)
+    pp_sjoinmap_list
+      (fun (ind_typename, enum_tag, swfunc, cstr_and_members) ->
+        let pp_enum =
+          Pp.hov 0 (
+            (Pp.str "enum" +++ Pp.str enum_tag +++
+            hovbrace (pp_join_list
+              (Pp.str "," ++ Pp.spc ())
+              (List.map (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) -> Pp.str cstr_enum_name)
+                cstr_and_members)) ++ Pp.str ";"))
+        in
+        let pp_typedef =
+          Pp.hov 0 (
+            Pp.str "typedef" +++
+            Pp.str "enum" +++
+            Pp.str enum_tag +++
+            Pp.str "*" ++
+            Pp.str ind_typename ++
+            Pp.str ";")
+        in
+        pp_enum +++ pp_typedef)
+      ind_names
   in
   let pp_ind_imps =
-    pp_sjoin_list
-      (List.map
-        (fun (ind_typename, enum_tag, swfunc, cstr_and_members) ->
-          let pp_swfunc =
-            Pp.h (
-              Pp.str "#define" +++
-              Pp.str swfunc ++ Pp.str "(x)" +++
-              Pp.str "(*(x))")
-          in
-          let member_decls =
-            List.map
-              (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-                Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;") +++
-                pp_sjoin_list
-                  (List.map
-                    (fun (member_type, member_name, accessor) ->
-                      Pp.hov 0 (Pp.str member_type +++ Pp.str member_name ++ Pp.str ";"))
-                    members_and_accessors))
-              cstr_and_members
-          in
-          let cstr_and_members_with_decls =
-            List.map2
-              (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) member_def ->
-                (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
-              cstr_and_members member_decls
-          in
-          let pp_cstr_struct_defs =
-            pp_sjoin_list
-              (List.map
-                (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl) ->
-                  Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
-                  vbrace member_decl ++
-                  Pp.str ";")
-                cstr_and_members_with_decls)
-          in
-          let pp_accessors =
-            (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
-            pp_sjoin_list
-              (List.map
-                (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-                  pp_sjoin_list
+    pp_sjoinmap_list
+      (fun (ind_typename, enum_tag, swfunc, cstr_and_members) ->
+        let pp_swfunc =
+          Pp.h (
+            Pp.str "#define" +++
+            Pp.str swfunc ++ Pp.str "(x)" +++
+            Pp.str "(*(x))")
+        in
+        let member_decls =
+          List.map
+            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
+              Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;") +++
+              pp_sjoinmap_list
+                (fun (member_type, member_name, accessor) ->
+                  Pp.hov 0 (Pp.str member_type +++ Pp.str member_name ++ Pp.str ";"))
+                members_and_accessors)
+            cstr_and_members
+        in
+        let cstr_and_members_with_decls =
+          List.map2
+            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) member_def ->
+              (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
+            cstr_and_members member_decls
+        in
+        let pp_cstr_struct_defs =
+          pp_sjoinmap_list
+            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl) ->
+              Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
+              vbrace member_decl ++
+              Pp.str ";")
+            cstr_and_members_with_decls
+        in
+        let pp_accessors =
+          (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
+          pp_sjoinmap_list
+            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
+              pp_sjoinmap_list
+                (fun (member_type, member_name, accessor) ->
+                  Pp.h (Pp.str "#define" +++
+                        Pp.str accessor ++
+                        Pp.str "(x)" +++
+                        Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
+                members_and_accessors)
+            cstr_and_members
+        in
+        let pp_cstr =
+          (*
+            static list_t list_cons(bool head, list_t tail) {
+              struct list_cons_struct *p;
+              if (!(p = malloc(sizeof(struct list_cons_struct)))) abort();
+              p->tag = list_cons_tag;
+              p->head = head;
+              p->tail = tail;
+              return (list_t)p;
+            }
+          *)
+          pp_sjoinmap_list
+            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
+              let fargs =
+                if members_and_accessors = [] then
+                  Pp.str "void"
+                else
+                  pp_join_list (Pp.str "," ++ Pp.spc ())
                     (List.map
-                      (fun (member_type, member_name, accessor) ->
-                        Pp.h (Pp.str "#define" +++
-                              Pp.str accessor ++
-                              Pp.str "(x)" +++
-                              Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
-                      members_and_accessors))
-                cstr_and_members)
-          in
-          let pp_cstr =
-            (*
-              static list_t list_cons(bool head, list_t tail) {
-                struct list_cons_struct *p;
-                if (!(p = malloc(sizeof(struct list_cons_struct)))) abort();
-                p->tag = list_cons_tag;
-                p->head = head;
-                p->tail = tail;
-                return (list_t)p;
-              }
-            *)
-            pp_sjoin_list
-              (List.map
-                (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-                  let fargs =
-                    if members_and_accessors = [] then
-                      Pp.str "void"
-                    else
-                      pp_join_list (Pp.str "," ++ Pp.spc ())
-                        (List.map
-                          (fun (member_type, member_name, accessor) -> Pp.hov 0 (Pp.str member_type +++ Pp.str member_name))
-                          members_and_accessors)
-                  in
-                  Pp.v 0 (Pp.hov 2 (
-                            Pp.str "static" +++
-                            Pp.str ind_typename +++
-                            Pp.str cstrname ++
-                            Pp.str "(" ++ fargs ++ Pp.str ")") +++
-                          vbrace (
-                            Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct +++ Pp.str "*p;") +++
-                            Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
-                            Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_name ++ Pp.str ";") +++
-                            pp_sjoin_list
-                              (List.map
-                                (fun (member_type, member_name, accessor) ->
-                                  Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
-                                members_and_accessors) +++
-                            Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
-                cstr_and_members)
-          in
-          pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
-      ind_names)
+                      (fun (member_type, member_name, accessor) -> Pp.hov 0 (Pp.str member_type +++ Pp.str member_name))
+                      members_and_accessors)
+              in
+              Pp.v 0 (Pp.hov 2 (
+                        Pp.str "static" +++
+                        Pp.str ind_typename +++
+                        Pp.str cstrname ++
+                        Pp.str "(" ++ fargs ++ Pp.str ")") +++
+                      vbrace (
+                        Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct +++ Pp.str "*p;") +++
+                        Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
+                        Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_name ++ Pp.str ";") +++
+                        pp_sjoinmap_list
+                          (fun (member_type, member_name, accessor) ->
+                            Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
+                          members_and_accessors +++
+                        Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
+            cstr_and_members
+        in
+        pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
+    ind_names
   in
   let pp = Pp.v 0 (pp_ind_types +++ pp_ind_imps) in
   (*Feedback.msg_debug (Pp.str (Pp.db_string_of_pp pp));*)
