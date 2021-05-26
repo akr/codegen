@@ -277,7 +277,6 @@ let codegen_define_instance
                           | _ -> false then
     user_err (Pp.str "[codegen] simplified id is specified for CodeGenPrimitive or CodeGenConstant:" +++
               Printer.pr_constr_env env sigma func));
-  let needs_simplification = (icommand = CodeGenFunction) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
@@ -356,9 +355,9 @@ let codegen_define_instance
         Constr.mkConst declared_ctnt
     in
     let simplified_status =
-      if needs_simplification then
+      if icommand = CodeGenFunction then
         SpExpectedId (s_id ())
-      else
+      else (* CodeGenPrimitive or CodeGenConstant *)
         SpNoSimplification
     in
     let sp_inst = {
