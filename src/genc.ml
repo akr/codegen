@@ -202,7 +202,8 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
     match sp_inst.sp_simplified_status with
     | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
     | SpExpectedId id ->
-        codegen_simplify cfunc_name (* modify global env *)
+        let (env, declared_ctnt, referred_cfuncs) = codegen_simplify cfunc_name in (* modify global env *)
+        (env, declared_ctnt)
     | SpDefined (ctnt, _) -> (Global.env (), ctnt)
   in
   (*msg_debug_hov (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)

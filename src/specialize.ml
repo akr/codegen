@@ -1667,7 +1667,7 @@ let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : stri
     msg_debug_hov (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term));
     specialization_time := now)
 
-let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
+let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
@@ -1753,7 +1753,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t =
    specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
   let env = Global.env () in
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
-  (env, declared_ctnt)
+  (env, declared_ctnt, referred_cfuncs)
 
 let command_simplify (cfuncs : string list) : unit =
   List.iter
@@ -1761,4 +1761,22 @@ let command_simplify (cfuncs : string list) : unit =
       ignore (codegen_simplify cfunc_name))
     cfuncs
 
+let rec trace_dependency (cfunc : string) (visited : StringSet.t) : StringSet.t =
+  if StringSet.mem cfunc visited then
+    visited
+  else
+    let visited2 = StringSet.add cfunc visited in
+    match CString.Map.find_opt cfunc !cfunc_instance_map with
+    | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
+    | Some (sp_cfg, sp_inst) ->
+        match sp_inst.sp_simplified_status with
+        | SpNoSimplification -> visited2
+        | SpExpectedId _ ->
+            let (_, _, referred_cfuncs) = codegen_simplify cfunc in
+            StringSet.fold trace_dependency referred_cfuncs visited2
+        | SpDefined (declared_ctnt, referred_cfuncs) ->
+            StringSet.fold trace_dependency referred_cfuncs visited2
 
+let command_trace_dependency (cfuncs : string list) : unit =
+  let visited = StringSet.empty in
+  ignore (StringSet.fold trace_dependency (StringSet.of_list cfuncs) visited)
