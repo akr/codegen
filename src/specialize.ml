@@ -259,7 +259,7 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
       Id.to_string cons_id
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
 
-let specialization_instance_internal
+let codegen_define_instance
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
@@ -439,7 +439,7 @@ let codegen_function_internal
   let args = List.map (Reductionops.nf_all env sigma) args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   ignore (codegen_define_or_check_static_arguments env sigma func sd_list);
-  specialization_instance_internal env sigma icommand func args (Some names)
+  codegen_define_instance env sigma icommand func args (Some names)
 
 let command_function
     (func : Libnames.qualid)
@@ -1142,7 +1142,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
         let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunction in
-        specialization_instance_internal ~cfunc env sigma icommand func nf_static_args None
+        codegen_define_instance ~cfunc env sigma icommand func nf_static_args None
     | Some sp_inst -> (env, sp_inst)
   in
   let sp_ctnt = sp_inst.sp_presimp_constr in
