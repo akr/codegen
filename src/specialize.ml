@@ -406,7 +406,7 @@ let codegen_define_instance
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
   (new_env_with_rels env, sp_inst)
 
-let codegen_function_internal
+let codegen_instance_command
     (icommand : instance_command)
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
@@ -444,21 +444,21 @@ let command_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
-  let (env, sp_inst) = codegen_function_internal CodeGenFunction func user_args names in
+  let (env, sp_inst) = codegen_instance_command CodeGenFunction func user_args names in
   generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
 let command_primitive
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
-  ignore (codegen_function_internal CodeGenPrimitive func user_args names)
+  ignore (codegen_instance_command CodeGenPrimitive func user_args names)
 
 let command_constant
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr list)
     (names : sp_instance_names) : unit =
   let user_args = List.map (fun arg -> Some arg) user_args in
-  ignore (codegen_function_internal CodeGenConstant func user_args names)
+  ignore (codegen_instance_command CodeGenConstant func user_args names)
 
 let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
   if Reductionops.is_conv env sigma t1 t2 then
