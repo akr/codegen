@@ -1761,28 +1761,31 @@ let command_simplify (cfuncs : string list) : unit =
       ignore (codegen_simplify cfunc_name))
     cfuncs
 
-let rec recursive_simplify (visited : StringSet.t ref) (cfunc : string) (postorder : string list) : string list =
+let rec recursive_simplify (visited : StringSet.t ref) (postorder : string list ref) (cfunc : string) : unit =
   if StringSet.mem cfunc !visited then
-    postorder
+    ()
   else
     (visited := StringSet.add cfunc !visited;
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
     | Some (sp_cfg, sp_inst) ->
         match sp_inst.sp_simplified_status with
-        | SpNoSimplification -> cfunc :: postorder
+        | SpNoSimplification -> postorder := cfunc :: !postorder
         | SpExpectedId _ ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
-            cfunc :: (StringSet.fold (recursive_simplify visited) referred_cfuncs postorder)
+            (StringSet.iter (recursive_simplify visited postorder) referred_cfuncs);
+            postorder := cfunc :: !postorder
         | SpDefined (declared_ctnt, referred_cfuncs) ->
-            cfunc :: (StringSet.fold (recursive_simplify visited) referred_cfuncs postorder))
+            (StringSet.iter (recursive_simplify visited postorder) referred_cfuncs);
+            postorder := cfunc :: !postorder)
 
 let command_recursive_simplify (cfuncs : string list) : unit =
   let visited = ref StringSet.empty in
   StringSet.iter
     (fun cfunc ->
-      let postorder = recursive_simplify visited cfunc [] in
+      let postorder = ref [] in
+      recursive_simplify visited postorder cfunc;
       msg_info_hov (Pp.str "[codegen] postorder from" +++
-      Pp.str cfunc ++ Pp.str ":" +++
-      pp_sjoinmap_list Pp.str (List.rev_append postorder [])))
+        Pp.str cfunc ++ Pp.str ":" +++
+        pp_sjoinmap_list Pp.str (List.rev_append !postorder [])))
     (StringSet.of_list cfuncs)
