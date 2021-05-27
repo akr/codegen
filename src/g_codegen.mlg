@@ -214,8 +214,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Simplify" string_list(cfuncs) ] ->
       { command_simplify cfuncs }
-    | [ "CodeGen" "Trace" "Dependency" string_list(cfuncs) ] ->
-      { command_trace_dependency cfuncs }
+    | [ "CodeGen" "Recursive" "Simplify" string_list(cfuncs) ] ->
+      { command_recursive_simplify cfuncs }
 
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
       { command_linear ty }

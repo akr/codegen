@@ -1761,7 +1761,7 @@ let command_simplify (cfuncs : string list) : unit =
       ignore (codegen_simplify cfunc_name))
     cfuncs
 
-let rec trace_dependency (cfunc : string) (visited : StringSet.t) : StringSet.t =
+let rec recursive_simplify (cfunc : string) (visited : StringSet.t) : StringSet.t =
   if StringSet.mem cfunc visited then
     visited
   else
@@ -1773,10 +1773,10 @@ let rec trace_dependency (cfunc : string) (visited : StringSet.t) : StringSet.t 
         | SpNoSimplification -> visited2
         | SpExpectedId _ ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
-            StringSet.fold trace_dependency referred_cfuncs visited2
+            StringSet.fold recursive_simplify referred_cfuncs visited2
         | SpDefined (declared_ctnt, referred_cfuncs) ->
-            StringSet.fold trace_dependency referred_cfuncs visited2
+            StringSet.fold recursive_simplify referred_cfuncs visited2
 
-let command_trace_dependency (cfuncs : string list) : unit =
+let command_recursive_simplify (cfuncs : string list) : unit =
   let visited = StringSet.empty in
-  ignore (StringSet.fold trace_dependency (StringSet.of_list cfuncs) visited)
+  ignore (StringSet.fold recursive_simplify (StringSet.of_list cfuncs) visited)
