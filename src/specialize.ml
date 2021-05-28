@@ -1755,7 +1755,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt, referred_cfuncs)
 
-let command_simplify (cfuncs : string list) : unit =
+let command_simplify_function (cfuncs : string list) : unit =
   List.iter
     (fun cfunc_name ->
       ignore (codegen_simplify cfunc_name))
@@ -1779,7 +1779,7 @@ let rec recursive_simplify (visited : StringSet.t ref) (postorder : string list 
             (StringSet.iter (recursive_simplify visited postorder) referred_cfuncs);
             postorder := cfunc :: !postorder)
 
-let command_recursive_simplify (cfuncs : string list) : unit =
+let command_simplify_dependencies (cfuncs : string list) : unit =
   let visited = ref StringSet.empty in
   StringSet.iter
     (fun cfunc ->

@@ -91,7 +91,8 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Global Inline QUALID...
   CodeGen Local Inline QUALID QUALID...
 
-  CodeGen Simplify C_FUNCNAME*.
+  CodeGen Simplify Function C_FUNCNAME*.
+  CodeGen Simplify Dependencies C_FUNCNAME*.
 
   CodeGen Linear COQ_TYPE.
   CodeGen LinearCheck FUNCTION*.
@@ -115,7 +116,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Function id nat => "id_nat" id_nat.
   CodeGen Function id nat => "id_nat" id_nat id_nat_specialized.
 
-  CodeGen Simplify id nat
+  CodeGen Simplify Function id nat
 
   Print CodeGen Specialization id.
 
@@ -212,10 +213,10 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
       { command_local_inline func funcs }
 
-    | [ "CodeGen" "Simplify" string_list(cfuncs) ] ->
-      { command_simplify cfuncs }
-    | [ "CodeGen" "Recursive" "Simplify" string_list(cfuncs) ] ->
-      { command_recursive_simplify cfuncs }
+    | [ "CodeGen" "Simplify" "Function" string_list(cfuncs) ] ->
+      { command_simplify_function cfuncs }
+    | [ "CodeGen" "Simplify" "Dependencies" string_list(cfuncs) ] ->
+      { command_simplify_dependencies cfuncs }
 
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
       { command_linear ty }
