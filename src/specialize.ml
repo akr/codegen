@@ -1761,7 +1761,7 @@ let command_simplify_function (cfuncs : string list) : unit =
       ignore (codegen_simplify cfunc_name))
     cfuncs
 
-let rec recursive_simplify (visited : StringSet.t ref) (postorder : string list ref) (cfunc : string) : unit =
+let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string list ref) (cfunc : string) : unit =
   if StringSet.mem cfunc !visited then
     ()
   else
@@ -1770,22 +1770,47 @@ let rec recursive_simplify (visited : StringSet.t ref) (postorder : string list 
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
     | Some (sp_cfg, sp_inst) ->
         match sp_inst.sp_simplified_status with
-        | SpNoSimplification -> postorder := cfunc :: !postorder
+        | SpNoSimplification -> ()
         | SpExpectedId _ ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
-            (StringSet.iter (recursive_simplify visited postorder) referred_cfuncs);
-            postorder := cfunc :: !postorder
+            (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
+            rev_postorder := cfunc :: !rev_postorder
         | SpDefined (declared_ctnt, referred_cfuncs) ->
-            (StringSet.iter (recursive_simplify visited postorder) referred_cfuncs);
-            postorder := cfunc :: !postorder)
+            (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
+            rev_postorder := cfunc :: !rev_postorder)
 
 let command_simplify_dependencies (cfuncs : string list) : unit =
   let visited = ref StringSet.empty in
   StringSet.iter
     (fun cfunc ->
-      let postorder = ref [] in
-      recursive_simplify visited postorder cfunc;
+      let rev_postorder = ref [] in
+      recursive_simplify visited rev_postorder cfunc;
       msg_info_hov (Pp.str "[codegen] postorder from" +++
         Pp.str cfunc ++ Pp.str ":" +++
-        pp_sjoinmap_list Pp.str (List.rev_append !postorder [])))
+        pp_sjoinmap_list Pp.str (List.rev_append !rev_postorder [])))
     (StringSet.of_list cfuncs)
+
+let command_resolve_dependencies () : unit =
+  let visited = ref StringSet.empty in
+  generation_list :=
+    List.fold_right
+      (fun gen new_genlist ->
+        match gen with
+        | GenSnippet snippet ->
+            gen :: new_genlist
+        | GenFunc cfunc ->
+            let rev_postorder = ref [] in
+            recursive_simplify visited rev_postorder cfunc;
+            list_map_append (fun cfunc -> GenFunc cfunc) !rev_postorder new_genlist)
+      !generation_list
+      []
+
+let command_print_generation_list () =
+  List.iter
+    (fun gen ->
+      match gen with
+      | GenSnippet snippet ->
+          msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string snippet))
+      | GenFunc cfunc ->
+          msg_info_hov (Pp.str "GenFunc" +++ Pp.str cfunc))
+    (List.rev_append !generation_list [])

@@ -134,6 +134,16 @@ let rec ncons n x s =
   else
     x :: (ncons (n-1) x s)
 
+let rec list_rev_map_append (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
+  match l1 with
+  | [] -> l2
+  | e :: rest -> list_rev_map_append f rest ((f e) :: l2)
+
+let rec list_map_append (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
+  match l1 with
+  | [] -> l2
+  | e :: rest -> (f e) :: list_map_append f rest l2
+
 let rec list_find_index pred l =
   match l with
   | [] -> raise Not_found

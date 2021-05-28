@@ -168,7 +168,7 @@ let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
 
 type code_generation =
-  GenFunc of string
+  GenFunc of string     (* C function name *)
 | GenSnippet of string
 
 (*
