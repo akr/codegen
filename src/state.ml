@@ -134,6 +134,7 @@ type simplified_status =
 *)
 type instance_command =
 | CodeGenFunction
+| CodeGenStaticFunction
 | CodeGenPrimitive
 | CodeGenConstant
 

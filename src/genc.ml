@@ -190,7 +190,15 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
   else
     gen_funcall c_fname argvars
 
-let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.types * Constr.t =
+let is_static_function_icommand (icommand : instance_command) : bool =
+  match icommand with
+  | CodeGenFunction -> false
+  | CodeGenStaticFunction -> true
+  | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
+  | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
+
+let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
+    bool * Constant.t * Constr.types * Constr.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
@@ -198,6 +206,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
                   Pp.str cfunc_name)
     | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
   in
+  let static = is_static_function_icommand sp_inst.sp_icommand in
   let (env, ctnt) =
     match sp_inst.sp_simplified_status with
     | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
@@ -212,7 +221,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) : Constant.t * Constr.ty
   match Global.body_of_constant_body Library.indirect_accessor cdef with
   | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
                       Printer.pr_constant env ctnt)
-  | Some (body,_, _) -> (ctnt, ty, body)
+  | Some (body,_, _) -> (static, ctnt, ty, body)
 
 let hbrace (pp : Pp.t) : Pp.t =
   h (str "{" +++ pp ++ brk (1,-2) ++ str "}")
@@ -1464,7 +1473,7 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
 
-let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_single (static : bool) (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
   (whole_body : EConstr.t) (return_type : string)
   (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
   let bodies = obtain_function_bodies env sigma fixinfo whole_body in
@@ -1492,7 +1501,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
-  hov 0 (str "static" +++
+  hov 0 ((if static then str "static" else mt ()) +++
         str return_type) +++
   str cfunc_name ++ str "(" ++
   hov 0 (gen_fargs c_fargs) ++
@@ -1504,7 +1513,7 @@ let gen_func_single (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_
     +++
     pp_body))
 
-let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixinfo : fixinfo_t) (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
@@ -1560,7 +1569,7 @@ let gen_func_multi (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_m
   let pp_entry_functions =
     let pr_entry_function c_name func_index formal_arguments return_type =
       let pp_return_type =
-        Pp.str "static" +++
+        (if static then Pp.str "static" else Pp.mt ()) +++
         Pp.str return_type
       in
       let pp_parameters =
@@ -1759,7 +1768,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Proj (proj, e) -> used_variables env sigma e
 
 let gen_func_sub (cfunc_name : string) : Pp.t =
-  let (ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
+  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   linear_type_check_term whole_body;
@@ -1772,9 +1781,9 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixinfo in
   (if called_fixfuncs <> [] then
-    gen_func_multi cfunc_name env sigma whole_body formal_arguments return_type fixinfo used called_fixfuncs
+    gen_func_multi static cfunc_name env sigma whole_body formal_arguments return_type fixinfo used called_fixfuncs
   else
-    gen_func_single cfunc_name env sigma whole_body return_type fixinfo used) ++
+    gen_func_single static cfunc_name env sigma whole_body return_type fixinfo used) ++
   Pp.fnl ()
 
 let gen_function (cfunc_name : string) : Pp.t =

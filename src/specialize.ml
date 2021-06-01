@@ -37,6 +37,20 @@ let pr_s_or_d (sd : s_or_d) : Pp.t =
 let drop_trailing_d (sd_list : s_or_d list) : s_or_d list =
   List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
+let is_function_icommand (icommand : instance_command) : bool =
+  match icommand with
+  | CodeGenFunction -> true
+  | CodeGenStaticFunction -> true
+  | CodeGenPrimitive -> false
+  | CodeGenConstant -> false
+
+let string_of_icommand (icommand : instance_command) : string =
+  match icommand with
+  | CodeGenFunction -> "Function"
+  | CodeGenStaticFunction -> "StaticFunction"
+  | CodeGenPrimitive -> "Primitive"
+  | CodeGenConstant -> "Constant"
+
 let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -62,10 +76,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
       Pp.str ".");
     let feedback_instance sp_inst =
       msg_info_hov (
-        (match sp_inst.sp_icommand with
-        | CodeGenFunction -> Pp.str "Function"
-        | CodeGenPrimitive -> Pp.str "Primitive"
-        | CodeGenConstant -> Pp.str "Constant") +++
+        Pp.str (string_of_icommand sp_inst.sp_icommand) +++
         Printer.pr_constr_env env sigma func +++
         pr_inst sp_inst ++ Pp.str ".");
       match sp_inst.sp_simplified_status with
@@ -269,13 +280,14 @@ let codegen_define_instance
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
-  (if (icommand = CodeGenFunction) && sp_cfg.sp_is_cstr then
-    user_err (Pp.str "[codegen] CodeGenFunction is used for a constructor:" +++
+  (if (is_function_icommand icommand) && sp_cfg.sp_is_cstr then
+    user_err (Pp.str "[codegen]" +++ Pp.str (string_of_icommand icommand) +++
+              Pp.str "is used for a constructor:" +++
               Printer.pr_constr_env env sigma func));
-  (if (icommand <> CodeGenFunction) &&
+  (if (not (is_function_icommand icommand)) &&
        match names_opt with Some { spi_simplified_id = Some _ } -> true
                           | _ -> false then
-    user_err (Pp.str "[codegen] simplified id is specified for CodeGenPrimitive or CodeGenConstant:" +++
+    user_err (Pp.str "[codegen] simplified id is specified for" +++ Pp.str (string_of_icommand icommand) +++ Pp.str ":" +++
               Printer.pr_constr_env env sigma func));
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
@@ -355,7 +367,7 @@ let codegen_define_instance
         Constr.mkConst declared_ctnt
     in
     let simplified_status =
-      if icommand = CodeGenFunction then
+      if is_function_icommand icommand then
         SpExpectedId (s_id ())
       else (* CodeGenPrimitive or CodeGenConstant *)
         SpNoSimplification
@@ -374,10 +386,7 @@ let codegen_define_instance
   msg_info_hov (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     Pp.str "CodeGen" +++
-    (match icommand with
-    | CodeGenFunction -> Pp.str "Function"
-    | CodeGenPrimitive -> Pp.str "Primitive"
-    | CodeGenConstant -> Pp.str "Constant") +++
+    Pp.str (string_of_icommand icommand) +++
     Printer.pr_constr_env env sigma func +++
     (pp_sjoin_list (snd (List.fold_right
            (fun sd (args, res) ->
@@ -445,6 +454,13 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunction func user_args names in
+  generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
+
+let command_static_function
+    (func : Libnames.qualid)
+    (user_args : Constrexpr.constr_expr option list)
+    (names : sp_instance_names) : unit =
+  let (env, sp_inst) = codegen_instance_command CodeGenStaticFunction func user_args names in
   generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
 
 let command_primitive
@@ -1140,7 +1156,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   (*msg_info_hov (Pp.str "[codegen] replace presimp: " ++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
-        let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunction in
+        let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenStaticFunction in
         codegen_define_instance ~cfunc env sigma icommand func nf_static_args None
     | Some sp_inst -> (env, sp_inst)
   in

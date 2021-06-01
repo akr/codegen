@@ -78,6 +78,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Arguments FUNCTION SorD*.
   CodeGen AutoArguments FUNCTION*.
   CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
+  CodeGen Static Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PRESIMP_NAME.
 
@@ -100,9 +101,10 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
-  "CodeGen Function" and "CodeGen Primitive" declares C function name for
-  a Gallina function.
-  "CodeGen GenerateFile" generates functions declared by "CodeGen Function".
+  "CodeGen Function", "CodeGen Static Function" and "CodeGen Primitive"
+  declares C function name for a Gallina function.
+  "CodeGen GenerateFile" generates functions declared by
+  "CodeGen Function" and "CodeGen Static Function".
   The actual C definition of functions declared by "CodeGen Primitive"
   should be provided by a user.
 
@@ -194,6 +196,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
       { command_function func args names }
+    | [ "CodeGen" "Static" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
+      { command_static_function func args names }
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names2(names) ] ->
       { command_primitive func args names }
     | [ "CodeGen" "Constant" ref(func) constr_list(args) sp_instance_names2(names) ] ->
