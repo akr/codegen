@@ -343,7 +343,9 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
       let ((mutind, i), j) = out_punivs cu in
       let mutind_body = Environ.lookup_mind mutind env in
       let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-      let s = Id.to_string oneind_body.Declarations.mind_consnames.(j) in
+      (*(if j < 1 then user_err (Pp.str "[codegen] too small j=" ++ Pp.int j));
+      (if Array.length oneind_body.Declarations.mind_consnames < j then user_err (Pp.str "[codegen] too big j=" ++ Pp.int j));*)
+      let s = Id.to_string oneind_body.Declarations.mind_consnames.(j-1) in
       Buffer.add_string buf s
   | App (f, argsary) ->
       mangle_term_buf env sigma buf f;

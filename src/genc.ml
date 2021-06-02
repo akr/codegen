@@ -52,7 +52,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
     List.init numcons
       (fun j ->
         let consname = oneind_body.Declarations.mind_consnames.(j) in
-        let cstr = mkConstruct ((mutind, i), j) in
+        let cstr = mkConstruct ((mutind, i), (j+1)) in
         let args = CArray.map_of_list EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term env sigma consterm in
