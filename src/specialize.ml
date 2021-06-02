@@ -47,7 +47,7 @@ let is_function_icommand (icommand : instance_command) : bool =
 let string_of_icommand (icommand : instance_command) : string =
   match icommand with
   | CodeGenFunction -> "Function"
-  | CodeGenStaticFunction -> "StaticFunction"
+  | CodeGenStaticFunction -> "Static Function"
   | CodeGenPrimitive -> "Primitive"
   | CodeGenConstant -> "Constant"
 
