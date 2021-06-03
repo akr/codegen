@@ -176,7 +176,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
       Pp.str "but" +++
       Pp.int (List.length cstr_caselabel_accessors_list)));
   let f j0 cstr_cfg =
-    let consname = Array.get oneind_body.Declarations.mind_consnames j0 in
+    let consname = oneind_body.Declarations.mind_consnames.(j0) in
     let p (cstr, caselabel, accessors) = Id.equal consname cstr in
     let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
     let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
@@ -184,10 +184,10 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
         Pp.str "[codegen] inductive match: constructor not found:" +++
         Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
-    (if Array.get oneind_body.Declarations.mind_consnrealdecls j0 <> List.length accessors then
+    (if oneind_body.Declarations.mind_consnrealdecls.(j0) <> List.length accessors then
       user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" ++
       Pp.str "needs" +++
-      Pp.int (Array.get oneind_body.Declarations.mind_consnrealdecls j0) +++
+      Pp.int oneind_body.Declarations.mind_consnrealdecls.(j0) +++
       Pp.str "but" +++
       Pp.int (List.length accessors) +++
       Pp.str "for" +++

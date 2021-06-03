@@ -85,7 +85,7 @@ let array_find_index_opt (p : 'a -> bool) (ary : 'a array) : int option =
   let rec aux i =
     if len <= i then
       None
-    else if p (Array.get ary i) then
+    else if p ary.(i) then
       Some i
     else
       aux (i + 1)
