@@ -1020,6 +1020,12 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(zeta-app)" env sigma term1 term2;
       reduce_exp env sigma term2
+  | Case _ ->
+      let f' = reduce_exp env sigma f in
+      if isCase sigma f' then
+        mkApp (f', args_nf)
+      else
+        reduce_app env sigma f' args_nf
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
       if ia.(i) < Array.length args_nf then
         let decarg_var = args_nf.(ia.(i)) in

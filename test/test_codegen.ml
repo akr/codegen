@@ -890,6 +890,22 @@ let test_app_match (ctx : test_ctxt) : unit =
       assert(add_or_sub(false, 2) == 8);
     |}
 
+let test_let_app_match (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Definition f a b :=
+        let g := Nat.add in
+        (match tt with tt => g end) a b.
+      CodeGen Function f.
+    |}) {|
+      assert(f(0, 0) == 0);
+      assert(f(0, 1) == 1);
+      assert(f(1, 0) == 1);
+      assert(f(1, 1) == 2);
+      assert(f(4, 7) == 11);
+    |}
+
 let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2305,6 +2321,7 @@ let suite : OUnit2.test =
     "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;
     "test_app_let" >:: test_app_let;
     "test_app_match" >:: test_app_match;
+    "test_let_app_match" >:: test_let_app_match;
     "test_cast" >:: test_cast;
     "test_beta_var_presimp" >:: test_beta_var_presimp;
     "test_delta_fun_constant" >:: test_delta_fun_constant;
