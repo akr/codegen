@@ -1045,12 +1045,22 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(zeta-app)" env sigma term1 term2;
       reduce_exp env sigma term2
-  | Case _ ->
-      let f' = reduce_exp env sigma f in
-      if isCase sigma f' then
-        mkApp (f', args_nf)
-      else
-        reduce_app env sigma f' args_nf
+  | Case (ci,p,iv,item,branches) ->
+      let item' = reduce_arg env sigma item in
+      try_iota_match env sigma ci p iv item' branches
+        (fun item_env item_content branch args ->
+          let term2 = mkApp (branch, args) in
+          debug_reduction "iota-match" (fun () ->
+            let term1 = mkCase (ci, p, iv, item', branches) in
+            Pp.str "match-item = " ++
+            Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
+            Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
+            Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
+            Pp.str "->" ++ Pp.fnl () ++
+            Printer.pr_econstr_env env sigma term2);
+          check_convertible "reduction(iota-match)" env sigma f term2;
+          reduce_app env sigma branch (Array.append args args_nf))
+        (fun () -> mkApp (mkCase (ci, p, iv, item', Array.map (reduce_exp env sigma) branches), args_nf))
   | Fix ((ia,i), ((nary, tary, fary) as prec)) ->
       if ia.(i) < Array.length args_nf then
         let decarg_var = args_nf.(ia.(i)) in
