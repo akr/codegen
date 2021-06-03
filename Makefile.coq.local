@@ -1,2 +1,5 @@
 # Merlin needs -bin-annot
 CAMLFLAGS += -bin-annot
+
+# This is required to print backtrace for coqide -bt.
+CAMLDEBUG=-g
