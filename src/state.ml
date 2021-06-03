@@ -53,6 +53,14 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_reduce_exp);
           optwrite = (:=) opt_debug_reduce_exp }
 
+(* Set/Unset Debug CodeGen ReduceApp. *)
+let opt_debug_reduce_app = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optkey   = ["Debug";"CodeGen";"ReduceApp"];
+          optread  = (fun () -> !opt_debug_reduce_app);
+          optwrite = (:=) opt_debug_reduce_app }
+
 (* Set/Unset Debug CodeGen Replace. *)
 let opt_debug_replace = ref false
 let () = let open Goptions in declare_bool_option

@@ -854,6 +854,7 @@ let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     msg_debug_hov (Pp.str "[codegen] reduce_exp ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_exp" env sigma term result;
   result
+
 and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
@@ -965,6 +966,17 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let args_nf = Array.map (reduce_arg env sigma) args in
       reduce_app env sigma f args_nf
 and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
+  let t1 = Unix.times () in
+  let term = mkApp (f, args_nf) in
+  (if !opt_debug_reduce_app then (* Set Debug CodeGen ReduceApp. *)
+    msg_debug_hov (Pp.str "[codegen] reduce_app arg: " ++ Printer.pr_econstr_env env sigma term));
+  let result = reduce_app1 env sigma f args_nf in
+  (if !opt_debug_reduce_app then
+    let t2 = Unix.times () in
+    msg_debug_hov (Pp.str "[codegen] reduce_app ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma result));
+  check_convertible "reduce_app" env sigma term result;
+  result
+and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
   if isRel sigma f then
     let m = destRel sigma f in
     match EConstr.lookup_rel m env with
