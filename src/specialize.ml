@@ -1771,10 +1771,10 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_simplification env sigma "reduce_exp" term;
-  let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
-  debug_simplification env sigma "replace" term;
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
+  let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
+  debug_simplification env sigma "replace" term;
   let term = delete_unused_let env sigma term in
   debug_simplification env sigma "delete_unused_let" term;
   let term = complete_args env sigma term in
