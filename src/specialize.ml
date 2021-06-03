@@ -885,7 +885,8 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let b' = Vars.liftn n 2 b in
         let term2 = compose_lets defs (mkLetIn (x, body, t', b')) in
         debug_reduction "zeta-flat" (fun () ->
-          Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+          let term1 = mkLetIn (x,e',t,b) in
+          Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
         check_convertible "reduction(zeta-flat)" env sigma term term2;
@@ -916,10 +917,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let args = Array.map (Vars.lift i) args in
               let term2 = mkApp (branch, args) in
               debug_reduction "iota-match" (fun () ->
+                let term1 = default () in
                 Pp.str "match-item = " ++
                 Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
-                Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+                Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
               check_convertible "reduction(iota-match)" env sigma term term2;
@@ -942,10 +944,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
               debug_reduction "iota-proj" (fun () ->
+                let term1 = default () in
                 Pp.str "proj-item = " ++
                 Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
                 Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e ++ Pp.fnl () ++
-                Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+                Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
               check_convertible "reduction(iota-proj)" env sigma term term2;
