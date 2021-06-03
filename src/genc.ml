@@ -50,16 +50,17 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
   let cstr_caselabel_accessors_list =
     List.init numcons
-      (fun j ->
-        let consname = oneind_body.Declarations.mind_consnames.(j) in
-        let cstr = mkConstruct ((mutind, i), (j+1)) in
+      (fun j0 ->
+        let j = j0 + 1 in
+        let consname = oneind_body.Declarations.mind_consnames.(j0) in
+        let cstr = mkConstruct ((mutind, i), j) in
         let args = CArray.map_of_list EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term env sigma consterm in
         let caselabel =
-          if j = 0 then "default" else "case " ^ s ^ "_tag"
+          if j = 1 then "default" else "case " ^ s ^ "_tag"
         in
-        let numargs = oneind_body.Declarations.mind_consnrealargs.(j) in
+        let numargs = oneind_body.Declarations.mind_consnrealargs.(j0) in
         let accessors =
           List.init numargs
             (fun k -> s ^ "_get_member_" ^ string_of_int k)
@@ -1812,13 +1813,13 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
     for i = 0 to ntypes - 1 do
       let oneind_body = mutind_body.mind_packets.(i) in
       let numcstr = Array.length oneind_body.mind_consnames in
-      for j = 0 to numcstr - 1 do
+      for j0 = 0 to numcstr - 1 do
         (*msg_info_hov (Pp.str "[codegen] ind_recursive_p i=" ++
                            Pp.int i ++
                            Pp.str "(" ++ Id.print oneind_body.mind_typename ++ Pp.str ")" +++
-                           Pp.str "j=" ++ Pp.int j ++
-                           Pp.str "(" ++ Id.print oneind_body.mind_consnames.(j) ++ Pp.str ")");*)
-        let (ctxt, rettype) = oneind_body.mind_nf_lc.(j) in
+                           Pp.str "j0=" ++ Pp.int j0 ++
+                           Pp.str "(" ++ Id.print oneind_body.mind_consnames.(j0) ++ Pp.str ")");*)
+        let (ctxt, rettype) = oneind_body.mind_nf_lc.(j0) in
         ignore
           (Context.Rel.fold_outside
             (fun decl k ->
@@ -1866,8 +1867,8 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
   done;
   for i = 0 to mib.mind_ntypes - 1 do
     let oib = mib.mind_packets.(i) in
-    for j = 0 to Array.length oib.mind_consnames - 1 do
-      let cstr_id = oib.mind_consnames.(j) in
+    for j0 = 0 to Array.length oib.mind_consnames - 1 do
+      let cstr_id = oib.mind_consnames.(j0) in
       if Hashtbl.mem h cstr_id then
         user_err (Pp.str "[codegen] constructor name conflict:" +++ Id.print cstr_id);
       Hashtbl.add h cstr_id true
@@ -1920,13 +1921,14 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let numcstr = Array.length oneind_body.mind_consnames in
         let cstr_and_members =
           List.init numcstr
-            (fun j ->
+            (fun j0 ->
+              let j = j0 + 1 in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
-              let cstrterm = mkApp ((mkConstruct (ind, (j+1))), params) in
+              let cstrterm = mkApp ((mkConstruct (ind, j)), params) in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
               let cstrtype = Retyping.get_type_of env sigma cstrterm in
               let (args, result_type) = decompose_prod sigma cstrtype in
-              let cstrid = oneind_body.mind_consnames.(j) in
+              let cstrid = oneind_body.mind_consnames.(j0) in
               let j_suffix = "_" ^ Id.to_string cstrid in
               let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
               let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
@@ -1973,12 +1975,12 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let env =
     CList.fold_left_i
       (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-        let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, (j+1))) in
+        let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, j)) in
         let params' = Array.map (EConstr.to_constr sigma) params in
         ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
         let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None }) in
         env)
-      0 env cstr_and_members
+      1 env cstr_and_members
   in
   ignore env;
   let constant_constructor_only =

@@ -148,11 +148,11 @@ and is_linear_ind env sigma ty ie argsary =
     let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
         (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
     let env = Environ.push_rel_context (
-        List.map (fun j ->
-          let oind_body = mind_body.Declarations.mind_packets.(Array.length mind_body.Declarations.mind_packets - j - 1) in
+        List.map (fun ii0 ->
+          let oind_body = mind_body.Declarations.mind_packets.(Array.length mind_body.Declarations.mind_packets - ii0 - 1) in
           Context.Rel.Declaration.LocalDef
             (Context.annotR (Names.Name.Name oind_body.Declarations.mind_typename),
-             ind_ary.(j),
+             ind_ary.(ii0),
              type_of_inductive_arity oind_body.Declarations.mind_arity))
           (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
       ) env in
