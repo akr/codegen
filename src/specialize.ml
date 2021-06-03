@@ -972,10 +972,16 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
     | Context.Rel.Declaration.LocalDef (x,e,t) ->
         (* We don't inline Case expression at function position because
            it can duplicate computation.
-           If f_content = match ... end args,
-           app-app inline the match-expression.
-           Proj should be supported after we support downward funargs
-           (restricted closures).  *)
+           For example, if
+             let f := match x with tt => let y = y1 + y2 in fun z => y + z end
+             in f 1 + f 2
+           is reduced to
+             match x with tt => let y = y1 + y2 in fun z => y + z end 1 +
+             match x with tt => let y = y1 + y2 in fun z => y + z end 2,
+           y1 + y2 is duplicated.
+           Note that Proj cannot have such let-in expression.
+           So we will support it (after we support downward funargs,
+           restricted closures).  *)
         let (f_f, f_args) = decompose_app sigma e in
         match EConstr.kind sigma f_f with
         | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
