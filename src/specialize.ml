@@ -1111,12 +1111,62 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                   let env2 = EConstr.push_rel_context ctx env in
                   let b = reduce_app env2 sigma fi args_nf_lifted in
                   compose_lets defs b
-
             else
               default ())
       else
         default ()
   | _ -> default ()
+
+let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
+  | Const _ | Construct _ -> term
+  | Evar (ev, es) ->
+      mkEvar (ev, List.map (normalize_types env sigma) es)
+  | Proj (proj, e) ->
+      mkProj (proj, normalize_types env sigma e)
+  | Cast (e,ck,t) ->
+      let e' = normalize_types env sigma e in
+      let t' = Reductionops.nf_all env sigma t in
+      mkCast(e', ck, t')
+  | App (f, args) ->
+      let f' = normalize_types env sigma f in
+      let args' = Array.map (normalize_types env sigma) args in
+      mkApp (f', args')
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = normalize_types env sigma e in
+      let t' = Reductionops.nf_all env sigma t in
+      let b' = normalize_types env2 sigma b in
+      mkLetIn (x, e', t', b')
+  | Case (ci, p, iv, item, branches) ->
+      let p' = Reductionops.nf_all env sigma p in
+      let item' = normalize_types env sigma item in
+      let branches' = Array.map (normalize_types env sigma) branches in
+      mkCase (ci, p', iv, item', branches')
+  | Prod (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let t' = Reductionops.nf_all env sigma t in
+      let b' = normalize_types env2 sigma b in
+      mkProd (x, t', b')
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let t' = Reductionops.nf_all env sigma t in
+      let e' = normalize_types env2 sigma e in
+      mkLambda (x, t', e')
+  | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
+      let funary' = Array.map (normalize_types env2 sigma) funary in
+      mkFix ((ia, i), (nameary, tyary', funary'))
+  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
+      let funary' = Array.map (normalize_types env2 sigma) funary in
+      mkCoFix (i, (nameary, tyary', funary'))
 
 let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
@@ -1293,57 +1343,6 @@ let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
           count_false_in_prefix (n-1) rest
         else
           1 + count_false_in_prefix (n-1) rest
-
-let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  match EConstr.kind sigma term with
-  | Rel _ | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
-  | Const _ | Construct _ -> term
-  | Evar (ev, es) ->
-      mkEvar (ev, List.map (normalize_types env sigma) es)
-  | Proj (proj, e) ->
-      mkProj (proj, normalize_types env sigma e)
-  | Cast (e,ck,t) ->
-      let e' = normalize_types env sigma e in
-      let t' = Reductionops.nf_all env sigma t in
-      mkCast(e', ck, t')
-  | App (f, args) ->
-      let f' = normalize_types env sigma f in
-      let args' = Array.map (normalize_types env sigma) args in
-      mkApp (f', args')
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      let e' = normalize_types env sigma e in
-      let t' = Reductionops.nf_all env sigma t in
-      let b' = normalize_types env2 sigma b in
-      mkLetIn (x, e', t', b')
-  | Case (ci, p, iv, item, branches) ->
-      let p' = Reductionops.nf_all env sigma p in
-      let item' = normalize_types env sigma item in
-      let branches' = Array.map (normalize_types env sigma) branches in
-      mkCase (ci, p', iv, item', branches')
-  | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let t' = Reductionops.nf_all env sigma t in
-      let b' = normalize_types env2 sigma b in
-      mkProd (x, t', b')
-  | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let t' = Reductionops.nf_all env sigma t in
-      let e' = normalize_types env2 sigma e in
-      mkLambda (x, t', e')
-  | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
-      let funary' = Array.map (normalize_types env2 sigma) funary in
-      mkFix ((ia, i), (nameary, tyary', funary'))
-  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
-      let funary' = Array.map (normalize_types env2 sigma) funary in
-      mkCoFix (i, (nameary, tyary', funary'))
 
 (* xxx: consider linear type *)
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
