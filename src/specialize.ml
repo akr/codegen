@@ -1315,8 +1315,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let nf_static_args = CArray.filter_with static_flags args in (* static arguments are already normalized by normalize_static_arguments *)
-  (Array.iteri (fun i arg ->
-    let nf_arg = nf_static_args.(i) in
+  (Array.iteri (fun i nf_arg ->
     let fv_opt = first_fv sigma nf_arg in
     match fv_opt with
     | None -> ()
@@ -1326,7 +1325,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
           Pp.str "'s" +++
           Pp.str (CString.ordinal (i+1)) +++
           Pp.str "static argument" +++
-          Printer.pr_econstr_env env sigma arg +++
+          Printer.pr_econstr_env env sigma nf_arg +++
           Pp.str "refer" +++
           Printer.pr_econstr_env env sigma (mkRel k)))
     nf_static_args);
