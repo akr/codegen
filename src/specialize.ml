@@ -103,7 +103,9 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
                 | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++
                                  Printer.pr_global gref)
               in
-              (func, ConstrMap.get func !specialize_config_map)
+              match ConstrMap.find_opt func !specialize_config_map with
+              | None -> user_err (Pp.str "[codegen] not specialized:" +++ Printer.pr_global gref)
+              | Some sp_cfg -> (func, sp_cfg)
   in
   msg_info_hov (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
@@ -188,6 +190,15 @@ let codegen_auto_arguments_internal
       let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       let sd_list = (determine_sd_list env sigma ty) in
       codegen_define_static_arguments ?cfunc env sigma func sd_list
+
+let codegen_auto_sd_list
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (func : Constr.t) : s_or_d list =
+  match ConstrMap.find_opt func !specialize_config_map with
+  | Some sp_cfg -> sp_cfg.sp_sd_list (* already defined *)
+  | None ->
+      let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
+      determine_sd_list env sigma ty
 
 let codegen_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) : unit =
@@ -1168,6 +1179,82 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let funary' = Array.map (normalize_types env2 sigma) funary in
       mkCoFix (i, (nameary, tyary', funary'))
 
+(*
+  "normalize_static_arguments" breaks V-normal form but it is not a problem
+  because "delete_unused_let" works well with general Gallina terms and
+  "replace" recovers V-normal form.
+
+  normalize_static_arguments: breaks V-normal, reduces variable references from static arguments
+  delete_unused_let: removes unsed let bindings
+  replace: replaces application with static arguments by specialized function application
+*)
+let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ -> term
+  | Var _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Var:" +++ Printer.pr_econstr_env env sigma term)
+  | Evar _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Evar:" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Cast:" +++ Printer.pr_econstr_env env sigma term)
+  | Prod _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Prod:" +++ Printer.pr_econstr_env env sigma term)
+  | CoFix _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected CoFix:" +++ Printer.pr_econstr_env env sigma term)
+  | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
+  | Lambda (x, t, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let b' = normalize_static_arguments env2 sigma b in
+      mkLambda (x, t, b')
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (normalize_static_arguments env2 sigma) fary in
+      mkFix ((ia, i), (nary, tary, fary'))
+  | LetIn (x, e, t, b) ->
+      let e' = normalize_static_arguments env sigma e in
+      let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
+      let env2 = EConstr.push_rel decl env in
+      let b' = normalize_static_arguments env2 sigma b in
+      mkLetIn (x, e', t, b')
+  | Case (ci, p, iv, item, branches) ->
+      let branches' = Array.map (normalize_static_arguments env sigma) branches in
+      mkCase (ci, p, iv, item, branches')
+  | Proj (proj, e) ->
+      term (* e is a variable because V-normal form *)
+  | Const (ctnt, u) ->
+      term
+  | Construct (cstr, u) ->
+      term
+  | App (f, args) ->
+      let normalize_args f' =
+        let sd_list = codegen_auto_sd_list env sigma f' in
+        let nl = List.length sd_list in
+        let na = Array.length args in
+        (* We don't raise an error if nl <> na because
+           the application itself can be dropped if it is not used *)
+        let sd_ary =
+          if nl < na then
+            Array.of_list (List.append sd_list (CList.make (na - nl) SorD_D))
+          else
+            Array.of_list (CList.firstn na sd_list)
+        in
+        let args' = Array.map2
+          (fun sd arg ->
+            match sd with
+            | SorD_S -> Reductionops.nf_all env sigma arg
+            | SorD_D -> arg)
+          sd_ary
+          args
+        in
+        mkApp (f, args')
+      in
+      match EConstr.kind sigma f with
+      | Const (ctnt, u) ->
+          let f' = Constr.mkConst ctnt in
+          normalize_args f'
+      | Construct (cstr, u) ->
+          let f' = Constr.mkConstruct cstr in
+          normalize_args f'
+      | _ ->
+          let f' = normalize_static_arguments env sigma f in
+          mkApp (f', args)
+
 let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
@@ -1227,8 +1314,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
               Pp.str ")"));
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
-  let static_args = CArray.filter_with static_flags args in
-  let nf_static_args = Array.map (Reductionops.nf_all env sigma) static_args in
+  let nf_static_args = CArray.filter_with static_flags args in (* static arguments are already normalized by normalize_static_arguments *)
   (Array.iteri (fun i arg ->
     let nf_arg = nf_static_args.(i) in
     let fv_opt = first_fv sigma nf_arg in
@@ -1772,10 +1858,12 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_exp" term;
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
-  let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
-  debug_simplification env sigma "replace" term;
+  let term = normalize_static_arguments env sigma term in
+  debug_simplification env sigma "normalize_static_arguments" term;
   let term = delete_unused_let env sigma term in
   debug_simplification env sigma "delete_unused_let" term;
+  let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
+  debug_simplification env sigma "replace" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
   let term = rename_vars env sigma term in

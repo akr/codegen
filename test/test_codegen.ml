@@ -1089,6 +1089,25 @@ let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
       assert(f(false, 3) == 5);
     |}
 
+let test_let_unused_is_not_specialized (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
+    {|
+      Definition f a b := let unused := Nat.pow 3 3 in Nat.add a b.
+      CodeGen Gen f.
+      Fail Print CodeGen Specialization Nat.pow.
+    |}
+
+let test_let_only_used_in_static_is_not_specialized (ctx : test_ctxt) : unit =
+  assert_coq_success ctx
+    {|
+      Definition f a :=
+        let only_used_in_static := Nat.mul 2 3 in
+        Nat.add only_used_in_static a.
+      CodeGen Arguments Nat.add s d.
+      CodeGen Gen f.
+      Fail Print CodeGen Specialization Nat.mul.
+    |}
+
 let test_add_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2336,6 +2355,8 @@ let suite : OUnit2.test =
     "test_let_match" >:: test_let_match;
     "test_let_match_let" >:: test_let_match_let;
     "test_let_match_let_nonempty_cargs" >:: test_let_match_let_nonempty_cargs;
+    "test_let_unused_is_not_specialized" >:: test_let_unused_is_not_specialized;
+    "test_let_only_used_in_static_is_not_specialized" >:: test_let_only_used_in_static_is_not_specialized;
     "test_add_tailrec" >:: test_add_tailrec;
     "test_add_nontailrec" >:: test_add_nontailrec;
     "test_map_succ" >:: test_map_succ;
