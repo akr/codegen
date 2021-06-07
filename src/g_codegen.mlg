@@ -174,13 +174,18 @@ VERNAC ARGUMENT EXTEND ind_constructor
 | [ "|" ident(coq_cstr) "=>" string(c_cstr) ] -> { { ic_coq_cstr = coq_cstr; ic_c_cstr = c_cstr } }
 END
 
+VERNAC ARGUMENT EXTEND string_or_none
+| [ string(s) ] -> { Some s }
+| [ "None" ] -> { None }
+END
+
 VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
     | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
       { command_print_inductive coq_type_list }
     | [ "Print" "CodeGen" "Specialization" ref_list(funcs)] ->
       { command_print_specialization funcs }
     | [ "Print" "CodeGen" "Generation" "List"] ->
-      { command_print_generation_list () }
+      { command_print_generation_map () }
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
@@ -211,7 +216,10 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
-    | [ "CodeGen" "GenerateFile" string(fn) ] -> { command_generate_file fn }
+    | [ "CodeGen" "Header" "File" string_or_none(fnopt) ] -> { current_header_filename := fnopt }
+    | [ "CodeGen" "Implementation" "File" string_or_none(fnopt) ] -> { current_implementation_filename := fnopt }
+
+    | [ "CodeGen" "GenerateFile" ] -> { command_generate_file () }
     | [ "CodeGen" "GenerateTest" ] -> { command_generate_test () }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->

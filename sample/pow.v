@@ -29,6 +29,8 @@ CodeGen Inductive Match bool => ""
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
+CodeGen Implementation File "sample/pow_generated.c".
+
 CodeGen Snippet "
 #include <stdbool.h> /* for bool, true and false */
 ".
@@ -59,7 +61,7 @@ CodeGen Snippet "
 #define uphalf(n) (((n)+1)>>1)
 ".
 
-CodeGen Function fastpow_iter.
-CodeGen Function fastpow.
+CodeGen Static Function fastpow_iter.
+CodeGen Static Function fastpow.
 
-CodeGen GenerateFile "sample/pow_generated.c".
+CodeGen GenerateFile.

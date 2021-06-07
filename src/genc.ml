@@ -1798,7 +1798,7 @@ let add_snippet (str : string) : unit =
     else
       str
   in
-  generation_list := GenSnippet str' :: !generation_list
+  codegen_add_implementation_generation (GenSnippet str')
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
@@ -2340,10 +2340,13 @@ let gen_test (gen_list : code_generation list) : unit =
     (fun pp -> Feedback.msg_info pp)
     gen_list
 
-let command_generate_file (fn : string) : unit =
-  gen_file fn (List.rev !generation_list);
-  generation_list := []
+let command_generate_file () : unit =
+  List.iter
+    (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
+    (CString.Map.bindings !generation_map);
+  generation_map := CString.Map.empty
 
 let command_generate_test () : unit =
-  gen_test (List.rev !generation_list);
-  generation_list := []
+  List.iter
+    (fun (fn, gen_list) -> gen_test (List.rev gen_list))
+    (CString.Map.bindings !generation_map)

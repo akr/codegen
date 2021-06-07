@@ -78,6 +78,8 @@ Compute sprintf (mkbuf 0) "bool:%b nat:%d" true 42 : buffer.
 
 Require Import codegen.codegen.
 
+CodeGen Implementation File "sample/sprintf_generated.c".
+
 CodeGen Inductive Type bool => "bool".
 CodeGen Inductive Match bool => ""
 | true => "default"
@@ -111,10 +113,7 @@ Definition add_mesg a b := sprintf (mkbuf 0) "%d + %d is %d" a b (a + b).
 Check add_mesg.
 
 CodeGen Linear buffer.
-CodeGen Function sprintf _ "%d + %d is %d".
-CodeGen Function add_mesg.
+CodeGen Static Function sprintf _ "%d + %d is %d".
+CodeGen Static Function add_mesg.
 
-CodeGen GenerateFile "sample/sprintf_generated.c".
-
-
-
+CodeGen GenerateFile.

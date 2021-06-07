@@ -466,14 +466,14 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunction func user_args names in
-  generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
+  codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_static_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunction func user_args names in
-  generation_list := GenFunc sp_inst.sp_cfunc_name :: !generation_list
+  codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
     (func : Libnames.qualid)
@@ -1937,22 +1937,25 @@ let command_simplify_dependencies (cfuncs : string list) : unit =
         pp_sjoinmap_list Pp.str (List.rev_append !rev_postorder [])))
     (StringSet.of_list cfuncs)
 
-let command_resolve_dependencies () : unit =
+let codegen_resolve_dependencies (gen_list : code_generation list) : code_generation list =
   let visited = ref StringSet.empty in
-  generation_list :=
-    List.fold_right
-      (fun gen new_genlist ->
-        match gen with
-        | GenSnippet snippet ->
-            gen :: new_genlist
-        | GenFunc cfunc ->
-            let rev_postorder = ref [] in
-            recursive_simplify visited rev_postorder cfunc;
-            list_map_append (fun cfunc -> GenFunc cfunc) !rev_postorder new_genlist)
-      !generation_list
-      []
+  List.fold_right
+    (fun gen new_genlist ->
+      match gen with
+      | GenSnippet snippet ->
+          gen :: new_genlist
+      | GenFunc cfunc ->
+          let rev_postorder = ref [] in
+          recursive_simplify visited rev_postorder cfunc;
+          list_map_append (fun cfunc -> GenFunc cfunc) !rev_postorder new_genlist)
+    gen_list
+    []
 
-let command_print_generation_list () =
+let command_resolve_dependencies () : unit =
+  generation_map :=
+    CString.Map.map codegen_resolve_dependencies !generation_map
+
+let command_print_generation_list gen_list =
   List.iter
     (fun gen ->
       match gen with
@@ -1960,4 +1963,17 @@ let command_print_generation_list () =
           msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string snippet))
       | GenFunc cfunc ->
           msg_info_hov (Pp.str "GenFunc" +++ Pp.str cfunc))
-    (List.rev_append !generation_list [])
+    (List.rev_append gen_list [])
+
+let command_print_generation_map () =
+  (match !current_header_filename with
+  | None -> msg_info_hov (Pp.str "current_header_filename = None")
+  | Some fn -> msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string fn)));
+  (match !current_implementation_filename with
+  | None -> msg_info_hov (Pp.str "current_implementation_filename = None")
+  | Some fn -> msg_info_hov (Pp.str "current_implementation_filename =" +++ Pp.str (escape_as_coq_string fn)));
+  CString.Map.iter
+    (fun filename gen_list ->
+      msg_info_hov (Pp.str filename);
+      command_print_generation_list gen_list)
+    !generation_map

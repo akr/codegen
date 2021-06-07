@@ -185,9 +185,10 @@ let codegen_test_template (ctx : test_ctxt)
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
+    "CodeGen Implementation File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile \"gen.c\".\n");
+    "CodeGen GenerateFile.\n");
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
     "#include <stdlib.h> /* for abort and malloc */\n" ^
@@ -216,9 +217,10 @@ let assert_coq_exit
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
+    "CodeGen Implementation File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile \"gen.c\".\n");
+    "CodeGen GenerateFile.\n");
   let foutput stream =
     let buf = Buffer.create 0 in
     Stream.iter (Buffer.add_char buf) stream;

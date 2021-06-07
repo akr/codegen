@@ -1,5 +1,5 @@
 static buffer
-codegen_p14_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
+codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
 {
   bool v5_b;
   bool v6_b;
@@ -159,6 +159,6 @@ add_mesg(nat v1_a, nat v2_b)
   v3_n = 0;
   v4_b = make_buffer(v3_n);
   v5_n = nat_add(v1_a, v2_b);
-  return codegen_p14_sprintf(v4_b, v1_a, v2_b, v5_n);
+  return codegen_p0_sprintf(v4_b, v1_a, v2_b, v5_n);
 }
 

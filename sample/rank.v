@@ -100,6 +100,8 @@ Definition rank_lookup aux i :=
   lookupD D1 j1 + lookupD D2 j2 +
   bcount b (j2 * sz2) j3 s.
 
+CodeGen Implementation File "sample/rank_generated.c".
+
 CodeGen Linear MDArr.
 
 CodeGen Inductive Type bool => "bool".
@@ -158,15 +160,15 @@ CodeGen Primitive ratio => "aux_ratio".
 CodeGen Primitive dir1 => "aux_dir1".
 CodeGen Primitive dir2 => "aux_dir2".
 
-CodeGen Function Nat.pred.
-CodeGen Function neq0.
-CodeGen Function buildDir2.
-CodeGen Function buildDir1.
-CodeGen Function buildDir.
-CodeGen Function rank_init.
-CodeGen Function rank_lookup.
+CodeGen Static Function Nat.pred.
+CodeGen Static Function neq0.
+CodeGen Static Function buildDir2.
+CodeGen Static Function buildDir1.
+CodeGen Static Function buildDir.
+CodeGen Static Function rank_init.
+CodeGen Static Function rank_lookup.
 
-CodeGen GenerateFile "sample/rank_generated.c".
+CodeGen GenerateFile.
 
 (* GenCFile checks them internaly
 CodeGen LinearCheck _pred _neq0.
