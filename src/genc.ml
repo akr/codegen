@@ -1790,15 +1790,20 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
 let gen_function (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub cfunc_name)
 
-let add_snippet (str : string) : unit =
+let fix_snippet (str : string) : string =
   let len = String.length str in
-  let str' =
-    if 0 < len && str.[len - 1] <> '\n' then
-      str ^ "\n"
-    else
-      str
-  in
+  if 0 < len && str.[len - 1] <> '\n' then
+    str ^ "\n"
+  else
+    str
+
+let add_snippet (str : string) : unit =
+  let str' = fix_snippet str in
   codegen_add_implementation_generation (GenSnippet str')
+
+let add_header_snippet (str : string) : unit =
+  let str' = fix_snippet str in
+  codegen_add_header_generation (GenSnippet str')
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
@@ -2311,6 +2316,9 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
 
 let command_snippet (str : string) : unit =
   add_snippet str
+
+let command_header_snippet (str : string) : unit =
+  add_header_snippet str
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
