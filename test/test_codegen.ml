@@ -174,7 +174,23 @@ let my_temp_dir (ctx : test_ctxt) : string =
   | Some _ -> make_temp_dir "codegen-test" ""
   | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
 
-let codegen_test_template (ctx : test_ctxt)
+type test_goal = UntilCoq | UntilCC | UntilExe
+
+let make_foutput regexp stream =
+  let buf = Buffer.create 0 in
+  Stream.iter (Buffer.add_char buf) stream;
+  let text = Buffer.contents buf in
+  try
+    ignore (Str.search_forward regexp text 0);
+    assert_bool "expected regexp found" true
+  with Not_found ->
+    assert_bool "expected regexp not found" false
+
+let codegen_test_template
+    ?(goal : test_goal = UntilExe)
+    ?(coq_exit_code : Unix.process_status option)
+    ?(coq_output_regexp : Str.regexp option)
+    (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
   let d = my_temp_dir ctx in
@@ -199,44 +215,29 @@ let codegen_test_template (ctx : test_ctxt)
     add_n_indent 2 (delete_indent c_body) ^ "\n" ^
     "  return EXIT_SUCCESS;\n" ^
     "}\n");
-  assert_command ~chdir:d ~ctxt:ctx coqc (List.append coq_opts [src_fn]);
-  assert_command ctx cc ["-o"; exe_fn; main_fn];
-  assert_command ctx exe_fn []
-
-let make_foutput regexp stream =
-  let buf = Buffer.create 0 in
-  Stream.iter (Buffer.add_char buf) stream;
-  let text = Buffer.contents buf in
-  try
-    ignore (Str.search_forward regexp text 0);
-    assert_bool "expected regexp found" true
-  with Not_found ->
-    assert_bool "expected regexp not found" false
+  let coq_foutput = Option.map make_foutput coq_output_regexp in
+  assert_command
+    ~chdir:d
+    ~ctxt:ctx
+    ?exit_code:coq_exit_code
+    ~use_stderr:true
+    ?foutput:coq_foutput
+    coqc (List.append coq_opts [src_fn]);
+  match goal with
+  | UntilCoq -> ()
+  | UntilCC ->
+      assert_command ctx cc ["-o"; exe_fn; main_fn];
+  | UntilExe ->
+      assert_command ctx cc ["-o"; exe_fn; main_fn];
+      assert_command ctx exe_fn []
 
 let assert_coq_exit
     ~(coq_exit_code : Unix.process_status)
     ~(coq_output_regexp : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
-  let d = my_temp_dir ctx in
-  let test_path = ounit_path ctx in
-  let src_fn = d ^ "/src.v" in
-  (*let gen_fn = d ^ "/gen.c" in*)
-  write_file src_fn
-    ("(* " ^ test_path ^ " *)\n" ^
-    "From codegen Require codegen.\n" ^
-    "CodeGen Implementation File \"gen.c\".\n" ^
-    "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
-    delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile.\n");
-  let foutput = Option.map make_foutput coq_output_regexp in
-  assert_command
-    ~chdir:d
-    ~exit_code:coq_exit_code
-    ~use_stderr:true
-    ?foutput:foutput
-    ~ctxt:ctx
-    coqc (List.append coq_opts [src_fn])
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code ?coq_output_regexp
+    ctx coq_commands ""
 
 let assert_coq_success
     ?(coq_output_regexp : Str.regexp option)
