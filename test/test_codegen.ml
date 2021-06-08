@@ -169,14 +169,15 @@ let make_temp_dir (prefix : string) (suffix : string) : string =
   in
   Unix.handle_unix_error f ()
 
+let my_temp_dir (ctx : test_ctxt) : string =
+  match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
+  | Some _ -> make_temp_dir "codegen-test" ""
+  | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
+
 let codegen_test_template (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
-  let d =
-    match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
-    | Some _ -> make_temp_dir "codegen-test" ""
-    | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
-  in
+  let d = my_temp_dir ctx in
   let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
   (*let gen_fn = d ^ "/gen.c" in*)
@@ -206,11 +207,7 @@ let assert_coq_exit
     ~(regexp_in_output : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
-  let d =
-    match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
-    | Some _ -> make_temp_dir "codegen-test" ""
-    | None -> bracket_tmpdir ~prefix:"codegen-test" ctx
-  in
+  let d = my_temp_dir ctx in
   let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
   (*let gen_fn = d ^ "/gen.c" in*)
