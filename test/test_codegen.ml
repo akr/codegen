@@ -203,9 +203,19 @@ let codegen_test_template (ctx : test_ctxt)
   assert_command ctx cc ["-o"; exe_fn; main_fn];
   assert_command ctx exe_fn []
 
+let make_foutput regexp stream =
+  let buf = Buffer.create 0 in
+  Stream.iter (Buffer.add_char buf) stream;
+  let text = Buffer.contents buf in
+  try
+    ignore (Str.search_forward regexp text 0);
+    assert_bool "expected regexp found" true
+  with Not_found ->
+    assert_bool "expected regexp not found" false
+
 let assert_coq_exit
-    ~(exit_code : Unix.process_status)
-    ~(regexp_in_output : Str.regexp option)
+    ~(coq_exit_code : Unix.process_status)
+    ~(coq_output_regexp : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
   let d = my_temp_dir ctx in
@@ -219,44 +229,32 @@ let assert_coq_exit
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
     "CodeGen GenerateFile.\n");
-  let foutput stream =
-    let buf = Buffer.create 0 in
-    Stream.iter (Buffer.add_char buf) stream;
-    let text = Buffer.contents buf in
-    match regexp_in_output with
-    | None -> ()
-    | Some expected ->
-        try
-          ignore (Str.search_forward expected text 0);
-          assert_bool "expected regexp found" true
-        with Not_found ->
-          assert_bool "expected regexp not found" false
-  in
+  let foutput = Option.map make_foutput coq_output_regexp in
   assert_command
     ~chdir:d
-    ~exit_code:exit_code
+    ~exit_code:coq_exit_code
     ~use_stderr:true
-    ~foutput:foutput
+    ?foutput:foutput
     ~ctxt:ctx
     coqc (List.append coq_opts [src_fn])
 
 let assert_coq_success
-    ?(regexp_in_output : Str.regexp option)
+    ?(coq_output_regexp : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
   assert_coq_exit
-    ~exit_code:(Unix.WEXITED 0)
-    ~regexp_in_output:regexp_in_output
+    ~coq_exit_code:(Unix.WEXITED 0)
+    ~coq_output_regexp:coq_output_regexp
     ctx
     coq_commands
 
 let assert_coq_failure
-    ?(regexp_in_output : Str.regexp option)
+    ?(coq_output_regexp : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
   assert_coq_exit
-    ~exit_code:(Unix.WEXITED 1)
-    ~regexp_in_output:regexp_in_output
+    ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:coq_output_regexp
     ctx
     coq_commands
 
