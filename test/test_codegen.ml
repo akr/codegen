@@ -192,11 +192,12 @@ let codegen_test_template (ctx : test_ctxt)
     "CodeGen GenerateFile.\n");
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
-    "#include <stdlib.h> /* for abort and malloc */\n" ^
+    "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
     "#include <assert.h>\n" ^
     "#include \"gen.c\"\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     add_n_indent 2 (delete_indent c_body) ^ "\n" ^
+    "  return EXIT_SUCCESS;\n" ^
     "}\n");
   assert_command ~chdir:d ~ctxt:ctx coqc (List.append coq_opts [src_fn]);
   assert_command ctx cc ["-o"; exe_fn; main_fn];
