@@ -160,14 +160,25 @@ CodeGen Primitive ratio => "aux_ratio".
 CodeGen Primitive dir1 => "aux_dir1".
 CodeGen Primitive dir2 => "aux_dir2".
 
+CodeGen Primitive bsize.
+CodeGen Primitive freezeD.
+CodeGen Primitive emptyD.
+CodeGen Primitive pushD.
+CodeGen Primitive lookupD.
+
+(*
 CodeGen Static Function Nat.pred.
 CodeGen Static Function neq0.
 CodeGen Static Function buildDir2.
 CodeGen Static Function buildDir1.
 CodeGen Static Function buildDir.
+*)
+
 CodeGen Static Function rank_init.
 CodeGen Static Function rank_lookup.
 
+CodeGen Resolve Dependencies.
+(*Print CodeGen Generation List.*)
 CodeGen GenerateFile.
 
 (* GenCFile checks them internaly

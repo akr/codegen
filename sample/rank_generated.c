@@ -1,28 +1,6 @@
-static nat
-pred(nat v1_n)
-{
-  nat v2_u;
-  switch (v1_n)
-  {
-    case 0:
-      return v1_n;
-    default:
-      v2_u = predn(v1_n);
-      return v2_u;
-  }
-}
-
-static nat
-neq0(nat v1_n)
-{
-  nat v2_n;
-  v2_n = pred(v1_n);
-  return succn(v2_n);
-}
-
 static pair_MDArr_nat
 buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
-          nat v7_m2)
+         nat v7_m2)
 {
   nat v8_cp;
   nat v9_m;
@@ -50,7 +28,7 @@ buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
 
 static pair_2MDArr_nat
 buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
-          nat v7_i, MDArr v8_D1, MDArr v9_D2, nat v10_m1)
+         nat v7_i, MDArr v8_D1, MDArr v9_D2, nat v10_m1)
 {
   pair_MDArr_MDArr v11_p;
   nat v12_cp;
@@ -132,6 +110,28 @@ buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
   v26_m = pushD(v18_D1, v17_m1);
   v27_m = pushD(v24_D2, v25_m2);
   return make_pair_MDArr_MDArr(v26_m, v27_m);
+}
+
+static nat
+pred(nat v1_n)
+{
+  nat v2_u;
+  switch (v1_n)
+  {
+    case 0:
+      return v1_n;
+    default:
+      v2_u = predn(v1_n);
+      return v2_u;
+  }
+}
+
+static nat
+neq0(nat v1_n)
+{
+  nat v2_n;
+  v2_n = pred(v1_n);
+  return succn(v2_n);
 }
 
 static Aux
