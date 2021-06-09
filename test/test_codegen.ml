@@ -2311,7 +2311,7 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
     |}
 
 let test_header_snippet (ctx : test_ctxt) : unit =
-  codegen_test_template ctx
+  codegen_test_template ~goal:UntilCC ctx
     {|
       CodeGen Header File "foo.h".
       CodeGen Header Snippet "static void foo(void) {}".
