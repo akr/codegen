@@ -1461,7 +1461,7 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
 
-let gen_prototype (static : bool) (return_type : string) (c_name : string)
+let gen_function_header (static : bool) (return_type : string) (c_name : string)
     (formal_arguments : (string * string) list) : Pp.t =
   let pp_return_type =
     (if static then Pp.str "static" else Pp.mt ()) +++
@@ -1507,7 +1507,7 @@ let gen_func_single (static : bool) (cfunc_name : string) (env : Environ.env) (s
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
-  gen_prototype static return_type cfunc_name c_fargs +++
+  gen_function_header static return_type cfunc_name c_fargs +++
   vbrace (
     pp_sjoinmap_list
       (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
@@ -1595,7 +1595,7 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
         Pp.str "return ret;"
       in
       v 0 (
-        gen_prototype static return_type c_name formal_arguments +++
+        gen_function_header static return_type c_name formal_arguments +++
         vbrace (
           hov 0 (pp_vardecl_args) +++
           hov 0 (pp_vardecl_ret) +++
