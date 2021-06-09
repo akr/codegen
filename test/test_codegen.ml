@@ -2320,6 +2320,21 @@ let test_header_snippet (ctx : test_ctxt) : unit =
       foo();
     |}
 
+let test_prototype (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCC ctx
+    (* If the prototype for id_bool is not generated, id_bool is implicitly declared as int id_bool() in f.
+       It conflicts with the actual definition: bool id_bool(bool v1_x).
+       The conflicts causes an error in C compilation.
+       So, this test examines that the prototype declaration exists. *)
+    (bool_src ^
+    {|
+      CodeGen Header File "foo.h".
+      CodeGen Snippet "#include ""foo.h""".
+      CodeGen Snippet "void f(void) { id_bool(true); }".
+      CodeGen Function id bool => "id_bool".
+    |}) {|
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2413,6 +2428,7 @@ let suite : OUnit2.test =
     "test_indimp_nat" >:: test_indimp_nat;
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_header_snippet" >:: test_header_snippet;
+    "test_prototype" >:: test_prototype;
   ]
 
 let () =

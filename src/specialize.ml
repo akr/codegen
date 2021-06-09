@@ -466,6 +466,7 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunction func user_args names in
+  codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_static_function
@@ -473,6 +474,7 @@ let command_static_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunction func user_args names in
+  codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
@@ -1944,6 +1946,8 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
       match gen with
       | GenSnippet snippet ->
           gen :: new_genlist
+      | GenPrototype cfunc ->
+          gen :: new_genlist
       | GenFunc cfunc ->
           let rev_postorder = ref [] in
           recursive_simplify visited rev_postorder cfunc;
@@ -1961,6 +1965,8 @@ let command_print_generation_list gen_list =
       match gen with
       | GenSnippet snippet ->
           msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string snippet))
+      | GenPrototype cfunc ->
+          msg_info_hov (Pp.str "GenPrototype" +++ Pp.str cfunc)
       | GenFunc cfunc ->
           msg_info_hov (Pp.str "GenFunc" +++ Pp.str cfunc))
     (List.rev_append gen_list [])

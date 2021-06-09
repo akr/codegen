@@ -1777,6 +1777,14 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
 let gen_function (cfunc_name : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub cfunc_name)
 
+let gen_prototype (cfunc_name : string) : Pp.t =
+  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
+  let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
+  gen_function_header static return_type cfunc_name formal_arguments ++ Pp.str ";"
+
 let fix_snippet (str : string) : string =
   let len = String.length str in
   if 0 < len && str.[len - 1] <> '\n' then
@@ -2274,6 +2282,8 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
       match gen with
       | GenFunc cfunc_name ->
           f (gen_function cfunc_name ++ Pp.fnl ())
+      | GenPrototype cfunc_name ->
+          f (gen_prototype cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
           f (Pp.str str ++ Pp.fnl ()))
     gen_list
@@ -2343,5 +2353,5 @@ let command_generate_file () : unit =
 
 let command_generate_test () : unit =
   List.iter
-    (fun (fn, gen_list) -> gen_test (List.rev gen_list))
+    (fun (fn, gen_list) -> Feedback.msg_info (Pp.str fn); gen_test (List.rev gen_list))
     (CString.Map.bindings !generation_map)
