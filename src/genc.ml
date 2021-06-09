@@ -143,19 +143,6 @@ let str_of_name (name : Name.t) : string =
 let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
   str_of_name (Context.binder_name name)
 
-let gen_farg (farg : (*varname*)string * (*vartype*)string) : Pp.t =
-  let (var, ty) = farg in
-  hov 2 (str ty +++ str var)
-
-let gen_fargs (fargs : (string * string) list) : Pp.t =
-  match fargs with
-  | [] -> str "void"
-  | farg1 :: rest ->
-      List.fold_left
-        (fun pp farg -> pp ++ str "," +++ gen_farg farg)
-        (gen_farg farg1)
-        rest
-
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ str "=" +++ rhs ++ str ";")
 
@@ -1520,11 +1507,7 @@ let gen_func_single (static : bool) (cfunc_name : string) (env : Environ.env) (s
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
-  hov 0 ((if static then str "static" else mt ()) +++
-        str return_type) +++
-  str cfunc_name ++ str "(" ++
-  hov 0 (gen_fargs c_fargs) ++
-  str ")" +++
+  pr_prototype static cfunc_name c_fargs return_type +++
   vbrace (
     pp_sjoinmap_list
       (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
