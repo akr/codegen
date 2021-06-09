@@ -1474,6 +1474,24 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
 
+let pr_prototype (static : bool) (c_name : string)
+    (formal_arguments : (string * string) list) (return_type : string) : Pp.t =
+  let pp_return_type =
+    (if static then Pp.str "static" else Pp.mt ()) +++
+    Pp.str return_type
+  in
+  let pp_parameters =
+    Pp.str "(" ++
+    (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+      (fun (c_arg, t) ->
+        hov 0 (Pp.str t +++ Pp.str c_arg))
+      formal_arguments) ++
+    Pp.str ")"
+  in
+  hov 0 pp_return_type +++
+  Pp.str c_name ++
+  hov 0 (pp_parameters)
+
 let gen_func_single (static : bool) (cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
   (whole_body : EConstr.t) (return_type : string)
   (fixinfo : fixinfo_t) (used : Id.Set.t) : Pp.t =
@@ -1569,18 +1587,6 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
   in
   let pp_entry_functions =
     let pr_entry_function c_name func_index formal_arguments return_type =
-      let pp_return_type =
-        (if static then Pp.str "static" else Pp.mt ()) +++
-        Pp.str return_type
-      in
-      let pp_parameters =
-        Pp.str "(" ++
-        (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-          (fun (c_arg, t) ->
-            hov 0 (Pp.str t +++ Pp.str c_arg))
-          formal_arguments) ++
-        Pp.str ")"
-      in
       let pp_vardecl_args =
         Pp.str ("struct codegen_args_" ^ c_name) +++
         Pp.str "args" +++
@@ -1606,9 +1612,7 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
         Pp.str "return ret;"
       in
       v 0 (
-        hov 0 pp_return_type +++
-        Pp.str c_name ++
-        hov 0 (pp_parameters) +++
+        pr_prototype static c_name formal_arguments return_type +++
         vbrace (
           hov 0 (pp_vardecl_args) +++
           hov 0 (pp_vardecl_ret) +++
