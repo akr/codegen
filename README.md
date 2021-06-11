@@ -38,6 +38,7 @@ rank algorithm of succinct data structure:
     coqc -Q theories codegen -I src sample/rank.v # generates sample/rank_generated.c
     gcc -g -Wall sample/rank.c -o sample/rank
     sample/rank rand
+    sample/rank 11011110001010101111
 
 sprintf function:
 

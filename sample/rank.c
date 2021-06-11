@@ -189,14 +189,33 @@ typedef struct {
   nat blksz2;
   DArr dir1;
   DArr dir2;
-} Aux;
-#define mkAux(b, s, k, sz2, D1, D2) ((Aux){ (b), (s), (k), (sz2), (D1), (D2) })
-#define aux_query_bit(aux) ((aux).query_bit)
-#define aux_input_bits(aux) ((aux).input_bits)
-#define aux_blksz2(aux) ((aux).blksz2)
-#define aux_ratio(aux) ((aux).ratio)
-#define aux_dir1(aux) ((aux).dir1)
-#define aux_dir2(aux) ((aux).dir2)
+} *Aux;
+
+static Aux mkAux(
+  bool query_bit,
+  bits input_bits,
+  nat ratio,
+  nat blksz2,
+  DArr dir1,
+  DArr dir2)
+{
+  Aux aux;
+  aux = malloc(sizeof(*aux));
+  aux->query_bit = query_bit;
+  aux->input_bits = input_bits;
+  aux->ratio = ratio;
+  aux->blksz2 = blksz2;
+  aux->dir1 = dir1;
+  aux->dir2 = dir2;
+  return aux;
+}
+
+#define aux_query_bit(aux) ((aux)->query_bit)
+#define aux_input_bits(aux) ((aux)->input_bits)
+#define aux_blksz2(aux) ((aux)->blksz2)
+#define aux_ratio(aux) ((aux)->ratio)
+#define aux_dir1(aux) ((aux)->dir1)
+#define aux_dir2(aux) ((aux)->dir2)
 
 #include "rank_generated.c"
 
