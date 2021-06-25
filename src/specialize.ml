@@ -474,7 +474,6 @@ let command_static_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunction func user_args names in
-  codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
