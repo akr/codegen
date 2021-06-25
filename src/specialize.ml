@@ -1651,15 +1651,28 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      if p = 0 && q = 0 then (* closure creation found *)
+      (* p = 0, q = 0, r = 0 is not possible because Lambda is a function *)
+      if p = 0 && q = 0 then
+        (* p = 0, q = 0, r > 0
+           closure creation found. *)
         let lazy r = r in
         mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1))
-      else if p > 0 then
+      else if p > 0 && (Lazy.force r) = 0 then
+        (* p > 0, q = 0, r = 0
+           p > 0, q > 0, r = 0
+           apply beta-var reduction.
+           r = 0 because beta-var needs that the result type is inductive type. *)
         let term' = Vars.subst1 (mkRel vs.(0)) e in (* reduction/expansion: beta *)
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
-      else (* p = 0 and q > 0 *)
-        mkLambda (x, t, complete_args_exp env2 sigma e [||] (q-1))
+      else
+        (* p = 0, q > 0, r = 0
+           p = 0, q > 0, r > 0
+           p > 0, q = 0, r > 0
+           p > 0, q > 0, r > 0 *)
+        mkApp (
+          mkLambda (x, t, complete_args_exp env2 sigma e [||] (p+q-1)),
+          Array.map (fun j -> mkRel j) vs)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
