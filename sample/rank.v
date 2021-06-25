@@ -100,7 +100,8 @@ Definition rank_lookup aux i :=
   lookupD D1 j1 + lookupD D2 j2 +
   bcount b (j2 * sz2) j3 s.
 
-CodeGen Implementation File "sample/rank_generated.c".
+CodeGen Header File "sample/rank_generated.h".
+CodeGen Source File "sample/rank_generated.c".
 
 CodeGen Linear MDArr.
 

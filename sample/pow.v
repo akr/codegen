@@ -29,7 +29,7 @@ CodeGen Inductive Match bool => ""
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen Implementation File "sample/pow_generated.c".
+CodeGen Source File "sample/pow_generated.c".
 
 CodeGen Snippet "
 #include <stdbool.h> /* for bool, true and false */

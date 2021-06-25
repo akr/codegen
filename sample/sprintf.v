@@ -78,7 +78,7 @@ Compute sprintf (mkbuf 0) "bool:%b nat:%d" true 42 : buffer.
 
 Require Import codegen.codegen.
 
-CodeGen Implementation File "sample/sprintf_generated.c".
+CodeGen Source File "sample/sprintf_generated.c".
 
 CodeGen Inductive Type bool => "bool".
 CodeGen Inductive Match bool => ""

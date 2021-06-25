@@ -202,7 +202,7 @@ let codegen_test_template
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
-    "CodeGen Implementation File \"gen.c\".\n" ^
+    "CodeGen Source File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
     "CodeGen GenerateFile.\n");
