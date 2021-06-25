@@ -217,7 +217,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
     | [ "CodeGen" "Header" "File" string_or_none(fnopt) ] -> { current_header_filename := fnopt }
-    | [ "CodeGen" "Source" "File" string_or_none(fnopt) ] -> { current_implementation_filename := fnopt }
+    | [ "CodeGen" "Source" "File" string_or_none(fnopt) ] -> { current_source_filename := fnopt }
 
     | [ "CodeGen" "GenerateFile" ] -> { command_generate_file () }
     | [ "CodeGen" "GenerateTest" ] -> { command_generate_test () }

@@ -181,7 +181,7 @@ type string_or_none = string option
 let current_header_filename = Summary.ref ~name:"CodegenCurrentHeaderFilename"
   (None : string option)
 
-let current_implementation_filename = Summary.ref ~name:"CodegenCurrentImplementationFilename"
+let current_source_filename = Summary.ref ~name:"CodegenCurrentImplementationFilename"
   (None : string option)
 
 type code_generation =
@@ -205,8 +205,8 @@ let codegen_add_generation filename (generation : code_generation) : unit =
       | Some rest -> Some (generation :: rest))
     !generation_map
 
-let codegen_add_implementation_generation (generation : code_generation) : unit =
-  match !current_implementation_filename with
+let codegen_add_source_generation (generation : code_generation) : unit =
+  match !current_source_filename with
   | None -> ()
   | Some filename ->
       codegen_add_generation filename generation

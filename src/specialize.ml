@@ -467,14 +467,14 @@ let command_function
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunction func user_args names in
   codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
-  codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_static_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunction func user_args names in
-  codegen_add_implementation_generation (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
     (func : Libnames.qualid)
@@ -1987,9 +1987,9 @@ let command_print_generation_map () =
   (match !current_header_filename with
   | None -> msg_info_hov (Pp.str "current_header_filename = None")
   | Some fn -> msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string fn)));
-  (match !current_implementation_filename with
-  | None -> msg_info_hov (Pp.str "current_implementation_filename = None")
-  | Some fn -> msg_info_hov (Pp.str "current_implementation_filename =" +++ Pp.str (escape_as_coq_string fn)));
+  (match !current_source_filename with
+  | None -> msg_info_hov (Pp.str "current_source_filename = None")
+  | Some fn -> msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string fn)));
   CString.Map.iter
     (fun filename gen_list ->
       msg_info_hov (Pp.str filename);

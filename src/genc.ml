@@ -1794,7 +1794,7 @@ let fix_snippet (str : string) : string =
 
 let add_snippet (str : string) : unit =
   let str' = fix_snippet str in
-  codegen_add_implementation_generation (GenSnippet str')
+  codegen_add_source_generation (GenSnippet str')
 
 let add_header_snippet (str : string) : unit =
   let str' = fix_snippet str in
