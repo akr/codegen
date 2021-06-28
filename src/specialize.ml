@@ -1049,8 +1049,9 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
       reduce_app env sigma f_f (Array.append f_args_nf args_nf)
   | LetIn (x,e,t,b) ->
       (* reduction: zeta-app *)
-      let args_nf_lifted = Array.map (Vars.lift 1) args_nf in
-      let term2 = mkLetIn (x,e,t, mkApp (b, args_nf_lifted)) in
+      let (defs, body) = decompose_lets sigma f in
+      let args_nf_lifted = Array.map (Vars.lift (List.length defs)) args_nf in
+      let term2 = compose_lets defs (mkApp (body, args_nf_lifted)) in
       debug_reduction "zeta-app" (fun () ->
         Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
         Pp.str "->" ++ Pp.fnl () ++
