@@ -231,23 +231,14 @@ let codegen_test_template
       assert_command ctx cc ["-o"; exe_fn; main_fn];
       assert_command ctx exe_fn []
 
-let assert_coq_exit
-    ~(coq_exit_code : Unix.process_status)
-    ~(coq_output_regexp : Str.regexp option)
-    (ctx : test_ctxt)
-    (coq_commands : string) : unit =
-  codegen_test_template ~goal:UntilCoq ~coq_exit_code ?coq_output_regexp
-    ctx coq_commands ""
-
-let assert_coq_success
+let template_coq_success
     ?(coq_output_regexp : Str.regexp option)
     (ctx : test_ctxt)
     (coq_commands : string) : unit =
-  assert_coq_exit
+  codegen_test_template ~goal:UntilCoq
     ~coq_exit_code:(Unix.WEXITED 0)
-    ~coq_output_regexp:coq_output_regexp
-    ctx
-    coq_commands
+    ?coq_output_regexp
+    ctx coq_commands ""
 
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
@@ -1079,7 +1070,7 @@ let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
     |}
 
 let test_let_unused_is_not_specialized (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     {|
       Definition f a b := let unused := Nat.pow 3 3 in Nat.add a b.
       CodeGen Gen f.
@@ -1087,7 +1078,7 @@ let test_let_unused_is_not_specialized (ctx : test_ctxt) : unit =
     |}
 
 let test_let_only_used_in_static_is_not_specialized (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     {|
       Definition f a :=
         let only_used_in_static := Nat.mul 2 3 in
@@ -1115,7 +1106,7 @@ let test_add_tailrec (ctx : test_ctxt) : unit =
     |}
 
 let test_add_nontailrec (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     (nat_src ^
     {|
       Fixpoint add (a b : nat) : nat :=
@@ -1447,7 +1438,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
     |}
 
 let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     (nat_src ^
     {|
       Definition add1 := Nat.add 1.
@@ -1459,7 +1450,7 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
     |})
 
 let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     (bool_src ^
     {|
       CodeGen Inductive Type bool*bool => "pair_bool_bool".
@@ -1473,7 +1464,7 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
     |})
 
 let test_command_gen_qualid (ctx : test_ctxt) : unit =
-  assert_coq_success ctx
+  template_coq_success ctx
     (bool_src ^
     {|
       Definition id_bool (x : bool) : bool := x.
