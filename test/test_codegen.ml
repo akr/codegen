@@ -249,16 +249,6 @@ let assert_coq_success
     ctx
     coq_commands
 
-let assert_coq_failure
-    ?(coq_output_regexp : Str.regexp option)
-    (ctx : test_ctxt)
-    (coq_commands : string) : unit =
-  assert_coq_exit
-    ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:coq_output_regexp
-    ctx
-    coq_commands
-
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
       CodeGen Inductive Match bool => ""
