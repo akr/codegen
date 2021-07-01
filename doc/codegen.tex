@@ -505,7 +505,10 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     \F{t~x_1\dots x_p}                                                                                 & (t = c \vee t = C) \wedge r > 0 \\
     \F{t}                                                                                              & t = \lam{x}{u} \wedge p = q = 0 \\
     \E{\subst{u}{x}{x_1}}{x_2\dots x_p}{q}                                                             & t = \lam{x}{u} \wedge p > 0 \wedge r = 0 \quad \text{(beta-var)} \\
-    \lam{x}{\E{u}{}{p+q-1}}                                                                           & t = \lam{x}{u} \wedge ((p = 0 \wedge q > 0) \vee r > 0) \\
+    (\lam{x}{\E{u}{}{p+q-1}})~x_1\dots x_p                                                             & t = \lam{x}{u} \wedge (\begin{aligned}[t]
+                                                                                                                                & (p = 0 \wedge q > 0) \mathop{\vee} \\
+                                                                                                                                & (p > 0 \wedge r > 0))
+                                                                                                                                \end{aligned} \\
     \E{u}{x_0~x_1\dots x_p}{q}                                                                & t = u~x_0 \\
     \letin{x}{\E{t_1}{}{0}}{\E{t_2}{x_1\dots x_p}{q}}                                                            & t = \letin{x}{t_1}{t_2} \quad \text{(zeta-app)} \\
     \match{x}{C_i}{\BR{t_i}{\NM_{C_i}}{p+q}}{i=1\dots h}~x_1\dots x_p                                   & t = \match{x}{C_i}{t_i}{i=1\dots h} \\
