@@ -166,6 +166,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \DeclareMathOperator{\RNTop}{RNT}
 \newcommand{\RNT}[2]{\RNTop\BRA{#1}_{#2}}
 
+\newcommand{\ldq}{\text{``}}
+\newcommand{\rdq}{\text{''}}
 \newcommand{\dq}[1]{\text{``}#1\text{''}}
 \newcommand{\ttlparen}{\texttt{(}}
 \newcommand{\ttrparen}{\texttt{)}}
@@ -210,6 +212,9 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \DeclareMathOperator{\Bop}{B}
 \newcommand{\A}[3]{\Aop_{#1}\BRA{#2\,/\,#3}}
 \newcommand{\B}[3]{\Bop_{#1}\BRA{#2\,/\,#3}}
+
+\newcommand{\AbreakEq}[3]{\Aop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & /\, #3 \rrbracket = \end{aligned}}
+\newcommand{\BbreakEq}[3]{\Bop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & /\, #3 \rrbracket = \end{aligned}}
 
 \DeclareMathOperator{\Fop}{F}
 \newcommand{\F}[1]{\Fop\BRA{#1}}
@@ -276,9 +281,9 @@ keywordstyle=[3]\color{myred}\ttfamily,
 % based on sphinx/language/core/conversion.rst and doc/sphinx/language/core/inductive.rst
 \begin{gather*}
   \text{beta:}~
-    E[\Gamma] \vdash ((\lam{x}{t})~u)~\triangleright~\subst{t}{x}{u} \qquad
+    E[\Gamma] \vdash ((\lam{x}{t})~u)~\triangleright~\subst{t}{x}{u} \\
   \text{delta-local:}~
-    \dfrac{(x:=t) \in \Gamma}{E[\Gamma] \vdash x~\triangleright~t} \qquad
+    \dfrac{(x:=t) \in \Gamma}{E[\Gamma] \vdash x~\triangleright~t} \\
   \text{delta-global:}~
     \dfrac{(c:=t) \in E}{E[\Gamma] \vdash c~\triangleright~t} \\
   \text{zeta:}~
@@ -298,10 +303,13 @@ keywordstyle=[3]\color{myred}\ttfamily,
     \dfrac{
       u_{k_j} = C~u'_1\ldots u'_m
     }{
-      E[\Gamma] \vdash
-      (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~u_1 \dots u_{k_j}
-      ~\triangleright~
-      \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} ~u_1 \dots u_{k_j}} \\
+      \begin{aligned}
+        E[\Gamma] \vdash
+        & ~(\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~u_1 \dots u_{k_j} \\
+        & ~\triangleright~
+        \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} ~u_1 \dots u_{k_j}
+      \end{aligned}
+    } \\
   \text{eta expansion:}~
     \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t~\triangleright~\lamT{x}{T}{(t~x)}}
 \end{gather*}
@@ -376,10 +384,12 @@ keywordstyle=[3]\color{myred}\ttfamily,
       \text{$t_0$ is not a variable} \quad
       \text{$x_0$ is a fresh variable}
     }{
+      \begin{aligned}
       E[\Gamma] \vdash
-      \match{t_0}{C_i}{t_i}{i=1\dots h}
-      ~\triangleright~
-      \letin{x_0}{t_0:T_0}{\match{x_0}{C_i}{t_i}{i=1\dots h}}
+      & ~\match{t_0}{C_i}{t_i}{i=1\dots h} \\
+      & ~\triangleright~
+        \letin{x_0}{t_0:T_0}{\match{x_0}{C_i}{t_i}{i=1\dots h}}
+        \end{aligned}
     }
 \end{gather*}
 
@@ -448,9 +458,8 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     }{
       \begin{aligned}
         E[\Gamma] &\vdash (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n ~\triangleright~ \\
-                  &\quad \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}}
-                         ~\dots~
-                         \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
+                  &\quad \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
+                  &\quad \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
                   &\quad \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
       \end{aligned}
     } \\
@@ -672,21 +681,29 @@ The result expression is passed to $K$. \\
 $K(e) = \dq{v = e\ttsemi}$ in simple situations.
 \begin{align*}
   &\A{K}{x}{} = K(\dq{x}) \\
-  &\A{K}{x}{x_1\dots x_n} = \dq{\passign(\fvarsd{x}, x_1 \dots x_n)~\kwgoto~\mathtt{entry\_}x\ttsemi}   && n > 0 \wedge \text{$x$ is bounded by a fixpoint} \wedge x \in \tr \\
-  &\A{K}{x}{x_1\dots x_n} = K(\dq{x\ttparen{y_1,\dots,y_o,x_1,\dots, x_n}})                             && n > 0 \wedge \text{$x$ is bounded by a fixpoint} \wedge x \not\in \tr \\
+  &\A{K}{x}{x_1\dots x_n} =
+      \begin{aligned}[t] \ldq & \passign(\fvarsd{x}, x_1 \dots x_n) \\ & \kwgoto~\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
+    && \begin{aligned}[t] & n > 0 \wedge \text{$x$ is bounded by a fixpoint} \mathop{\wedge} \\ & x \in \tr \end{aligned} \\
+  &\A{K}{x}{x_1\dots x_n} = K(\dq{x\ttparen{y_1,\dots,y_o,x_1,\dots, x_n}})
+    && \begin{aligned}[t] & n > 0 \wedge \text{$x$ is bounded by a fixpoint} \mathop{\wedge} \\ & x \not\in \tr \end{aligned} \\
   &\A{K}{c}{x_1\dots x_n} = K(\dq{c\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\A{K}{C}{x_1\dots x_n} = K(\dq{C\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\A{K}{t~x_0}{x_1\dots x_n} = \A{K}{t}{x_0~x_1\dots x_n} \\
-  &\A{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} = \dq{\A{K'}{t_1}{}~\A{K}{t_2}{x_1\dots x_n}}  && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
+  &\A{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} =
+      \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \A{K}{t_2}{x_1\dots x_n} \rdq \end{aligned}
+    && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
   &\A{K}{\lam{x}{t}}{x_1~x_2\dots x_n} = \A{K}{t}{x_2\dots x_n}                                  && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
-  &\A{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} =  && \text{where}\quad x : T \\
+  &\AbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \text{``} & \kwswitch~\ttparen{\mathit{swfunc}_T\ttparen{x}}~\ttlbrace \\
                  & \dots \\
-                 & \mathit{caselabel}_{C_i}\ttcolon \\
-                 & \quad y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi~ y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
-                 & \quad \A{K}{t_i}{x_1\dots x_n} \\
-                 & \quad \kwbreak\ttsemi \\
+                 & \mathit{caselabel}_{C_i}\ttcolon\quad
+                   \begin{aligned}[t]
+                   & y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi \\
+                   & y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                   & {\A{K}{t_i}{x_1\dots x_n}} \\
+                   & \kwbreak\ttsemi
+                   \end{aligned} \\
                  & \dots \\
                  & \ttrbrace\text{''}
        \end{alignedat} \\
@@ -736,21 +753,25 @@ The result expression is passed to $K$. \\
 $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
 \begin{align*}
   &\B{K}{x}{} = K(\dq{x}) \\
-  &\B{K}{x}{x_1\dots x_n} = \dq{\passign(\fvarsd{x}, x_1\dots x_n)~\kwgoto~\mathtt{entry\_}x\ttsemi}   && n > 0 \wedge \text{$x$ is bounded by a fixpoint} \\
+  &\B{K}{x}{x_1\dots x_n} = \begin{aligned}[t] \ldq & \passign(\fvarsd{x}, x_1\dots x_n) \\ & \kwgoto~\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
+    && n > 0 \wedge \text{$x$ is bounded by a fixpoint} \\
   &\B{K}{c}{x_1\dots x_n} = K(\dq{c\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\B{K}{C}{x_1\dots x_n} = K(\dq{C\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\B{K}{t~x_0}{x_1\dots x_n} = \B{K}{t}{x_0~x_1\dots x_n} \\
-  &\B{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} = \dq{\A{K'}{t_1}{}~\B{K}{t_2}{x_1\dots x_n}}  && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
+  &\B{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} =
+      \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \B{K}{t_2}{x_1\dots x_n} \rdq \end{aligned}
+    && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
   &\B{K}{\lam{x}{t}}{x_1~x_2\dots x_n} = \B{K}{t}{x_2\dots x_n}                                 && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
-  &\B{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} = && \text{where}\quad x : T \\
+  &\BbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \text{``} & \kwswitch~\ttparen{\mathit{swfunc}_T\ttparen{x}}~\ttlbrace \\
                  & \dots \\
                  & \mathit{caselabel}_{C_i}\ttcolon\quad
-                   \begin{minipage}[t]{1cm}
-                     $y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi~ y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi$ \\
-                     $\quad \B{K}{t_i}{x_1\dots x_n}$
-                   \end{minipage} \\
+                   \begin{aligned}[t]
+                     & y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi \\
+                     & y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                     & {\B{K}{t_i}{x_1\dots x_n}}
+                   \end{aligned} \\
                  & \dots \\
                  & \ttrbrace\text{''}
      \end{alignedat} \\
@@ -790,7 +811,10 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
     \genbodyan{u}                            & t = \lam{x}{u} \\
     \dq{\mathtt{entry\_}f_i\ttcolon~\genbodyan{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
     \quad \text{for}~i=1,\dots, h \\
-    \B{K}{t}{}                            & \text{otherwise} \quad \text{where}~t:T \quad K(e) = \dq{\texttt{*($T$*)ret = $e$; \kwCreturn;}}
+    \B{K}{t}{}                            & \begin{aligned}[t]
+                                            & \text{otherwise} \\
+                                            & \text{where}~t:T \quad K(e) = \dq{\texttt{*($T$*)ret = $e$; \kwCreturn;}}
+                                            \end{aligned}
   \end{cases}
 \]
 \[
@@ -832,7 +856,11 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
         & t = \letin{x}{t_1}{t_2} \\
         & \text{where}\quad (R_1,N_1,T_1) = \RNT{t_1}{0} \quad (R_2,N_2,T_2) = \RNT{t_2}{n}
       \end{aligned} \\
-    \bigl(\bigcup_{i=1}^h R_i, \bigcup_{i=1}^h N_i, \bigcup_{i=1}^h T_i \bigr)         & t = \match{x}{C_i}{t_i}{i=1\dots h} \quad\text{where}~(R_i, N_i, T_i) = \RNT{t_i}{\NM_{C_i}+n} \\
+    \bigl(\bigcup_{i=1}^h R_i, \bigcup_{i=1}^h N_i, \bigcup_{i=1}^h T_i \bigr)         &
+      \begin{aligned}[t]
+        & t = \match{x}{C_i}{t_i}{i=1\dots h} \\
+        & \text{where}~(R_i, N_i, T_i) = \RNT{t_i}{\NM_{C_i}+n}
+      \end{aligned} \\
     (R, N-\{x\}, T - \{x\})                                           & t = \lam{x}{u} \wedge n > 0 \quad \text{where}\quad  (R, N, T) = \RNT{u}{n-1} \\
     (R, (N \cup T) - \{x\}, \varnothing)                             & t = \lam{x}{u} \wedge n = 0 \quad \text{where}\quad  (R, N, T) = \RNT{u}{\NA_u} \quad \text{(closure)} \\
     \begin{aligned}[t]
