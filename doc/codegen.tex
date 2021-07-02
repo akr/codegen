@@ -109,16 +109,16 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\kwfor}{\mbox{\color{mygreen}\ttfamily for}}
 
 \newcommand{\lam}[2]{\lambda #1.~#2}
-\newcommand{\lamT}[3]{\lambda #1\!:\!#2.~#3}
+\newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.~#3}
 \newcommand{\lamB}[1]{\lambda #1.~}
-\newcommand{\lamTB}[2]{\lambda #1\!:\!#2.~}
+\newcommand{\lamTB}[2]{\lambda #1\mathord{:}#2.~}
 
-\newcommand{\gassum}[2]{(#1\!:\!#2)}
-\newcommand{\glodef}[3]{(#1:=#2\!:\!#3)}
-\newcommand{\lassum}[2]{(#1\!:\!#2)}
-\newcommand{\ldef}[3]{(#1:=#2\!:\!#3)}
+\newcommand{\gassum}[2]{(#1\mathord{:}#2)}
+\newcommand{\glodef}[3]{(#1:=#2\mathord{:}#3)}
+\newcommand{\lassum}[2]{(#1\mathord{:}#2)}
+\newcommand{\ldef}[3]{(#1:=#2\mathord{:}#3)}
 
-\newcommand{\prodT}[3]{\forall #1\!:\!#2.~#3}
+\newcommand{\prodT}[3]{\forall #1\mathord{:}#2.~#3}
 
 \newcommand{\letin}[3]{\kwlet~#1:=#2~\kwin~#3}
 \newcommand{\letinB}[2]{\kwlet~#1:=#2~\kwin}
