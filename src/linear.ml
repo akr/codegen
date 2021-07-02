@@ -339,12 +339,9 @@ and check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br =
     | _ ->
         user_err (str "[codegen] unexpected non-Lambda in a case branch")) (* should eta-expansion? *)
 
-let linear_type_check_term term =
+let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
   if !type_linearity_list <> [] then
-    (let env = Global.env () in
-    let sigma = Evd.from_env env in
-    let eterm = EConstr.of_constr term in
-    check_linear_valexp env sigma [] 0 eterm)
+    check_linear_valexp env sigma [] 0 term
 
 let linear_type_check_single libref =
   let gref = Smartlocate.global_with_alias libref in

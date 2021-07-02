@@ -1759,8 +1759,8 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  linear_type_check_term whole_body;
   let whole_body = EConstr.of_constr whole_body in
+  linear_type_check_term env sigma whole_body;
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
