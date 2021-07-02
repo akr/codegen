@@ -457,10 +457,13 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
       \end{gathered}
     }{
       \begin{aligned}
-        E[\Gamma] \vdash\; & (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n ~\triangleright \\
-                           & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
-                           & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
-                           & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
+        E[\Gamma] \vdash\; & (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n \\
+                           & {\triangleright~
+                              \begin{aligned}[t]
+                              & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
+                              & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
+                              & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
+                              \end{aligned}}
       \end{aligned}
     } \\
   \text{iota-fix-var':}~
@@ -714,10 +717,14 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                  & \mathtt{exit\_}f_j\ttcolon \text{''}
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
-                  & \text{where}\quad K'(e) = \\
-                  & \begin{cases}
+                  & \text{where} \\
+                  & K'(e) =
+                    \begin{cases}
                     K(e) & \text{$K(e)$ contains \kwgoto}  \\
-                    \dq{K(e)~\kwgoto~\mathtt{exit\_}f_j\ttsemi} & \text{otherwise}
+                    \begin{aligned}[t]
+                      \ldq & K(e) \\
+                           & \kwgoto~\mathtt{exit\_}f_j\ttsemi \rdq
+                    \end{aligned} & \text{otherwise}
                   \end{cases}
                 \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\dots h}{f_j}}{x_1\dots x_n} =                      && f_j \not\in \tr \\
@@ -813,7 +820,9 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
     \quad \text{for}~i=1,\dots, h \\
     \B{K}{t}{}                            & \begin{aligned}[t]
                                             & \text{otherwise} \\
-                                            & \text{where}~t:T \quad K(e) = \dq{\texttt{*($T$*)ret = $e$; \kwCreturn;}}
+                                            & \text{where} \\
+                                            & \quad t:T \\
+                                            & \quad K(e) = \dq{\texttt{*($T$*)ret = $e$; \kwCreturn;}}
                                             \end{aligned}
   \end{cases}
 \]
