@@ -108,25 +108,25 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\kwfix}{\mbox{\color{mygreen}\ttfamily fix}}
 \newcommand{\kwfor}{\mbox{\color{mygreen}\ttfamily for}}
 
-\newcommand{\lam}[2]{\lambda #1.~#2}
-\newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.~#3}
-\newcommand{\lamB}[1]{\lambda #1.~}
-\newcommand{\lamTB}[2]{\lambda #1\mathord{:}#2.~}
+\newcommand{\lam}[2]{\lambda #1.\:#2}
+\newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.\:#3}
+\newcommand{\lamB}[1]{\lambda #1.\:}
+\newcommand{\lamTB}[2]{\lambda #1\mathord{:}#2.\:}
 
 \newcommand{\gassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\glodef}[3]{(#1:=#2\mathord{:}#3)}
 \newcommand{\lassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\ldef}[3]{(#1:=#2\mathord{:}#3)}
 
-\newcommand{\prodT}[3]{\forall #1\mathord{:}#2.~#3}
+\newcommand{\prodT}[3]{\forall #1\mathord{:}#2.\:#3}
 
-\newcommand{\letin}[3]{\kwlet~#1:=#2~\kwin~#3}
-\newcommand{\letinB}[2]{\kwlet~#1:=#2~\kwin}
+\newcommand{\letin}[3]{\kwlet\:#1:=#2\:\kwin\:#3}
+\newcommand{\letinB}[2]{\kwlet\:#1:=#2\:\kwin}
 
-\newcommand{\match}[4]{\kwmatch~#1~\kwwith~(#2 \Rightarrow #3)_{#4}~\kwend}
+\newcommand{\match}[4]{\kwmatch\:#1\:\kwwith\:(#2 \Rightarrow #3)_{#4}\:\kwend}
 
-\newcommand{\fix}[4]{\kwfix~(#1 := #2)_{#3}~\kwfor~#4}
-\newcommand{\fixT}[5]{\kwfix~(#1:\!#2 := #3)_{#4}~\kwfor~#5}
+\newcommand{\fix}[4]{\kwfix\:(#1 := #2)_{#3}\:\kwfor\:#4}
+\newcommand{\fixT}[5]{\kwfix\:(#1:\!#2 := #3)_{#4}\:\kwfor\:#5}
 
 \DeclareMathOperator{\NA}{NA}
 \DeclareMathOperator{\NP}{NP}
@@ -253,7 +253,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
     |&\ C & \text{constructor} \\
     |&\ T & \text{type} \\
     |&\ \lamT{x}{T}{t}        & \text{abstraction} \\
-    |&\ t~u                   & \text{application} \\
+    |&\ t\:u                  & \text{application} \\
     |&\ \letin{x}{t:T}{u}     & \text{let-in} \\
     |&\ \match{t_0}{C_i}{t_i}{i=1\dots h} & \text{conditional} \\
     |&\ \fixT{f_i/k_i}{T_i}{t_i}{i=1\dots h}{f_j} & \text{fixpoint}
@@ -262,7 +262,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 {\small Note:
 \begin{itemize}
   \item $u$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
-  \item We write $(\cdots((t~u_1)~u_2)\cdots~u_n)$ as $t~u_1\dots u_n$.
+  \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\dots u_n$.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
   \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression).  It is not used in reductions.
@@ -283,7 +283,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 % based on sphinx/language/core/conversion.rst and doc/sphinx/language/core/inductive.rst
 \begin{gather*}
   \text{beta:}~
-    E[\Gamma] \vdash ((\lam{x}{t})~u) \reltri \subst{t}{x}{u} \\
+    E[\Gamma] \vdash ((\lam{x}{t})\:u) \reltri \subst{t}{x}{u} \\
   \text{delta-local:}~
     \dfrac{(x:=t) \in \Gamma}{E[\Gamma] \vdash x \reltri t} \\
   \text{delta-global:}~
@@ -293,27 +293,27 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \text{iota-match:}~
     \dfrac
     {
-      E[\Gamma] \vdash C_j~u_1\ldots u_{p+m} : T \quad
+      E[\Gamma] \vdash C_j\:u_1\ldots u_{p+m} : T \quad
       \text{$p$ is the number of parameters of the inductive type $T$}
     }{
       E[\Gamma] \vdash
-      \match{(C_j~u_1\ldots u_{p+m})}{C_i}{t_i}{i=1\dots h}
+      \match{(C_j\:u_1\ldots u_{p+m})}{C_i}{t_i}{i=1\dots h}
       \reltri
-      t_j~u_{p+1}\ldots u_{p+m}
+      t_j\:u_{p+1}\ldots u_{p+m}
     } \\
   \text{iota-fix:}~
     \dfrac{
-      u_{k_j} = C~u'_1\ldots u'_m
+      u_{k_j} = C\:u'_1\ldots u'_m
     }{
       \begin{aligned}
         E[\Gamma] \vdash\; &
-          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~u_1 \dots u_{k_j} \\
+          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})\:u_1 \dots u_{k_j} \\
         \reltri\; &
-          \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} ~u_1 \dots u_{k_j}
+          \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} \:u_1 \dots u_{k_j}
       \end{aligned}
     } \\
   \text{eta expansion:}~
-    \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t~x)}}
+    \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t\:x)}}
 \end{gather*}
 \raggedright
 {\small Note:
@@ -325,14 +325,14 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item $E$ is a global environment which is a list of
     global assumptions $\gassum{c}{T}$,
     global definitions $\glodef{c}{t}{T}$, and
-    inductive definitions ($\text{\sf Ind}~[p]~(\Gamma_I := \Gamma_C)$).
+    inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
   \item $\Gamma$ is a local context which is a list of
     local assumptions $\lassum{x}{T}$ and
     local definitions $\ldef{x}{t}{T}$.
     The local assumptions represent variables bounded by outer abstractions and fixpoints.
     The local definitions represent variables bounded by outer let-in.
   \item If it is unambiguous, we omit type annotations in these definitions for the sake of simplicity.
-  \item Iota-match reduces $\kwmatch~\mathtt{@cons~nat~1~nil}~\kwwith~(\mathtt{nil} \Rightarrow t_1)~(\mathtt{cons} \Rightarrow t_2)~\kwend$ to $t_2~1~\mathtt{nil}$
+  \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:(\mathtt{cons} \Rightarrow t_2)\:\kwend$ to $t_2\:1\:\mathtt{nil}$
     because \lstinline!list! has one parameter $(p=1)$ and \lstinline!cons! has two members $(m=2)$.
 \end{itemize}}
 
@@ -375,9 +375,9 @@ keywordstyle=[3]\color{myred}\ttfamily,
       \text{$x_i$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-      t_0~x_1 \ldots x_{i-1}~t_i~t_{i+1} \ldots t_n
+      t_0\:x_1 \ldots x_{i-1}\:t_i\:t_{i+1} \ldots t_n
       \reltri
-      \letin{x_i}{t_i:T_i}{t_0~x_1 \ldots x_{i-1}~x_i~t_{i+1} \ldots t_n}
+      \letin{x_i}{t_i:T_i}{t_0\:x_1 \ldots x_{i-1}\:x_i\:t_{i+1} \ldots t_n}
     } \\
   \text{zeta-item:}~
     \dfrac
@@ -400,7 +400,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \begin{align*}
   t =&\ x~|~c~|~C~|~T~|~\lamT{x}{T}{t}~|~ \letin{x}{t:T}{u} \\
     |&\ \fixT{f_i/k_i}{T_i}{t_i}{i=1\dots h}{f_j} \\
-    |&\ t~x                               & \leftarrow (1) \\
+    |&\ t\:x                               & \leftarrow (1) \\
     |&\ \match{x}{C_i}{t_i}{i=1\dots h} & \leftarrow (2)
 \end{align*}
 
@@ -409,10 +409,10 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
   \text{beta-var:}~
     \dfrac{
       0 < n \quad
-      E[\Gamma] \vdash (\lam{x}{t})~y_1\dots y_n : T \quad
+      E[\Gamma] \vdash (\lam{x}{t})\:y_1\dots y_n : T \quad
       \text{$T$ is an inductive type}
     }{
-      E[\Gamma] \vdash (\lam{x}{t})~y_1\dots y_n \reltri \subst{t}{x}{y_1}~y_2\dots y_n
+      E[\Gamma] \vdash (\lam{x}{t})\:y_1\dots y_n \reltri \subst{t}{x}{y_1}\:y_2\dots y_n
     } \\
   \text{delta-var:}~
     \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \\
@@ -421,12 +421,12 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
      {
        0 \leq p \quad
        0 < q \quad
-       (f := t~x_1\ldots x_p) \in \Gamma \quad
+       (f := t\:x_1\ldots x_p) \in \Gamma \quad
        \text{$t$ is one of $x, c, C, \lam{x}{u}, \fix{f_i/k_i}{t_i}{i=1\dots h}{f_j}$}
      }{
-       E[\Gamma] \vdash f~y_1\ldots y_q
+       E[\Gamma] \vdash f\:y_1\ldots y_q
                         \reltri
-                        t~x_1\ldots x_p~y_1\dots y_q
+                        t\:x_1\ldots x_p\:y_1\dots y_q
      } \\
   \text{zeta-flat:}~
     E[\Gamma] \vdash \letin{y}{(\letin{x}{t_1}{t_2})}{t_0}
@@ -434,38 +434,38 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
                        \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \\
   \text{zeta-app:}~
     E[\Gamma] \vdash
-     (\letin{x_0}{t}{u})~x_1\ldots x_n
+     (\letin{x_0}{t}{u})\:x_1\ldots x_n
      \reltri
-     \letin{x_0}{t}{(u~x_1\ldots x_n)} \\
+     \letin{x_0}{t}{(u\:x_1\ldots x_n)} \\
   \text{iota-match-var:}~
     \dfrac
     {
-      (x:=C_j~y_1\ldots y_{p+m}:T) \in \Gamma \quad
+      (x:=C_j\:y_1\ldots y_{p+m}:T) \in \Gamma \quad
       \text{$p$ is the number of parameters of the inductive type $T$}
     }{
       E[\Gamma] \vdash
       \match{x}{C_i}{t_i}{i=1\dots h}
       \reltri
-      t_j~y_{p+1}\ldots y_{p+m}
+      t_j\:y_{p+1}\ldots y_{p+m}
     } \\
   \text{iota-fix-var:}~
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C~y_1\ldots y_m) \in \Gamma \quad
+        (x_{k_j} := C\:y_1\ldots y_m) \in \Gamma \quad
         \text{$f'_1\dots f'_h$ are fresh variables} \\
-        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n : T \quad
+        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})\:x_1\ldots x_n : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
       \begin{aligned}
         E[\Gamma] \vdash\; &
-          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n \\
+          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})\:x_1\ldots x_n \\
         \reltri\; &
           \begin{aligned}[t]
           & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
           & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
-          & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
+          & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} \:x_1 \dots x_n
           \end{aligned}
       \end{aligned}
     } \\
@@ -473,17 +473,17 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C~y_1\ldots y_m) \in \Gamma \\
+        (x_{k_j} := C\:y_1\ldots y_m) \in \Gamma \\
         (f'_1 := \fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}) \in \Gamma ~\dots~
         (f'_h := \fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}) \in \Gamma \\
-        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n : T \quad
+        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})\:x_1\ldots x_n : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
       E[\Gamma] \vdash
-      (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n
+      (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})\:x_1\ldots x_n
       \reltri
-      \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
+      \subst{t_j}{f_k}{f'_k}_{k=1\dots h} \:x_1 \dots x_n
     }
 \end{gather*}
 
@@ -509,7 +509,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     Fixpoint expressions are allowed outside or between the abstractions.
   \item $\BR{t}{m}{q}$ transforms a branch of a match expression into a nested abstraction expression that takes constructor members.
     Fixpoint expressions are not allowed.
-  \item $\E{t}{x_1\dots x_p}{q}$ is a term convertible with $t~x_1\dots x_p$ that does not contain a partial application.
+  \item $\E{t}{x_1\dots x_p}{q}$ is a term convertible with $t\:x_1\dots x_p$ that does not contain a partial application.
     $\E{t}{x_1\dots x_p}{q}$ traverses $t$ while tracking the arguments for $t$ to find closure-generating expressions.
     The number of arguments given to $t$ is $p+q$.
     The first $p$ arguments are $x_1\dots x_p$ and they can be the argument of beta-var redex.
@@ -534,7 +534,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
   \BR{t}{m}{q} =
   \begin{cases}
     \E{t}{}{q}    & m = 0 \\
-    \lam{x}{\BR{u}{m-1}{q}} & m > 0 ~\wedge~ t = \lam{x}{u} \\
+    \lam{x}{\BR{u}{m-1}{q}} & (m > 0) \wedge (t = \lam{x}{u}) \\
     \lambda x_1\dots\lamB{x_m}\E{t}{x_1\dots x_m}{q}        & \text{otherwise} \quad \text{(eta expansion)}
   \end{cases}
 \]
@@ -546,21 +546,21 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \[
   \E{t}{x_1\dots x_p}{q} =
   \begin{cases}
-    x                                                                                                 & t = x \wedge p = q = 0 \\
-    x~x_1\dots x_p                                                                                    & t = x \wedge \neg (p = q = 0) \wedge r = 0 \\
-    \F{x~x_1\dots x_p}                                                                                 & t = x \wedge \neg (p = q = 0) \wedge r > 0 \\
-    t~x_1\dots x_p                                                                                    & (t = c \vee t = C) \wedge r = 0 \\
-    \F{t~x_1\dots x_p}                                                                                 & (t = c \vee t = C) \wedge r > 0 \\
-    \F{t}                                                                                              & t = \lam{x}{u} \wedge p = q = 0 \\
-    \E{\subst{u}{x}{x_1}}{x_2\dots x_p}{q}                                                             & t = \lam{x}{u} \wedge p > 0 \wedge r = 0 \quad \text{(beta-var)} \\
-    (\lam{x}{\E{u}{}{p+q-1}})~x_1\dots x_p                                                             & t = \lam{x}{u} \wedge (\begin{aligned}[t]
-                                                                                                                                & (p = 0 \wedge q > 0) \mathop{\vee} \\
-                                                                                                                                & (p > 0 \wedge r > 0))
+    x                                                                                                 & (t = x) \wedge (p = q = 0) \\
+    x\:x_1\dots x_p                                                                                    & (t = x) \wedge \neg (p = q = 0) \wedge (r = 0) \\
+    \F{x\:x_1\dots x_p}                                                                                 & (t = x) \wedge \neg (p = q = 0) \wedge (r > 0) \\
+    t\:x_1\dots x_p                                                                                    & ((t = c) \vee (t = C)) \wedge (r = 0) \\
+    \F{t\:x_1\dots x_p}                                                                                 & ((t = c) \vee (t = C)) \wedge (r > 0) \\
+    \F{t}                                                                                              & (t = \lam{x}{u}) \wedge (p = q = 0) \\
+    \E{\subst{u}{x}{x_1}}{x_2\dots x_p}{q}                                                             & (t = \lam{x}{u}) \wedge (p > 0) \wedge (r = 0) \quad \text{(beta-var)} \\
+    (\lam{x}{\E{u}{}{p+q-1}})\:x_1\dots x_p                                                             & (t = \lam{x}{u}) \wedge (\begin{aligned}[t]
+                                                                                                                                & ((p = 0) \wedge (q > 0)) \:\vee \\
+                                                                                                                                & ((p > 0) \wedge (r > 0)))
                                                                                                                                 \end{aligned} \\
-    \E{u}{x_0~x_1\dots x_p}{q}                                                                & t = u~x_0 \\
+    \E{u}{x_0\:x_1\dots x_p}{q}                                                                & t = u\:x_0 \\
     \letin{x}{\E{t_1}{}{0}}{\E{t_2}{x_1\dots x_p}{q}}                                                            & t = \letin{x}{t_1}{t_2} \quad \text{(zeta-app)} \\
-    \match{x}{C_i}{\BR{t_i}{\NM_{C_i}}{p+q}}{i=1\dots h}~x_1\dots x_p                                   & t = \match{x}{C_i}{t_i}{i=1\dots h} \\
-    (\fix{f_i}{\F{t_i}}{i=1\dots h}{f_j})~x_1\dots x_p                                             & t = \fix{f_i}{t_i}{i=1\dots h}{f_j}
+    \match{x}{C_i}{\BR{t_i}{\NM_{C_i}}{p+q}}{i=1\dots h}\:x_1\dots x_p                                   & t = \match{x}{C_i}{t_i}{i=1\dots h} \\
+    (\fix{f_i}{\F{t_i}}{i=1\dots h}{f_j})\:x_1\dots x_p                                             & t = \fix{f_i}{t_i}{i=1\dots h}{f_j}
   \end{cases}
 \]
 \[ \quad\text{where} \quad
@@ -589,10 +589,10 @@ $V$ is the variable mapping for variables declared outside.
 \[
   \cv{t}{x_1\dots x_n}{V} =
   \begin{cases}
-    empty                                             & t = x \vee t = c \vee t = C \vee t = T \\
-    \cv{u}{}{V; M}; M                                & t = \lam{x}{u} \wedge n = 0 \quad \text{where}~M = x\mapsto v \\
-    \cv{u}{x_2\dots x_n}{V; M}; M                    & t = \lam{x}{u} \wedge n > 0 \quad \text{where}~M = x\mapsto V(x_1) \\
-    \cv{u}{x_0~x_1\dots x_n}V                        & t = u~x_0 \\
+    empty                                             & (t = x) \vee (t = c) \vee (t = C) \vee (t = T) \\
+    \cv{u}{}{V; M}; M                                & (t = \lam{x}{u}) \wedge (n = 0) \quad \text{where}~M = x\mapsto v \\
+    \cv{u}{x_2\dots x_n}{V; M}; M                    & (t = \lam{x}{u}) \wedge (n > 0) \quad \text{where}~M = x\mapsto V(x_1) \\
+    \cv{u}{x_0\:x_1\dots x_n}V                        & t = u\:x_0 \\
     \cv{t_1}{}{V}; \cv{t_2}{x_1\dots x_n}{V; M}; M    & t = \letin{x}{t_1}{t_2} \quad \text{where}~M = x\mapsto v \\
     \begin{aligned}[t]
       (&\cv{t_1}{x_1\dots x_n}{V;M_1};\dots; \\
@@ -628,7 +628,7 @@ $V$ is the variable mapping for variables declared outside.
     E[\Gamma] \vdash x : T \quad
     \text{$T$ is a non-dependent inductive type}
   }{
-    E[\Gamma] \vdashb t~x
+    E[\Gamma] \vdashb t\:x
   } \\
   \dfrac{
     E[\Gamma] \vdashb t \quad
@@ -640,8 +640,8 @@ $V$ is the variable mapping for variables declared outside.
   \dfrac{
     \begin{gathered}
       E[\Gamma] \vdash x:T \quad
-      \text{$T$ is a non-dependent inductive type with $p$ parameters:}~I~u_1\dots u_p \\
-      E[] \vdash C_i~u_1\dots u_p: T_{i1} \rightarrow \dots \rightarrow T_{i\NM_{C_i}} \rightarrow T \quad
+      \text{$T$ is a non-dependent inductive type with $p$ parameters:}~I\:u_1\dots u_p \\
+      E[] \vdash C_i\:u_1\dots u_p: T_{i1} \rightarrow \dots \rightarrow T_{i\NM_{C_i}} \rightarrow T \quad
       \text{$T_{ij}$ are non-dependent inductive types} \\
       E[\Gamma::\lassum{y_{i1}}{T_{i1}}::\dots::\lassum{y_{i\NM_{C_i}}}{T_{i\NM_{C_i}}}] \vdashb t_i
     \end{gathered}
@@ -682,31 +682,31 @@ $V$ is the variable mapping for variables declared outside.
 
 \subsection{Translation to C for a Non-Tail Position}\label{sec:AK}
 \raggedright
-$\A{K}{t}{x_1\dots x_n}$ generates C code for $t~x_1\dots x_n$ in a non-tail position.
+$\A{K}{t}{x_1\dots x_n}$ generates C code for $t\:x_1\dots x_n$ in a non-tail position.
 The result expression is passed to $K$. \\
 $K(e) = \dq{v = e\ttsemi}$ in simple situations.
 \begin{align*}
   &\A{K}{x}{} = K(\dq{x}) \\
   &\A{K}{x}{x_1\dots x_n} =
-      \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1 \dots x_n)} \\ & \kwgoto~\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
-    && \begin{aligned}[t] & n > 0 \wedge \text{$x$ is bounded by a fixpoint} \mathop{\wedge} \\ & x \in \tr \end{aligned} \\
+      \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1 \dots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
+    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \:\wedge \\ & x \in \tr \end{aligned} \\
   &\A{K}{x}{x_1\dots x_n} = K(\dq{x\ttparen{y_1,\dots,y_o,x_1,\dots, x_n}})
-    && \begin{aligned}[t] & n > 0 \wedge \text{$x$ is bounded by a fixpoint} \mathop{\wedge} \\ & x \not\in \tr \end{aligned} \\
+    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \:\wedge \\ & x \not\in \tr \end{aligned} \\
   &\A{K}{c}{x_1\dots x_n} = K(\dq{c\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\A{K}{C}{x_1\dots x_n} = K(\dq{C\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
-  &\A{K}{t~x_0}{x_1\dots x_n} = \A{K}{t}{x_0~x_1\dots x_n} \\
+  &\A{K}{t\:x_0}{x_1\dots x_n} = \A{K}{t}{x_0\:x_1\dots x_n} \\
   &\A{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} =
       \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \A{K}{t_2}{x_1\dots x_n} \rdq \end{aligned}
-    && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
-  &\A{K}{\lam{x}{t}}{x_1~x_2\dots x_n} = \A{K}{t}{x_2\dots x_n}                                  && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
+    && \text{where}\quad K'(e) = \dq{x\:\tteq\:e\ttsemi} \\
+  &\A{K}{\lam{x}{t}}{x_1\:x_2\dots x_n} = \A{K}{t}{x_2\dots x_n}                                  && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
   &\AbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
-       \text{``} & \kwswitch~\ttparen{\mathit{swfunc}_T\ttparen{x}}~\ttlbrace \\
+       \text{``} & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
                  & \dots \\
                  & \mathit{caselabel}_{C_i}\ttcolon\quad
                    \begin{aligned}[t]
-                   & y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi \\
-                   & y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                   & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dots\ttsemi \\
+                   & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
                    & {\A{K}{t_i}{x_1\dots x_n}} \\
                    & \kwbreak\ttsemi
                    \end{aligned} \\
@@ -726,14 +726,14 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                     K(e) & \text{$K(e)$ contains \kwgoto}  \\
                     \begin{aligned}[t]
                       \ldq & K(e) \\
-                           & \kwgoto~\mathtt{exit\_}f_j\ttsemi \rdq
+                           & \kwgoto\:\mathtt{exit\_}f_j\ttsemi \rdq
                     \end{aligned} & \text{otherwise}
                   \end{cases}
                 \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\dots h}{f_j}}{x_1\dots x_n} =                      && f_j \not\in \tr \\
      & \quad\begin{alignedat}[t]{2}
        \text{``} & K(f_j\ttparen{y_1,\dots,y_o,x_1\dots, x_n})                  \\
-                 & \kwgoto~\mathtt{skip\_}f_j\ttsemi                                    \\
+                 & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
                  & {\genbodyan{\fix{f_i}{t_i}{i=1\dots h}{f_j}}}                          \\
                  & \mathtt{skip\_}f_j\ttcolon \text{''}
        \end{alignedat}
@@ -753,33 +753,33 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   \item $\passign(y_1\dots y_n, x_1\dots x_n)$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\dots x_n$ into $y_1\dots y_n$.  It may require temporary variables.
   \item $y_1,\dots,y_o$ are the outer variables of the fixpoint.
   \item We do not define $\A{K}{\lam{x}{t}}{}$ because we do not support closures yet.
-  \item Actual \codegen{} generates $\genbodyan{}$ in a different position to avoid the label $\mathtt{skip\_}f_j$ and $\kwgoto~\mathtt{skip\_}f_j\ttsemi$.
+  \item Actual \codegen{} generates $\genbodyan{}$ in a different position to avoid the label $\mathtt{skip\_}f_j$ and $\kwgoto\:\mathtt{skip\_}f_j\ttsemi$.
 \end{itemize}}
 
 \subsection{Translation to C for a Tail Position}\label{sec:BK}
 \raggedright
-$\B{K}{t}{x_1\dots x_n}$ generates C code for $t~x_1\dots x_n$ in a tail position.
+$\B{K}{t}{x_1\dots x_n}$ generates C code for $t\:x_1\dots x_n$ in a tail position.
 The result expression is passed to $K$. \\
-$K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
+$K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 \begin{align*}
   &\B{K}{x}{} = K(\dq{x}) \\
-  &\B{K}{x}{x_1\dots x_n} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1\dots x_n)} \\ & \kwgoto~\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
-    && n > 0 \wedge \text{$x$ is bounded by a fixpoint} \\
+  &\B{K}{x}{x_1\dots x_n} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1\dots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
+    && (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \\
   &\B{K}{c}{x_1\dots x_n} = K(\dq{c\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\B{K}{C}{x_1\dots x_n} = K(\dq{C\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
-  &\B{K}{t~x_0}{x_1\dots x_n} = \B{K}{t}{x_0~x_1\dots x_n} \\
+  &\B{K}{t\:x_0}{x_1\dots x_n} = \B{K}{t}{x_0\:x_1\dots x_n} \\
   &\B{K}{\letin{x}{t_1}{t_2}}{x_1\dots x_n} =
       \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \B{K}{t_2}{x_1\dots x_n} \rdq \end{aligned}
-    && \text{where}\quad K'(e) = \dq{x~\tteq~e\ttsemi} \\
-  &\B{K}{\lam{x}{t}}{x_1~x_2\dots x_n} = \B{K}{t}{x_2\dots x_n}                                 && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
+    && \text{where}\quad K'(e) = \dq{x\:\tteq\:e\ttsemi} \\
+  &\B{K}{\lam{x}{t}}{x_1\:x_2\dots x_n} = \B{K}{t}{x_2\dots x_n}                                 && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
   &\BbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\dots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\dots h}}{x_1\dots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
-       \text{``} & \kwswitch~\ttparen{\mathit{swfunc}_T\ttparen{x}}~\ttlbrace \\
+       \text{``} & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
                  & \dots \\
                  & \mathit{caselabel}_{C_i}\ttcolon\quad
                    \begin{aligned}[t]
-                     & y_{i1}~\tteq~\mathit{get\_member}_{C_i1}(x)\ttsemi ~\dots\ttsemi \\
-                     & y_{i\NM_{C_i}}~\tteq~\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                     & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dots\ttsemi \\
+                     & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
                      & {\B{K}{t_i}{x_1\dots x_n}}
                    \end{aligned} \\
                  & \dots \\
@@ -798,7 +798,7 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
 \[
   \fvars{t} =
   \begin{cases}
-    \dq{x;~\fvars{u}} & t = \lam{x}{u} \\
+    \dq{x;\:\fvars{u}} & t = \lam{x}{u} \\
     \fvars{t_j}       & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
     \dq{}             & \text{otherwise}
   \end{cases}
@@ -810,7 +810,7 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
   \genbodyat{K}{t} =
   \begin{cases}
     \genbodyat{K}{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon~\genbodyat{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyat{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
     \quad \text{for}~i=j, 1,\dots, (j-1), (j+1),\dots, h \\
     \A{K}{t}{}                            & \text{otherwise}
   \end{cases}
@@ -819,7 +819,7 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
   \genbodyan{t} =
   \begin{cases}
     \genbodyan{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon~\genbodyan{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyan{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
     \quad \text{for}~i=1,\dots, h \\
     \B{K}{t}{}                            & \begin{aligned}[t]
                                             & \text{otherwise} \\
@@ -833,7 +833,7 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
   \genbodyb{K}{t} =
   \begin{cases}
     \genbodyb{K}{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon~\genbodyb{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyb{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
     \quad \text{for}~i=j, 1,\dots, (j-1), (j+1),\dots, h \\
     \B{K}{t}{}                            & \text{otherwise}
   \end{cases}
@@ -841,14 +841,14 @@ $K(e) = \dq{\kwCreturn~e\ttsemi}$ in simple situations.
 {\small Note:
 \begin{itemize}
   \item $\fvarsop$ and $\fvarsop'$ returns a list of variables: $x_1;\dots;x_n;$.  For simplicity, we omit ``$;$'' if not ambiguous.
-  \item $\dq{g(i)}~\text{for}~i=j_1,\dots,j_n$ means $\dq{g(j_1)~\dots~g(j_n)}$.
+  \item $\dq{g(i)}~\text{for}~i=j_1,\dots,j_n$ means $\dq{g(j_1)\:\dots\:g(j_n)}$.
 \end{itemize}}
 
 \subsection{Detection of Tail Recursive Fixpoint Bounded Functions}\label{sec:tailrec-fixpoint-detection}
 \raggedright
 $\TR{t}{n}$ is the first element of $\RNT{t}{n}$.
 
-$(R,N,T) = \RNT{t}{n}$ classify variables in $t$ assuming that it is called with $n$ arguments as $t~x_1\dots x_n$:
+$(R,N,T) = \RNT{t}{n}$ classify variables in $t$ assuming that it is called with $n$ arguments as $t\:x_1\dots x_n$:
 \begin{align*}
   R &: \text{tail-recursive fixpoint bounded functions that do not need to be real functions} \\
   N &: \text{free variables at non-tail positions of $t$} \\
@@ -861,8 +861,8 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
   &\RNT{t}{n} = \\
   &\begin{cases}
     (\varnothing, \varnothing, \{x\})             & t = x \\
-    (\varnothing, \varnothing, \varnothing)         & t = c \vee t = C \\
-    (R, N \cup \{x\}, T)         & t = u~x \quad \text{where}\quad (R,N,T) = \RNT{u}{n+1} \\
+    (\varnothing, \varnothing, \varnothing)         & (t = c) \vee (t = C) \\
+    (R, N \cup \{x\}, T)         & t = u\:x \quad \text{where}\quad (R,N,T) = \RNT{u}{n+1} \\
     (R_1 \cup R_2, N_1 \cup T_1 \cup N_2 - \{x\}, T_2 - \{x\})        &
       \begin{aligned}[t]
         & t = \letin{x}{t_1}{t_2} \\
@@ -873,16 +873,16 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
         & t = \match{x}{C_i}{t_i}{i=1\dots h} \\
         & \text{where}~(R_i, N_i, T_i) = \RNT{t_i}{\NM_{C_i}+n}
       \end{aligned} \\
-    (R, N-\{x\}, T - \{x\})                                           & t = \lam{x}{u} \wedge n > 0 \quad \text{where}\quad  (R, N, T) = \RNT{u}{n-1} \\
-    (R, (N \cup T) - \{x\}, \varnothing)                             & t = \lam{x}{u} \wedge n = 0 \quad \text{where}\quad  (R, N, T) = \RNT{u}{\NA_u} \quad \text{(closure)} \\
+    (R, N-\{x\}, T - \{x\})                                           & (t = \lam{x}{u}) \wedge (n > 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{n-1} \\
+    (R, (N \cup T) - \{x\}, \varnothing)                             & (t = \lam{x}{u}) \wedge (n = 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{\NA_u} \quad \text{(closure)} \\
     \begin{aligned}[t]
       \bigl( & \textstyle\bigcup_{i=1}^h R_i \cup \{f_1,\dots, f_h\}, \\
              & \textstyle\bigcup_{i=1}^h N_i - \{f_1,\dots, f_h\}, \\
              & \textstyle\bigcup_{i=1}^h T_i - \{f_1,\dots, f_h\} \bigr)
     \end{aligned} &
       \begin{aligned}[t]
-        & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} ~\wedge \\
-        & n = \NA_t \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dots, f_h\} = \varnothing\bigr) \\
+        & (t = \fix{f_i}{t_i}{i=1\dots h}{f_j}) \:\wedge \\
+        & (n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dots, f_h\} = \varnothing\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned} \\
     \begin{aligned}[t]
@@ -891,8 +891,8 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
              & \varnothing \bigr)
     \end{aligned} &
       \begin{aligned}[t]
-        & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} ~\wedge \quad \text{(real function, maybe closure)} \\
-        & \neg (n = \NA_t \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dots, f_h\} = \varnothing\bigr)) \\
+        & (t = \fix{f_i}{t_i}{i=1\dots h}{f_j}) \wedge \quad \text{(real function, maybe closure)} \\
+        & \neg ((n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dots, f_h\} = \varnothing\bigr)) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned}
   \end{cases}
@@ -926,46 +926,46 @@ We iterate it until no fixpoint functions.
 \begin{alignat*}{2}
   \genfunm{c} &= \text{``} && \enumentries{c}~\argstructdefs{c}~\forwarddecl{c}~\entryfunctions{c}~\bodyfunction{c} \text{''}
 \end{alignat*}
-\[ \enumentries{c} = \dq{\kwenum~\mathtt{enum\_func\_}c~\ttbrace{ \mathtt{func\_}c\ttcomma \mathtt{func\_}f_1\ttcomma \dots\ttcomma \mathtt{func\_}f_n }\ttsemi} \]
-\[ \argstructdefs{c} = \dq{\mainstructdef{c}~\auxstructdef{c}{1} \dots \auxstructdef{c}{n}} \]
-\[ \mainstructdef{c} = \dq{\kwstruct~\mathtt{arg\_}c~\ttbrace{~T_{01}~\mathtt{arg}1\ttsemi \dots T_{0m_0}~\mathtt{arg}m_0\ttsemi~}\ttsemi} \]
-\[ \auxstructdef{c}{i} = \dq{\kwstruct~\mathtt{arg\_}f_i~\ttbrace{~U_{i1}~\mathtt{outer}1\ttsemi \dots U_{io_i}~\mathtt{outer}o_i\ttsemi~T_{i1}~\mathtt{arg}1\ttsemi \dots T_{im_i}~\mathtt{arg}m_i\ttsemi~}\ttsemi} \]
-\[ \forwarddecl{c} = \dq{\kwstatic~\kwvoid~\mathtt{body\_function\_}c\ttparen{\kwenum~\mathtt{enum\_func\_}c~\mathtt{g}\ttcomma \kwvoid~\mathtt{\ttstar arg}\ttcomma \kwvoid~\mathtt{\ttstar ret}}\ttsemi} \]
-\[ \entryfunctions{c} = \dq{\mainfunction{c}~\auxfunction{c}{1} \dots \auxfunction{c}{n}} \]
+\[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c\ttcomma \mathtt{func\_}f_1\ttcomma \dots\ttcomma \mathtt{func\_}f_n }\ttsemi} \]
+\[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\auxstructdef{c}{1} \dots \auxstructdef{c}{n}} \]
+\[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:T_{01}\:\mathtt{arg}1\ttsemi \dots T_{0m_0}\:\mathtt{arg}m_0\ttsemi\:}\ttsemi} \]
+\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:U_{i1}\:\mathtt{outer}1\ttsemi \dots U_{io_i}\:\mathtt{outer}o_i\ttsemi\:T_{i1}\:\mathtt{arg}1\ttsemi \dots T_{im_i}\:\mathtt{arg}m_i\ttsemi\:}\ttsemi} \]
+\[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
+\[ \entryfunctions{c} = \dq{\mainfunction{c}\:\auxfunction{c}{1} \dots \auxfunction{c}{n}} \]
 \begin{alignat*}{2}
-  \mainfunction{c} &= \text{``} && \kwstatic~T_{00}~c\ttparen{T_{01}~x_{01}\ttcomma\dots\ttcomma T_{0m_0}~x_{0m_0}}~\ttlbrace \\
-  & && \quad \kwstruct~\mathtt{arg\_}c~\mathtt{arg}~\tteq~\ttbrace{ x_{01}\ttcomma\dots\ttcomma x_{0m_0} }\ttsemi~T_{00}~\mathtt{ret}\ttsemi \\
-  & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn~\mathtt{ret}\ttsemi \\
+  \mainfunction{c} &= \text{``} && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dots\ttcomma T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ x_{01}\ttcomma\dots\ttcomma x_{0m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
+  & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \text{''}
 \end{alignat*}
 \begin{alignat*}{2}
-  \auxfunction{c}{i} &= \text{``} && \kwstatic~T_{i0}~f_i\ttparen{U_{i1}~y_{i1}\ttcomma\dots\ttcomma U_{io_i}~y_{io_i}\ttcomma T_{i1}~x_{i1}\ttcomma\dots\ttcomma T_{im_i}~x_{im_i}}~\ttlbrace \\
-  & && \quad \kwstruct~\mathtt{arg\_}f_i~\mathtt{arg}~\tteq~\ttbrace{ y_{i1}\ttcomma\dots\ttcomma y_{io_i}\ttcomma x_{i1}\ttcomma\dots\ttcomma x_{im_i} }\ttsemi~T_{i0}~\mathtt{ret}\ttsemi\\
-  & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi~\kwCreturn~\mathtt{ret}\ttsemi \\
+  \auxfunction{c}{i} &= \text{``} && \kwstatic\:T_{i0}\:f_i\ttparen{U_{i1}\:y_{i1}\ttcomma\dots\ttcomma U_{io_i}\:y_{io_i}\ttcomma T_{i1}\:x_{i1}\ttcomma\dots\ttcomma T_{im_i}\:x_{im_i}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ y_{i1}\ttcomma\dots\ttcomma y_{io_i}\ttcomma x_{i1}\ttcomma\dots\ttcomma x_{im_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
+  & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \text{''}
 \end{alignat*}
 \begin{alignat*}{2}
   \bodyfunction{c} &= \text{``}
-    && \kwstatic~\kwvoid~\mathtt{body\_function\_}c\ttparen{\kwenum~\mathtt{enum\_func\_}c~\mathtt{g}\ttcomma \kwvoid~\ttstar\mathtt{arg}\ttcomma \kwvoid~\ttstar\mathtt{ret}}~\ttlbrace \\
+    && \kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\ttstar\mathtt{arg}\ttcomma \kwvoid\:\ttstar\mathtt{ret}}\:\ttlbrace \\
   & && \quad \mathit{decls} \\
-  & && \quad \kwswitch~\ttparen{\mathtt{g}}~\ttbrace{~\auxcase{c}{1} \dots \auxcase{c}{n}~\maincase{c}~} \\
+  & && \quad \kwswitch\:\ttparen{\mathtt{g}}\:\ttbrace{\:\auxcase{c}{1} \dots \auxcase{c}{n}\:\maincase{c}\:} \\
   & && \quad {\genbodyb{K}{t}} \\
   & && \ttrbrace \text{''}
 \end{alignat*}
 \begin{align*}
-  \auxcase{c}{i} = \text{``} & \kwcase~\mathtt{func\_}f_i\ttcolon \\
-  & y_{i1}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}f_i~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}1\ttsemi \dots\ttsemi~y_{io_i}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}f_i~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}o_i\ttsemi \\
-  & x_{i1}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}f_i~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \dots\ttsemi~x_{im_i}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}f_i~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_i\ttsemi \\
-  & \kwgoto~\mathtt{entry\_}f_i\ttsemi \text{''}
+  \auxcase{c}{i} = \text{``} & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
+  & y_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}1\ttsemi \dots\ttsemi\:y_{io_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}o_i\ttsemi \\
+  & x_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \dots\ttsemi\:x_{im_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_i\ttsemi \\
+  & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \text{''}
 \end{align*}
 \begin{align*}
   \maincase{c} = \text{``} & \kwdefault\ttcolon\ttsemi \\
-  & x_{01}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}c~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \dots\ttsemi~x_{0m_0}~\tteq~\ttparen{\ttparen{\kwstruct~\mathtt{arg\_}c~\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_0\ttsemi \text{''}
+  & x_{01}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \dots\ttsemi\:x_{0m_0}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_0\ttsemi \text{''}
 \end{align*}
 \[ \text{where} \quad
   \begin{aligned}[t]
     & \text{$\mathit{decls}$ is local variable declarations for variables used in $\genbodyb{K}{t}$.} \\
-    & K(e) = \dq{\ttstar\ttparen{T_{00}\ttstar}\texttt{ret}~\tteq~e\ttsemi \kwCreturn\ttsemi}
+    & K(e) = \dq{\ttstar\ttparen{T_{00}\ttstar}\texttt{ret}\:\tteq\:e\ttsemi \kwCreturn\ttsemi}
   \end{aligned}
 \]
 
@@ -973,17 +973,17 @@ We iterate it until no fixpoint functions.
 \raggedright
 $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 \[
-  \genfuns{c} = \dq{\kwstatic~T_0~c\ttparen{\fargsd{t}}~\ttbrace{~\mathit{decls}~\genbodyb{K}{t}~}}
+  \genfuns{c} = \dq{\kwstatic\:T_0\:c\ttparen{\fargsd{t}}\:\ttbrace{\:\mathit{decls}\:\genbodyb{K}{t}\:}}
 \]
 \[ \text{where} \quad
   \begin{aligned}[t]
     & \text{$c$ is defined as \kwDefinition~$c : T_1 \rightarrow \dots \rightarrow T_n \rightarrow T_0 := t.$} \\
     & \text{$T_0$ is an inductive type} \\
     & \text{$\mathit{decls}$ is local variable declarations for variables used in $\genbodyb{K}{t}$ excluding $\fargs{t}$.} \\
-    & K(e) = \dq{\kwCreturn~e\ttsemi} \\
+    & K(e) = \dq{\kwCreturn\:e\ttsemi} \\
     & \fargs{t} =
       \begin{cases}
-        \dq{T~x\ttcomma~\fargs{u}}      & t = \lamT{x}{T}{u} \\
+        \dq{T\:x\ttcomma\:\fargs{u}}      & t = \lamT{x}{T}{u} \\
         \fargs{t_j}       & t = \fix{f_i}{t_i}{i=1\dots h}{f_j} \\
         \dq{}    & \text{otherwise}
       \end{cases} \\
