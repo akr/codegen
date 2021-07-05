@@ -240,6 +240,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\vdashb}{\vdash_{\textrm{b}}}
 \newcommand{\vdashf}{\vdash_{\textrm{f}}}
 
+\newcommand{\reltri}{\mathrel{\triangleright}}
+
 \begin{document}
 
 \section{\gallina{}}\label{sec:gallina}
@@ -281,13 +283,13 @@ keywordstyle=[3]\color{myred}\ttfamily,
 % based on sphinx/language/core/conversion.rst and doc/sphinx/language/core/inductive.rst
 \begin{gather*}
   \text{beta:}~
-    E[\Gamma] \vdash ((\lam{x}{t})~u)~\triangleright~\subst{t}{x}{u} \\
+    E[\Gamma] \vdash ((\lam{x}{t})~u) \reltri \subst{t}{x}{u} \\
   \text{delta-local:}~
-    \dfrac{(x:=t) \in \Gamma}{E[\Gamma] \vdash x~\triangleright~t} \\
+    \dfrac{(x:=t) \in \Gamma}{E[\Gamma] \vdash x \reltri t} \\
   \text{delta-global:}~
-    \dfrac{(c:=t) \in E}{E[\Gamma] \vdash c~\triangleright~t} \\
+    \dfrac{(c:=t) \in E}{E[\Gamma] \vdash c \reltri t} \\
   \text{zeta:}~
-    E[\Gamma] \vdash \letin{x}{t}{u}~\triangleright~\subst{u}{x}{t} \\
+    E[\Gamma] \vdash \letin{x}{t}{u} \reltri \subst{u}{x}{t} \\
   \text{iota-match:}~
     \dfrac
     {
@@ -296,7 +298,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
     }{
       E[\Gamma] \vdash
       \match{(C_j~u_1\ldots u_{p+m})}{C_i}{t_i}{i=1\dots h}
-      ~\triangleright~
+      \reltri
       t_j~u_{p+1}\ldots u_{p+m}
     } \\
   \text{iota-fix:}~
@@ -304,14 +306,14 @@ keywordstyle=[3]\color{myred}\ttfamily,
       u_{k_j} = C~u'_1\ldots u'_m
     }{
       \begin{aligned}
-        E[\Gamma] \vdash\;
-        & (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~u_1 \dots u_{k_j} \\
-        & {\triangleright~
-           \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} ~u_1 \dots u_{k_j}}
+        E[\Gamma] \vdash\; &
+          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~u_1 \dots u_{k_j} \\
+        \reltri\; &
+          \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_k}}_{k=1\dots h} ~u_1 \dots u_{k_j}
       \end{aligned}
     } \\
   \text{eta expansion:}~
-    \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t~\triangleright~\lamT{x}{T}{(t~x)}}
+    \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t~x)}}
 \end{gather*}
 \raggedright
 {\small Note:
@@ -374,7 +376,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
     }{
       E[\Gamma] \vdash
       t_0~x_1 \ldots x_{i-1}~t_i~t_{i+1} \ldots t_n
-      ~\triangleright~
+      \reltri
       \letin{x_i}{t_i:T_i}{t_0~x_1 \ldots x_{i-1}~x_i~t_{i+1} \ldots t_n}
     } \\
   \text{zeta-item:}~
@@ -385,11 +387,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
       \text{$x_0$ is a fresh variable}
     }{
       \begin{aligned}
-      E[\Gamma] \vdash\;
-      & \match{t_0}{C_i}{t_i}{i=1\dots h} \\
-      & {\triangleright~
-        \letin{x_0}{t_0:T_0}{\match{x_0}{C_i}{t_i}{i=1\dots h}}}
-        \end{aligned}
+      E[\Gamma] \vdash\; &
+        \match{t_0}{C_i}{t_i}{i=1\dots h} \\
+      \reltri\; &
+        \letin{x_0}{t_0:T_0}{\match{x_0}{C_i}{t_i}{i=1\dots h}}
+      \end{aligned}
     }
 \end{gather*}
 
@@ -410,10 +412,10 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
       E[\Gamma] \vdash (\lam{x}{t})~y_1\dots y_n : T \quad
       \text{$T$ is an inductive type}
     }{
-      E[\Gamma] \vdash (\lam{x}{t})~y_1\dots y_n~\triangleright~\subst{t}{x}{y_1}~y_2\dots y_n
+      E[\Gamma] \vdash (\lam{x}{t})~y_1\dots y_n \reltri \subst{t}{x}{y_1}~y_2\dots y_n
     } \\
   \text{delta-var:}~
-    \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x~\triangleright~y} \\
+    \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \\
   \text{delta-fun:}~
      \dfrac
      {
@@ -423,17 +425,17 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
        \text{$t$ is one of $x, c, C, \lam{x}{u}, \fix{f_i/k_i}{t_i}{i=1\dots h}{f_j}$}
      }{
        E[\Gamma] \vdash f~y_1\ldots y_q
-                        ~\triangleright~
+                        \reltri
                         t~x_1\ldots x_p~y_1\dots y_q
      } \\
   \text{zeta-flat:}~
     E[\Gamma] \vdash \letin{y}{(\letin{x}{t_1}{t_2})}{t_0}
-                       ~\triangleright~
+                       \reltri
                        \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \\
   \text{zeta-app:}~
     E[\Gamma] \vdash
      (\letin{x_0}{t}{u})~x_1\ldots x_n
-     ~\triangleright~
+     \reltri
      \letin{x_0}{t}{(u~x_1\ldots x_n)} \\
   \text{iota-match-var:}~
     \dfrac
@@ -443,7 +445,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     }{
       E[\Gamma] \vdash
       \match{x}{C_i}{t_i}{i=1\dots h}
-      ~\triangleright~
+      \reltri
       t_j~y_{p+1}\ldots y_{p+m}
     } \\
   \text{iota-fix-var:}~
@@ -457,13 +459,14 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
       \end{gathered}
     }{
       \begin{aligned}
-        E[\Gamma] \vdash\; & (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n \\
-                           & {\triangleright~
-                              \begin{aligned}[t]
-                              & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
-                              & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
-                              & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
-                              \end{aligned}}
+        E[\Gamma] \vdash\; &
+          (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n \\
+        \reltri\; &
+          \begin{aligned}[t]
+          & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_1}} ~\dots \\
+          & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\dots h}{f_h}} \\
+          & \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
+          \end{aligned}
       \end{aligned}
     } \\
   \text{iota-fix-var':}~
@@ -479,7 +482,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     }{
       E[\Gamma] \vdash
       (\fix{f_i/k_i}{t_i}{i=1\dots h}{f_j})~x_1\ldots x_n
-      ~\triangleright~
+      \reltri
       \subst{t_j}{f_k}{f'_k}_{k=1\dots h} ~x_1 \dots x_n
     }
 \end{gather*}
@@ -492,7 +495,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     \dfrac{
       \text{$x$ does not occur in $u$}
     }{E[\Gamma] \vdash \letin{x}{t}{u}
-                       ~\triangleright~
+                       \reltri
                        u
     }
 \end{gather*}
