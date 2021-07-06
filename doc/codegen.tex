@@ -554,7 +554,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     \F{t}                                                                                              & (t = \lam{x}{u}) \wedge (p = q = 0) \\
     \E{\subst{u}{x}{x_1}}{x_2\dots x_p}{q}                                                             & (t = \lam{x}{u}) \wedge (p > 0) \wedge (r = 0) \quad \text{(beta-var)} \\
     (\lam{x}{\E{u}{}{p+q-1}})\:x_1\dots x_p                                                             & (t = \lam{x}{u}) \wedge (\begin{aligned}[t]
-                                                                                                                                & ((p = 0) \wedge (q > 0)) \:\vee \\
+                                                                                                                                & ((p = 0) \wedge (q > 0)) \vee \mbox{} \\
                                                                                                                                 & ((p > 0) \wedge (r > 0)))
                                                                                                                                 \end{aligned} \\
     \E{u}{x_0\:x_1\dots x_p}{q}                                                                & t = u\:x_0 \\
@@ -689,9 +689,9 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\A{K}{x}{} = K(\dq{x}) \\
   &\A{K}{x}{x_1\dots x_n} =
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1 \dots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
-    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \:\wedge \\ & x \in \tr \end{aligned} \\
+    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge \mbox{} \\ & x \in \tr \end{aligned} \\
   &\A{K}{x}{x_1\dots x_n} = K(\dq{x\ttparen{y_1,\dots,y_o,x_1,\dots, x_n}})
-    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \:\wedge \\ & x \not\in \tr \end{aligned} \\
+    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge \mbox{} \\ & x \not\in \tr \end{aligned} \\
   &\A{K}{c}{x_1\dots x_n} = K(\dq{c\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\A{K}{C}{x_1\dots x_n} = K(\dq{C\ttparen{x_1,\dots, x_n}})                                   && n \geq 0 \\
   &\A{K}{t\:x_0}{x_1\dots x_n} = \A{K}{t}{x_0\:x_1\dots x_n} \\
@@ -881,7 +881,7 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
              & \textstyle\bigcup_{i=1}^h T_i - \{f_1,\dots, f_h\} \bigr)
     \end{aligned} &
       \begin{aligned}[t]
-        & (t = \fix{f_i}{t_i}{i=1\dots h}{f_j}) \:\wedge \\
+        & (t = \fix{f_i}{t_i}{i=1\dots h}{f_j}) \wedge \mbox{} \\
         & (n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dots, f_h\} = \varnothing\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned} \\
