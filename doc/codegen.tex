@@ -702,22 +702,22 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\AbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
-                 & \cdots \\
-                 & \mathit{caselabel}_{C_i}\ttcolon\quad
-                   \begin{aligned}[t]
-                   & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
-                   & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
-                   & {\A{K}{t_i}{x_1\ldots x_n}} \\
-                   & \kwbreak\ttsemi
-                   \end{aligned} \\
-                 & \cdots \\
-                 & \ttrbrace\rdq
+            & \cdots \\
+            & \mathit{caselabel}_{C_i}\ttcolon\quad
+              \begin{aligned}[t]
+              & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
+              & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+              & {\A{K}{t_i}{x_1\ldots x_n}} \\
+              & \kwbreak\ttsemi
+              \end{aligned} \\
+            & \cdots \\
+            & \ttrbrace\rdq
        \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                   && f_j \in \tr \\
      & \quad\begin{alignedat}[t]{2}
        \ldq & \passign(\fvars{t_j}, x_1\ldots x_n) \\
-                 & {\genbodyat{K'}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \\
-                 & \mathtt{exit\_}f_j\ttcolon \rdq
+            & {\genbodyat{K'}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \\
+            & \mathtt{exit\_}f_j\ttcolon \rdq
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
                   & \text{where} \\
@@ -733,9 +733,9 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                      && f_j \not\in \tr \\
      & \quad\begin{alignedat}[t]{2}
        \ldq & K(f_j\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma x_n})                  \\
-                 & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
-                 & {\genbodyan{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}}                          \\
-                 & \mathtt{skip\_}f_j\ttcolon \rdq
+            & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
+            & {\genbodyan{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}}                          \\
+            & \mathtt{skip\_}f_j\ttcolon \rdq
        \end{alignedat}
 \end{align*}
 {\small Note:
@@ -775,20 +775,20 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   &\BbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
-                 & \cdots \\
-                 & \mathit{caselabel}_{C_i}\ttcolon\quad
-                   \begin{aligned}[t]
-                     & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
-                     & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
-                     & {\B{K}{t_i}{x_1\ldots x_n}}
-                   \end{aligned} \\
-                 & \cdots \\
-                 & \ttrbrace\rdq
+            & \cdots \\
+            & \mathit{caselabel}_{C_i}\ttcolon\quad
+              \begin{aligned}[t]
+                & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
+                & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                & {\B{K}{t_i}{x_1\ldots x_n}}
+              \end{aligned} \\
+            & \cdots \\
+            & \ttrbrace\rdq
      \end{alignedat} \\
   &\B{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =       \\
      & \quad\begin{alignedat}{2}
        \ldq & {\passign(\fvars{t_j}, x_1\ldots x_n)} \\
-                 & {\genbodyb{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \rdq
+            & {\genbodyb{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \rdq
        \end{alignedat}
 \end{align*}
 {\small Note: \quad We do not define $\B{K}{\lam{x}{t}}{}$ because a tail position cannot be a function after the argument completion.}
