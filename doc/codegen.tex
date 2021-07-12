@@ -690,10 +690,10 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\A{K}{x}{x_1\ldots x_n} =
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1 \ldots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
     && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge {} \\ & x \in \tr \end{aligned} \\
-  &\A{K}{x}{x_1\ldots x_n} = K(\dq{x\ttparen{y_1,\dotsc,y_o,x_1,\dotsc, x_n}})
+  &\A{K}{x}{x_1\ldots x_n} = K(\dq{x\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma  x_n}})
     && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge {} \\ & x \not\in \tr \end{aligned} \\
-  &\A{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1,\dotsc, x_n}})                                   && n \geq 0 \\
-  &\A{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1,\dotsc, x_n}})                                   && n \geq 0 \\
+  &\A{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
+  &\A{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
   &\A{K}{t\:x_0}{x_1\ldots x_n} = \A{K}{t}{x_0\:x_1\ldots x_n} \\
   &\A{K}{\letin{x}{t_1}{t_2}}{x_1\ldots x_n} =
       \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \A{K}{t_2}{x_1\ldots x_n} \rdq \end{aligned}
@@ -732,7 +732,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                 \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                      && f_j \not\in \tr \\
      & \quad\begin{alignedat}[t]{2}
-       \text{``} & K(f_j\ttparen{y_1,\dotsc,y_o,x_1,\dotsc, x_n})                  \\
+       \text{``} & K(f_j\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma x_n})                  \\
                  & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
                  & {\genbodyan{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}}                          \\
                  & \mathtt{skip\_}f_j\ttcolon \text{''}
@@ -765,8 +765,8 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   &\B{K}{x}{} = K(\dq{x}) \\
   &\B{K}{x}{x_1\ldots x_n} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1\ldots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
     && (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \\
-  &\B{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1,\dotsc, x_n}})                                   && n \geq 0 \\
-  &\B{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1,\dotsc, x_n}})                                   && n \geq 0 \\
+  &\B{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
+  &\B{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
   &\B{K}{t\:x_0}{x_1\ldots x_n} = \B{K}{t}{x_0\:x_1\ldots x_n} \\
   &\B{K}{\letin{x}{t_1}{t_2}}{x_1\ldots x_n} =
       \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \B{K}{t_2}{x_1\ldots x_n} \rdq \end{aligned}
@@ -933,8 +933,8 @@ We iterate it until no fixpoint functions.
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\auxfunction{c}{1} \ldots \auxfunction{c}{n}} \]
 \begin{alignat*}{2}
-  \mainfunction{c} &= \text{``} && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dotsc\ttcomma T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ x_{01}\ttcomma\dotsc\ttcomma x_{0m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
+  \mainfunction{c} &= \text{``} && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dotsc\ttcomma\, T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ x_{01}\ttcomma\dotsc\ttcomma\, x_{0m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \text{''}
 \end{alignat*}
