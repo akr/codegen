@@ -1039,7 +1039,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
            because it apply beta reduction multiply when f is nested lambda. *)
         (let first_arg = args_nf.(0) in
          let rest_args = Array.sub args_nf 1 (Array.length args_nf - 1) in
-         let term2 = mkApp (Reductionops.beta_applist sigma (f, [first_arg]), rest_args) in
+         let term2 = mkApp (Vars.subst1 first_arg b, rest_args) in
         debug_reduction "beta-var" (fun () ->
           Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
