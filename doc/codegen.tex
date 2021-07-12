@@ -701,7 +701,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\A{K}{\lam{x}{t}}{x_1\:x_2\ldots x_n} = \A{K}{t}{x_2\ldots x_n}                                  && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
   &\AbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
-       \text{``} & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
+       \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
                  & \cdots \\
                  & \mathit{caselabel}_{C_i}\ttcolon\quad
                    \begin{aligned}[t]
@@ -711,13 +711,13 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                    & \kwbreak\ttsemi
                    \end{aligned} \\
                  & \cdots \\
-                 & \ttrbrace\text{''}
+                 & \ttrbrace\rdq
        \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                   && f_j \in \tr \\
      & \quad\begin{alignedat}[t]{2}
-       \text{``} & \passign(\fvars{t_j}, x_1\ldots x_n) \\
+       \ldq & \passign(\fvars{t_j}, x_1\ldots x_n) \\
                  & {\genbodyat{K'}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \\
-                 & \mathtt{exit\_}f_j\ttcolon \text{''}
+                 & \mathtt{exit\_}f_j\ttcolon \rdq
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
                   & \text{where} \\
@@ -732,10 +732,10 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                 \end{alignedat} \\
   &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                      && f_j \not\in \tr \\
      & \quad\begin{alignedat}[t]{2}
-       \text{``} & K(f_j\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma x_n})                  \\
+       \ldq & K(f_j\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma x_n})                  \\
                  & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
                  & {\genbodyan{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}}                          \\
-                 & \mathtt{skip\_}f_j\ttcolon \text{''}
+                 & \mathtt{skip\_}f_j\ttcolon \rdq
        \end{alignedat}
 \end{align*}
 {\small Note:
@@ -774,7 +774,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   &\B{K}{\lam{x}{t}}{x_1\:x_2\ldots x_n} = \B{K}{t}{x_2\ldots x_n}                                 && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
   &\BbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
-       \text{``} & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
+       \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
                  & \cdots \\
                  & \mathit{caselabel}_{C_i}\ttcolon\quad
                    \begin{aligned}[t]
@@ -783,12 +783,12 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
                      & {\B{K}{t_i}{x_1\ldots x_n}}
                    \end{aligned} \\
                  & \cdots \\
-                 & \ttrbrace\text{''}
+                 & \ttrbrace\rdq
      \end{alignedat} \\
   &\B{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =       \\
      & \quad\begin{alignedat}{2}
-       \text{``} & {\passign(\fvars{t_j}, x_1\ldots x_n)} \\
-                 & {\genbodyb{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \text{''}
+       \ldq & {\passign(\fvars{t_j}, x_1\ldots x_n)} \\
+                 & {\genbodyb{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \rdq
        \end{alignedat}
 \end{align*}
 {\small Note: \quad We do not define $\B{K}{\lam{x}{t}}{}$ because a tail position cannot be a function after the argument completion.}
@@ -924,7 +924,7 @@ If the free variables contain a function bounded by an outer fixpoint, the funct
 We iterate it until no fixpoint functions.
 
 \begin{alignat*}{2}
-  \genfunm{c} &= \text{``} && \enumentries{c}~\argstructdefs{c}~\forwarddecl{c}~\entryfunctions{c}~\bodyfunction{c} \text{''}
+  \genfunm{c} &= \ldq && \enumentries{c}~\argstructdefs{c}~\forwarddecl{c}~\entryfunctions{c}~\bodyfunction{c} \rdq
 \end{alignat*}
 \[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c\ttcomma \mathtt{func\_}f_1\ttcomma \dotsc\ttcomma \mathtt{func\_}f_n }\ttsemi} \]
 \[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\auxstructdef{c}{1} \ldots \auxstructdef{c}{n}} \]
@@ -933,34 +933,34 @@ We iterate it until no fixpoint functions.
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\auxfunction{c}{1} \ldots \auxfunction{c}{n}} \]
 \begin{alignat*}{2}
-  \mainfunction{c} &= \text{``} && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dotsc\ttcomma\, T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
+  \mainfunction{c} &= \ldq && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dotsc\ttcomma\, T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
   & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ x_{01}\ttcomma\dotsc\ttcomma\, x_{0m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
-  & && \ttrbrace \text{''}
+  & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
-  \auxfunction{c}{i} &= \text{``} && \kwstatic\:T_{i0}\:f_i\ttparen{U_{i1}\:y_{i1}\ttcomma\dotsc\ttcomma U_{io_i}\:y_{io_i}\ttcomma T_{i1}\:x_{i1}\ttcomma\dotsc\ttcomma T_{im_i}\:x_{im_i}}\:\ttlbrace \\
+  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{U_{i1}\:y_{i1}\ttcomma\dotsc\ttcomma U_{io_i}\:y_{io_i}\ttcomma T_{i1}\:x_{i1}\ttcomma\dotsc\ttcomma T_{im_i}\:x_{im_i}}\:\ttlbrace \\
   & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ y_{i1}\ttcomma\dotsc\ttcomma y_{io_i}\ttcomma x_{i1}\ttcomma\dotsc\ttcomma x_{im_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
-  & && \ttrbrace \text{''}
+  & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
-  \bodyfunction{c} &= \text{``}
+  \bodyfunction{c} &= \ldq
     && \kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\ttstar\mathtt{arg}\ttcomma \kwvoid\:\ttstar\mathtt{ret}}\:\ttlbrace \\
   & && \quad \mathit{decls} \\
   & && \quad \kwswitch\:\ttparen{\mathtt{g}}\:\ttbrace{\:\auxcase{c}{1} \ldots \auxcase{c}{n}\:\maincase{c}\:} \\
   & && \quad {\genbodyb{K}{t}} \\
-  & && \ttrbrace \text{''}
+  & && \ttrbrace \rdq
 \end{alignat*}
 \begin{align*}
-  \auxcase{c}{i} = \text{``} & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
+  \auxcase{c}{i} = \ldq & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
   & y_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}1\ttsemi \ldots\ttsemi\:y_{io_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}o_i\ttsemi \\
   & x_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \ldots\ttsemi\:x_{im_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_i\ttsemi \\
-  & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \text{''}
+  & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \rdq
 \end{align*}
 \begin{align*}
-  \maincase{c} = \text{``} & \kwdefault\ttcolon\ttsemi \\
-  & x_{01}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \ldots\ttsemi\:x_{0m_0}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_0\ttsemi \text{''}
+  \maincase{c} = \ldq & \kwdefault\ttcolon\ttsemi \\
+  & x_{01}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \ldots\ttsemi\:x_{0m_0}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_0\ttsemi \rdq
 \end{align*}
 \[ \text{where} \quad
   \begin{aligned}[t]
