@@ -595,16 +595,16 @@ $V$ is the variable mapping for variables declared outside.
     \cv{u}{x_0\:x_1\ldots x_n}V                        & t = u\:x_0 \\
     \cv{t_1}{}{V}; \cv{t_2}{x_1\ldots x_n}{V; M}; M    & t = \letin{x}{t_1}{t_2} \quad \text{where}~M = x\mapsto v \\
     \begin{aligned}[t]
-      (&\cv{t_1}{x_1\ldots x_n}{V;M_1};\dotsb; \\
+      (&\cv{t_1}{x_1\ldots x_n}{V;M_1};\ldots; \\
        &\cv{t_h}{x_1\ldots x_n}{V;M_h}; \\
-       &M_1;\dotsb;M_h)
+       &M_1;\ldots;M_h)
     \end{aligned} &                                   \begin{aligned}[t]
                                                         &t = \match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h} \\
-                                                        &\text{where}~M_i = y_{i1}\mapsto v_{i1}; \dotsb; y_{i\NM_{C_i}}\mapsto v_{i\NM_{C_i}}
+                                                        &\text{where}~M_i = y_{i1}\mapsto v_{i1}; \ldots; y_{i\NM_{C_i}}\mapsto v_{i\NM_{C_i}}
                                                       \end{aligned} \\
-    \cv{t_1}{}{V;M}; \dotsb; \cv{t_h}{}{V;M}; M &    \begin{aligned}[t]
+    \cv{t_1}{}{V;M}; \ldots; \cv{t_h}{}{V;M}; M &    \begin{aligned}[t]
                                                         &t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-                                                        &\text{where}~M = f_1\mapsto v_1;\dotsb; f_h\mapsto v_h
+                                                        &\text{where}~M = f_1\mapsto v_1;\ldots; f_h\mapsto v_h
                                                       \end{aligned}
   \end{cases}
 \]
@@ -705,7 +705,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-              & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
+              & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
               & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
               & {\A{K}{t_i}{x_1\ldots x_n}} \\
               & \kwbreak\ttsemi
@@ -778,7 +778,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-                & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\dotsb\ttsemi \\
+                & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
                 & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
                 & {\B{K}{t_i}{x_1\ldots x_n}}
               \end{aligned} \\
@@ -840,7 +840,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 \]
 {\small Note:
 \begin{itemize}
-  \item $\fvarsop$ and $\fvarsop'$ returns a list of variables: $x_1;\dotsb;x_n;$.  For simplicity, we omit ``$;$'' if not ambiguous.
+  \item $\fvarsop$ and $\fvarsop'$ returns a list of variables: $x_1;\ldots;x_n;$.  For simplicity, we omit ``$;$'' if not ambiguous.
   \item $\dq{g(i)}~\text{for}~i=j_1,\dotsc,j_n$ means $\dq{g(j_1)\:\ldots\:g(j_n)}$.
 \end{itemize}}
 
