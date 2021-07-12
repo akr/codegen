@@ -1034,11 +1034,12 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
          let app_ty = Retyping.get_type_of env sigma (mkApp (f, args_nf)) in
          is_ind_type env sigma app_ty then
         (* reduction: beta-var *)
+        (* We apply beta reduction only for the first argument.
+           We don't Reductionops.beta_applist sigma (f, (Array.to_list args_nf))
+           because it apply beta reduction multiply when f is nested lambda. *)
         (let first_arg = args_nf.(0) in
-        let first_arg_ty = Retyping.get_type_of env sigma first_arg in
-        let rest_args0 = Array.sub args_nf 1 (Array.length args_nf - 1) in
-        let rest_args = Array.map (fun arg -> Vars.lift 1 arg) rest_args0 in
-        let term2 = mkLetIn (x, first_arg, first_arg_ty, (mkApp (b, rest_args))) in
+         let rest_args = Array.sub args_nf 1 (Array.length args_nf - 1) in
+         let term2 = mkApp (Reductionops.beta_applist sigma (f, [first_arg]), rest_args) in
         debug_reduction "beta-var" (fun () ->
           Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
           Pp.str "->" ++ Pp.fnl () ++
