@@ -160,6 +160,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
           (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
       ) env in
     let oind_body = mind_body.Declarations.mind_packets.(i) in
+    (* xxx: use mind_nf_lc instead of mind_user_lc *)
     let cons_is_linear = Array.map
       (fun user_lc ->
         (*Feedback.msg_debug (str "[codegen] user_lc1:" ++ str (term_kind sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
