@@ -8,7 +8,7 @@ open EConstr
 open Cgenutil
 open State
 
-let term_kind sigma term =
+let term_kind (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with
   | Constr.Rel _ -> "Rel"
   | Constr.Var _ -> "Var"
@@ -31,12 +31,12 @@ let term_kind sigma term =
   | Constr.Float _ -> "Float"
   | Constr.Array _ -> "Array"
 
-let whd_all env sigma term = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
-let nf_all env sigma term = Reductionops.nf_all env sigma term
+let whd_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
+let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = Reductionops.nf_all env sigma term
 
-let prod_appvect sigma c v = EConstr.of_constr (prod_appvect (EConstr.to_constr sigma c) (Array.map (EConstr.to_constr sigma) v))
+let prod_appvect (sigma : Evd.evar_map) (c : EConstr.t) (v : EConstr.t array) : EConstr.t = EConstr.of_constr (prod_appvect (EConstr.to_constr sigma c) (Array.map (EConstr.to_constr sigma) v))
 
-let rec is_concrete_inductive_type env sigma term =
+let rec is_concrete_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   let termty = Retyping.get_type_of env sigma term in
   (if isSort sigma termty then
     match EConstr.kind sigma term with
@@ -48,7 +48,7 @@ let rec is_concrete_inductive_type env sigma term =
   else
     false) (* "list" is not "concrete" inductive type because it has concrete parameter *)
 
-let command_linear (ty : Constrexpr.constr_expr) =
+let command_linear (ty : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
@@ -59,23 +59,23 @@ let command_linear (ty : Constrexpr.constr_expr) =
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
   Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty3)
 
-let rec is_registered_linear_type env sigma ty l =
+let rec is_registered_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (l : (EConstr.t * type_linearity) list) : type_linearity option =
   match l with
   | [] -> None
   | (k, linearity) :: rest ->
       if eq_constr sigma ty k then Some linearity else is_registered_linear_type env sigma ty rest
 
-let type_of_inductive_arity mind_arity : Constr.t =
+let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
   match mind_arity with
   | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
   | Declarations.TemplateArity temp_arity -> Constr.mkType (temp_arity : Declarations.template_arity).Declarations.template_level
 
-let valid_type_param env sigma decl =
+let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.rel_declaration) : bool =
   match decl with
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
   | Context.Rel.Declaration.LocalDef _ -> false
 
-let rec hasRel sigma term =
+let rec hasRel (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   match EConstr.kind sigma term with
   | Constr.Rel i -> true
   | Constr.Var name -> false
@@ -98,14 +98,14 @@ let rec hasRel sigma term =
   | Constr.Float n -> false
   | Constr.Array (u,t,def,ty) -> Array.exists (hasRel sigma) t || hasRel sigma def || hasRel sigma ty
 
-let rec destProdX_rec sigma term =
+let rec destProdX_rec (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot list * EConstr.t list * EConstr.t =
   match EConstr.kind sigma term with
   | Constr.Prod (name, ty, body) ->
       let (names, tys, body) = destProdX_rec sigma body in
       (name :: names, ty :: tys, body)
   | _ -> ([], [], term)
 
-let destProdX sigma term =
+let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot array * EConstr.t array * EConstr.t =
   let (names, tys, body) = destProdX_rec sigma term in
   (Array.of_list names, Array.of_list tys, body)
 
@@ -122,7 +122,7 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
   | Constr.Ind iu -> is_linear_app env sigma ty ty [| |]
   | Constr.App (f, argsary) -> is_linear_app env sigma ty f argsary
   | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" +++ Printer.pr_econstr_env env sigma ty)
-and is_linear_app env sigma ty f argsary =
+and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (f : EConstr.t) (argsary : EConstr.t array) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match is_registered_linear_type env sigma ty !type_linearity_list with
   | Some Linear -> true
@@ -139,7 +139,7 @@ and is_linear_app env sigma ty f argsary =
           type_linearity_list := (ty, Unrestricted) :: !type_linearity_list; false)
       else
         user_err (str "[codegen] is_linear_app: unexpected type application:" +++ Printer.pr_econstr_env env sigma f))
-and is_linear_ind env sigma ty ie argsary =
+and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ie : Names.inductive * EConstr.EInstance.t) (argsary : EConstr.t array) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   let ((mutind, i), _) = ie in (* strip EInstance.t *)
   let mind_body = Environ.lookup_mind mutind env in
@@ -178,35 +178,35 @@ and is_linear_ind env sigma ty ie argsary =
       (Array.map EConstr.of_constr oind_body.Declarations.mind_user_lc) in
     Array.mem true cons_is_linear
 
-let is_linear env sigma ty =
+let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
   let ty2 = nf_all env sigma ty in
   is_linear_type env sigma ty2
 
-let check_type_linearity env sigma ty =
+let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   ignore (is_linear env sigma ty)
 
-let rec copy_linear_refs linear_refs =
+let rec copy_linear_refs (linear_refs : int ref option list) : int ref option list =
   match linear_refs with
   | [] -> []
   | None :: rest -> None :: copy_linear_refs rest
   | Some r :: rest -> Some (ref !r) :: copy_linear_refs rest
 
-let rec eq_linear_refs linear_refs1 linear_refs2 =
+let rec eq_linear_refs (linear_refs1 : int ref option list) (linear_refs2 : int ref option list) : bool =
   match linear_refs1, linear_refs2 with
   | [], [] -> true
   | (None :: rest1), (None :: rest2) -> eq_linear_refs rest1 rest2
   | (Some r1 :: rest1), (Some r2 :: rest2) -> !r1 = !r2 && eq_linear_refs rest1 rest2
   | _, _ -> raise (CodeGenError "inconsistent linear_refs")
 
-let rec update_linear_refs dst_linear_refs src_linear_refs =
+let rec update_linear_refs (dst_linear_refs : int ref option list) (src_linear_refs : int ref option list) : unit =
   match dst_linear_refs, src_linear_refs with
   | [], [] -> ()
   | (None :: rest1), (None :: rest2) -> update_linear_refs rest1 rest2
   | (Some r1 :: rest1), (Some r2 :: rest2) -> (r1 := !r2; update_linear_refs rest1 rest2)
   | _, _ -> raise (CodeGenError "inconsistent linear_refs")
 
-let update_linear_refs_for_case linear_refs_ary dst_linear_refs =
+let update_linear_refs_for_case (linear_refs_ary : int ref option list array) (dst_linear_refs : int ref option list) : unit =
   Array.iter (fun linear_ref ->
     if not (eq_linear_refs linear_refs_ary.(0) linear_ref) then
       raise (CodeGenError "inconsistent linear variable use in match branches"))
@@ -219,22 +219,25 @@ let rec ntimes n f v =
   else
     ntimes (n-1) f (f v)
 
-let string_of_name name =
+let string_of_name (name : Names.Name.t) : string =
   match name with
   | Names.Name.Name id -> Names.Id.to_string id
   | Names.Name.Anonymous -> "_"
 
-let name_of_decl decl =
+let name_of_decl (decl : EConstr.rel_declaration) : Names.Name.t Context.binder_annot =
   match decl with
   | Context.Rel.Declaration.LocalAssum (name, ty) -> name
   | Context.Rel.Declaration.LocalDef (name, expr, ty) -> name
 
-let ty_of_decl decl =
+let ty_of_decl (decl : EConstr.rel_declaration) : EConstr.types =
   match decl with
   | Context.Rel.Declaration.LocalAssum (name, ty) -> ty
   | Context.Rel.Declaration.LocalDef (name, expr, ty) -> ty
 
-let with_local_var env sigma decl linear_refs num_innermost_locals f =
+let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
+    (decl : EConstr.rel_declaration) (linear_refs : int ref option list)
+    (num_innermost_locals : int)
+    (f : Environ.env -> int ref option list -> int -> unit) : unit =
   let env2 = EConstr.push_rel decl env in
   let name = name_of_decl decl in
   let ty = ty_of_decl decl in
@@ -250,7 +253,7 @@ let with_local_var env sigma decl linear_refs num_innermost_locals f =
     else
       ()
 
-let rec check_outermost_lambdas env sigma linear_refs num_innermost_locals term =
+let rec check_outermost_lambdas (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : int ref option list) (num_innermost_locals : int) (term : EConstr.t) : unit =
   ((*Feedback.msg_debug (str "[codegen] check_outermost_lambdas:" +++ Printer.pr_econstr_env env sigma term);*)
   match EConstr.kind sigma term with
   | Constr.Lambda (name, ty, body) ->
@@ -259,7 +262,7 @@ let rec check_outermost_lambdas env sigma linear_refs num_innermost_locals term 
       with_local_var env sigma decl linear_refs num_innermost_locals
         (fun env2 linear_refs2 num_innermost_locals2 -> check_outermost_lambdas env2 sigma linear_refs2 num_innermost_locals2 body))
   | _ -> check_linear_valexp env sigma linear_refs num_innermost_locals term)
-and check_linear_valexp env sigma linear_refs num_innermost_locals term =
+and check_linear_valexp (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : int ref option list) (num_innermost_locals : int) (term : EConstr.t) : unit =
   ((*Feedback.msg_debug (str "[codegen] check_linear_valexp:" +++ Printer.pr_econstr_env env sigma term);*)
   let termty = Retyping.get_type_of env sigma term in
   match EConstr.kind sigma term with
@@ -329,7 +332,7 @@ and check_linear_valexp env sigma linear_refs num_innermost_locals term =
       check_linear_valexp env sigma linear_refs num_innermost_locals def
   | Constr.Int n -> ()
   | Constr.Float n -> ())
-and check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br =
+and check_case_branch (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : int ref option list) (num_innermost_locals : int) (cstr_nargs : int) (br : EConstr.t) : unit =
   if cstr_nargs = 0 then
     check_linear_valexp env sigma linear_refs num_innermost_locals br
   else
@@ -346,7 +349,7 @@ let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EC
   if !type_linearity_list <> [] then
     check_linear_valexp env sigma [] 0 term
 
-let linear_type_check_single libref =
+let linear_type_check_single (libref : Libnames.qualid) : unit =
   let gref = Smartlocate.global_with_alias libref in
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -363,7 +366,7 @@ let linear_type_check_single libref =
       | _ -> user_err (str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
       | _ -> user_err (str "[codegen] not constant")
 
-let command_linear_check libref_list =
+let command_linear_check (libref_list : Libnames.qualid list) : unit =
   List.iter linear_type_check_single libref_list
 
 (* xxx test *)
