@@ -240,6 +240,17 @@ let template_coq_success
     ?coq_output_regexp
     ctx coq_commands ""
 
+let unit_src = {|
+      CodeGen Inductive Type unit => "unit".
+      CodeGen Constant tt => "tt".
+
+      CodeGen Snippet "
+      #include <stdbool.h> /* for bool and true */
+      typedef bool unit;
+      #define tt true
+      ".
+|}
+
 let bool_src = {|
       CodeGen Inductive Type bool => "bool".
       CodeGen Inductive Match bool => ""
@@ -982,9 +993,9 @@ let test_reduce_proj (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Set Primitive Projections.
-      Record TestRecord (par:nat) : Set := mk { f0 : nat; f1 : nat }.
-      Definition f0_mk a b : nat := f0 10 (mk 10 a b).
-      Definition f1_mk a b : nat := f1 10 (mk 10 a b).
+      Record TestRecord (par:Type) : Set := mk { f0 : nat; f1 : nat }.
+      Definition f0_mk a b : nat := f0 bool (mk bool a b).
+      Definition f1_mk a b : nat := f1 bool (mk bool a b).
       CodeGen Function f0_mk.
       CodeGen Function f1_mk.
     |}) {|
@@ -2316,6 +2327,62 @@ let test_prototype (ctx : test_ctxt) : unit =
     |}) {|
     |}
 
+let boolbox_src = {|
+      Inductive boolbox : Set := BoolBox : bool -> boolbox.
+      Definition boolbox_dealloc (x : boolbox) : unit := tt.
+      CodeGen Linear boolbox.
+      CodeGen Inductive Type boolbox => "boolbox".
+      (* "match" on linear value is not supported yet.
+      CodeGen Inductive Match boolbox => ""
+      | BoolBox => "" "boolbox_get".
+      *)
+      CodeGen Primitive BoolBox => "boolbox_alloc".
+      CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
+
+      CodeGen Snippet "
+      typedef bool *boolbox;
+
+      static char boolbox_log_buffer[1000];
+      static char *boolbox_log_next = boolbox_log_buffer;
+
+      static inline boolbox boolbox_alloc(bool b) {
+        *boolbox_log_next++ = 'a';
+        boolbox ret = malloc(sizeof(bool));
+        if (ret == NULL) abort();
+        *ret = b;
+        return ret;
+      }
+
+      static inline bool boolbox_get(boolbox x) {
+        *boolbox_log_next++ = 'g';
+        return *x;
+      }
+
+      static inline unit boolbox_dealloc(boolbox x) {
+        *boolbox_log_next++ = 'd';
+        free(x);
+        return tt;
+      }
+      ".
+|}
+
+let test_linear_dellet (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) :=
+        let unused := boolbox_dealloc x in
+        true.
+      CodeGen Function f.
+    |}) {|
+      assert(f(boolbox_alloc(true)) == true);
+      assert(boolbox_log_next - boolbox_log_buffer > 0);
+      assert(boolbox_log_buffer[0] == 'a');
+      assert(boolbox_log_next - boolbox_log_buffer > 1);
+      assert(boolbox_log_buffer[1] == 'd');
+      assert(boolbox_log_next - boolbox_log_buffer == 2);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2410,6 +2477,7 @@ let suite : OUnit2.test =
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
+    "test_linear_dellet" >:: test_linear_dellet;
   ]
 
 let () =

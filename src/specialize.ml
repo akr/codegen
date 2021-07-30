@@ -1436,7 +1436,15 @@ let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
         else
           1 + count_false_in_prefix (n-1) rest
 
-(* xxx: consider linear type *)
+let has_linear_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
+  match EConstr.kind sigma term with
+  | App (f, args) ->
+      (* f should not be linear because closures cannot capture linear variable *)
+      Array.for_all
+        (fun arg -> Linear.is_linear env sigma (Retyping.get_type_of env sigma arg))
+        args
+  | _ -> false
+
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : unit -> EConstr.t =
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
@@ -1463,7 +1471,8 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs :
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let r = ref false in
+      let undeletable = Linear.is_linear env sigma t || has_linear_arg env sigma e in
+      let r = ref undeletable in
       let refs2 = r :: refs in
       let fb = delete_unused_let_rec env2 sigma refs2 b in
       if !r then

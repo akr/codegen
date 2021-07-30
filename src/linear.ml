@@ -109,9 +109,12 @@ let destProdX sigma term =
   let (names, tys, body) = destProdX_rec sigma term in
   (Array.of_list names, Array.of_list tys, body)
 
-let rec is_linear_type env sigma ty =
+let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
+  | Constr.Sort _ ->
+      (* types cannot be linear. *)
+      false
   | Constr.Prod (name, namety, body) ->
       ignore (is_linear_type env sigma namety);
       ignore (is_linear_type env sigma body);
@@ -143,7 +146,7 @@ and is_linear_ind env sigma ty ie argsary =
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
     user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
   else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
-    user_err (str "[codegen] is_linear_ind: non-sort type binder:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
+    user_err (str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
   else
     let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
         (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
@@ -152,7 +155,7 @@ and is_linear_ind env sigma ty ie argsary =
           let oind_body = mind_body.Declarations.mind_packets.(Array.length mind_body.Declarations.mind_packets - ii0 - 1) in
           Context.Rel.Declaration.LocalDef
             (Context.annotR (Names.Name.Name oind_body.Declarations.mind_typename),
-             ind_ary.(ii0),
+             ind_ary.(Array.length mind_body.Declarations.mind_packets - ii0 - 1),
              type_of_inductive_arity oind_body.Declarations.mind_arity))
           (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
       ) env in
@@ -167,7 +170,7 @@ and is_linear_ind env sigma ty ie argsary =
         (* cparam_tys and body can be interpreted under env because they have no Rel *)
         let (cparam_names, cparam_tys, body) = destProdX sigma user_lc in
         (if not (eq_constr sigma body ty) then
-          user_err (str "[codegen] unexpected constructor body type:" +++ Printer.pr_econstr_env env sigma body +++ str (term_kind sigma body)));
+          user_err (str "[codegen] unexpected constructor body type:" +++ Printer.pr_econstr_env env sigma body +++ str "(expected:" +++ Printer.pr_econstr_env env sigma ty ++ str ")"));
         (if Array.exists (isSort sigma) cparam_tys then
           user_err (str "[codegen] is_linear_ind: constractor has type argument"));
         let consarg_is_linear = Array.map (is_linear_type env sigma) cparam_tys in
