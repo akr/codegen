@@ -1274,6 +1274,12 @@ let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
         else
           1 + count_false_in_prefix (n-1) rest
 
+(* xxx: App alone is not enough.
+  For example,
+    let x := match u with tt => let z := y in tt end in ...
+  refer y.
+  So, x cannot be deleted if y is linear.
+ *)
 let has_linear_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   match EConstr.kind sigma term with
   | App (f, args) ->
