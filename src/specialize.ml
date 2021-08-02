@@ -1264,14 +1264,14 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
           let f' = normalize_static_arguments env sigma f in
           mkApp (f', args)
 
-let rec count_false_in_prefix (n : int) (refs : bool ref list) : int =
+let rec count_false_in_prefix (n : int) (vars_used : bool list) : int =
   if n <= 0 then
     0
   else
-    match refs with
+    match vars_used with
     | [] -> 0
-    | r :: rest ->
-        if !r then
+    | b :: rest ->
+        if b then
           count_false_in_prefix (n-1) rest
         else
           1 + count_false_in_prefix (n-1) rest
@@ -1308,7 +1308,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (refs : bo
   | Rel i ->
       (List.nth refs (i-1)) := true;
       let fvs = IntSet.singleton (Environ.nb_rel env - i) in
-      (fvs, fun vars_used -> mkRel (i - count_false_in_prefix (i-1) refs))
+      (fvs, fun vars_used -> mkRel (i - count_false_in_prefix (i-1) vars_used))
   | Evar (ev, es) ->
       let fs2 = List.map (delete_unused_let_rec env sigma refs) es in
       let fs = List.map snd fs2 in
@@ -1337,7 +1337,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (refs : bo
       assert (!r = used);
       let undeletable = Linear.is_linear env sigma t || has_linear_arg env sigma e in
       (if undeletable then r := true);
-      if !r || undeletable then
+      if used || undeletable then
         let (fvse, fe) = delete_unused_let_rec env sigma refs e in
         let (fvst, ft) = delete_unused_let_rec env sigma refs t in
         let fvs = IntSet.union (IntSet.remove (Environ.nb_rel env) fvsb) (IntSet.union fvse fvst) in
