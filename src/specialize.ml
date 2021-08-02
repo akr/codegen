@@ -1291,64 +1291,57 @@ let has_linear_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
         args
   | _ -> false
 
-let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
+let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
-  let (fvs, retf) = delete_unused_let_rec1 env sigma refs term in
-  IntSet.iter (fun i -> assert !(List.nth refs (Environ.nb_rel env - i - 1))) fvs;
+  let (fvs, retf) = delete_unused_let_rec1 env sigma term in
   (fvs,
    fun vars_used ->
      assert (List.length vars_used = Environ.nb_rel env);
-     assert (List.map (fun r -> !r) refs = vars_used);
      retf vars_used)
-and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (refs : bool ref list) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
+and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
   | Const _ | Construct _ -> (IntSet.empty, fun vars_used -> term)
   | Rel i ->
-      (List.nth refs (i-1)) := true;
       let fvs = IntSet.singleton (Environ.nb_rel env - i) in
       (fvs, fun vars_used -> mkRel (i - count_false_in_prefix (i-1) vars_used))
   | Evar (ev, es) ->
-      let fs2 = List.map (delete_unused_let_rec env sigma refs) es in
+      let fs2 = List.map (delete_unused_let_rec env sigma) es in
       let fs = List.map snd fs2 in
       let fvs = List.fold_left IntSet.union IntSet.empty (List.map fst fs2) in
       (fvs, fun vars_used -> mkEvar (ev, List.map (fun f -> f vars_used) fs))
   | Proj (proj, e) ->
-      let (fvs, f) = delete_unused_let_rec env sigma refs e in
+      let (fvs, f) = delete_unused_let_rec env sigma e in
       (fvs, fun vars_used -> mkProj (proj, f vars_used))
   | Cast (e,ck,t) ->
-      let (fvse, fe) = delete_unused_let_rec env sigma refs e in
-      let (fvst, ft) = delete_unused_let_rec env sigma refs t in
+      let (fvse, fe) = delete_unused_let_rec env sigma e in
+      let (fvst, ft) = delete_unused_let_rec env sigma t in
       (IntSet.union fvse fvst, fun vars_used -> mkCast(fe vars_used, ck, ft vars_used))
   | App (f, args) ->
-      let (fvs1, ff) = delete_unused_let_rec env sigma refs f in
-      let fargs2 = Array.map (delete_unused_let_rec env sigma refs) args in
+      let (fvs1, ff) = delete_unused_let_rec env sigma f in
+      let fargs2 = Array.map (delete_unused_let_rec env sigma) args in
       let fargs = Array.map snd fargs2 in
       let fvs = Array.fold_left IntSet.union fvs1 (Array.map fst fargs2) in
       (fvs, fun vars_used -> mkApp (ff vars_used, Array.map (fun g -> g vars_used) fargs))
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let r = ref false in
-      let refs2 = r :: refs in
-      let (fvsb, fb) = delete_unused_let_rec env2 sigma refs2 b in
+      let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
       let used = IntSet.mem (Environ.nb_rel env) fvsb in
-      assert (!r = used);
       let undeletable = Linear.is_linear env sigma t || has_linear_arg env sigma e in
-      (if undeletable then r := true);
       if used || undeletable then
-        let (fvse, fe) = delete_unused_let_rec env sigma refs e in
-        let (fvst, ft) = delete_unused_let_rec env sigma refs t in
+        let (fvse, fe) = delete_unused_let_rec env sigma e in
+        let (fvst, ft) = delete_unused_let_rec env sigma t in
         let fvs = IntSet.union (IntSet.remove (Environ.nb_rel env) fvsb) (IntSet.union fvse fvst) in
         (fvs, fun vars_used -> mkLetIn (x, fe vars_used, ft vars_used, fb (true :: vars_used)))
       else
         (* reduction: zeta-del *)
         (fvsb, fun vars_used -> fb (false :: vars_used))
   | Case (ci, p, iv, item, branches) ->
-      let (fvsp, fp) = delete_unused_let_rec env sigma refs p in
-      let (fvsitem, fitem) = delete_unused_let_rec env sigma refs item in
-      let fbranches2 = Array.map (delete_unused_let_rec env sigma refs) branches in
+      let (fvsp, fp) = delete_unused_let_rec env sigma p in
+      let (fvsitem, fitem) = delete_unused_let_rec env sigma item in
+      let fbranches2 = Array.map (delete_unused_let_rec env sigma) branches in
       let fbranches = Array.map snd fbranches2 in
       let fvsbrances = Array.fold_left IntSet.union IntSet.empty (Array.map fst fbranches2) in
       let fvs = IntSet.union fvsp (IntSet.union fvsitem fvsbrances) in
@@ -1356,28 +1349,24 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (refs : bo
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let refs2 = (ref true) :: refs in
-      let (fvst, ft) = delete_unused_let_rec env sigma refs t in
-      let (fvsb, fb) = delete_unused_let_rec env2 sigma refs2 b in
+      let (fvst, ft) = delete_unused_let_rec env sigma t in
+      let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvsb) in
       (fvs, fun vars_used -> mkProd (x, ft vars_used, fb (true :: vars_used)))
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let refs2 = (ref true) :: refs in
-      let (fvst, ft) = delete_unused_let_rec env sigma refs t in
-      let (fvse, fe) = delete_unused_let_rec env2 sigma refs2 e in
+      let (fvst, ft) = delete_unused_let_rec env sigma t in
+      let (fvse, fe) = delete_unused_let_rec env2 sigma e in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvse) in
       (fvs, fun vars_used -> mkLambda (x, ft vars_used, fe (true :: vars_used)))
   | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
       let h = Array.length funary in
       let env2 = push_rec_types prec env in
-      let rs = List.init h (fun _ -> ref true) in
-      let refs2 = List.append rs refs in
-      let ftyary2 = Array.map (delete_unused_let_rec env sigma refs) tyary in
+      let ftyary2 = Array.map (delete_unused_let_rec env sigma) tyary in
       let ftyary = Array.map snd ftyary2 in
       let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftyary2) in
-      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma refs2) funary in
+      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma) funary in
       let ffunary = Array.map snd ffunary2 in
       let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffunary2) in
       let fvs =
@@ -1394,12 +1383,10 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (refs : bo
   | CoFix (i, ((nameary, tyary, funary) as prec)) ->
       let h = Array.length funary in
       let env2 = push_rec_types prec env in
-      let rs = List.init h (fun _ -> ref true) in
-      let refs2 = List.append rs refs in
-      let ftyary2 = Array.map (delete_unused_let_rec env sigma refs) tyary in
+      let ftyary2 = Array.map (delete_unused_let_rec env sigma) tyary in
       let ftyary = Array.map snd ftyary2 in
       let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftyary2) in
-      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma refs2) funary in
+      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma) funary in
       let ffunary = Array.map snd ffunary2 in
       let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffunary2) in
       let fvs =
@@ -1418,7 +1405,7 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term));
   assert (Environ.nb_rel env = 0);
-  let (fvs, f) = delete_unused_let_rec env sigma [] term in
+  let (fvs, f) = delete_unused_let_rec env sigma term in
   let result = f [] in
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result));
