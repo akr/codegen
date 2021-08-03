@@ -2383,6 +2383,23 @@ let test_linear_dellet (ctx : test_ctxt) : unit =
       assert(boolbox_log_next - boolbox_log_buffer == 2);
     |}
 
+let test_linear_dellet_match (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) (u : unit) :=
+        let unused := match u with tt => boolbox_dealloc x end in
+        true.
+      CodeGen Function f.
+    |}) {|
+      assert(f(boolbox_alloc(true), tt) == true);
+      assert(boolbox_log_next - boolbox_log_buffer > 0);
+      assert(boolbox_log_buffer[0] == 'a');
+      assert(boolbox_log_next - boolbox_log_buffer > 1);
+      assert(boolbox_log_buffer[1] == 'd');
+      assert(boolbox_log_next - boolbox_log_buffer == 2);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2478,6 +2495,7 @@ let suite : OUnit2.test =
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_linear_dellet" >:: test_linear_dellet;
+    "test_linear_dellet_match" >:: test_linear_dellet_match;
   ]
 
 let () =

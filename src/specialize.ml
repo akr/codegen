@@ -1276,21 +1276,6 @@ let rec count_false_in_prefix (n : int) (vars_used : bool list) : int =
         else
           1 + count_false_in_prefix (n-1) rest
 
-(* xxx: App alone is not enough.
-  For example,
-    let x := match u with tt => let z := y in tt end in ...
-  refer y.
-  So, x cannot be deleted if y is linear.
- *)
-let has_linear_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
-  match EConstr.kind sigma term with
-  | App (f, args) ->
-      (* f should not be linear because closures cannot capture linear variable *)
-      Array.for_all
-        (fun arg -> Linear.is_linear env sigma (Retyping.get_type_of env sigma arg))
-        args
-  | _ -> false
-
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
@@ -1328,11 +1313,19 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
       let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
-      let used = IntSet.mem (Environ.nb_rel env) fvsb in
-      let undeletable = Linear.is_linear env sigma t || has_linear_arg env sigma e in
-      if used || undeletable then
-        let (fvse, fe) = delete_unused_let_rec env sigma e in
-        let (fvst, ft) = delete_unused_let_rec env sigma t in
+      let declared_var_used = IntSet.mem (Environ.nb_rel env) fvsb in
+      let linear_var_declared = Linear.is_linear env sigma t in
+      let (fvse, fe) = delete_unused_let_rec env sigma e in
+      let (fvst, ft) = delete_unused_let_rec env sigma t in
+      let linear_var_used =
+        IntSet.exists
+          (fun i ->
+            let rel = EConstr.lookup_rel (Environ.nb_rel env - i) env in
+            let ty = Context.Rel.Declaration.get_type rel in
+            Linear.is_linear env sigma ty)
+          fvse
+      in
+      if declared_var_used || linear_var_declared || linear_var_used then
         let fvs = IntSet.union (IntSet.remove (Environ.nb_rel env) fvsb) (IntSet.union fvse fvst) in
         (fvs, fun vars_used -> mkLetIn (x, fe vars_used, ft vars_used, fb (true :: vars_used)))
       else
