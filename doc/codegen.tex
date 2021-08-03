@@ -132,6 +132,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \DeclareMathOperator{\NP}{NP}
 \DeclareMathOperator{\NM}{NM}
 
+\DeclareMathOperator{\FV}{FV}
+
 \newcommand{\BRA}[1]{\llbracket #1 \rrbracket}
 
 \DeclareMathOperator{\genbody}{GENBODY}
@@ -493,12 +495,16 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \begin{gather*}
   \text{zeta-del:}~
     \dfrac{
-      \text{$x$ does not occur in $u$}
+      \text{$x$ does not occur in $u$} \quad \text{$x$ is not linear} \quad \text{$\FV(t)$ does not contain linear variable}
     }{E[\Gamma] \vdash \letin{x}{t}{u}
                        \reltri
                        u
     }
 \end{gather*}
+{\small Note:
+\begin{itemize}
+  \item $\FV(t)$ means the free variables of $t$.
+\end{itemize}}
 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
 
