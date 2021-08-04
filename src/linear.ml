@@ -132,9 +132,18 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
           (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
       ) env in
     let oind_body = mind_body.Declarations.mind_packets.(i) in
-    (* xxx: use mind_nf_lc instead of mind_user_lc *)
     let cons_is_linear = Array.map
-      (fun user_lc ->
+      (fun nf_lc ->
+        let user_lc =
+          let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
+          Context.Rel.fold_inside
+            (fun (t : Constr.t) (decl : Constr.rel_declaration) ->
+              match decl with
+              | Context.Rel.Declaration.LocalAssum (name, ty) -> Constr.mkProd (name, ty, t)
+              | Context.Rel.Declaration.LocalDef (name, expr, ty) -> Constr.mkLetIn (name, expr, ty, t))
+            ~init:t ctx
+        in
+        let user_lc = EConstr.of_constr user_lc in
         (*Feedback.msg_debug (str "[codegen] user_lc1:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
         let user_lc = nf_all env sigma (prod_appvect sigma user_lc argsary) in (* apply type arguments *)
         (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
@@ -148,7 +157,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
           user_err (str "[codegen] is_linear_ind: constractor has type argument"));
         let consarg_is_linear = Array.map (is_linear_type env sigma) cparam_tys in
         Array.mem true consarg_is_linear)
-      (Array.map EConstr.of_constr oind_body.Declarations.mind_user_lc) in
+      oind_body.Declarations.mind_nf_lc in
     Array.mem true cons_is_linear
 
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
