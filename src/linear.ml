@@ -59,12 +59,6 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) Linear !type_linearity_map;
   Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty3)
 
-let rec is_registered_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (l : (EConstr.t * type_linearity) list) : type_linearity option =
-  match l with
-  | [] -> None
-  | (k, linearity) :: rest ->
-      if eq_constr sigma ty k then Some linearity else is_registered_linear_type env sigma ty rest
-
 let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
   match mind_arity with
   | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
