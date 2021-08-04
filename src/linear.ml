@@ -29,12 +29,11 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
-  let ty3 = ty2 in
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
   type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) Linear !type_linearity_map;
-  Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty3)
+  Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
 let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
   match mind_arity with
