@@ -101,7 +101,7 @@ and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   | None ->
       (type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Investigating !type_linearity_map;
       if isInd sigma f then
-        if is_linear_ind env sigma ty (destInd sigma f) argsary then
+        if is_linear_ind env sigma ty f argsary then
           (Feedback.msg_info (str "[codegen] Linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
           type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Linear !type_linearity_map;
           true)
@@ -111,14 +111,14 @@ and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
           false)
       else
         user_err (str "[codegen] is_linear_app: unexpected type application:" +++ Printer.pr_econstr_env env sigma f))
-and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ie : Names.inductive * EConstr.EInstance.t) (argsary : EConstr.t array) : bool =
+and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ind_f : EConstr.t) (argsary : EConstr.t array) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  let ((mutind, i), _) = ie in (* strip EInstance.t *)
+  let ((mutind, i), _) = destInd sigma ind_f in
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
-    user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
+    user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_econstr_env env sigma ind_f)
   else if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
-    user_err (str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_econstr_env env sigma (mkIndU ie))
+    user_err (str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_econstr_env env sigma ind_f)
   else
     let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
         (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
