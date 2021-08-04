@@ -206,23 +206,13 @@ let string_of_name (name : Names.Name.t) : string =
   | Names.Name.Name id -> Names.Id.to_string id
   | Names.Name.Anonymous -> "_"
 
-let name_of_decl (decl : EConstr.rel_declaration) : Names.Name.t Context.binder_annot =
-  match decl with
-  | Context.Rel.Declaration.LocalAssum (name, ty) -> name
-  | Context.Rel.Declaration.LocalDef (name, expr, ty) -> name
-
-let ty_of_decl (decl : EConstr.rel_declaration) : EConstr.types =
-  match decl with
-  | Context.Rel.Declaration.LocalAssum (name, ty) -> ty
-  | Context.Rel.Declaration.LocalDef (name, expr, ty) -> ty
-
 let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     (decl : EConstr.rel_declaration) (linear_refs : int ref option list)
     (num_innermost_locals : int)
     (f : Environ.env -> int ref option list -> int -> unit) : unit =
   let env2 = EConstr.push_rel decl env in
-  let name = name_of_decl decl in
-  let ty = ty_of_decl decl in
+  let name = Context.Rel.Declaration.get_name decl in
+  let ty = Context.Rel.Declaration.get_type decl in
   let num_innermost_locals2 = num_innermost_locals+1 in
   if not (is_linear env sigma ty) then
     f env2 (None :: linear_refs) num_innermost_locals2
@@ -231,7 +221,7 @@ let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     let linear_refs2 = Some r :: linear_refs in
     f env2 linear_refs2 num_innermost_locals2;
     if !r <> 1 then
-      user_err (str "[codegen] linear var not lineary used:" +++ Names.Name.print (Context.binder_name name) +++ str "(" ++ int !r +++ str "times used)")
+      user_err (str "[codegen] linear var not lineary used:" +++ Names.Name.print name +++ str "(" ++ int !r +++ str "times used)")
     else
       ()
 
