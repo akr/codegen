@@ -8,29 +8,6 @@ open EConstr
 open Cgenutil
 open State
 
-let term_kind (sigma : Evd.evar_map) (term : EConstr.t) : string =
-  match EConstr.kind sigma term with
-  | Constr.Rel _ -> "Rel"
-  | Constr.Var _ -> "Var"
-  | Constr.Meta _ -> "Meta"
-  | Constr.Evar _ -> "Evar"
-  | Constr.Sort _ -> "Sort"
-  | Constr.Cast _ -> "Cast"
-  | Constr.Prod _ -> "Prod"
-  | Constr.Lambda _ -> "Lambda"
-  | Constr.LetIn _ -> "LetIn"
-  | Constr.App _ -> "App"
-  | Constr.Const _ -> "Const"
-  | Constr.Ind _ -> "Ind"
-  | Constr.Construct _ -> "Construct"
-  | Constr.Case _ -> "Case"
-  | Constr.Fix _ -> "Fix"
-  | Constr.CoFix _ -> "CoFix"
-  | Constr.Proj _ -> "Proj"
-  | Constr.Int _ -> "Int"
-  | Constr.Float _ -> "Float"
-  | Constr.Array _ -> "Array"
-
 let whd_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
 let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = Reductionops.nf_all env sigma term
 
@@ -159,9 +136,9 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
     (* xxx: use mind_nf_lc instead of mind_user_lc *)
     let cons_is_linear = Array.map
       (fun user_lc ->
-        (*Feedback.msg_debug (str "[codegen] user_lc1:" ++ str (term_kind sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
+        (*Feedback.msg_debug (str "[codegen] user_lc1:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
         let user_lc = nf_all env sigma (prod_appvect sigma user_lc argsary) in (* apply type arguments *)
-        (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (term_kind sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
+        (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
         (if hasRel sigma user_lc then
           user_err (str "[codegen] is_linear_ind: constractor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
         (* cparam_tys and body can be interpreted under env because they have no Rel *)
