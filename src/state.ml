@@ -125,6 +125,8 @@ let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~nam
 type type_linearity = Linear | Unrestricted | Investigating
 let type_linearity_list_empty : (EConstr.t * type_linearity) list = []
 let type_linearity_list = Summary.ref type_linearity_list_empty ~name:"CodeGenLinearTypeList"
+let type_linearity_map_empty : type_linearity ConstrMap.t = ConstrMap.empty
+let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLinearTypeMap"
 
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)

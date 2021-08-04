@@ -57,6 +57,7 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
   type_linearity_list := (ty4, Linear) :: !type_linearity_list;
+  type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) Linear !type_linearity_map;
   Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty3)
 
 let rec is_registered_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (l : (EConstr.t * type_linearity) list) : type_linearity option =
@@ -124,19 +125,26 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
   | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" +++ Printer.pr_econstr_env env sigma ty)
 and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (f : EConstr.t) (argsary : EConstr.t array) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  assert (is_registered_linear_type env sigma ty !type_linearity_list =
+          ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map);
   match is_registered_linear_type env sigma ty !type_linearity_list with
   | Some Linear -> true
   | Some Unrestricted -> false
   | Some Investigating -> false
   | None ->
       (type_linearity_list := (ty, Investigating) :: !type_linearity_list;
+      type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Investigating !type_linearity_map;
       if isInd sigma f then
         if is_linear_ind env sigma ty (destInd sigma f) argsary then
           (Feedback.msg_info (str "[codegen] Linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
-          type_linearity_list := (ty, Linear) :: !type_linearity_list; true)
+          type_linearity_list := (ty, Linear) :: !type_linearity_list;
+          type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Linear !type_linearity_map;
+          true)
         else
           (Feedback.msg_info (str "[codegen] Non-linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
-          type_linearity_list := (ty, Unrestricted) :: !type_linearity_list; false)
+          type_linearity_list := (ty, Unrestricted) :: !type_linearity_list;
+          type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Unrestricted !type_linearity_map;
+          false)
       else
         user_err (str "[codegen] is_linear_app: unexpected type application:" +++ Printer.pr_econstr_env env sigma f))
 and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ie : Names.inductive * EConstr.EInstance.t) (argsary : EConstr.t array) : bool =
@@ -347,6 +355,8 @@ and check_case_branch (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : 
         user_err (str "[codegen] unexpected non-Lambda in a case branch")) (* should eta-expansion? *)
 
 let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
+  assert ((!type_linearity_list <> []) =
+    not (ConstrMap.is_empty !type_linearity_map));
   if !type_linearity_list <> [] then
     check_linear_valexp env sigma [] 0 term
 
