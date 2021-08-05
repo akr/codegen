@@ -3,6 +3,7 @@ open GlobRef
 open Pp
 open CErrors
 open Term
+open Constr
 open EConstr
 
 open Cgenutil
@@ -17,8 +18,8 @@ let rec is_concrete_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (t
   let termty = Retyping.get_type_of env sigma term in
   (if isSort sigma termty then
     match EConstr.kind sigma term with
-    | Constr.Ind _ -> true
-    | Constr.App (f, argsary) ->
+    | Ind _ -> true
+    | App (f, argsary) ->
         isInd sigma f &&
         Array.for_all (is_concrete_inductive_type env sigma) argsary
     | _ -> false
@@ -47,30 +48,30 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
 
 let rec hasRel (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   match EConstr.kind sigma term with
-  | Constr.Rel i -> true
-  | Constr.Var name -> false
-  | Constr.Meta i -> false
-  | Constr.Evar (ekey, terms) -> List.exists (hasRel sigma) terms
-  | Constr.Sort s -> false
-  | Constr.Cast (expr, kind, ty) -> hasRel sigma expr || hasRel sigma ty
-  | Constr.Prod (name, ty, body) -> hasRel sigma ty || hasRel sigma body
-  | Constr.Lambda (name, ty, body) -> hasRel sigma ty || hasRel sigma body
-  | Constr.LetIn (name, expr, ty, body) -> hasRel sigma expr || hasRel sigma ty || hasRel sigma body
-  | Constr.App (f, argsary) -> hasRel sigma f || Array.exists (hasRel sigma) argsary
-  | Constr.Const ctntu -> false
-  | Constr.Ind iu -> false
-  | Constr.Construct cstru -> false
-  | Constr.Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
-  | Constr.Fix ((ia, i), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
-  | Constr.CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
-  | Constr.Proj (proj, expr) -> hasRel sigma expr
-  | Constr.Int n -> false
-  | Constr.Float n -> false
-  | Constr.Array (u,t,def,ty) -> Array.exists (hasRel sigma) t || hasRel sigma def || hasRel sigma ty
+  | Rel i -> true
+  | Var name -> false
+  | Meta i -> false
+  | Evar (ekey, terms) -> List.exists (hasRel sigma) terms
+  | Sort s -> false
+  | Cast (expr, kind, ty) -> hasRel sigma expr || hasRel sigma ty
+  | Prod (name, ty, body) -> hasRel sigma ty || hasRel sigma body
+  | Lambda (name, ty, body) -> hasRel sigma ty || hasRel sigma body
+  | LetIn (name, expr, ty, body) -> hasRel sigma expr || hasRel sigma ty || hasRel sigma body
+  | App (f, argsary) -> hasRel sigma f || Array.exists (hasRel sigma) argsary
+  | Const ctntu -> false
+  | Ind iu -> false
+  | Construct cstru -> false
+  | Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
+  | Fix ((ia, i), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
+  | CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
+  | Proj (proj, expr) -> hasRel sigma expr
+  | Int n -> false
+  | Float n -> false
+  | Array (u,t,def,ty) -> Array.exists (hasRel sigma) t || hasRel sigma def || hasRel sigma ty
 
 let rec destProdX_rec (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot list * EConstr.t list * EConstr.t =
   match EConstr.kind sigma term with
-  | Constr.Prod (name, ty, body) ->
+  | Prod (name, ty, body) ->
       let (names, tys, body) = destProdX_rec sigma body in
       (name :: names, ty :: tys, body)
   | _ -> ([], [], term)
@@ -82,15 +83,15 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
 let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
-  | Constr.Sort _ ->
+  | Sort _ ->
       (* types cannot be linear. *)
       false
-  | Constr.Prod (name, namety, body) ->
+  | Prod (name, namety, body) ->
       ignore (is_linear_type env sigma namety);
       ignore (is_linear_type env sigma body);
       false (* function (closure) must not reference outside linear variables *)
-  | Constr.Ind iu -> is_linear_app env sigma ty ty [| |]
-  | Constr.App (f, argsary) -> is_linear_app env sigma ty f argsary
+  | Ind iu -> is_linear_app env sigma ty ty [| |]
+  | App (f, argsary) -> is_linear_app env sigma ty f argsary
   | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" +++ Printer.pr_econstr_env env sigma ty)
 and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (f : EConstr.t) (argsary : EConstr.t array) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
@@ -228,7 +229,7 @@ let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
 let rec check_outermost_lambdas (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : int ref option list) (num_innermost_locals : int) (term : EConstr.t) : unit =
   ((*Feedback.msg_debug (str "[codegen] check_outermost_lambdas:" +++ Printer.pr_econstr_env env sigma term);*)
   match EConstr.kind sigma term with
-  | Constr.Lambda (name, ty, body) ->
+  | Lambda (name, ty, body) ->
       (check_type_linearity env sigma ty;
       let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
       with_local_var env sigma decl linear_refs num_innermost_locals
@@ -238,7 +239,7 @@ and check_linear_valexp (env : Environ.env) (sigma : Evd.evar_map) (linear_refs 
   ((*Feedback.msg_debug (str "[codegen] check_linear_valexp:" +++ Printer.pr_econstr_env env sigma term);*)
   let termty = Retyping.get_type_of env sigma term in
   match EConstr.kind sigma term with
-  | Constr.Rel i ->
+  | Rel i ->
       (match List.nth linear_refs (i-1) with
       | None -> () (* usual (non-linear) variable *)
       | Some cell ->
@@ -250,66 +251,66 @@ and check_linear_valexp (env : Environ.env) (sigma : Evd.evar_map) (linear_refs 
               user_err (str "[codegen] second reference to a linear variable:" +++ Printer.pr_econstr_env env sigma term)
           else
             user_err (str "[codegen] linear variable reference outside of a function:" +++ Printer.pr_econstr_env env sigma term))
-  | Constr.Var name -> ()
-  | Constr.Meta i -> ()
-  | Constr.Evar (ekey, termary) -> ()
-  | Constr.Sort s -> ()
-  | Constr.Cast (expr, kind, ty) ->
+  | Var name -> ()
+  | Meta i -> ()
+  | Evar (ekey, termary) -> ()
+  | Sort s -> ()
+  | Cast (expr, kind, ty) ->
       (check_type_linearity env sigma ty;
       check_linear_valexp env sigma linear_refs num_innermost_locals expr)
-  | Constr.Prod (name, ty, body) ->
+  | Prod (name, ty, body) ->
       check_type_linearity env sigma term
-  | Constr.Lambda (name, ty, body) ->
+  | Lambda (name, ty, body) ->
       check_outermost_lambdas env sigma linear_refs 0 term
-  | Constr.LetIn (name, expr, ty, body) ->
+  | LetIn (name, expr, ty, body) ->
       (check_type_linearity env sigma ty;
       check_linear_valexp env sigma linear_refs num_innermost_locals expr;
       let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
       with_local_var env sigma decl linear_refs num_innermost_locals
         (fun env2 linear_refs2 num_innermost_locals2 -> check_linear_valexp env2 sigma linear_refs2 num_innermost_locals2 body))
-  | Constr.App (f, argsary) ->
+  | App (f, argsary) ->
       (check_linear_valexp env sigma linear_refs num_innermost_locals f;
       Array.iter (check_linear_valexp env sigma linear_refs num_innermost_locals) argsary;
       if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
                        is_linear env sigma ty) argsary &&
          isProd sigma termty then
            user_err (str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term))
-  | Constr.Const ctntu -> ()
-  | Constr.Ind iu -> ()
-  | Constr.Construct cstru -> ()
-  | Constr.Case (ci, tyf, iv, expr, brs) ->
+  | Const ctntu -> ()
+  | Ind iu -> ()
+  | Construct cstru -> ()
+  | Case (ci, tyf, iv, expr, brs) ->
       ((* tyf is not checked because it is not a target of code generation.
           check tyf is (fun _ -> termty) ? *)
       check_linear_valexp env sigma linear_refs num_innermost_locals expr;
       let linear_refs_ary = Array.map (fun _ -> copy_linear_refs linear_refs) brs in
       let f linear_refs cstr_nargs br = check_case_branch env sigma linear_refs num_innermost_locals cstr_nargs br in
-      array_iter3 f linear_refs_ary ci.Constr.ci_cstr_nargs brs;
+      array_iter3 f linear_refs_ary ci.ci_cstr_nargs brs;
       update_linear_refs_for_case linear_refs_ary linear_refs)
-  | Constr.Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
+  | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
       (let n = Array.length funary in
       let env2 = push_rec_types prec env in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
       Array.iter (check_type_linearity env sigma) tyary;
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
-  | Constr.CoFix (i, ((nameary, tyary, funary) as prec)) ->
+  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
       (let n = Array.length funary in
       let env2 = push_rec_types prec env in
       let linear_refs2 = ntimes n (List.cons None) linear_refs in
       Array.iter (check_type_linearity env sigma) tyary;
       Array.iter (check_linear_valexp env2 sigma linear_refs2 0) funary)
-  | Constr.Proj (proj, expr) ->
+  | Proj (proj, expr) ->
       check_linear_valexp env sigma linear_refs num_innermost_locals expr
-  | Constr.Array (u,t,def,ty) ->
+  | Array (u,t,def,ty) ->
       Array.iter (check_linear_valexp env sigma linear_refs num_innermost_locals) t;
       check_linear_valexp env sigma linear_refs num_innermost_locals def
-  | Constr.Int n -> ()
-  | Constr.Float n -> ())
+  | Int n -> ()
+  | Float n -> ())
 and check_case_branch (env : Environ.env) (sigma : Evd.evar_map) (linear_refs : int ref option list) (num_innermost_locals : int) (cstr_nargs : int) (br : EConstr.t) : unit =
   if cstr_nargs = 0 then
     check_linear_valexp env sigma linear_refs num_innermost_locals br
   else
     (match EConstr.kind sigma br with
-    | Constr.Lambda (name, ty, body) ->
+    | Lambda (name, ty, body) ->
         (check_type_linearity env sigma ty;
         let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
         with_local_var env sigma decl linear_refs num_innermost_locals
