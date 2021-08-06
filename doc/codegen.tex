@@ -578,7 +578,12 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
   \end{aligned}
 \]
 \raggedright
-{\small Note: \quad This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.}
+{\small Note:
+\begin{itemize}
+  \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
+  \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
+    $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
+\end{itemize}}
 
 \subsection{C Variable Allocation}\label{sec:cvaralloc}
 
@@ -753,8 +758,6 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   \item \gallina{} types, constants, and constructors have corresponding (user-configurable) C names and they are implicitly translated.
     \gallina{} variables are translated by the mapping defined in \secref{sec:cvaralloc}.
   \item $\tr = \TR{t}{n}$ where the translating function is defined as \kwDefinition~$c := t$ and $t$ is an $n$-arguments function.
-  \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
-    $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
   \item $\mathit{swfunc}_T, \mathit{caselabel}_{C_i}$, and $\mathit{get\_member}_{C_i j}$ are defined by a user to translate \kwmatch-expressions for the inductive type $T$.
   \item $\passign(y_1\ldots y_n, x_1\ldots x_n)$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\ldots x_n$ into $y_1\ldots y_n$.  It may require temporary variables.
   \item $y_1,\dotsc,y_o$ are the outer variables of the fixpoint.
