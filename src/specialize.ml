@@ -1935,6 +1935,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "replace" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
+  Linear.linear_type_check_term env sigma term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
   let globref = Declare.declare_definition
