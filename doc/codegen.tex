@@ -587,10 +587,11 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 
 \subsection{Linearity Check}\label{sec:linearity-check}
 
-We define a judgement $E[\Gamma] \vdash t~[q]~\{x_1 \mapsto n_1, \dotsc, x_m \mapsto n_m\}$ for linearity check.
+We define a judgement $E[\Gamma] \vdash t~[q]~\Delta$ for linearity check.
+$\Delta$ is a map from variables to non-negative integers: $\{x_1 \mapsto n_1, \dotsc, x_m \mapsto n_m\}$.
 It means that a free linear variable $x_i$ in $t$ is referenced $n_i$ times when $t$ is evaluated with $q$ arguments.
 
-We require $E[\Gamma] \vdash t'~[\NA_t]~\varnothing$ when \kwDefinition~$c := t$ is transformed to $t'$ by the convertible transformations until argument completion.
+We require $E[] \vdash t'~[\NA_t]~\varnothing$ when $t$ which defined as \kwDefinition~$c := t$ is transformed to $t'$ by the convertible transformations until argument completion.
 
 \begin{gather*}
   \text{l-var:}~
