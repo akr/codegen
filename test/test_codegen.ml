@@ -2366,6 +2366,24 @@ let boolbox_src = {|
       ".
 |}
 
+let test_linear_novar (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear var not lineary used:") ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) := tt.
+      CodeGen Function f.
+    |}) {| |}
+
+let test_linear_twovar (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] second reference to a linear variable:") ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) := (x,x).
+      CodeGen Function f.
+    |}) {| |}
+
 let test_linear_dellet (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ boolbox_src ^
@@ -2494,6 +2512,8 @@ let suite : OUnit2.test =
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
+    "test_linear_novar" >:: test_linear_novar;
+    "test_linear_twovar" >:: test_linear_twovar;
     "test_linear_dellet" >:: test_linear_dellet;
     "test_linear_dellet_match" >:: test_linear_dellet_match;
   ]
