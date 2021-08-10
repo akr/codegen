@@ -2368,7 +2368,7 @@ let boolbox_src = {|
 
 let test_linear_novar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear var not lineary used:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable not lineary used:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := tt.
@@ -2377,7 +2377,7 @@ let test_linear_novar (ctx : test_ctxt) : unit =
 
 let test_linear_twovar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] second reference to a linear variable:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable not lineary used:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := (x,x).
