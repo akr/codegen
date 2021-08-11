@@ -274,7 +274,16 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
       Array.iter
         (fun c ->
           if not (IntMap.equal Int.equal c counts.(0)) then
-            user_err (Pp.str "[codegen] inconsistent linear variable use in match branches"))
+            let pp_vars =
+              List.filter_map
+                (fun (j, n) ->
+                  if n = Array.length brs then
+                    None
+                  else
+                    Some (Names.Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - j) env))))
+                (IntMap.bindings (Array.fold_left merge_count IntMap.empty counts))
+            in
+            user_err (Pp.str "[codegen] inconsistent linear variable use in match branches:" +++ pp_sjoin_list pp_vars))
         counts;
       merge_count count0 counts.(0))
   | Fix ((ia, i), ((nameary, tyary, funary) as prec)) ->
