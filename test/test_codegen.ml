@@ -2384,6 +2384,29 @@ let test_linear_twovar (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
+let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] inconsistent linear variable use in match branches") ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) (b : bool) :=
+	match b with
+	| true => x
+	| false => BoolBox true
+	end.
+      CodeGen Function f.
+    |}) {| |}
+
+let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable is referened by an inner function:") ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) :=
+	fix g (n : nat) := x.
+      CodeGen Function f.
+    |}) {| |}
+
 let test_linear_dellet (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ boolbox_src ^
@@ -2514,6 +2537,8 @@ let suite : OUnit2.test =
     "test_prototype" >:: test_prototype;
     "test_linear_novar" >:: test_linear_novar;
     "test_linear_twovar" >:: test_linear_twovar;
+    "test_linear_inconsistent_reference_in_match" >:: test_linear_inconsistent_reference_in_match;
+    "test_linear_reference_in_fix" >:: test_linear_reference_in_fix;
     "test_linear_dellet" >:: test_linear_dellet;
     "test_linear_dellet_match" >:: test_linear_dellet_match;
   ]
