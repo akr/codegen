@@ -109,7 +109,7 @@ and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
           type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Linear !type_linearity_map;
           true)
         else
-          (Feedback.msg_info (str "[codegen] Non-linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
+          (Feedback.msg_info (str "[codegen] Unrestricted type registered:" +++ Printer.pr_econstr_env env sigma ty);
           type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Unrestricted !type_linearity_map;
           false)
       else
@@ -147,8 +147,10 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
             ~init:t ctx
         in
         let user_lc = EConstr.of_constr user_lc in
-        (*Feedback.msg_debug (str "[codegen] user_lc1:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
-        let user_lc = nf_all env sigma (prod_appvect sigma user_lc argsary) in (* apply type arguments *)
+        Feedback.msg_debug (str "[codegen] user_lc:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);
+        Feedback.msg_debug (str "[codegen] argsary:" +++ pp_sjoinmap_ary (Printer.pr_econstr_env env sigma) argsary);
+        let user_lc1 = prod_appvect sigma user_lc argsary in (* apply type arguments *)
+        let user_lc = nf_all env sigma user_lc1 in (* apply type arguments *)
         (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
         (if hasRel sigma user_lc then
           user_err (str "[codegen] is_linear_ind: constractor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
@@ -335,6 +337,24 @@ let linear_type_check_single (libref : Libnames.qualid) : unit =
 
 let command_linear_check (libref_list : Libnames.qualid list) : unit =
   List.iter linear_type_check_single libref_list
+
+let command_test_linear (t : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+  if is_linear env sigma t then
+    Feedback.msg_info (str "linear type:" +++ Printer.pr_econstr_env env sigma t)
+  else
+    user_err (str "[codegen] unrestricted type:" +++ Printer.pr_econstr_env env sigma t)
+
+let command_test_unrestricted (t : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+  if is_linear env sigma t then
+    user_err (str "[codegen] linear type:" +++ Printer.pr_econstr_env env sigma t)
+  else
+    Feedback.msg_info (str "unrestricted type:" +++ Printer.pr_econstr_env env sigma t)
 
 (* xxx test *)
 

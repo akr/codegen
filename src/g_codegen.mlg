@@ -241,5 +241,9 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_linear_check libref_list }
     | [ "CodeGen" "LinearTest" constr(t1) constr(t2) ] ->
       { command_linear_test t1 t2 }
+    | [ "CodeGen" "Test" "Linear" "Type" lconstr(t) ] ->
+      { command_test_linear t }
+    | [ "CodeGen" "Test" "Unrestricted" "Type" lconstr(t) ] ->
+      { command_test_unrestricted t }
 
 END
