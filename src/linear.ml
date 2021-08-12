@@ -92,11 +92,11 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
       ignore (is_linear_type env sigma namety);
       ignore (is_linear_type env sigma body);
       false (* function (closure) must not reference outside linear variables *)
-  | Ind iu -> is_linear_app env sigma ty
-  | App (f, argsary) -> is_linear_app env sigma ty
-  | _ -> user_err (str "[codegen] is_linear_type: unexpected term:" +++ Printer.pr_econstr_env env sigma ty)
-and is_linear_app (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (str "[codegen] is_linear_app:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  | Ind iu -> is_linear_ind1 env sigma ty
+  | App (f, argsary) when isInd sigma f -> is_linear_ind1 env sigma ty
+  | _ -> user_err (str "[codegen] sort, prod, ind or app of ind expected:" +++ Printer.pr_econstr_env env sigma ty)
+and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  (*Feedback.msg_debug (str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
   | Some Linear -> true
   | Some Unrestricted -> false
@@ -118,8 +118,6 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
     | App (f, argsary) -> (f, argsary)
     | _ -> (ty, [| |])
   in
-  if not (isInd sigma ind_f) then
-    user_err (str "[codegen] is_linear_ind: inductive type application expected:" +++ Printer.pr_econstr_env env sigma ty);
   let ((mutind, i), _) = destInd sigma ind_f in
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
