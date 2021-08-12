@@ -171,6 +171,9 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
 
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
+  let sort = Retyping.get_type_of env sigma ty in
+  if not (isSort sigma sort) then
+    user_err (str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ str ":" +++ Printer.pr_econstr_env env sigma sort);
   let ty2 = nf_all env sigma ty in
   is_linear_type env sigma ty2
 
