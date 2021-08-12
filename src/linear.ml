@@ -119,7 +119,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
     | _ -> (ty, [| |])
   in
   if not (isInd sigma ind_f) then
-    user_err (str "[codegen] is_linear_ind: unexpected type application:" +++ Printer.pr_econstr_env env sigma ty);
+    user_err (str "[codegen] is_linear_ind: inductive type application expected:" +++ Printer.pr_econstr_env env sigma ty);
   let ((mutind, i), _) = destInd sigma ind_f in
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
@@ -157,13 +157,13 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
       let user_lc = nf_all env sigma user_lc1 in (* apply type parameters *)
       (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
       (if hasRel sigma user_lc then
-        user_err (str "[codegen] is_linear_ind: constractor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
+        user_err (str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
       (* cparam_tys and body can be interpreted under env because they have no Rel *)
       let (cparam_names, cparam_tys, body) = destProdX sigma user_lc in
       (if not (eq_constr sigma body ty) then
         user_err (str "[codegen] unexpected constructor body type:" +++ Printer.pr_econstr_env env sigma body +++ str "(expected:" +++ Printer.pr_econstr_env env sigma ty ++ str ")"));
       (if Array.exists (isSort sigma) cparam_tys then
-        user_err (str "[codegen] is_linear_ind: constractor has type argument"));
+        user_err (str "[codegen] is_linear_ind: constructor has type argument"));
       let consarg_is_linear = Array.map (is_linear_type env sigma) cparam_tys in
       Array.mem true consarg_is_linear)
     oind_body.Declarations.mind_nf_lc in
