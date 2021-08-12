@@ -35,6 +35,9 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
+  (match ConstrMap.find_opt (EConstr.to_constr sigma ty4) !type_linearity_map with
+  | Some _ -> user_err (str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty4)
+  | None -> ());
   type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) Linear !type_linearity_map;
   Feedback.msg_info (str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
