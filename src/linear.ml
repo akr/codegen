@@ -126,6 +126,8 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
     user_err (str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_econstr_env env sigma ind_f);
+  if mind_body.Declarations.mind_nparams <> Array.length argsary then
+    user_err (str "[codegen] is_linear_ind: indexed types not supported:" +++ Printer.pr_econstr_env env sigma ty);
   if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
     user_err (str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_econstr_env env sigma ind_f);
   let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
