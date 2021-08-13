@@ -90,6 +90,7 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
   match EConstr.kind sigma ty with
   | Sort _ ->
       (* types cannot be linear. *)
+      (* delete_unused_let uses is_linear.  the input term for it can contains sort bindings. *)
       false
   | Prod (name, namety, body) ->
       ignore (is_linear_type env sigma namety);
