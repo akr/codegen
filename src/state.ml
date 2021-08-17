@@ -126,6 +126,9 @@ type type_linearity = Linear | Unrestricted | Investigating
 let type_linearity_map_empty : type_linearity ConstrMap.t = ConstrMap.empty
 let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLinearTypeMap"
 
+let deallocator_cfunc_of_type = Summary.ref
+  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncOfType"
+
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)
 | SpExpectedId of Id.t

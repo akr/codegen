@@ -2332,10 +2332,9 @@ let boolbox_src = {|
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
       CodeGen Linear boolbox.
       CodeGen Inductive Type boolbox => "boolbox".
-      (* "match" on linear value is not supported yet.
       CodeGen Inductive Match boolbox => ""
       | BoolBox => "" "boolbox_get".
-      *)
+      CodeGen DeallocatorType boolbox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
@@ -2459,6 +2458,40 @@ let test_linear_dellet_match (ctx : test_ctxt) : unit =
       assert(boolbox_log_next - boolbox_log_buffer == 2);
     |}
 
+let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
+    {|
+      Definition f (x : boolbox) : bool :=
+        match x with
+        | BoolBox b => b
+        end.
+      CodeGen Function f.
+    |}) {|
+      assert(f(boolbox_alloc(true)) == true);
+      assert(f(boolbox_alloc(false)) == false);
+      assert(boolbox_log_next - boolbox_log_buffer > 0); assert(boolbox_log_buffer[0] == 'a');
+      assert(boolbox_log_next - boolbox_log_buffer > 1); assert(boolbox_log_buffer[1] == 'g');
+      assert(boolbox_log_next - boolbox_log_buffer > 2); assert(boolbox_log_buffer[2] == 'd');
+      assert(boolbox_log_next - boolbox_log_buffer > 3); assert(boolbox_log_buffer[3] == 'a');
+      assert(boolbox_log_next - boolbox_log_buffer > 4); assert(boolbox_log_buffer[4] == 'g');
+      assert(boolbox_log_next - boolbox_log_buffer > 5); assert(boolbox_log_buffer[5] == 'd');
+      assert(boolbox_log_next - boolbox_log_buffer == 6);
+    |}
+
+let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] cannot match linear variable without destructor:") ctx
+    (unit_src ^ bool_src ^
+     Str.global_replace (Str.regexp "CodeGen DeallocatorType boolbox .*\n") "" boolbox_src ^
+    {|
+      Definition f (x : boolbox) : bool :=
+        match x with
+        | BoolBox b => b
+        end.
+      CodeGen Function f.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2560,6 +2593,8 @@ let suite : OUnit2.test =
     "test_linear_reference_in_fix" >:: test_linear_reference_in_fix;
     "test_linear_dellet" >:: test_linear_dellet;
     "test_linear_dellet_match" >:: test_linear_dellet_match;
+    "test_linear_match_with_deallocator" >:: test_linear_match_with_deallocator;
+    "test_linear_match_without_deallocator" >:: test_linear_match_without_deallocator;
   ]
 
 let () =
