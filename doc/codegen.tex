@@ -818,6 +818,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
               \begin{aligned}[t]
               & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
               & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+              & \mathit{dealloc}_{T}(x)\ttsemi \\
               & {\A{K}{t_i}{x_1\ldots x_n}} \\
               & \kwbreak\ttsemi
               \end{aligned} \\
@@ -863,6 +864,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   \item $y_1,\dotsc,y_o$ are the outer variables of the fixpoint.
   \item We do not define $\A{K}{\lam{x}{t}}{}$ because we do not support closures yet.
   \item Actual \codegen{} generates $\genbodyan{}$ in a different position to avoid the label $\mathtt{skip\_}f_j$ and $\kwgoto\:\mathtt{skip\_}f_j\ttsemi$.
+  \item $\mathit{dealloc}_{T}(x)$ is the deallocation function for the linear type $T$.  It is empty for unrestricted types.
 \end{itemize}}
 
 \subsection{Translation to C for a Tail Position}\label{sec:BK}
@@ -889,6 +891,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
               \begin{aligned}[t]
                 & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
                 & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                & \mathit{dealloc}_{T}(x)\ttsemi \\
                 & {\B{K}{t_i}{x_1\ldots x_n}}
               \end{aligned} \\
             & \cdots \\
