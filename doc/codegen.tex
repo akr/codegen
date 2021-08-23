@@ -986,7 +986,7 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
     \bigl(\bigcup_{i=1}^h R_i, \bigcup_{i=1}^h N_i, \bigcup_{i=1}^h T_i \bigr)         &
       \begin{aligned}[t]
         & t = \match{x}{C_i}{t_i}{i=1\ldots h} \\
-        & \text{where}~(R_i, N_i, T_i) = \RNT{t_i}{\NM_{C_i}+n}
+        & \text{where}~(R_i, N_i, T_i) = \RNT{t_i}{n+\NM_{C_i}}
       \end{aligned} \\
     (R, N-\{x\}, T - \{x\})                                           & (t = \lam{x}{u}) \wedge (n > 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{n-1} \\
     (R, (N \cup T) - \{x\}, \varnothing)                             & (t = \lam{x}{u}) \wedge (n = 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{\NA_u} \quad \text{(closure)} \\
@@ -996,8 +996,8 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
              & \textstyle\bigcup_{i=1}^h T_i - \{f_1,\dotsc, f_h\} \bigr)
     \end{aligned} &
       \begin{aligned}[t]
-        & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \wedge {} \\
-        & (n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr) \\
+        & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \\
+        & {} \wedge (n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned} \\
     \begin{aligned}[t]
@@ -1006,8 +1006,8 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
              & \varnothing \bigr)
     \end{aligned} &
       \begin{aligned}[t]
-        & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \wedge \quad \text{(real function, maybe closure)} \\
-        & \neg \bigl((n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr)\bigr) \\
+        & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \quad \text{(real function, maybe closure)} \\
+        & {} \wedge \neg \bigl((n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr)\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned}
   \end{cases}
@@ -1018,6 +1018,7 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
   \item The variables in $t$ are unique.
     \codegen{} uses de Bruijn's indexes for $N$ and $T$;
     the variables renamed by \secref{sec:cvaralloc} for $R$.
+  \item $x$ of $\match{x}{C_i}{t_i}{i=1\ldots h}$ is not counted because $x$ is not a function and does not affect the final result.
 \end{itemize}}
 
 \subsection{Translation for a Top-Level Function which is Translated to Multiple C Functions}\label{sec:genfunm}
