@@ -60,32 +60,41 @@ let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : sp
   pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
   Pp.str "."
 
+let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) (sp_inst : specialization_instance) : Pp.t =
+  let icommand = sp_inst.sp_icommand in
+  let func = sp_cfg.sp_func in
+  let static_args = sp_inst.sp_static_arguments in
+  let cfunc_name = sp_inst.sp_cfunc_name in
+  Pp.str "CodeGen" +++
+  Pp.str (string_of_icommand icommand) +++
+  Printer.pr_constr_env env sigma func +++
+  (pp_sjoin_list (snd (List.fold_right
+         (fun sd (args, res) ->
+           match sd with
+           | SorD_S ->
+               (List.tl args, (Printer.pr_constr_env env sigma (List.hd args) :: res))
+           | SorD_D ->
+               (args, (Pp.str "_" :: res)))
+         sp_cfg.sp_sd_list (static_args, [])))) +++
+  Pp.str "=>" +++
+  Pp.str (escape_as_coq_string cfunc_name) +++
+  (if sp_inst.sp_presimp_constr = func then
+    Pp.str "_"
+  else
+    Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
+  (match sp_inst.sp_simplified_status with
+  | SpNoSimplification -> Pp.str "(*no-simplification*)"
+  | SpExpectedId s_id -> Id.print s_id +++ Pp.str "(*before-simplification*)"
+  | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt +++ Pp.str "(*after-simplification*)") ++
+  Pp.str "."
+
 let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let pr_inst sp_inst =
-    let pr_names =
-      Pp.str "=>" +++
-      Pp.str (escape_as_coq_string sp_inst.sp_cfunc_name) +++
-      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr +++
-      (match sp_inst.sp_simplified_status with
-      | SpNoSimplification -> Pp.str "(no-simplification)"
-      | SpExpectedId id -> Id.print id +++ Pp.str "(before-simplification)"
-      | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt +++ Pp.str "(after-simplification)")
-    in
-    let pr_inst_list = List.map (Printer.pr_constr_env env sigma)
-                                sp_inst.sp_static_arguments in
-    pp_sjoin_list pr_inst_list +++
-    pr_names
-  in
   let pr_cfg sp_cfg =
     msg_info_hov (pr_codegen_arguments env sigma sp_cfg);
-    let func = sp_cfg.sp_func in
     let feedback_instance sp_inst =
-      msg_info_hov (
-        Pp.str (string_of_icommand sp_inst.sp_icommand) +++
-        Printer.pr_constr_env env sigma func +++
-        pr_inst sp_inst ++ Pp.str ".");
+      msg_info_hov (pr_codegen_instance env sigma sp_cfg sp_inst);
       match sp_inst.sp_simplified_status with
       | SpNoSimplification -> ()
       | SpExpectedId id -> ()
@@ -402,28 +411,7 @@ let codegen_define_instance
   let cfunc_name = sp_inst.sp_cfunc_name in
   msg_info_hov (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
-    Pp.str "CodeGen" +++
-    Pp.str (string_of_icommand icommand) +++
-    Printer.pr_constr_env env sigma func +++
-    (pp_sjoin_list (snd (List.fold_right
-           (fun sd (args, res) ->
-             match sd with
-             | SorD_S ->
-                 (List.tl args, (Printer.pr_constr_env env sigma (List.hd args) :: res))
-             | SorD_D ->
-                 (args, (Pp.str "_" :: res)))
-           sp_cfg.sp_sd_list (static_args, [])))) +++
-    Pp.str "=>" +++
-    Pp.str (escape_as_coq_string cfunc_name) +++
-    (if sp_inst.sp_presimp_constr = func then
-      Pp.str "_"
-    else
-      Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
-    (match sp_inst.sp_simplified_status with
-    | SpNoSimplification -> Pp.mt ()
-    | SpExpectedId s_id -> Id.print s_id
-    | SpDefined _ -> user_err (Pp.str "[codegen] SpNoSimplification or SpExpectedId expected")) ++
-    Pp.str ".");
+    pr_codegen_instance env sigma sp_cfg sp_inst);
   gallina_instance_map := (ConstrMap.add sp_inst.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
   cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
