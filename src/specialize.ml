@@ -52,8 +52,11 @@ let string_of_icommand (icommand : instance_command) : string =
   | CodeGenConstant -> "Constant"
 
 let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) : Pp.t =
-  Pp.str "Arguments" +++
-  Printer.pr_constr_env env sigma sp_cfg.sp_func +++
+  Pp.str "CodeGen Arguments" +++
+  (match Constr.kind sp_cfg.sp_func with
+  | Const (ctnt, _) -> Printer.pr_constant env ctnt
+  | Construct (cstr, _) -> Printer.pr_constructor env cstr
+  | _ -> user_err (Pp.str "[codegen] expect constant or constructor")) +++
   pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
   Pp.str "."
 
