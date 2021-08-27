@@ -51,6 +51,12 @@ let string_of_icommand (icommand : instance_command) : string =
   | CodeGenPrimitive -> "Primitive"
   | CodeGenConstant -> "Constant"
 
+let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) : Pp.t =
+  Pp.str "Arguments" +++
+  Printer.pr_constr_env env sigma sp_cfg.sp_func +++
+  pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
+  Pp.str "."
+
 let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -69,11 +75,9 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     pp_sjoin_list pr_inst_list +++
     pr_names
   in
-  let pr_cfg (func, sp_cfg) =
-    msg_info_hov (Pp.str "Arguments" +++
-      Printer.pr_constr_env env sigma func +++
-      pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
-      Pp.str ".");
+  let pr_cfg sp_cfg =
+    msg_info_hov (pr_codegen_arguments env sigma sp_cfg);
+    let func = sp_cfg.sp_func in
     let feedback_instance sp_inst =
       msg_info_hov (
         Pp.str (string_of_icommand sp_inst.sp_icommand) +++
@@ -93,7 +97,8 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
   in
   let l = if funcs = [] then
             ConstrMap.bindings !specialize_config_map |>
-            (List.sort @@ fun (x,_) (y,_) -> Constr.compare x y)
+            (List.sort @@ fun (x,_) (y,_) -> Constr.compare x y) |>
+            List.map snd
           else
             funcs |> List.map @@ fun func ->
               let gref = Smartlocate.global_with_alias func in
@@ -105,7 +110,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
               in
               match ConstrMap.find_opt func !specialize_config_map with
               | None -> user_err (Pp.str "[codegen] not specialized:" +++ Printer.pr_global gref)
-              | Some sp_cfg -> (func, sp_cfg)
+              | Some sp_cfg -> sp_cfg
   in
   msg_info_hov (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
@@ -134,10 +139,7 @@ let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env)
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
   msg_info_hov (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
-    Pp.str "CodeGen Arguments" +++
-    Printer.pr_constr_env env sigma func +++
-    pp_sjoinmap_list (fun sd -> Pp.str (match sd with SorD_S -> "s" | SorD_D -> "d")) sd_list ++
-    Pp.str "."));
+    pr_codegen_arguments env sigma sp_cfg));
   sp_cfg
 
 let codegen_define_or_check_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
@@ -1966,7 +1968,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    let m = !specialize_config_map in
-   specialize_config_map := ConstrMap.add (Constr.mkConst ctnt) sp_cfg2 m);
+   specialize_config_map := ConstrMap.add sp_cfg.sp_func sp_cfg2 m);
   let env = Global.env () in
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt, referred_cfuncs)
