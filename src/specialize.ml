@@ -86,10 +86,14 @@ let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : spe
   else
     Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
   (match sp_inst.sp_simplified_status with
+  | SpNoSimplification -> Pp.mt ()
+  | SpExpectedId s_id -> Id.print s_id
+  | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt) ++
+  Pp.str "." +++
+  (match sp_inst.sp_simplified_status with
   | SpNoSimplification -> Pp.str "(*no-simplification*)"
-  | SpExpectedId s_id -> Id.print s_id +++ Pp.str "(*before-simplification*)"
-  | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt +++ Pp.str "(*after-simplification*)") ++
-  Pp.str "."
+  | SpExpectedId s_id -> Pp.str "(*before-simplification*)"
+  | SpDefined (ctnt, refered_cfuncs) -> Pp.str "(*after-simplification*)")
 
 let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
