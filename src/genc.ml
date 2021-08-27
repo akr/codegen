@@ -63,22 +63,11 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         in
         (consname, caselabel, accessors))
   in
+  let ind_cfg = register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list in
   Feedback.msg_info (v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
-     hv 0 (hv 2 (Pp.str "CodeGen Inductive Match" +++
-                 hv 2 (
-                   Printer.pr_econstr_env env sigma t +++
-                   Pp.str "=>" +++
-                   Pp.str (escape_as_coq_string swfunc))) +++
-           pp_sjoinmap_list
-             (fun (consname, caselabel, accessors) ->
-               hv 2 (
-                 Pp.str "|" +++
-                 Pp.str (escape_as_coq_string caselabel) +++
-                 pp_sjoinmap_list (fun access -> Pp.str (escape_as_coq_string access)) accessors))
-             cstr_caselabel_accessors_list ++
-          Pp.str ".")));
-  register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list
+     hv 0 (pr_inductive_match env sigma ind_cfg)));
+  ind_cfg
 
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with

@@ -52,20 +52,32 @@ let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind
     Printer.pr_constr_env env sigma ind_cfg.coq_type +++
     str (quote_coq_string ind_cfg.c_type) ++ str ".")
 
-let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
+let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
   let f cstr_cfg =
-     Ppconstr.pr_id cstr_cfg.coq_cstr +++
-     str (quote_coq_string cstr_cfg.c_caselabel) +++
-     pp_sjoinmap_ary
-       (fun accessor -> str (quote_coq_string accessor))
-       cstr_cfg.c_accessors
+    Pp.hv 2 (
+      Pp.str "|" +++
+      Ppconstr.pr_id cstr_cfg.coq_cstr +++
+      str "=>" +++
+      str (quote_coq_string cstr_cfg.c_caselabel) +++
+      pp_sjoinmap_ary
+        (fun accessor -> str (quote_coq_string accessor))
+        cstr_cfg.c_accessors)
   in
   match ind_cfg.c_swfunc with
   | Some c_swfunc ->
-      Feedback.msg_info (str "CodeGen Inductive Match" +++
-        Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-        str (quote_coq_string c_swfunc) +++
-        pp_sjoinmap_ary f ind_cfg.cstr_configs)
+      Pp.hv 2 (
+        str "CodeGen Inductive Match" +++
+          Pp.hv 2 (
+            Printer.pr_constr_env env sigma ind_cfg.coq_type +++
+            str "=>" +++
+            str (quote_coq_string c_swfunc))) +++
+      pp_sjoinmap_ary f ind_cfg.cstr_configs ++
+      str "."
+  | None -> mt ()
+
+let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
+  match ind_cfg.c_swfunc with
+  | Some c_swfunc -> Feedback.msg_info (pr_inductive_match env sigma ind_cfg)
   | None -> ()
 
 let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
