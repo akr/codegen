@@ -51,12 +51,15 @@ let string_of_icommand (icommand : instance_command) : string =
   | CodeGenPrimitive -> "Primitive"
   | CodeGenConstant -> "Constant"
 
-let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) : Pp.t =
-  Pp.str "CodeGen Arguments" +++
-  (match Constr.kind sp_cfg.sp_func with
+let pr_constant_or_constructor (env : Environ.env) (func : Constr.t) : Pp.t =
+  match Constr.kind func with
   | Const (ctnt, _) -> Printer.pr_constant env ctnt
   | Construct (cstr, _) -> Printer.pr_constructor env cstr
-  | _ -> user_err (Pp.str "[codegen] expect constant or constructor")) +++
+  | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
+
+let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) : Pp.t =
+  Pp.str "CodeGen Arguments" +++
+  pr_constant_or_constructor env sp_cfg.sp_func +++
   pp_sjoinmap_list pr_s_or_d sp_cfg.sp_sd_list ++
   Pp.str "."
 
@@ -67,7 +70,7 @@ let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : spe
   let cfunc_name = sp_inst.sp_cfunc_name in
   Pp.str "CodeGen" +++
   Pp.str (string_of_icommand icommand) +++
-  Printer.pr_constr_env env sigma func +++
+  pr_constant_or_constructor env sp_cfg.sp_func +++
   (pp_sjoin_list (snd (List.fold_right
          (fun sd (args, res) ->
            match sd with
