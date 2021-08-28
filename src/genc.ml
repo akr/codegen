@@ -579,7 +579,7 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : bool Id.Map.t
           fixfunc_used_as_goto = false;
           fixfunc_formal_arguments = formal_arguments;
           fixfunc_return_type = return_type;
-          fixfunc_top_call = None; (* dummy. updated detect_top_calls *)
+          fixfunc_top_call = None; (* dummy. updated by detect_top_calls *)
           fixfunc_c_name = "dummy"; (* dummy. updated by determine_fixfunc_c_names *)
           fixfunc_outer_variables = []; (* dummy. updated by set_fixinfo_naive_outer_variables *)
         }
