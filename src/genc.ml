@@ -393,7 +393,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
         let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
         (tailset_b, nontailset_b, inlinable_b)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let n = Array.length nary in
+      let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
       let fixfuncs_result = Array.mapi
         (fun i f -> detect_inlinable_fixterm_rec env2 sigma f
@@ -418,15 +418,9 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
             Id.Set.union set inlineable_f)
           Id.Set.empty fixfuncs_result
       in
-      let inlinable_fixterm = not (IntSet.exists ((>=) n) nontailset_fs) in
-      let inlinable_fs' =
-        if inlinable_fixterm then
-          Id.Set.add (id_of_annotated_name nary.(i)) inlinable_fs
-        else
-          inlinable_fs
-      in
-      let tailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) tailset_fs) in
-      let nontailset_fs' = IntSet.map (fun k -> k - n) (IntSet.filter ((<) n) nontailset_fs) in
+      let inlinable_fixterm = not (IntSet.exists ((>=) h) nontailset_fs) in
+      let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
+      let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
       if numargs < numargs_of_type env sigma tary.(i) || (* closure creation *)
          not inlinable_fixterm then
         (* At least one fix-bounded function is used at
@@ -434,8 +428,14 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
           Assuming fix-bounded functions are strongly-connected,
           there is no tail position in this fix term. *)
         let nontailset = IntSet.union tailset_fs' nontailset_fs' in
-        (IntSet.empty, nontailset, inlinable_fs')
+        (IntSet.empty, nontailset, inlinable_fs)
       else
+        let inlinable_fs' =
+          Array.fold_left
+            (fun fs name -> Id.Set.add (id_of_annotated_name name) fs)
+            inlinable_fs
+            nary
+        in
         (tailset_fs', nontailset_fs', inlinable_fs')
 
 let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) : Id.Set.t =
