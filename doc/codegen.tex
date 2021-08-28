@@ -509,7 +509,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
 
 \subsection{Argument Completion}\label{sec:argcomp}
-\raggedright
+Argument completion removes partial applications by applying eta expansions.
 \begin{itemize}
   \item $\F{t}$ considers t to be a top-level function or a closure-generating expression.  $\Fop$ transforms $t$ to be a nested abstraction expression that takes all arguments.
     Fixpoint expressions are allowed outside or between the abstractions.
