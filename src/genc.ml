@@ -456,6 +456,9 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
         in
         (inlinable_fs', nontailset_fs', tailset_fs')
 
+(*
+  detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
+*)
 let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) : bool Id.Map.t =
   let (inlinable, nontailset, tailset) = detect_inlinable_fixterm_rec env sigma term numargs in
   inlinable
