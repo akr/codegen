@@ -288,9 +288,9 @@ let disjoint_id_map_union (m1 : 'a Id.Map.t) (m2 : 'a Id.Map.t) =
 (*
   detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term]_numargs in doc/codegen.tex.
   R is a map from fix-bounded IDs to bool.
-  R[n] = true if n is fix-bounded function which is inlinable (only used for goto so do not need to be real functions).
+  R[n] = true if n is fix-bounded function which is inlinable (only used for goto so do not need to be a real function).
   R[n] = false if n is fix-bounded function not inlinable.
-  R can also be usable to check an ID is fix-bounded function or not.
+  R can also be usable to determine an ID is fix-bounded function or not.
 *)
 let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) :
     (* fixterms inlinable or not *) bool Id.Map.t *
