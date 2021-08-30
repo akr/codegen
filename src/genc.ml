@@ -633,6 +633,12 @@ let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
       Some { info with fixfunc_c_name = c_name })
     fixinfo
 
+(*
+  set_fixinfo_naive_outer_variables computes outer variables in "naive" way:
+  It may contain unused variables.
+  They are filtered by filter_fixinfo_outer_variables.
+*)
+
 let rec set_fixinfo_naive_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
   let result = set_fixinfo_naive_outer_variables1 fixinfo env sigma outer term in
