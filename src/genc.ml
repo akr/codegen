@@ -850,7 +850,7 @@ let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
       done;
       Hashtbl.add fixterm_outer_variables fixterm_id
         (Id.Set.diff !outer_variables fixfuncs))
-    fixterm_to_fixfuncs;
+    fixterm_free_variables;
   fixterm_outer_variables
 
 let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
