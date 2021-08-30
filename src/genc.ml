@@ -1539,7 +1539,7 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
       Pp.str ("(enum " ^ func_index_type ^ " g, void *args, void *ret);"))
   in
   let pp_entry_functions =
-    let pr_entry_function c_name func_index formal_arguments return_type =
+    let pr_entry_function static c_name func_index formal_arguments return_type =
       let pp_vardecl_args =
         Pp.str ("struct codegen_args_" ^ c_name) +++
         Pp.str "args" +++
@@ -1574,13 +1574,13 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
     in
     pp_sjoinmap_list
       (fun info ->
-        pr_entry_function info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
+        pr_entry_function true info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
           (List.append
             info.fixfunc_outer_variables
             info.fixfunc_formal_arguments)
           info.fixfunc_return_type)
       called_fixfuncs +++
-    pr_entry_function cfunc_name (func_index_prefix ^ cfunc_name)
+    pr_entry_function static cfunc_name (func_index_prefix ^ cfunc_name)
       formal_arguments return_type
   in
   let bodies = obtain_function_bodies env sigma fixinfo whole_body in
