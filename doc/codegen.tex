@@ -791,8 +791,18 @@ $V$ is the variable mapping for variables declared outside.
   }
 \end{gather*}
 
-\subsection{Detection of Tail Recursive Fixpoint Bounded Functions}\label{sec:tailrec-fixpoint-detection}
-\raggedright
+\subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
+We detect inlinable fixpoints.
+``Inlinable fixpoint'' means a fixpoint, $\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j}$,
+which all application to $f_i$ is located at the tail positions of $f_1\ldots f_h$.
+In this case, the continuation of the applications to $f_1\ldots f_h$
+in $\letin{x}{(\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\;x_1\ldots x_n}{u}$
+are always $\letin{x}{\Box}{u}$.
+Thus, we can translate the tail positions of $f_1\ldots f_h$ to
+(1) assignments to the arguments of $f_i$ and $\kwgoto{}\;f_i$ for application to $f_i$ and
+(2) assignment to $x$ and $\kwgoto{}\;u$ otherwise.
+This translation is equivalent to inlining a recursive function, which means generating a loop at a non-tail position.
+
 $\TR{t}{n}$ is the first element of $\RNT{t}{n}$.
 
 $(R,N,T) = \RNT{t}{n}$ classify variables in $t$ assuming that it is called with $n$ arguments as $t\:x_1\ldots x_n$:
