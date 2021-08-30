@@ -620,6 +620,19 @@ let detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t) : unit =
   detect_top_calls_rec env sigma fixinfo top_c_func_name term
 
+let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
+  Hashtbl.filter_map_inplace
+    (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
+      let c_name =
+        if info.fixfunc_used_as_call &&
+           info.fixfunc_top_call = None then
+          global_gensym_with_id fixfunc_id
+        else
+          Id.to_string fixfunc_id
+      in
+      Some { info with fixfunc_c_name = c_name })
+    fixinfo
+
 let rec set_fixinfo_naive_outer_variables (fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map)
     (outer : (string * string) list) (term : EConstr.t) : unit =
   let result = set_fixinfo_naive_outer_variables1 fixinfo env sigma outer term in
@@ -858,30 +871,6 @@ let filter_fixinfo_outer_variables (fixinfo : fixinfo_t)
         Some { info with fixfunc_outer_variables = ov })
     fixinfo
 
-let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
-  Hashtbl.fold
-    (fun fixfunc_id info fixfuncs ->
-      if info.fixfunc_used_as_call &&
-         info.fixfunc_top_call = None then
-        info :: fixfuncs
-      else
-        fixfuncs)
-    fixinfo
-    []
-
-let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
-  Hashtbl.filter_map_inplace
-    (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
-      let c_name =
-        if info.fixfunc_used_as_call &&
-           info.fixfunc_top_call = None then
-          global_gensym_with_id fixfunc_id
-        else
-          Id.to_string fixfunc_id
-      in
-      Some { info with fixfunc_c_name = c_name })
-    fixinfo
-
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixinfo_t =
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
@@ -893,6 +882,17 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   filter_fixinfo_outer_variables fixinfo env sigma term;
   (*show_fixinfo env sigma fixinfo;*)
   fixinfo
+
+let compute_called_fixfuncs (fixinfo : fixinfo_t) : fixfunc_info list =
+  Hashtbl.fold
+    (fun fixfunc_id info fixfuncs ->
+      if info.fixfunc_used_as_call &&
+         info.fixfunc_top_call = None then
+        info :: fixfuncs
+      else
+        fixfuncs)
+    fixinfo
+    []
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   v 0 (
