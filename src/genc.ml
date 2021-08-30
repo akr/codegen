@@ -598,27 +598,22 @@ and collect_fix_usage1 (fixinfo : fixinfo_t) (inlinable_fixterms : bool Id.Map.t
           (numargs_of_type env sigma tary.(i)) tail_position2)
         fary)
 
-let rec detect_top_calls_rec (env : Environ.env) (sigma : Evd.evar_map)
+let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t)
     (top_c_func_name : string) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      detect_top_calls_rec env2 sigma fixinfo top_c_func_name e
+      detect_top_calls env2 sigma fixinfo top_c_func_name e
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      detect_top_calls_rec env2 sigma fixinfo top_c_func_name fary.(i);
+      detect_top_calls env2 sigma fixinfo top_c_func_name fary.(i);
       let key = id_of_annotated_name nary.(i) in
       let usage = Hashtbl.find fixinfo key in
       Hashtbl.replace fixinfo key { usage with fixfunc_top_call = Some top_c_func_name }
   (* xxx: consider App *)
   | _ -> ()
-
-let detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t)
-    (top_c_func_name : string) (term : EConstr.t) : unit =
-  detect_top_calls_rec env sigma fixinfo top_c_func_name term
 
 let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
   Hashtbl.filter_map_inplace
