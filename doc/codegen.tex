@@ -260,7 +260,6 @@ keywordstyle=[3]\color{myred}\ttfamily,
     |&\ \match{t_0}{C_i}{t_i}{i=1\ldots h} & \text{conditional} \\
     |&\ \fixT{f_i/k_i}{T_i}{t_i}{i=1\ldots h}{f_j} & \text{fixpoint}
 \end{align*}
-\raggedright
 {\small Note:
 \begin{itemize}
   \item $u$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
@@ -272,6 +271,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
     This formalism is taken from CIC~\cite{coqrefman8.12.0}.
   \item We omitted the detail of the types.  Actual \gallina{} permits any \gallina{} term which evaluates to a type.
 \end{itemize}}
+
 % {\tiny
 % We ignore Var, Meta, Evar because they are not used in complete program.
 % Int and Float are considered as constants.
@@ -317,7 +317,6 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \text{eta expansion:}~
     \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t\:x)}}
 \end{gather*}
-\raggedright
 {\small Note:
 \begin{itemize}
   \item The rules shown here are reductions, except the eta expansion.
@@ -577,7 +576,6 @@ Argument completion removes partial applications by applying eta expansions.
     & \text{$T_0$ is an inductive type} \\
   \end{aligned}
 \]
-\raggedright
 {\small Note:
 \begin{itemize}
   \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
@@ -693,10 +691,11 @@ We require $E[] \vdash t'~[\NA_t]~\varnothing$ when $t$ which defined as \kwDefi
   V =&\ \mathit{empty} ~|~ x \mapsto v ~|~ V;V
 \end{align*}
 
-\raggedright
-$\cv{t}{x_1\ldots x_n}{V}$ is the variable mapping of the variables declared in $t$. \\
-$x_1\ldots x_n$ are arguments for $t$.
-$V$ is the variable mapping for variables declared outside.
+\begin{itemize}
+  \item $\cv{t}{x_1\ldots x_n}{V}$ is the variable mapping of the variables declared in $t$.
+  \item $x_1\ldots x_n$ are arguments for $t$.
+  \item $V$ is the variable mapping for variables declared outside.
+\end{itemize}
 \[
   \cv{t}{x_1\ldots x_n}{V} =
   \begin{cases}
@@ -724,12 +723,10 @@ $V$ is the variable mapping for variables declared outside.
     & \text{$v, v_i, v_{ij}$ are fresh C variables}
   \end{aligned}
 \]
-\raggedright
 {\small Note: \quad We consider \gallina{} variables unique.}
 
 \section{C Code Generation}\label{sec:c-code-gen}
 \subsection{The \gallina{} Subset For C Code Generation}\label{sec:gallinasubsetforcgen}
-\raggedright
 \begin{gather*}
   E[\Gamma] \vdashb x \qquad
   E[\Gamma] \vdashb c \qquad
@@ -804,7 +801,6 @@ Thus, we can translate the tail positions of $f_1\ldots f_h$ to
 This translation is equivalent to inlining a recursive function, which means generating a loop at a non-tail position.
 
 $\TR{t}{n}$ is the first element of $\RNT{t}{n}$.
-
 $(R,N,T) = \RNT{t}{n}$ classify variables in $t$ assuming that it is called with $n$ arguments as $t\:x_1\ldots x_n$:
 \begin{align*}
   R &: \text{tail-recursive fixpoint bounded functions that do not need to be real functions} \\
@@ -864,7 +860,6 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
 \end{itemize}}
 
 \subsection{Translation to C for a Non-Tail Position}\label{sec:AK}
-\raggedright
 $\A{K}{t}{x_1\ldots x_n}$ generates C code for $t\:x_1\ldots x_n$ in a non-tail position.
 The result expression is passed to $K$. \\
 $K(e) = \dq{v = e\ttsemi}$ in simple situations.
@@ -940,7 +935,6 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
 \end{itemize}}
 
 \subsection{Translation to C for a Tail Position}\label{sec:BK}
-\raggedright
 $\B{K}{t}{x_1\ldots x_n}$ generates C code for $t\:x_1\ldots x_n$ in a tail position.
 The result expression is passed to $K$. \\
 $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
@@ -981,7 +975,6 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 \end{itemize}}
 
 \subsection{Auxiliary Functions for Translation to C}\label{sec:aux-function}
-\raggedright
 \[
   \fvars{t} =
   \begin{cases}
@@ -1033,7 +1026,6 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 
 
 \subsection{Translation for a Top-Level Function which is Translated to Multiple C Functions}\label{sec:genfunm}
-\raggedright
 $\genfunm{c}$ translates the function (constant) $c$ with one or more auxiliary functions.
 We assume $c$ is defined as \kwDefinition~$c := t.$
 The auxiliary functions $f_1 \ldots f_n$ are fixpoint bounded functions in $t$ which are invoked as functions.
@@ -1097,7 +1089,6 @@ We iterate it until no fixpoint functions.
 \]
 
 \subsection{Translation for a Top-Level Function which is Translated to a Single C Function}\label{sec:genfuns}
-\raggedright
 $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 \[
   \genfuns{c} = \dq{\kwstatic\:T_0\:c\ttparen{\fargsd{t}}\:\ttbrace{\:\mathit{decls}\:\genbodyb{K}{t}\:}}
@@ -1119,7 +1110,6 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 \]
 
 \subsection{Translation for Top-Level Function}\label{sec:genfun}
-\raggedright
 \[
   \genfun{c} =
   \begin{cases}
