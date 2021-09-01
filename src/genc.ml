@@ -1679,6 +1679,8 @@ let gen_func_multi (static : bool) (cfunc_name : string) (env : Environ.env) (si
       pp_switch +++
       pp_body)
 
+(* the reslut of used_variables is used to avoid
+   useless accessor call and assignment in translation of match-expression *)
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
