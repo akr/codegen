@@ -474,13 +474,13 @@ let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : 
 let rec collect_fix_usage
     ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) (numargs : int) (tail_position : bool)
+    (tail_position : bool) (term : EConstr.t) (numargs : int)
     ~(fixinfo : fixinfo_t) : unit =
   (*msg_debug_hov (Pp.str "[codegen:collect_fix_usage] start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "numargs=" ++ Pp.int numargs +++
     Pp.str "tail_position=" ++ Pp.bool tail_position);*)
-  let result = collect_fix_usage1 ~inlinable_fixterms env sigma term numargs tail_position ~fixinfo in
+  let result = collect_fix_usage1 ~inlinable_fixterms env sigma tail_position term numargs ~fixinfo in
   (*let (tailset, nontailset) = result in
   msg_debug_hov (Pp.str "[codegen:collect_fix_usage] end:" +++
     Printer.pr_econstr_env env sigma term +++
@@ -505,7 +505,7 @@ let rec collect_fix_usage
   result
 and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) (numargs : int) (tail_position : bool)
+    (tail_position : bool) (term : EConstr.t) (numargs : int)
     ~(fixinfo : fixinfo_t) : unit =
   match EConstr.kind sigma term with
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
@@ -539,26 +539,26 @@ and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
       (* e must be a Rel which type is inductive (non-function) type *)
       ()
   | App (f, args) ->
-      collect_fix_usage ~inlinable_fixterms env sigma f (Array.length args + numargs) tail_position ~fixinfo
+      collect_fix_usage ~inlinable_fixterms env sigma tail_position f (Array.length args + numargs) ~fixinfo
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      collect_fix_usage ~inlinable_fixterms env sigma e 0 false ~fixinfo;
-      collect_fix_usage ~inlinable_fixterms env2 sigma b numargs tail_position ~fixinfo
+      collect_fix_usage ~inlinable_fixterms env sigma false e 0 ~fixinfo;
+      collect_fix_usage ~inlinable_fixterms env2 sigma tail_position b numargs ~fixinfo
   | Case (ci, p, iv, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
       Array.iter2
-        (fun cstr_nargs br -> collect_fix_usage ~inlinable_fixterms env sigma br
-          (cstr_nargs + numargs) tail_position ~fixinfo)
+        (fun cstr_nargs br -> collect_fix_usage ~inlinable_fixterms env sigma
+          tail_position br (cstr_nargs + numargs) ~fixinfo)
         ci.Constr.ci_cstr_nargs branches
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       if numargs = 0 then
         (* closure creation *)
-        collect_fix_usage ~inlinable_fixterms env2 sigma b (numargs_of_exp env sigma term) true ~fixinfo
+        collect_fix_usage ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma term) ~fixinfo
       else
-        collect_fix_usage ~inlinable_fixterms env2 sigma b (numargs-1) tail_position ~fixinfo
+        collect_fix_usage ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~fixinfo
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       (let inlinable = Id.Map.find (id_of_annotated_name nary.(i)) inlinable_fixterms in
       let h = Array.length nary in
@@ -596,8 +596,8 @@ and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
           true (* B_K via GENBODY^{B} *)
       in
       Array.iter2
-        (fun t f -> collect_fix_usage ~inlinable_fixterms env2 sigma f
-          (numargs_of_type env sigma t) tail_position2 ~fixinfo)
+        (fun t f -> collect_fix_usage ~inlinable_fixterms env2 sigma
+          tail_position2 f (numargs_of_type env sigma t) ~fixinfo)
         tary fary)
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
@@ -881,7 +881,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
-  ignore (collect_fix_usage ~fixinfo ~inlinable_fixterms env sigma term numargs true);
+  ignore (collect_fix_usage ~fixinfo ~inlinable_fixterms env sigma true term numargs);
   detect_top_calls env sigma name term ~fixinfo;
   determine_fixfunc_c_names fixinfo;
   set_fixinfo_naive_outer_variables env sigma [] term ~fixinfo;
