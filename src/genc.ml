@@ -139,7 +139,7 @@ let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
 
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
   str c_fname ++ str "(" ++
-  pp_join_ary (str "," ++ spc ()) (Array.map (fun av -> str av) argvars) ++
+  pp_join_ary (str "," ++ spc ()) (Array.map Pp.str argvars) ++
   str ")"
 
 let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
@@ -364,10 +364,10 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       (inlinable, nontailset, tailset_b)
   | Case (ci, p, iv, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
-      let branches_result = Array.mapi
-        (fun i br -> detect_inlinable_fixterm_rec env sigma br
-          (ci.Constr.ci_cstr_nargs.(i) + numargs))
-        branches
+      let branches_result = Array.map2
+        (fun cstr_nargs br -> detect_inlinable_fixterm_rec env sigma br
+          (cstr_nargs + numargs))
+        ci.Constr.ci_cstr_nargs branches
       in
       let tailset =
         Array.fold_left
@@ -407,10 +407,10 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
-      let fixfuncs_result = Array.mapi
-        (fun i f -> detect_inlinable_fixterm_rec env2 sigma f
-          (numargs_of_type env sigma tary.(i)))
-        fary
+      let fixfuncs_result = Array.map2
+        (fun t f -> detect_inlinable_fixterm_rec env2 sigma f
+          (numargs_of_type env sigma t))
+        tary fary
       in
       let tailset_fs =
         Array.fold_left
@@ -547,10 +547,10 @@ and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
       collect_fix_usage ~inlinable_fixterms env2 sigma b numargs tail_position ~fixinfo
   | Case (ci, p, iv, item, branches) ->
       (* item must be a Rel which type is inductive (non-function) type *)
-      Array.iteri
-        (fun i br -> collect_fix_usage ~inlinable_fixterms env sigma br
-          (ci.Constr.ci_cstr_nargs.(i) + numargs) tail_position ~fixinfo)
-        branches
+      Array.iter2
+        (fun cstr_nargs br -> collect_fix_usage ~inlinable_fixterms env sigma br
+          (cstr_nargs + numargs) tail_position ~fixinfo)
+        ci.Constr.ci_cstr_nargs branches
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
@@ -595,10 +595,10 @@ and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
         else
           true (* B_K via GENBODY^{B} *)
       in
-      Array.iteri
-        (fun i f -> collect_fix_usage ~inlinable_fixterms env2 sigma f
-          (numargs_of_type env sigma tary.(i)) tail_position2 ~fixinfo)
-        fary)
+      Array.iter2
+        (fun t f -> collect_fix_usage ~inlinable_fixterms env2 sigma f
+          (numargs_of_type env sigma t) tail_position2 ~fixinfo)
+        tary fary)
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
@@ -992,11 +992,10 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
     let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
-      (Array.mapi
-        (fun i br ->
-          let (caselabel, accessors) = caselabel_accessors.(i) in
+      (Array.map2
+        (fun (caselabel, accessors) br ->
           (caselabel, gen_branch accessors br))
-        branches))
+        caselabel_accessors branches))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
     (pr : Projection.t) (item : EConstr.t) : Pp.t =
@@ -2317,16 +2316,14 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (let (temp_fn, ch) = Filename.open_temp_file
     ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
   let fmt = Format.formatter_of_out_channel ch in
-  gen_pp_iter (fun pp -> Pp.pp_with fmt pp) gen_list;
+  gen_pp_iter (Pp.pp_with fmt) gen_list;
   Format.pp_print_flush fmt ();
   close_out ch;
   Sys.rename temp_fn fn;
   msg_info_hov (str ("[codegen] file generated: " ^ fn)))
 
 let gen_test (gen_list : code_generation list) : unit =
-  gen_pp_iter
-    (fun pp -> Feedback.msg_info pp)
-    gen_list
+  gen_pp_iter Feedback.msg_info gen_list
 
 let command_generate_file () : unit =
   List.iter
