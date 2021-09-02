@@ -881,7 +881,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let fixinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
-  ignore (collect_fix_usage ~fixinfo ~inlinable_fixterms env sigma true term numargs);
+  ignore (collect_fix_usage ~inlinable_fixterms env sigma true term numargs ~fixinfo);
   detect_top_calls env sigma name term ~fixinfo;
   determine_fixfunc_c_names fixinfo;
   set_fixinfo_naive_outer_variables env sigma [] term ~fixinfo;
