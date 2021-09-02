@@ -155,6 +155,49 @@ let rec list_find_index pred l =
       else
         1 + (list_find_index pred rest)
 
+let seq_map2 (f : 'a -> 'b -> 'c) (xs : 'a Seq.t) (ys : 'b Seq.t) () : 'c Seq.node =
+  let rec r xs ys () =
+    match xs (), ys () with
+    | Seq.Nil, Seq.Nil -> Seq.Nil
+    | Seq.Cons (x, xs), Seq.Cons (y, ys) -> Seq.Cons (f x y, r xs ys)
+    | _ -> raise (Invalid_argument "seq_map2")
+  in
+  r xs ys ()
+
+let seq_mapi (f : int -> 'a -> 'b) (s : 'a Seq.t) () : 'b Seq.node =
+  let rec r i s () =
+    match s () with
+    | Seq.Nil -> Seq.Nil
+    | Seq.Cons (x, xs) -> Seq.Cons (f i x, r (i+1) xs)
+  in
+  r 0 s ()
+
+let seq_flat_map2 (f : 'a -> 'b -> 'c Seq.t) (xs : 'a Seq.t) (ys : 'b Seq.t) () : 'c Seq.node =
+  let rec r xs ys () =
+    match xs (), ys () with
+    | Seq.Nil, Seq.Nil -> Seq.Nil
+    | Seq.Cons (x, xs), Seq.Cons (y,ys) -> Seq.append (f x y) (r xs ys) ()
+    | _ -> raise (Invalid_argument "seq_flat_map2")
+  in
+  r xs ys ()
+
+let seq_flat_mapi (f : int -> 'a -> 'b Seq.t) (s : 'a Seq.t) () : 'b Seq.node =
+  let rec r i s () =
+    match s () with
+    | Seq.Nil -> Seq.Nil
+    | Seq.Cons (x, xs) -> Seq.append (f i x) (r (i+1) xs) ()
+  in
+  r 0 s ()
+
+let seq_flat_map2_i (f : int -> 'a -> 'b -> 'c Seq.t) (xs : 'a Seq.t) (ys : 'b Seq.t) () : 'c Seq.node =
+  let rec r i xs ys () =
+    match xs (), ys () with
+    | Seq.Nil, Seq.Nil -> Seq.Nil
+    | Seq.Cons (x, xs), Seq.Cons (y,ys) -> Seq.append (f i x y) (r (i+1) xs ys) ()
+    | _ -> raise (Invalid_argument "seq_flat_map2_i")
+  in
+  r 0 xs ys ()
+
 let string_of_name name =
   match name with
   | Name.Name id -> Id.to_string id

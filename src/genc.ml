@@ -1295,12 +1295,12 @@ and gen_tail1 (fixinfo : fixinfo_t) (used : Id.Set.t) (gen_ret : Pp.t -> Pp.t) (
 type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
 
 let rec detect_top_fixterms_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t) (is_tail_position : bool) (term : EConstr.t) (numargs : int)
-    (result : top_fixterm_t list)  : top_fixterm_t list =
-  detect_top_fixterms_rec1 env sigma fixinfo is_tail_position term numargs result
+    (fixinfo : fixinfo_t) (is_tail_position : bool)
+    (term : EConstr.t) (numargs : int) : top_fixterm_t Seq.t =
+  detect_top_fixterms_rec1 env sigma fixinfo is_tail_position term numargs
 and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
-    (fixinfo : fixinfo_t) (is_tail_position : bool) (term : EConstr.t) (numargs : int)
-    (result : top_fixterm_t list)  : top_fixterm_t list =
+    (fixinfo : fixinfo_t) (is_tail_position : bool)
+    (term : EConstr.t) (numargs : int) : top_fixterm_t Seq.t =
   match EConstr.kind sigma term with
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
@@ -1311,65 +1311,63 @@ and detect_top_fixterms_rec1 (env : Environ.env) (sigma : Evd.evar_map)
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
   | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Rel i -> result
-  | Int _ | Float _ | Const _ | Construct _ -> result
-  | Proj _ -> result
+  | Rel i -> Seq.empty
+  | Int _ | Float _ | Const _ | Construct _ -> Seq.empty
+  | Proj _ -> Seq.empty
   | App (f, args) ->
       detect_top_fixterms_rec env sigma fixinfo is_tail_position f
-        (Array.length args + numargs) result
+        (Array.length args + numargs)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let result1 = detect_top_fixterms_rec env sigma fixinfo false e 0 result in
-      detect_top_fixterms_rec env2 sigma fixinfo is_tail_position b numargs result1
+      Seq.append
+        (detect_top_fixterms_rec env sigma fixinfo false e 0)
+        (detect_top_fixterms_rec env2 sigma fixinfo is_tail_position b numargs)
   | Case (ci, p, iv, item, branches) ->
-      let acc = ref result in
-      for i = 0 to Array.length branches - 1 do
-        let br = branches.(i) in
-        acc := detect_top_fixterms_rec env sigma fixinfo is_tail_position br (ci.Constr.ci_cstr_nargs.(i) + numargs) !acc
-      done;
-      !acc
+      seq_flat_map2
+        (fun cstr_nargs br ->
+          detect_top_fixterms_rec env sigma fixinfo is_tail_position br (cstr_nargs + numargs))
+        (Array.to_seq ci.Constr.ci_cstr_nargs)
+        (Array.to_seq branches)
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       if numargs = 0 then
         user_err (Pp.str "[codegen:detect_top_fixterms] closure not supported yet")
       else
-        detect_top_fixterms_rec env2 sigma fixinfo is_tail_position b (numargs-1) result
+        detect_top_fixterms_rec env2 sigma fixinfo is_tail_position b (numargs-1)
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let n = Array.length nary in
       if is_tail_position then
-        let acc = ref result in
-        for j = 0 to n - 1 do
-          let numargs2 = numargs_of_type env sigma tary.(j) in
-          acc := detect_top_fixterms_rec env2 sigma fixinfo is_tail_position fary.(j) numargs2 !acc
-        done;
-        !acc
+        seq_flat_map2
+          (fun t f ->
+            let numargs2 = numargs_of_type env sigma t in
+            detect_top_fixterms_rec env2 sigma fixinfo is_tail_position f numargs2)
+          (Array.to_seq tary) (Array.to_seq fary)
       else
         let id = id_of_annotated_name nary.(i) in
         let usage = Hashtbl.find fixinfo id in
         if usage.fixfunc_inlinable then
-          let acc = ref result in
-          for j = 0 to n - 1 do
-            let numargs2 = numargs_of_type env sigma tary.(j) in
-            acc := detect_top_fixterms_rec env2 sigma fixinfo is_tail_position fary.(j) numargs2 !acc
-          done;
-          !acc
+          seq_flat_map2
+            (fun t f ->
+              let numargs2 = numargs_of_type env sigma t in
+              detect_top_fixterms_rec env2 sigma fixinfo is_tail_position f numargs2)
+            (Array.to_seq tary) (Array.to_seq fary)
         else
           (* top functions found. *)
-          let acc = ref result in
-          for j = 0 to n - 1 do
-            let numargs2 = numargs_of_type env sigma tary.(j) in
-            acc := detect_top_fixterms_rec env2 sigma fixinfo true fary.(j) numargs2 !acc
-          done;
-          (usage.fixfunc_outer_variables, env, term) :: !acc
+          Seq.cons
+            (usage.fixfunc_outer_variables, env, term)
+            (seq_flat_map2
+              (fun t f ->
+                let numargs2 = numargs_of_type env sigma t in
+                detect_top_fixterms_rec env2 sigma fixinfo true f numargs2)
+              (Array.to_seq tary) (Array.to_seq fary))
 
 let detect_top_fixterms (env : Environ.env) (sigma : Evd.evar_map)
     (fixinfo : fixinfo_t) (term : EConstr.t) :
     top_fixterm_t list =
   let numargs = numargs_of_exp env sigma term in
-  detect_top_fixterms_rec env sigma fixinfo true term numargs []
+  List.of_seq (detect_top_fixterms_rec env sigma fixinfo true term numargs)
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
