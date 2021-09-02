@@ -771,9 +771,9 @@ let fixterm_free_variables (env : Environ.env) (sigma : Evd.evar_map)
   result
 
 let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
-    (fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t)
-    (term : EConstr.t) : unit =
+    (term : EConstr.t)
+    ~(fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
+    ~(fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t) : unit =
   match EConstr.kind sigma term with
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
@@ -786,22 +786,22 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
   | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
   | Rel i -> ()
   | Int _ | Float _ | Const _ | Construct _ -> ()
-  | Proj (proj, e) -> fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e
+  | Proj (proj, e) -> fixterm_fixfunc_relation_rec env sigma e ~fixterm_to_fixfuncs ~fixfunc_to_fixterm
   | App (f, args) ->
-      fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm f
+      fixterm_fixfunc_relation_rec env sigma f ~fixterm_to_fixfuncs ~fixfunc_to_fixterm
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm e;
-      fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm b
+      fixterm_fixfunc_relation_rec env sigma e ~fixterm_to_fixfuncs ~fixfunc_to_fixterm;
+      fixterm_fixfunc_relation_rec env2 sigma b ~fixterm_to_fixfuncs ~fixfunc_to_fixterm
   | Case (ci, p, iv, item, branches) ->
       Array.iter
-        (fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm)
+        (fixterm_fixfunc_relation_rec env sigma ~fixterm_to_fixfuncs ~fixfunc_to_fixterm)
         branches
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm b
+      fixterm_fixfunc_relation_rec env2 sigma b ~fixterm_to_fixfuncs ~fixfunc_to_fixterm
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let fixterm_id = id_of_annotated_name nary.(i) in
       let fixfunc_ids = Array.map id_of_annotated_name nary in
@@ -813,14 +813,14 @@ let rec fixterm_fixfunc_relation_rec (env : Environ.env) (sigma : Evd.evar_map)
 	(Array.fold_right Id.Set.add fixfunc_ids Id.Set.empty);
       let env2 = EConstr.push_rec_types prec env in
       Array.iter
-        (fixterm_fixfunc_relation_rec env2 sigma fixterm_to_fixfuncs fixfunc_to_fixterm)
+        (fixterm_fixfunc_relation_rec env2 sigma ~fixterm_to_fixfuncs ~fixfunc_to_fixterm)
         fary
 
 let fixterm_fixfunc_relation (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : (Id.t, Id.Set.t) Hashtbl.t * (Id.t, Id.t) Hashtbl.t =
   let fixterm_to_fixfuncs = Hashtbl.create 0 in
   let fixfunc_to_fixterm = Hashtbl.create 0 in
-  fixterm_fixfunc_relation_rec env sigma fixterm_to_fixfuncs fixfunc_to_fixterm term;
+  fixterm_fixfunc_relation_rec env sigma term ~fixterm_to_fixfuncs ~fixfunc_to_fixterm;
   (fixterm_to_fixfuncs, fixfunc_to_fixterm)
 
 let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
