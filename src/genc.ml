@@ -1303,7 +1303,7 @@ let rec detect_top_fixterms_rec
     (env : Environ.env) (sigma : Evd.evar_map)
     (is_tail_position : bool)
     (term : EConstr.t) (numargs : int) : top_fixterm_t Seq.t =
-  detect_top_fixterms_rec1 env sigma ~fixinfo is_tail_position term numargs
+  detect_top_fixterms_rec1 ~fixinfo env sigma is_tail_position term numargs
 and detect_top_fixterms_rec1
     ~(fixinfo : fixinfo_t)
     (env : Environ.env) (sigma : Evd.evar_map)
