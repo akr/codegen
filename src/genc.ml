@@ -1425,7 +1425,7 @@ let obtain_function_bodies (env : Environ.env) (sigma : Evd.evar_map)
         Array.map
           (fun (args, fixes, env2, body) ->
             (args, gen_labels fixes, env2, body))
-        (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
+          (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
       (detect_top_fixterms env sigma fixinfo term)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
