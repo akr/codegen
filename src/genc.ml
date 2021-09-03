@@ -242,6 +242,8 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Name id -> Id.to_string id
 
 type fixfunc_info = {
+  fixfunc_term_env: Environ.env;
+  fixfunc_func_env: Environ.env;
   fixfunc_inlinable: bool;
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
@@ -249,7 +251,7 @@ type fixfunc_info = {
   fixfunc_return_type: string;
   fixfunc_top_call: string option; (* by detect_top_calls *)
   fixfunc_c_name: string; (* by determine_fixfunc_c_names *)
-  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_naive_outer_variables and filter_fixinfo_outer_variables *)
+  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixinfo_outer_variables *)
 }
 
 type fixinfo_t = (Id.t, fixfunc_info) Hashtbl.t
@@ -576,6 +578,8 @@ and collect_fix_usage1 ~(inlinable_fixterms : bool Id.Map.t)
         msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] used_as_goto=" ++ Pp.bool used_as_goto);
         msg_debug_hov (Pp.str "[codegen:collect_fix_usage1] used_as_call=" ++ Pp.bool used_as_call);*)
         Hashtbl.add fixinfo (id_of_name fname) {
+          fixfunc_term_env = env;
+          fixfunc_func_env = env2;
           fixfunc_inlinable = inlinable;
           fixfunc_used_as_call = used_as_call;
           fixfunc_used_as_goto = false;
@@ -629,73 +633,6 @@ let determine_fixfunc_c_names (fixinfo : fixinfo_t) : unit =
       in
       Some { info with fixfunc_c_name = c_name })
     fixinfo
-
-(*
-  set_fixinfo_naive_outer_variables computes outer variables in "naive" way:
-  It may contain unused variables.
-  They are filtered by filter_fixinfo_outer_variables.
-*)
-
-let rec set_fixinfo_naive_outer_variables
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (outer : (string * string) list) (term : EConstr.t)
-    ~(fixinfo : fixinfo_t) : unit =
-  let result = set_fixinfo_naive_outer_variables1 env sigma outer term ~fixinfo in
-  result
-and set_fixinfo_naive_outer_variables1
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (outer : (string * string) list) (term : EConstr.t)
-    ~(fixinfo : fixinfo_t) : unit =
-  match EConstr.kind sigma term with
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Rel i -> ()
-  | Int _ | Float _ | Const _ | Construct _ -> ()
-  | Proj (proj, e) -> ()
-  | App (f, args) ->
-      set_fixinfo_naive_outer_variables env sigma outer f ~fixinfo
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
-      set_fixinfo_naive_outer_variables env sigma outer e ~fixinfo;
-      set_fixinfo_naive_outer_variables env2 sigma outer2 b ~fixinfo
-  | Case (ci, p, iv, item, branches) ->
-      Array.iter
-        (set_fixinfo_naive_outer_variables env sigma outer ~fixinfo)
-        branches
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let outer2 = (str_of_annotated_name x, c_typename env sigma t) :: outer in
-      set_fixinfo_naive_outer_variables env2 sigma outer2 b ~fixinfo
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let n = Array.length nary in
-      for j = 0 to n - 1 do
-        let key = id_of_annotated_name nary.(j) in
-        let usage = Hashtbl.find fixinfo key in
-        Hashtbl.replace fixinfo key {
-          fixfunc_inlinable = usage.fixfunc_inlinable;
-          fixfunc_used_as_call = usage.fixfunc_used_as_call;
-          fixfunc_used_as_goto = usage.fixfunc_used_as_goto;
-          fixfunc_formal_arguments = usage.fixfunc_formal_arguments;
-          fixfunc_return_type = usage.fixfunc_return_type;
-          fixfunc_top_call = usage.fixfunc_top_call;
-          fixfunc_c_name = usage.fixfunc_c_name;
-          fixfunc_outer_variables = List.rev outer;
-        }
-      done;
-      let env2 = EConstr.push_rec_types prec env in
-      Array.iter
-        (set_fixinfo_naive_outer_variables env2 sigma outer ~fixinfo)
-        fary
 
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) ~(result : (Id.t, Id.Set.t) Hashtbl.t) : Id.Set.t =
@@ -823,6 +760,34 @@ let fixterm_fixfunc_relation (env : Environ.env) (sigma : Evd.evar_map)
   fixterm_fixfunc_relation_rec env sigma term ~fixterm_to_fixfuncs ~fixfunc_to_fixterm;
   (fixterm_to_fixfuncs, fixfunc_to_fixterm)
 
+let pr_outer_variable (outer : (string * string) list) : Pp.t =
+  Pp.str "[" ++
+  pp_joinmap_list (Pp.str ",")
+    (fun (x,t) -> Pp.str "(" ++ Pp.str x ++ Pp.str "," ++ Pp.str t ++ Pp.str ")")
+    outer ++
+  Pp.str "]"
+
+let check_eq_outer_variables outer1 outer2 =
+  if outer1 <> outer2 then
+    user_err (Pp.str "[codegen:bug] outer length differ:" +++ pr_outer_variable outer1 +++ Pp.str "<>" +++ pr_outer_variable outer2)
+
+(*
+  outer_variables_from_env computes outer variables in "naive" way:
+  It may contain unused variables.
+*)
+let outer_variables_from_env ~(fixinfo : fixinfo_t) (env : Environ.env) (sigma : Evd.evar_map) : (string * string) list =
+  let n = Environ.nb_rel env in
+  let outer = ref [] in
+  for i = 1 to n do
+    let decl = Environ.lookup_rel i env in
+    let x = Context.Rel.Declaration.get_name decl in
+    let t = Context.Rel.Declaration.get_type decl in
+    let id = id_of_name x in
+    if not (Hashtbl.mem fixinfo id) then (* Don't include fix-bounded functions *)
+      outer := (str_of_name x, c_typename env sigma (EConstr.of_constr t)) :: !outer;
+  done;
+  !outer
+
 let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
     (fixterm_to_fixfuncs : (Id.t, Id.Set.t) Hashtbl.t)
     (fixfunc_to_fixterm : (Id.t, Id.t) Hashtbl.t)
@@ -858,7 +823,7 @@ let compute_outer_variables (env : Environ.env) (sigma : Evd.evar_map)
     fixterm_free_variables;
   fixterm_outer_variables
 
-let filter_fixinfo_outer_variables
+let set_fixinfo_outer_variables
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     ~(fixinfo : fixinfo_t) : unit =
   let (fixterm_to_fixfuncs, fixfunc_to_fixterm) = fixterm_fixfunc_relation env sigma term in
@@ -867,12 +832,13 @@ let filter_fixinfo_outer_variables
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let fixterm_id = Hashtbl.find fixfunc_to_fixterm fixfunc_id in
+      let ov = outer_variables_from_env ~fixinfo info.fixfunc_term_env sigma in
       if info.fixfunc_top_call <> None then
-        Some info
+        Some { info with fixfunc_outer_variables = ov }
       else
         let ov = List.filter
           (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
-          info.fixfunc_outer_variables
+          ov
         in
         Some { info with fixfunc_outer_variables = ov })
     fixinfo
@@ -884,8 +850,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   ignore (collect_fix_usage ~inlinable_fixterms env sigma true term numargs ~fixinfo);
   detect_top_calls env sigma name term ~fixinfo;
   determine_fixfunc_c_names fixinfo;
-  set_fixinfo_naive_outer_variables env sigma [] term ~fixinfo;
-  filter_fixinfo_outer_variables env sigma term ~fixinfo;
+  set_fixinfo_outer_variables env sigma term ~fixinfo;
   (*show_fixinfo env sigma fixinfo;*)
   fixinfo
 
