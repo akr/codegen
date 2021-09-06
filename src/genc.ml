@@ -249,7 +249,6 @@ type fixterm_info = {
   fixterm_term_env: Environ.env;
   fixterm_term: EConstr.t;
   fixterm_inlinable: bool;
-  fixterm_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixfuncinfo_outer_variables *)
 }
 
 type fixfunc_info = {
@@ -266,7 +265,11 @@ type fixfunc_info = {
   fixfunc_return_type: string;
   fixfunc_top_call: string option; (* by detect_top_calls *)
   fixfunc_c_name: string; (* by determine_fixfunc_c_names *)
+
   fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixfuncinfo_outer_variables *)
+  (* outer variables are mostly same for same fix-bouded functions in a fix-term.
+    However, they can be different when some of them have Some X for fixfunc_top_call.
+    In such case, outer variables are all bounded variables by lambda and let-in and not filtered. *)
 }
 
 type fixterminfo_t = (Id.t, fixterm_info) Hashtbl.t
@@ -597,7 +600,6 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         fixterm_term_env = env;
         fixterm_term = term;
         fixterm_inlinable = inlinable;
-        fixterm_outer_variables = []; (* dummy. updated by set_fixfuncinfo_naive_outer_variables *)
       } in
       let fixfuncs =
         Array.to_seq
