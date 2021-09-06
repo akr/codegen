@@ -242,7 +242,8 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
   | Name.Name id -> Id.to_string id
 
 type fixterm_info = {
-  fixterm_id: Id.t;
+  fixterm_term_id: Id.t;
+  fixterm_func_ids: Id.t array;
   fixterm_tail_position: bool;
   fixterm_numargs: int;
   fixterm_term_env: Environ.env;
@@ -585,7 +586,8 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
           tary fary
       in
       let fixterm = {
-        fixterm_id = fixterm_id;
+        fixterm_term_id = fixterm_id;
+        fixterm_func_ids = Array.map id_of_annotated_name nary;
         fixterm_tail_position = tail_position;
         fixterm_numargs = numargs;
         fixterm_term_env = env;
