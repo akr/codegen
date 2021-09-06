@@ -1352,9 +1352,10 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
   Pp.str c_name ++
   hov 0 (pp_parameters)
 
-let gen_func_single ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
-  (whole_body : EConstr.t) (return_type : string)
-  ~(fixterms : fixterm_info list) (fixfuncinfo : fixfuncinfo_t) (used : Id.Set.t) : Pp.t =
+let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
+    ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+    (whole_body : EConstr.t) (return_type : string)
+    (used : Id.Set.t) : Pp.t =
   let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo env sigma whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1388,9 +1389,10 @@ let gen_func_single ~(static : bool) ~(cfunc_name : string) (env : Environ.env) 
     +++
     pp_body))
 
-let gen_func_multi ~(fixterms : fixterm_info list) ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
+    ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
-    (fixfuncinfo : fixfuncinfo_t) (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
+    (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
   let func_index_prefix = "codegen_func_index_" in
   let pp_enum =
@@ -1643,9 +1645,9 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixfuncinfo in
   (if called_fixfuncs <> [] then
-    gen_func_multi ~fixterms ~static ~cfunc_name env sigma whole_body formal_arguments return_type fixfuncinfo used called_fixfuncs
+    gen_func_multi ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body formal_arguments return_type used called_fixfuncs
   else
-    gen_func_single ~fixterms ~static ~cfunc_name env sigma whole_body return_type fixfuncinfo used) ++
+    gen_func_single ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body return_type used) ++
   Pp.fnl ()
 
 let gen_function (cfunc_name : string) : Pp.t =
