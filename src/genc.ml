@@ -831,7 +831,7 @@ let set_fixfuncinfo_outer_variables
         Some { info with fixfunc_outer_variables = ov })
     fixfuncinfo
 
-let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixfuncinfo_t =
+let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixterm_info list * fixfuncinfo_t =
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
@@ -841,7 +841,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   determine_fixfunc_c_names fixfuncinfo;
   set_fixfuncinfo_outer_variables env sigma term ~fixfuncinfo;
   (*show_fixfuncinfo env sigma fixfuncinfo;*)
-  fixfuncinfo
+  (fixterms, fixfuncinfo)
 
 let compute_called_fixfuncs (fixfuncinfo : fixfuncinfo_t) : fixfunc_info list =
   Hashtbl.fold
@@ -1252,86 +1252,23 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(gen_ret : Pp.t
 
 type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
 
-let rec detect_top_fixterms_rec
-    ~(fixfuncinfo : fixfuncinfo_t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (tail_position : bool)
-    (term : EConstr.t) (numargs : int) : top_fixterm_t Seq.t =
-  detect_top_fixterms_rec1 ~fixfuncinfo env sigma tail_position term numargs
-and detect_top_fixterms_rec1
-    ~(fixfuncinfo : fixfuncinfo_t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (tail_position : bool)
-    (term : EConstr.t) (numargs : int) : top_fixterm_t Seq.t =
-  match EConstr.kind sigma term with
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Rel i -> Seq.empty
-  | Int _ | Float _ | Const _ | Construct _ -> Seq.empty
-  | Proj _ -> Seq.empty
-  | App (f, args) ->
-      detect_top_fixterms_rec ~fixfuncinfo env sigma tail_position f
-        (Array.length args + numargs)
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      Seq.append
-        (detect_top_fixterms_rec ~fixfuncinfo env sigma false e 0)
-        (detect_top_fixterms_rec ~fixfuncinfo env2 sigma tail_position b numargs)
-  | Case (ci, p, iv, item, branches) ->
-      seq_flat_map2
-        (fun cstr_nargs br ->
-          detect_top_fixterms_rec ~fixfuncinfo env sigma tail_position br (cstr_nargs + numargs))
-        (Array.to_seq ci.Constr.ci_cstr_nargs)
-        (Array.to_seq branches)
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      if numargs = 0 then
-        user_err (Pp.str "[codegen:detect_top_fixterms] closure not supported yet")
-      else
-        detect_top_fixterms_rec ~fixfuncinfo env2 sigma tail_position b (numargs-1)
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      if tail_position then
-        seq_flat_map2
-          (fun t f ->
-            let numargs2 = numargs_of_type env sigma t in
-            detect_top_fixterms_rec ~fixfuncinfo env2 sigma tail_position f numargs2)
-          (Array.to_seq tary) (Array.to_seq fary)
-      else
-        let id = id_of_annotated_name nary.(i) in
-        let usage = Hashtbl.find fixfuncinfo id in
-        if usage.fixfunc_inlinable then
-          seq_flat_map2
-            (fun t f ->
-              let numargs2 = numargs_of_type env sigma t in
-              detect_top_fixterms_rec ~fixfuncinfo env2 sigma tail_position f numargs2)
-            (Array.to_seq tary) (Array.to_seq fary)
-        else
-          (* top functions found. *)
-          Seq.cons
-            (usage.fixfunc_outer_variables, env, term)
-            (seq_flat_map2
-              (fun t f ->
-                let numargs2 = numargs_of_type env sigma t in
-                detect_top_fixterms_rec ~fixfuncinfo env2 sigma true f numargs2)
-              (Array.to_seq tary) (Array.to_seq fary))
-
 let detect_top_fixterms
-    ~(fixfuncinfo : fixfuncinfo_t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) :
+    ~(fixterms : fixterm_info list)
+    ~(fixfuncinfo : fixfuncinfo_t) :
     top_fixterm_t list =
-  let numargs = numargs_of_exp env sigma term in
-  List.of_seq (detect_top_fixterms_rec ~fixfuncinfo env sigma true term numargs)
+  let non_inlinable_non_tail_position_fixterms =
+    List.filter
+      (fun fixterm ->
+        not fixterm.fixterm_inlinable &&
+        not fixterm.fixterm_tail_position)
+    fixterms
+  in
+  List.map
+    (fun fixterm ->
+      let fixterm_id = fixterm.fixterm_term_id in
+      let outer_variables = (Hashtbl.find fixfuncinfo fixterm_id).fixfunc_outer_variables in
+      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
+    non_inlinable_non_tail_position_fixterms
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
@@ -1362,6 +1299,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
       [|(fargs, fixfuncs, env, term)|]
 
 let obtain_function_bodies
+    ~(fixterms : fixterm_info list)
     ~(fixfuncinfo : fixfuncinfo_t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
@@ -1392,7 +1330,7 @@ let obtain_function_bodies
           (fun (args, fixes, env2, body) ->
             (args, gen_labels fixes, env2, body))
           (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
-      (detect_top_fixterms ~fixfuncinfo env sigma term)
+      (detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
 
@@ -1416,8 +1354,8 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
 
 let gen_func_single ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
   (whole_body : EConstr.t) (return_type : string)
-  (fixfuncinfo : fixfuncinfo_t) (used : Id.Set.t) : Pp.t =
-  let bodies = obtain_function_bodies ~fixfuncinfo env sigma whole_body in
+  ~(fixterms : fixterm_info list) (fixfuncinfo : fixfuncinfo_t) (used : Id.Set.t) : Pp.t =
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo env sigma whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_ary
@@ -1450,7 +1388,7 @@ let gen_func_single ~(static : bool) ~(cfunc_name : string) (env : Environ.env) 
     +++
     pp_body))
 
-let gen_func_multi ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+let gen_func_multi ~(fixterms : fixterm_info list) ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (fixfuncinfo : fixfuncinfo_t) (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
@@ -1548,7 +1486,7 @@ let gen_func_multi ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (
     pr_entry_function static cfunc_name (func_index_prefix ^ cfunc_name)
       formal_arguments return_type
   in
-  let bodies = obtain_function_bodies ~fixfuncinfo env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo env sigma whole_body in
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1700,14 +1638,14 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let fixfuncinfo = collect_fix_info env sigma cfunc_name whole_body in
+  let (fixterms, fixfuncinfo) = collect_fix_info env sigma cfunc_name whole_body in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixfuncinfo in
   (if called_fixfuncs <> [] then
-    gen_func_multi ~static ~cfunc_name env sigma whole_body formal_arguments return_type fixfuncinfo used called_fixfuncs
+    gen_func_multi ~fixterms ~static ~cfunc_name env sigma whole_body formal_arguments return_type fixfuncinfo used called_fixfuncs
   else
-    gen_func_single ~static ~cfunc_name env sigma whole_body return_type fixfuncinfo used) ++
+    gen_func_single ~fixterms ~static ~cfunc_name env sigma whole_body return_type fixfuncinfo used) ++
   Pp.fnl ()
 
 let gen_function (cfunc_name : string) : Pp.t =
