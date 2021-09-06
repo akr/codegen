@@ -480,8 +480,7 @@ let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : 
   inlinable
 
 (*
-  collect_fix_usage collects information for each fix-bounded functions.
-  The result is stored in fixfuncinfo as side effect.
+  collect_fix_usage collects information for each fix-terms and fix-bounded functions.
 
   collect_fix_usage tracks the term will be translated by gen_assign or gen_tail.
   tail_position=false means that term will be translated by gen_assign.
@@ -623,7 +622,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       (Seq.cons fixterm (concat_array_seq (Array.map fst results)),
        Seq.append fixfuncs (concat_array_seq (Array.map snd results)))
 
-let collect_fix_usage2
+let collect_fix_usage
     ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
@@ -631,16 +630,15 @@ let collect_fix_usage2
   let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] in
   (List.of_seq fixterms, List.of_seq fixfuncs)
 
-let collect_fix_usage
-    ~(inlinable_fixterms : bool Id.Map.t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t)
-    ~(fixfuncinfo : fixfuncinfo_t) : unit =
-  let (fixterms, fixfuncs) = collect_fix_usage2 ~inlinable_fixterms env sigma term in
-  List.iter
-    (fun fixfunc ->
-      Hashtbl.add fixfuncinfo fixfunc.fixfunc_func_id fixfunc)
-    fixfuncs
+let fixterm_table (fixterms : fixterm_info list) : (Id.t, fixterm_info) Hashtbl.t =
+  let fixterminfo = Hashtbl.create 0 in
+  List.iter (fun fixterm -> Hashtbl.add fixterminfo fixterm.fixterm_term_id fixterm) fixterms;
+  fixterminfo
+
+let fixfunc_table (fixfuncs : fixfunc_info list) : (Id.t, fixfunc_info) Hashtbl.t =
+  let fixfuncinfo = Hashtbl.create 0 in
+  List.iter (fun fixfunc -> Hashtbl.add fixfuncinfo fixfunc.fixfunc_func_id fixfunc) fixfuncs;
+  fixfuncinfo
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
@@ -882,10 +880,10 @@ let set_fixfuncinfo_outer_variables
     fixfuncinfo
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixfuncinfo_t =
-  let fixfuncinfo = Hashtbl.create 0 in
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
-  ignore (collect_fix_usage ~inlinable_fixterms env sigma term ~fixfuncinfo);
+  let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
+  let fixfuncinfo = fixfunc_table fixfuncs in
   detect_top_calls env sigma name term ~fixfuncinfo;
   determine_fixfunc_c_names fixfuncinfo;
   set_fixfuncinfo_outer_variables env sigma term ~fixfuncinfo;
