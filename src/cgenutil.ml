@@ -198,6 +198,18 @@ let seq_flat_map2_i (f : int -> 'a -> 'b -> 'c Seq.t) (xs : 'a Seq.t) (ys : 'b S
   in
   r 0 xs ys ()
 
+let rec concat_list_seq (l : 'a Seq.t list) : 'a Seq.t =
+  match l with
+  | [] -> Seq.empty
+  | s :: rest -> Seq.append s (concat_list_seq rest)
+
+let concat_array_seq (ary : 'a Seq.t array) : 'a Seq.t =
+  let r = ref Seq.empty in
+  for i = Array.length ary - 1 downto 0 do
+    r := Seq.append ary.(i) !r
+  done;
+  !r
+
 let string_of_name name =
   match name with
   | Name.Name id -> Id.to_string id
