@@ -247,14 +247,17 @@ type fixterm_info = {
   fixterm_tail_position: bool;
   fixterm_numargs: int;
   fixterm_term_env: Environ.env;
+  fixterm_term: EConstr.t;
   fixterm_inlinable: bool;
   fixterm_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixfuncinfo_outer_variables *)
 }
 
 type fixfunc_info = {
   fixfunc_func_id: Id.t;
+  fixfunc_func_index: int;
   fixfunc_term_env: Environ.env;
   fixfunc_func_env: Environ.env;
+  fixfunc_func: EConstr.t;
   fixfunc_inlinable: bool;
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
@@ -591,6 +594,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         fixterm_tail_position = tail_position;
         fixterm_numargs = numargs;
         fixterm_term_env = env;
+        fixterm_term = term;
         fixterm_inlinable = inlinable;
         fixterm_outer_variables = []; (* dummy. updated by set_fixfuncinfo_naive_outer_variables *)
       } in
@@ -600,10 +604,11 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
             (fun j name ty ->
               let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
               {
-                (*fixfunc_term_id = id_of_annotated_name nary.(i);*)
                 fixfunc_func_id = id_of_annotated_name nary.(j);
+                fixfunc_func_index = j;
                 fixfunc_term_env = env;
                 fixfunc_func_env = env2;
+                fixfunc_func = fary.(j);
                 fixfunc_inlinable = inlinable;
                 fixfunc_used_as_call = !(List.nth used_as_call2 (h - j - 1));
                 fixfunc_used_as_goto = !(List.nth used_as_goto2 (h - j - 1));
