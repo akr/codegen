@@ -511,7 +511,7 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
                       Printer.pr_constant env ctnt_i)
   | Some (def_i,_,_) ->
       let def_i = EConstr.of_constr def_i in
-      let (ctx_rel_i, body_i) = decompose_lam_assum sigma def_i in
+      let (args_i, body_i) = decompose_lam sigma def_i in
       match EConstr.kind sigma body_i with
       | Constr.Fix ((ia, i), (nary, tary, fary)) ->
           let ctnt_ary =
@@ -531,7 +531,7 @@ let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option 
                       | Some (def_j,_,_) ->
                           let def_j = EConstr.of_constr def_j in
                           let body_j' = mkFix ((ia, j), (nary, tary, fary)) in
-                          let def_j' = it_mkLambda_or_LetIn body_j' ctx_rel_i in
+                          let def_j' = compose_lam args_i body_j' in
                           if EConstr.eq_constr sigma def_j def_j' then
                             Some ctnt_j
                           else
