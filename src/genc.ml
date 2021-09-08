@@ -2220,6 +2220,13 @@ let gen_test (gen_list : code_generation list) : unit =
   gen_pp_iter Feedback.msg_info gen_list
 
 let command_generate_file () : unit =
+  let gen_map2 = CString.Map.map codegen_resolve_dependencies !generation_map in
+  List.iter
+    (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
+    (CString.Map.bindings gen_map2);
+  generation_map := CString.Map.empty
+
+let command_generate_file_no_dependencies () : unit =
   List.iter
     (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
     (CString.Map.bindings !generation_map);

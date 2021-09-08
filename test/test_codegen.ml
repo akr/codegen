@@ -190,6 +190,7 @@ let codegen_test_template
     ?(goal : test_goal = UntilExe)
     ?(coq_exit_code : Unix.process_status option)
     ?(coq_output_regexp : Str.regexp option)
+    ?(resolve_dependencies : bool = true)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -205,7 +206,8 @@ let codegen_test_template
     "CodeGen Source File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    "CodeGen GenerateFile.\n");
+    (if resolve_dependencies then "CodeGen GenerateFile.\n"
+                             else "CodeGen GenerateFile NoDependencies.\n"));
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
     "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
@@ -1964,7 +1966,9 @@ let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
     |}
 
 let test_auto_const (ctx : test_ctxt) : unit =
-  codegen_test_template ctx
+  codegen_test_template
+    ~resolve_dependencies:false
+    ctx
     (nat_src ^ {|
       CodeGen Snippet "#define one() 1".
       Definition one := 1.
