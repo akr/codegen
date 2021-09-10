@@ -1,6 +1,6 @@
 .PHONY: check checker
 
-SHARDS?=4
+SHARDS?=`nproc 2> /dev/null || echo 4`
 
 check: checker
 	./test_codegen -shards $(SHARDS)
