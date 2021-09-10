@@ -1,5 +1,6 @@
 .PHONY: check checker
 
+# nproc command prints the number of CPUs.
 SHARDS?=`nproc 2> /dev/null || echo 4`
 
 check: checker
