@@ -855,6 +855,36 @@ let test_inner_fix_even_odd_2 (ctx : test_ctxt) : unit =
       assert(even(3) == false);
       assert(even(4) == true);
     |}
+let test_two_even (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Definition even1 :=
+	fix even (n : nat) : bool :=
+	  match n with | O => true | S m => odd m end
+	with odd (m : nat) : bool :=
+	  match m with | O => false | S n => even n end
+	for even.
+      Definition even2 :=
+	fix even (n : nat) : bool :=
+	  match n with | O => true | S m => odd m end
+	with odd (m : nat) : bool :=
+	  match m with | O => false | S n => even n end
+	for even.
+      CodeGen Function even1.
+      CodeGen Function even2.
+    |}) {|
+      assert(even1(0) == true);
+      assert(even1(1) == false);
+      assert(even1(2) == true);
+      assert(even1(3) == false);
+      assert(even1(4) == true);
+      assert(even2(0) == true);
+      assert(even2(1) == false);
+      assert(even2(2) == true);
+      assert(even2(3) == false);
+      assert(even2(4) == true);
+    |}
 
 let test_app_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2600,6 +2630,7 @@ let suite : OUnit2.test =
     "test_even_odd" >:: test_even_odd;
     "test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1;
     "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;
+    "test_two_even" >:: test_two_even;
     "test_app_let" >:: test_app_let;
     "test_app_match" >:: test_app_match;
     "test_let_app_match" >:: test_let_app_match;
