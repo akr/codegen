@@ -1326,7 +1326,7 @@ let unique_string_list (ss : string list) : string list =
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
     ~(fixfuncinfo : fixfuncinfo_t)
-    ~(cfunc_name : string)
+    ~(primary_cfunc : string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     (((*varname*)string * (*vartype*)string) list *
@@ -1338,7 +1338,7 @@ let obtain_function_bodies
       (CList.map_filter
         (fun fix_name ->
           let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
-          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some cfunc_name then
+          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
             Some ("entry_" ^ fix_usage.fixfunc_c_name)
           else
             None)
@@ -1380,10 +1380,10 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
   hov 0 (pp_parameters)
 
 let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
-    ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+    ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (return_type : string)
     (used : Id.Set.t) : Pp.t =
-  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~cfunc_name env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~primary_cfunc env sigma whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_ary
@@ -1408,7 +1408,7 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   v 0 (
-  gen_function_header static return_type cfunc_name c_fargs +++
+  gen_function_header static return_type primary_cfunc c_fargs +++
   vbrace (
     pp_sjoinmap_list
       (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
@@ -1417,11 +1417,11 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
     pp_body))
 
 let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
-    ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
+    ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (used : Id.Set.t) (called_fixfuncs : fixfunc_info list)
     (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
-  let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
+  let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
   let other_topfuncs_and_called_fixfuncs =
     (match other_topfuncs with
@@ -1436,7 +1436,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
       Pp.str func_index_type +++
       hovbrace (
         pp_join_list (Pp.str "," ++ Pp.spc ())
-          (Pp.str (func_index_prefix ^ cfunc_name) ::
+          (Pp.str (func_index_prefix ^ primary_cfunc) ::
            List.map
              (fun (static1, info) -> Pp.str (func_index_prefix ^ info.fixfunc_c_name))
              other_topfuncs_and_called_fixfuncs)) ++
@@ -1449,7 +1449,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         args
     in
     hv 0 (
-    Pp.str ("struct codegen_args_" ^ cfunc_name) +++
+    Pp.str ("struct codegen_args_" ^ primary_cfunc) +++
     hovbrace (
     pr_members formal_arguments +++
     (if CList.is_empty formal_arguments then
@@ -1475,7 +1475,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
   let pp_forward_decl =
     hv 0 (
       Pp.str "static void" +++
-      Pp.str ("codegen_functions_" ^ cfunc_name) ++
+      Pp.str ("codegen_functions_" ^ primary_cfunc) ++
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
@@ -1495,7 +1495,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         Pp.str "codegen_ret;"
       in
       let pp_call =
-        Pp.str ("codegen_functions_" ^ cfunc_name) ++
+        Pp.str ("codegen_functions_" ^ primary_cfunc) ++
         Pp.str "(" ++
         Pp.str func_index ++ Pp.str "," +++
         Pp.str "&codegen_args," +++
@@ -1512,7 +1512,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           hov 0 pp_call +++
           hov 0 pp_return))
     in
-    pr_entry_function static cfunc_name (func_index_prefix ^ cfunc_name)
+    pr_entry_function static primary_cfunc (func_index_prefix ^ primary_cfunc)
       formal_arguments return_type +++
     pp_sjoinmap_list
       (fun (static1, info) ->
@@ -1523,7 +1523,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           info.fixfunc_return_type)
       other_topfuncs_and_called_fixfuncs
   in
-  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~cfunc_name env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~primary_cfunc env sigma whole_body in
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)codegen_ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1591,7 +1591,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           hov 0 (
             Pp.str c_arg +++
             Pp.str "=" +++
-            Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)codegen_args)->" ^ c_arg) ++
+            Pp.str ("((struct codegen_args_" ^ primary_cfunc ^ " *)codegen_args)->" ^ c_arg) ++
             Pp.str ";"))
         formal_arguments
   in
@@ -1611,7 +1611,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     pp_forward_decl +++
     pp_entry_functions +++
     Pp.str "static void" +++
-    Pp.str ("codegen_functions_" ^ cfunc_name) ++
+    Pp.str ("codegen_functions_" ^ primary_cfunc) ++
     Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
     vbrace (
       pp_local_variables_decls +++
@@ -1667,26 +1667,26 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           args)
   | Proj (proj, e) -> used_variables env sigma e
 
-let gen_func_sub (cfunc_name : string) (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
-  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
+let gen_func_sub (primary_cfunc : string) (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
+  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_body = EConstr.of_constr whole_body in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let (fixterms, fixfuncinfo) = collect_fix_info env sigma cfunc_name whole_body other_topfuncs in
+  let (fixterms, fixfuncinfo) = collect_fix_info env sigma primary_cfunc whole_body other_topfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixfuncinfo in
   (if called_fixfuncs <> [] || other_topfuncs <> None then
-    gen_func_multi ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body formal_arguments return_type used called_fixfuncs other_topfuncs
+    gen_func_multi ~fixterms ~fixfuncinfo ~static ~primary_cfunc env sigma whole_body formal_arguments return_type used called_fixfuncs other_topfuncs
   else
-    gen_func_single ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body return_type used) ++
+    gen_func_single ~fixterms ~fixfuncinfo ~static ~primary_cfunc env sigma whole_body return_type used) ++
   Pp.fnl ()
 
-let gen_function ?(other_topfuncs : (string * int * Id.t) list option) (cfunc_name : string) : Pp.t =
-  local_gensym_with (fun () -> gen_func_sub cfunc_name other_topfuncs)
+let gen_function ?(other_topfuncs : (string * int * Id.t) list option) (primary_cfunc : string) : Pp.t =
+  local_gensym_with (fun () -> gen_func_sub primary_cfunc other_topfuncs)
 
 let fixfunc_for_mutual_recursion (cfunc : string) : (int * Id.t) option =
   let (static, ctnt, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
