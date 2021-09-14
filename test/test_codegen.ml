@@ -57,6 +57,12 @@ let quote_C_header (str : string) =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
+let read_file (fn : string) : string =
+  let ch = open_in fn in
+  let result = really_input_string ch (in_channel_length ch) in
+  close_in ch;
+  result
+
 let write_file (fn : string) (content : string) : unit =
   let ch = open_out fn in
   output_string ch content;
@@ -190,6 +196,7 @@ let codegen_test_template
     ?(goal : test_goal = UntilExe)
     ?(coq_exit_code : Unix.process_status option)
     ?(coq_output_regexp : Str.regexp option)
+    ?(modify_generated_source : (string -> string) option)
     ?(resolve_dependencies : bool = true)
     (ctx : test_ctxt)
     (coq_commands : string)
@@ -197,7 +204,7 @@ let codegen_test_template
   let d = my_temp_dir ctx in
   let test_path = ounit_path ctx in
   let src_fn = d ^ "/src.v" in
-  (*let gen_fn = d ^ "/gen.c" in*)
+  let gen_fn = d ^ "/gen.c" in
   let main_fn = d ^ "/main.c" in
   let exe_fn = d ^ "/exe" in
   write_file src_fn
@@ -225,6 +232,10 @@ let codegen_test_template
     ~use_stderr:true
     ?foutput:coq_foutput
     coqc (List.append coq_opts [src_fn]);
+  (match modify_generated_source with
+  | None -> ()
+  | Some f ->
+      write_file gen_fn (f (read_file gen_fn)));
   match goal with
   | UntilCoq -> ()
   | UntilCC ->
@@ -855,22 +866,23 @@ let test_inner_fix_even_odd_2 (ctx : test_ctxt) : unit =
       assert(even(3) == false);
       assert(even(4) == true);
     |}
+
 let test_two_even (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
     {|
       Definition even1 :=
-	fix even (n : nat) : bool :=
-	  match n with | O => true | S m => odd m end
-	with odd (m : nat) : bool :=
-	  match m with | O => false | S n => even n end
-	for even.
+        fix even (n : nat) : bool :=
+          match n with | O => true | S m => odd m end
+        with odd (m : nat) : bool :=
+          match m with | O => false | S n => even n end
+        for even.
       Definition even2 :=
-	fix even (n : nat) : bool :=
-	  match n with | O => true | S m => odd m end
-	with odd (m : nat) : bool :=
-	  match m with | O => false | S n => even n end
-	for even.
+        fix even (n : nat) : bool :=
+          match n with | O => true | S m => odd m end
+        with odd (m : nat) : bool :=
+          match m with | O => false | S n => even n end
+        for even.
       CodeGen Function even1.
       CodeGen Function even2.
     |}) {|
@@ -1575,13 +1587,13 @@ let forest_src = {|
       #include <stdlib.h> /* for NULL, malloc(), abort() */
 
       struct tree_st {
-	struct forest_st *f;
+        struct forest_st *f;
       };
 
       struct forest_st {
-	/* constructed by consf constructor */
-	struct tree_st *t;
-	struct forest_st *f;
+        /* constructed by consf constructor */
+        struct tree_st *t;
+        struct forest_st *f;
       };
 
       typedef struct tree_st *tree; /* NULL is invalid */
@@ -1589,21 +1601,21 @@ let forest_src = {|
 
       tree node(forest f)
       {
-	tree t;
-	if ((t = malloc(sizeof(*t))) == NULL) { abort(); }
-	t->f = f;
-	return t;
+        tree t;
+        if ((t = malloc(sizeof(*t))) == NULL) { abort(); }
+        t->f = f;
+        return t;
       }
 
       #define emptyf NULL
 
       forest consf(tree t, forest f)
       {
-	forest ret;
-	if ((ret = malloc(sizeof(*ret))) == NULL) { abort(); }
-	ret->t = t;
-	ret->f = f;
-	return ret;
+        forest ret;
+        if ((ret = malloc(sizeof(*ret))) == NULL) { abort(); }
+        ret->t = t;
+        ret->f = f;
+        return ret;
       }
 
       #define node_get_member_0(n) ((n)->f)
@@ -1638,6 +1650,57 @@ let test_mutual_sizet_sizef (ctx : test_ctxt) : unit =
       assert(sizet(t1) == 1);
       assert(sizef(f1) == 1);
       assert(sizef(f2) == 2);
+    |}
+
+(*
+  test dedup by counting calls of sizet and sizef.
+  If dedup doesn't work, calling sizef doesn't cause calling sizet.
+  In such case, assert(sizet_count == 2) will fail.
+*)
+let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ forest_src ^
+    {|
+      CodeGen Snippet "
+      static int sizet_count = 0;
+      static int sizef_count = 0;
+      ".
+      Fixpoint sizet (t:tree) : nat :=
+        let (f) := t in S (sizef f)
+      with sizef (f:forest) : nat :=
+        match f with
+        | emptyf => O
+        | consf t f => plus (sizet t) (sizef f)
+        end.
+      CodeGen Function sizet.
+      CodeGen Function sizef.
+    |})
+    ~modify_generated_source:
+      (fun s ->
+        (*print_string src;*)
+        let s = Str.substitute_first
+          (Str.regexp "^nat\nsizet")
+          (fun _ -> "nat tmp_sizet(tree);\n" ^
+                    "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n" ^
+                    "nat tmp_sizet")
+          s
+        in
+        let s = Str.substitute_first
+          (Str.regexp "^nat\nsizef")
+          (fun _ -> "nat tmp_sizef(forest);\n" ^
+                    "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n" ^
+                    "nat tmp_sizef")
+          s
+        in
+        s)
+    {|
+      forest f0 = emptyf;
+      tree t1 = node(f0);
+      forest f1 = consf(t1, f0);
+      forest f2 = consf(t1, f1);
+      assert(sizef(f2) == 2);
+      assert(sizet_count == 2);
+      assert(sizef_count == 5);
     |}
 
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
@@ -2518,10 +2581,10 @@ let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) (b : bool) :=
-	match b with
-	| true => x
-	| false => BoolBox true
-	end.
+        match b with
+        | true => x
+        | false => BoolBox true
+        end.
       CodeGen Function f.
     |}) {| |}
 
@@ -2531,7 +2594,7 @@ let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) :=
-	fix g (n : nat) := x.
+        fix g (n : nat) := x.
       CodeGen Function f.
     |}) {| |}
 
@@ -2668,6 +2731,7 @@ let suite : OUnit2.test =
     "test_mftest" >:: test_mftest;
     "test_multifunc_noargument" >:: test_multifunc_noargument;
     "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
+    "test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
