@@ -1476,13 +1476,13 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     hv 0 (
       Pp.str "static void" +++
       Pp.str ("codegen_functions_" ^ cfunc_name) ++
-      Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *args, void *ret);"))
+      Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
     let pr_entry_function static c_name func_index formal_arguments return_type =
       let pp_vardecl_args =
         Pp.str ("struct codegen_args_" ^ c_name) +++
-        Pp.str "args" +++
+        Pp.str "codegen_args" +++
         Pp.str "=" +++
         hovbrace (
           (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
@@ -1492,17 +1492,17 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
       in
       let pp_vardecl_ret =
         Pp.str return_type +++
-        Pp.str "ret;"
+        Pp.str "codegen_ret;"
       in
       let pp_call =
         Pp.str ("codegen_functions_" ^ cfunc_name) ++
         Pp.str "(" ++
         Pp.str func_index ++ Pp.str "," +++
-        Pp.str "&args," +++
-        Pp.str "&ret);"
+        Pp.str "&codegen_args," +++
+        Pp.str "&codegen_ret);"
       in
       let pp_return =
-        Pp.str "return ret;"
+        Pp.str "return codegen_ret;"
       in
       v 0 (
         gen_function_header static return_type c_name formal_arguments +++
@@ -1524,7 +1524,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
       other_topfuncs_and_called_fixfuncs
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~cfunc_name env sigma whole_body in
-  let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)ret)")) in
+  let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)codegen_ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_ary
@@ -1554,7 +1554,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
               hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
+                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
                 Pp.str ";"))
             info.fixfunc_outer_variables
         in
@@ -1564,7 +1564,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
               hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)args)->" ^ c_arg) ++
+                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
                 Pp.str ";"))
             info.fixfunc_formal_arguments
         in
@@ -1591,7 +1591,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           hov 0 (
             Pp.str c_arg +++
             Pp.str "=" +++
-            Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)args)->" ^ c_arg) ++
+            Pp.str ("((struct codegen_args_" ^ cfunc_name ^ " *)codegen_args)->" ^ c_arg) ++
             Pp.str ";"))
         formal_arguments
   in
@@ -1612,7 +1612,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     pp_entry_functions +++
     Pp.str "static void" +++
     Pp.str ("codegen_functions_" ^ cfunc_name) ++
-    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *args, void *ret)")) +++
+    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
     vbrace (
       pp_local_variables_decls +++
       pp_switch +++
