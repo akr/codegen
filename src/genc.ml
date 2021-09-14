@@ -267,7 +267,7 @@ type fixfunc_info = {
   fixfunc_c_name: string; (* by determine_fixfunc_c_names *)
 
   fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by set_fixfuncinfo_outer_variables *)
-  (* outer variables are mostly same for same fix-bouded functions in a fix-term.
+  (* outer variables are mostly same for fix-bouded functions in a fix-term.
     However, they can be different when some of them have Some X for fixfunc_top_call.
     In such case, outer variables are all bounded variables by lambda and let-in and not filtered. *)
 }
