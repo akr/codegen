@@ -171,7 +171,7 @@ let is_static_function_icommand (icommand : instance_command) : bool =
   | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
 
 let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
-    bool * Constant.t * Constr.types * Constr.t =
+    (*static*)bool * Constant.t * Constr.types * Constr.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
@@ -647,18 +647,29 @@ let fixfunc_table (fixfuncs : fixfunc_info list) : fixfuncinfo_t =
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
+    (other_topfuncs : (string * int * Id.t) list option)
     ~(fixfuncinfo : fixfuncinfo_t) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      detect_top_calls env2 sigma top_c_func_name e ~fixfuncinfo
+      detect_top_calls env2 sigma top_c_func_name e other_topfuncs ~fixfuncinfo
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      detect_top_calls env2 sigma top_c_func_name fary.(i) ~fixfuncinfo;
+      detect_top_calls env2 sigma top_c_func_name fary.(i) None ~fixfuncinfo;
       let key = id_of_annotated_name nary.(i) in
       let usage = Hashtbl.find fixfuncinfo key in
-      Hashtbl.replace fixfuncinfo key { usage with fixfunc_top_call = Some top_c_func_name }
+      Hashtbl.replace fixfuncinfo key { usage with fixfunc_top_call = Some top_c_func_name };
+      (match other_topfuncs with
+      | None -> ()
+      | Some other_topfunc_list ->
+          List.iter
+            (fun (another_top_cfunc_name, j, fixfunc_id) ->
+              detect_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfuncinfo;
+              let key = id_of_annotated_name nary.(j) in
+              let usage = Hashtbl.find fixfuncinfo key in
+              Hashtbl.replace fixfuncinfo key { usage with fixfunc_top_call = Some another_top_cfunc_name; fixfunc_used_as_call = true })
+            other_topfunc_list)
   (* xxx: consider App *)
   | _ -> ()
 
@@ -670,7 +681,9 @@ let determine_fixfunc_c_names (fixfuncinfo : fixfuncinfo_t) : unit =
            info.fixfunc_top_call = None then
           global_gensym_with_id fixfunc_id
         else
-          Id.to_string fixfunc_id
+          match info.fixfunc_top_call with
+          | None -> Id.to_string fixfunc_id
+          | Some cfunc -> cfunc
       in
       Some { info with fixfunc_c_name = c_name })
     fixfuncinfo
@@ -831,13 +844,14 @@ let set_fixfuncinfo_outer_variables
         Some { info with fixfunc_outer_variables = ov })
     fixfuncinfo
 
-let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t) : fixterm_info list * fixfuncinfo_t =
+let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
+    (other_topfuncs : (string * int * Id.t) list option) : fixterm_info list * fixfuncinfo_t =
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
   (*let fixterminfo = fixterm_table fixterms in*)
   let fixfuncinfo = fixfunc_table fixfuncs in
-  detect_top_calls env sigma name term ~fixfuncinfo;
+  detect_top_calls env sigma name term other_topfuncs ~fixfuncinfo;
   determine_fixfunc_c_names fixfuncinfo;
   set_fixfuncinfo_outer_variables env sigma term ~fixfuncinfo;
   (*show_fixfuncinfo env sigma fixfuncinfo;*)
@@ -1298,9 +1312,21 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
   | _ ->
       [|(fargs, fixfuncs, env, term)|]
 
+let unique_string_list (ss : string list) : string list =
+  let h = Hashtbl.create 0 in
+  List.filter
+    (fun s ->
+      if Hashtbl.mem h s then
+        false
+      else
+        (Hashtbl.add h s true;
+        true))
+    ss
+
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
     ~(fixfuncinfo : fixfuncinfo_t)
+    ~(cfunc_name : string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     (((*varname*)string * (*vartype*)string) list *
@@ -1308,14 +1334,15 @@ let obtain_function_bodies
      Environ.env *
      EConstr.t) array =
   let gen_labels fixes =
-    CList.map_filter
-      (fun fix_name ->
-        let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
-        if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call = None then
-          Some ("entry_" ^ fix_usage.fixfunc_c_name)
-        else
-          None)
-      fixes
+    unique_string_list
+      (CList.map_filter
+        (fun fix_name ->
+          let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
+          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some cfunc_name then
+            Some ("entry_" ^ fix_usage.fixfunc_c_name)
+          else
+            None)
+        fixes)
   in
   let result_whole_body =
     Array.map
@@ -1356,7 +1383,7 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
     ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (return_type : string)
     (used : Id.Set.t) : Pp.t =
-  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~cfunc_name env sigma whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_ary
@@ -1392,9 +1419,17 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
 let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
     ~(static : bool) ~(cfunc_name : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
-    (used : Id.Set.t) (called_fixfuncs : fixfunc_info list) : Pp.t =
+    (used : Id.Set.t) (called_fixfuncs : fixfunc_info list)
+    (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ cfunc_name in
   let func_index_prefix = "codegen_func_index_" in
+  let other_topfuncs_and_called_fixfuncs =
+    (match other_topfuncs with
+    | None -> []
+    | Some other_topfunc_list ->
+        (List.map (fun (another_top_cfunc_name, j, fixfunc_id) -> (static, Hashtbl.find fixfuncinfo fixfunc_id)) other_topfunc_list)) @
+    List.map (fun info -> (true, info)) called_fixfuncs
+  in
   let pp_enum =
     hov 0 (
       Pp.str "enum" +++
@@ -1403,8 +1438,8 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         pp_join_list (Pp.str "," ++ Pp.spc ())
           (Pp.str (func_index_prefix ^ cfunc_name) ::
            List.map
-             (fun info -> Pp.str (func_index_prefix ^ info.fixfunc_c_name))
-             called_fixfuncs)) ++
+             (fun (static1, info) -> Pp.str (func_index_prefix ^ info.fixfunc_c_name))
+             other_topfuncs_and_called_fixfuncs)) ++
       Pp.str ";")
   in
   let pp_struct_args =
@@ -1413,8 +1448,17 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         (fun (c_arg, t) -> hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
         args
     in
+    hv 0 (
+    Pp.str ("struct codegen_args_" ^ cfunc_name) +++
+    hovbrace (
+    pr_members formal_arguments +++
+    (if CList.is_empty formal_arguments then
+      (* empty struct is undefined behavior *)
+      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
+    else
+      mt ())) ++ Pp.str ";") +++
     pp_sjoinmap_list
-      (fun info ->
+      (fun (static1, info) ->
         hv 0 (
         Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
         hovbrace (
@@ -1426,22 +1470,13 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
         else
           mt ())) ++ Pp.str ";"))
-      called_fixfuncs +++
-    hv 0 (
-    Pp.str ("struct codegen_args_" ^ cfunc_name) +++
-    hovbrace (
-    pr_members formal_arguments +++
-    (if CList.is_empty formal_arguments then
-      (* empty struct is undefined behavior *)
-      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
-    else
-      mt ())) ++ Pp.str ";")
+      other_topfuncs_and_called_fixfuncs
   in
   let pp_forward_decl =
     hv 0 (
       Pp.str "static void" +++
       Pp.str ("codegen_functions_" ^ cfunc_name) ++
-      Pp.str ("(enum " ^ func_index_type ^ " g, void *args, void *ret);"))
+      Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *args, void *ret);"))
   in
   let pp_entry_functions =
     let pr_entry_function static c_name func_index formal_arguments return_type =
@@ -1477,18 +1512,18 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           hov 0 pp_call +++
           hov 0 pp_return))
     in
+    pr_entry_function static cfunc_name (func_index_prefix ^ cfunc_name)
+      formal_arguments return_type +++
     pp_sjoinmap_list
-      (fun info ->
-        pr_entry_function true info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
+      (fun (static1, info) ->
+        pr_entry_function static1 info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
           (List.append
             info.fixfunc_outer_variables
             info.fixfunc_formal_arguments)
           info.fixfunc_return_type)
-      called_fixfuncs +++
-    pr_entry_function static cfunc_name (func_index_prefix ^ cfunc_name)
-      formal_arguments return_type
+      other_topfuncs_and_called_fixfuncs
   in
-  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~cfunc_name env sigma whole_body in
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1509,7 +1544,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
   in
   let pp_switch_cases =
     pp_sjoinmap_list
-      (fun info ->
+      (fun (static1, info) ->
         let pp_case =
           Pp.str "case" +++ Pp.str (func_index_prefix ^ info.fixfunc_c_name) ++ Pp.str ":"
         in
@@ -1544,7 +1579,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
             hov 0 pp_goto)
         in
         pp_result)
-      called_fixfuncs
+      other_topfuncs_and_called_fixfuncs
   in
   let pp_switch_default = Pp.str "default:" in
   let pp_assign_args_default =
@@ -1566,7 +1601,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     v 0 pp_assign_args_default
   in
   let pp_switch =
-    hov 0 (Pp.str "switch" +++ Pp.str "(g)") +++
+    hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
     vbrace pp_switch_body
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
@@ -1577,7 +1612,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     pp_entry_functions +++
     Pp.str "static void" +++
     Pp.str ("codegen_functions_" ^ cfunc_name) ++
-    Pp.str ("(enum " ^ func_index_type ^ " g, void *args, void *ret)")) +++
+    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *args, void *ret)")) +++
     vbrace (
       pp_local_variables_decls +++
       pp_switch +++
@@ -1632,7 +1667,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           args)
   | Proj (proj, e) -> used_variables env sigma e
 
-let gen_func_sub (cfunc_name : string) : Pp.t =
+let gen_func_sub (cfunc_name : string) (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -1640,18 +1675,39 @@ let gen_func_sub (cfunc_name : string) : Pp.t =
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let (fixterms, fixfuncinfo) = collect_fix_info env sigma cfunc_name whole_body in
+  let (fixterms, fixfuncinfo) = collect_fix_info env sigma cfunc_name whole_body other_topfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixfuncinfo in
-  (if called_fixfuncs <> [] then
-    gen_func_multi ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body formal_arguments return_type used called_fixfuncs
+  (if called_fixfuncs <> [] || other_topfuncs <> None then
+    gen_func_multi ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body formal_arguments return_type used called_fixfuncs other_topfuncs
   else
     gen_func_single ~fixterms ~fixfuncinfo ~static ~cfunc_name env sigma whole_body return_type used) ++
   Pp.fnl ()
 
-let gen_function (cfunc_name : string) : Pp.t =
-  local_gensym_with (fun () -> gen_func_sub cfunc_name)
+let gen_function ?(other_topfuncs : (string * int * Id.t) list option) (cfunc_name : string) : Pp.t =
+  local_gensym_with (fun () -> gen_func_sub cfunc_name other_topfuncs)
+
+let fixfunc_for_mutual_recursion (cfunc : string) : (int * Id.t) option =
+  let (static, ctnt, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
+  let (args, body) = Term.decompose_lam term in
+  match Constr.kind body with
+  | Fix ((ks, j), (nary, tary, fary)) -> Some (j, id_of_annotated_name nary.(j))
+  | _ -> None
+
+let gen_mutual (cfunc_names : string list) : Pp.t =
+  match cfunc_names with
+  | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
+  | cfunc :: other_cfuncs ->
+      let other_topfuncs =
+        CList.map_filter
+          (fun cfunc ->
+            match fixfunc_for_mutual_recursion cfunc with
+            | None -> None
+            | Some (j, fixfunc_id) -> Some (cfunc, j, fixfunc_id))
+          other_cfuncs
+      in
+      gen_function ~other_topfuncs cfunc
 
 let gen_prototype (cfunc_name : string) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
@@ -2152,12 +2208,62 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   (*msg_info_hov pp;*)
   ()
 
+let common_key_for_mutual_recursion (term : Constr.t) : (int * Constr.t) option =
+  let (args, body) = Term.decompose_lam term in
+  match Constr.kind body with
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      Some (j, Constr.mkFix ((ks, 0), (nary, tary, fary)))
+  | _ -> None
+
+let codegen_detect_mutual_recursion (gen_list : code_generation list) : code_generation list =
+  let map = ref ConstrMap.empty in
+  let gens = List.map
+    (fun gen ->
+      gen,
+      (match gen with
+      | GenFunc cfunc ->
+          let (static, ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc in
+          (match common_key_for_mutual_recursion body with
+          | Some (j, key) as v ->
+              map := ConstrMap.update
+                key
+                (fun njs_opt ->
+                  match njs_opt with
+                  | None -> Some [(cfunc, j)]
+                  | Some njs -> Some ((cfunc, j) :: njs))
+                !map;
+              v
+          | None -> None)
+      | _ -> None))
+    gen_list
+  in
+  CList.map_filter (* assumes CList.map_filter invokes the function left-to-right order *)
+    (fun (gen, jkey_opt) ->
+      match jkey_opt with
+      | None -> Some gen
+      | Some (j, key) ->
+          (match ConstrMap.find_opt key !map with
+          | Some njs ->
+              (match njs with
+              | [] -> assert false
+              | [(cfunc, j)] -> Some (GenFunc cfunc)
+              | _ ->
+                  let njs = List.sort (fun (_,j1) (_,j2) -> Int.compare j1 j2) njs in
+                  map := ConstrMap.remove key !map;
+                  let cfuncs = List.map fst njs in
+                  msg_info_hov (Pp.str "[codegen] mutually recursive functions detected:" +++ pp_sjoinmap_list Pp.str cfuncs);
+                  Some (GenMutual cfuncs))
+          | None -> None))
+    gens
+
 let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
   List.iter
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
           f (gen_function cfunc_name ++ Pp.fnl ())
+      | GenMutual cfunc_names ->
+          f (gen_mutual cfunc_names ++ Pp.fnl ())
       | GenPrototype cfunc_name ->
           f (gen_prototype cfunc_name ++ Pp.fnl ())
       | GenSnippet str ->
@@ -2167,13 +2273,14 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
 (* Vernacular commands *)
 
 let command_gen (cfunc_list : string_or_qualid list) : unit =
-  List.iter
-    (fun cfunc_name ->
-      match cfunc_name with
-      | StrOrQid_Str str ->
-          Feedback.msg_info (gen_function str)
-      | StrOrQid_Qid qid ->
-          (let env = Global.env () in
+  let gen_list =
+    List.map
+      (fun arg ->
+        match arg with
+        | StrOrQid_Str cfunc_name ->
+            GenFunc cfunc_name
+        | StrOrQid_Qid qid ->
+          let env = Global.env () in
           let sigma = Evd.from_env env in
           let func = func_of_qualid env qid in
           let sp_cfg = codegen_auto_arguments_internal env sigma func in
@@ -2184,8 +2291,14 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
             | None -> codegen_define_instance env sigma CodeGenFunction func [] None
             | Some sp_inst -> (env, sp_inst)
           in
-          Feedback.msg_info (gen_function sp_inst.sp_cfunc_name)))
-    cfunc_list
+          GenFunc sp_inst.sp_cfunc_name)
+      cfunc_list
+  in
+  (* Don't call codegen_resolve_dependencies.
+     CodeGen Gen is used to test code generation of specified functions.
+     Generating non-specified functions would make result longer with uninteresting functions. *)
+  let gen_list = codegen_detect_mutual_recursion gen_list in
+  gen_pp_iter Feedback.msg_info gen_list
 
 let command_snippet (str : string) : unit =
   add_snippet str
@@ -2220,10 +2333,12 @@ let gen_test (gen_list : code_generation list) : unit =
   gen_pp_iter Feedback.msg_info gen_list
 
 let command_generate_file () : unit =
-  let gen_map2 = CString.Map.map codegen_resolve_dependencies !generation_map in
+  let gen_map = !generation_map in
+  let gen_map = CString.Map.map codegen_resolve_dependencies gen_map in
+  let gen_map = CString.Map.map codegen_detect_mutual_recursion gen_map in
   List.iter
     (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
-    (CString.Map.bindings gen_map2);
+    (CString.Map.bindings gen_map);
   generation_map := CString.Map.empty
 
 let command_generate_file_no_dependencies () : unit =

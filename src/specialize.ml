@@ -2018,7 +2018,20 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
       | GenFunc cfunc ->
           let rev_postorder = ref [] in
           recursive_simplify visited rev_postorder cfunc;
-          list_map_append (fun cfunc -> GenFunc cfunc) !rev_postorder new_genlist)
+          list_map_append (fun cfunc -> GenFunc cfunc) !rev_postorder new_genlist
+      | GenMutual cfuncs ->
+          match cfuncs with
+          | [] -> new_genlist
+          | cfunc1 :: rest ->
+              let rev_postorder = ref [] in
+              recursive_simplify visited rev_postorder cfunc1;
+              list_map_append
+                (fun cfunc2 ->
+                  if cfunc1 = cfunc2 then
+                    gen (* GenMutual cfunc1 :: rest *)
+                  else
+                    GenFunc cfunc2)
+                !rev_postorder new_genlist)
     gen_list
     []
 
@@ -2035,7 +2048,9 @@ let command_print_generation_list gen_list =
       | GenPrototype cfunc ->
           msg_info_hov (Pp.str "GenPrototype" +++ Pp.str cfunc)
       | GenFunc cfunc ->
-          msg_info_hov (Pp.str "GenFunc" +++ Pp.str cfunc))
+          msg_info_hov (Pp.str "GenFunc" +++ Pp.str cfunc)
+      | GenMutual cfuncs ->
+          msg_info_hov (Pp.str "GenMutual" +++ pp_sjoinmap_list Pp.str cfuncs))
     (List.rev_append gen_list [])
 
 let command_print_generation_map () =

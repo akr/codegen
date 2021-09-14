@@ -1533,6 +1533,83 @@ let test_multifunc_noargument (ctx : test_ctxt) : unit =
       assert(f1() == 1);
     |}
 
+let forest_src = {|
+      (* This example is taken from Coq reference manual *)
+      Inductive tree : Set :=
+      | node : forest -> tree
+      with forest : Set :=
+      | emptyf : forest
+      | consf : tree -> forest -> forest.
+
+      CodeGen Snippet "
+      #include <stdlib.h> /* for NULL, malloc(), abort() */
+
+      struct tree_st {
+	struct forest_st *f;
+      };
+
+      struct forest_st {
+	/* constructed by consf constructor */
+	struct tree_st *t;
+	struct forest_st *f;
+      };
+
+      typedef struct tree_st *tree; /* NULL is invalid */
+      typedef struct forest_st *forest; /* NULL means emptyf constructor */
+
+      tree node(forest f)
+      {
+	tree t;
+	if ((t = malloc(sizeof(*t))) == NULL) { abort(); }
+	t->f = f;
+	return t;
+      }
+
+      #define emptyf NULL
+
+      forest consf(tree t, forest f)
+      {
+	forest ret;
+	if ((ret = malloc(sizeof(*ret))) == NULL) { abort(); }
+	ret->t = t;
+	ret->f = f;
+	return ret;
+      }
+
+      #define node_get_member_0(n) ((n)->f)
+
+      #define sw_forest(f) ((f) != NULL)
+      #define emptyf_tag 0
+      #define consf_tag 1
+      #define consf_get_member_0(c) ((c)->t)
+      #define consf_get_member_1(c) ((c)->f)
+      ".
+|}
+
+let test_mutual_sizet_sizef (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ forest_src ^
+    {|
+      Fixpoint sizet (t:tree) : nat :=
+        let (f) := t in S (sizef f)
+      with sizef (f:forest) : nat :=
+        match f with
+        | emptyf => O
+        | consf t f => plus (sizet t) (sizef f)
+        end.
+      CodeGen Function sizet.
+      CodeGen Function sizef.
+    |}) {|
+      forest f0 = emptyf;
+      tree t1 = node(f0);
+      forest f1 = consf(t1, f0);
+      forest f2 = consf(t1, f1);
+      assert(sizef(f0) == 0);
+      assert(sizet(t1) == 1);
+      assert(sizef(f1) == 1);
+      assert(sizef(f2) == 2);
+    |}
+
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2559,6 +2636,7 @@ let suite : OUnit2.test =
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_mftest" >:: test_mftest;
     "test_multifunc_noargument" >:: test_multifunc_noargument;
+    "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;

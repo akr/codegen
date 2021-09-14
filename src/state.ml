@@ -189,6 +189,7 @@ let current_source_filename = Summary.ref ~name:"CodegenCurrentImplementationFil
 
 type code_generation =
   GenFunc of string     (* C function name *)
+| GenMutual of string list      (* C function names *)
 | GenPrototype of string        (* C function name *)
 | GenSnippet of string  (* code fragment *)
 
