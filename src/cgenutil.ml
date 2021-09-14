@@ -502,46 +502,6 @@ let escape_as_coq_string str =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let detect_recursive_functions (ctnt_i : Constant.t) : (int * Constant.t option array) option =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let modpath = KerName.modpath (Constant.canonical ctnt_i) in
-  match Global.body_of_constant Library.indirect_accessor ctnt_i with
-  | None -> user_err (Pp.str "[codegen] couldn't obtain the definition of" +++
-                      Printer.pr_constant env ctnt_i)
-  | Some (def_i,_,_) ->
-      let def_i = EConstr.of_constr def_i in
-      let (args_i, body_i) = decompose_lam sigma def_i in
-      match EConstr.kind sigma body_i with
-      | Constr.Fix ((ia, i), (nary, tary, fary)) ->
-          let ctnt_ary =
-            Array.mapi (fun j nm ->
-              if j = i then
-                Some ctnt_i
-              else
-                let nm = Context.binder_name nm in
-                match nm with
-                | Name.Anonymous -> None
-                | Name.Name id ->
-                    let label = Label.of_id id in
-                    let ctnt_j = Constant.make1 (KerName.make modpath label) in
-                    try
-                      match Global.body_of_constant Library.indirect_accessor ctnt_j with
-                      | None -> None
-                      | Some (def_j,_,_) ->
-                          let def_j = EConstr.of_constr def_j in
-                          let body_j' = mkFix ((ia, j), (nary, tary, fary)) in
-                          let def_j' = compose_lam args_i body_j' in
-                          if EConstr.eq_constr sigma def_j def_j' then
-                            Some ctnt_j
-                          else
-                            None
-                    with Not_found -> None)
-            nary
-          in
-          Some (i, ctnt_ary)
-      | _ -> None
-
 let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
   match l with
   | [] -> b
