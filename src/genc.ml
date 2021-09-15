@@ -1714,7 +1714,7 @@ let common_key_for_mutual_recursion (term : Constr.t) : (int * Constr.t) option 
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
   | Fix ((ks, j), (nary, tary, fary)) ->
-      Some (j, Constr.mkFix ((ks, 0), (nary, tary, fary)))
+      Some (j, Term.compose_lam args (Constr.mkFix ((ks, 0), (nary, tary, fary))))
   | _ -> None
 
 let codegen_detect_mutual_recursion (gen_list : code_generation list) : code_generation list =
