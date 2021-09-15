@@ -1327,19 +1327,14 @@ let obtain_function_bodies
             None)
         fixes)
   in
+  let add_labels (args, fixes, env2, body) = (args, gen_labels fixes, env2, body) in
   let result_whole_body =
-    Array.map
-      (fun (args, fixes, env2, body) ->
-        (args, gen_labels fixes, env2, body))
-      (obtain_function_bodies_rec env sigma [] [] term)
+    Array.map add_labels (obtain_function_bodies_rec env sigma [] [] term)
   in
   let results_top_fixterms =
     List.map
       (fun (outer_variables, env1, fix) ->
-        Array.map
-          (fun (args, fixes, env2, body) ->
-            (args, gen_labels fixes, env2, body))
-          (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
+        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
       (detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
   Array.concat (result_whole_body :: results_top_fixterms)
