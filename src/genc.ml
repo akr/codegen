@@ -668,13 +668,13 @@ let determine_fixfunc_c_names (fixfuncinfo : fixfuncinfo_t) : unit =
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (info : fixfunc_info) ->
       let c_name =
-        if info.fixfunc_used_as_call &&
-           info.fixfunc_top_call = None then
-          global_gensym_with_id fixfunc_id
-        else
-          match info.fixfunc_top_call with
-          | None -> Id.to_string fixfunc_id
-          | Some cfunc -> cfunc
+        match info.fixfunc_top_call with
+        | Some cfunc -> cfunc
+        | None ->
+            if info.fixfunc_used_as_call then
+              global_gensym_with_id fixfunc_id
+            else
+              Id.to_string fixfunc_id
       in
       Some { info with fixfunc_c_name = c_name })
     fixfuncinfo
