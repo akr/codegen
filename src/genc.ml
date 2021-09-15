@@ -659,7 +659,10 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
               detect_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfuncinfo;
               let key = id_of_annotated_name nary.(j) in
               let usage = Hashtbl.find fixfuncinfo key in
-              Hashtbl.replace fixfuncinfo key { usage with fixfunc_top_call = Some another_top_cfunc_name; fixfunc_used_as_call = true })
+              Hashtbl.replace fixfuncinfo key
+                { usage with
+                  fixfunc_top_call = Some another_top_cfunc_name;
+                  fixfunc_used_as_call = true })
             other_topfunc_list)
   (* xxx: consider App *)
   | _ -> ()
