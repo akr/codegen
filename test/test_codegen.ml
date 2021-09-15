@@ -797,7 +797,6 @@ let test_even_odd (ctx : test_ctxt) : unit =
         | O => false
         | S n' => even n'
         end.
-
       CodeGen Global Inline even.
       Definition even3 := even 3.
       CodeGen Function even.
@@ -815,6 +814,49 @@ let test_even_odd (ctx : test_ctxt) : unit =
       assert(odd(3) == true);
       assert(odd(4) == false);
       assert(even3() == false);
+    |}
+
+let test_even_odd_count (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      CodeGen Snippet "
+      static int even_count = 0;
+      static int odd_count = 0;
+      ".
+      Fixpoint even (n : nat) : bool :=
+        match n with
+        | O => true
+        | S n' => odd n'
+        end
+      with odd (n : nat) : bool :=
+        match n with
+        | O => false
+        | S n' => even n'
+        end.
+      CodeGen Function even.
+      CodeGen Function odd.
+    |})
+    ~modify_generated_source:
+      (fun s ->
+        let s = Str.replace_first
+          (Str.regexp "^bool\neven\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          ("nat tmp_even\\1" ^
+           "nat even(nat n) { even_count++; return tmp_even(n); }\n")
+          s
+        in
+        let s = Str.replace_first
+          (Str.regexp "^bool\nodd\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          ("nat tmp_odd\\1" ^
+           "nat odd(nat n) { odd_count++; return tmp_odd(n); }\n")
+          s
+        in
+        s)
+    {|
+      assert(even(3) == false);
+      /* tail recursion elimination avoids calls except the first one */
+      assert(even_count == 1);
+      assert(odd_count == 0);
     |}
 
 let test_inner_fix_even_odd_1 (ctx : test_ctxt) : unit =
@@ -2689,6 +2731,7 @@ let suite : OUnit2.test =
     "test_add3" >:: test_add3;
     "test_mul3" >:: test_mul3;
     "test_even_odd" >:: test_even_odd;
+    "test_even_odd_count" >:: test_even_odd_count;
     "test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1;
     "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;
     "test_two_even" >:: test_two_even;
