@@ -210,6 +210,17 @@ let concat_array_seq (ary : 'a Seq.t array) : 'a Seq.t =
   done;
   !r
 
+let unique_string_list (ss : string list) : string list =
+  let h = Hashtbl.create 0 in
+  List.filter
+    (fun s ->
+      if Hashtbl.mem h s then
+        false
+      else
+        (Hashtbl.add h s true;
+        true))
+    ss
+
 let string_of_name name =
   match name with
   | Name.Name id -> Id.to_string id

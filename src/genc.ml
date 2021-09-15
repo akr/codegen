@@ -1306,17 +1306,6 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
   | _ ->
       [|(fargs, fixfuncs, env, term)|]
 
-let unique_string_list (ss : string list) : string list =
-  let h = Hashtbl.create 0 in
-  List.filter
-    (fun s ->
-      if Hashtbl.mem h s then
-        false
-      else
-        (Hashtbl.add h s true;
-        true))
-    ss
-
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
     ~(fixfuncinfo : fixfuncinfo_t)
