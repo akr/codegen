@@ -1695,21 +1695,6 @@ let gen_prototype (cfunc_name : string) : Pp.t =
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   gen_function_header static return_type cfunc_name formal_arguments ++ Pp.str ";"
 
-let fix_snippet (str : string) : string =
-  let len = String.length str in
-  if 0 < len && str.[len - 1] <> '\n' then
-    str ^ "\n"
-  else
-    str
-
-let add_snippet (str : string) : unit =
-  let str' = fix_snippet str in
-  codegen_add_source_generation (GenSnippet str')
-
-let add_header_snippet (str : string) : unit =
-  let str' = fix_snippet str in
-  codegen_add_header_generation (GenSnippet str')
-
 let common_key_for_mutual_recursion (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
@@ -1801,12 +1786,6 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
      Generating non-specified functions would make result longer with uninteresting functions. *)
   let gen_list = codegen_detect_mutual_recursion gen_list in
   gen_pp_iter Feedback.msg_info gen_list
-
-let command_snippet (str : string) : unit =
-  add_snippet str
-
-let command_header_snippet (str : string) : unit =
-  add_header_snippet str
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (* open in the standard permission, 0o666, which will be masked by umask. *)

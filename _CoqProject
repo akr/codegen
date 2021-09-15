@@ -11,7 +11,7 @@ src/induc.ml
 src/specialize.ml
 src/linear.ml
 src/genc.ml
+src/snippet.ml
 src/indimp.ml
 src/g_codegen.mlg
 theories/codegen.v
-

@@ -29,6 +29,7 @@ open State
 open Specialize
 open Linear
 open Genc
+open Snippet
 open Indimp
 open Induc
 

@@ -26,6 +26,7 @@ open State
 open Induc
 open Specialize
 open Genc
+open Snippet
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
