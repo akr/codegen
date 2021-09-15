@@ -198,6 +198,7 @@ let codegen_test_template
     ?(coq_output_regexp : Str.regexp option)
     ?(modify_generated_source : (string -> string) option)
     ?(resolve_dependencies : bool = true)
+    ?(mutual_recursion_detection : bool = true)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -213,8 +214,10 @@ let codegen_test_template
     "CodeGen Source File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent coq_commands ^ "\n" ^
-    (if resolve_dependencies then "CodeGen GenerateFile.\n"
-                             else "CodeGen GenerateFile NoDependencies.\n"));
+    "CodeGen GenerateFile" ^
+    (if resolve_dependencies then "" else " DisableDependencyResolver") ^
+    (if mutual_recursion_detection then "" else " DisableMutualRecursionDetection") ^
+    ".\n");
   write_file main_fn
     ("/* " ^ test_path ^ " */\n" ^
     "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
@@ -1743,6 +1746,51 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
       assert(sizef_count == 5);
     |}
 
+let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    ~mutual_recursion_detection:false
+    (nat_src ^ forest_src ^
+    {|
+      CodeGen Snippet "
+      static int sizet_count = 0;
+      static int sizef_count = 0;
+      ".
+      Fixpoint sizet (t:tree) : nat :=
+        let (f) := t in S (sizef f)
+      with sizef (f:forest) : nat :=
+        match f with
+        | emptyf => O
+        | consf t f => plus (sizet t) (sizef f)
+        end.
+      CodeGen Function sizet.
+      CodeGen Function sizef.
+    |})
+    ~modify_generated_source:
+      (fun s ->
+        (*print_string src;*)
+        let s = Str.replace_first
+          (Str.regexp "^nat\nsizet\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          ("nat tmp_sizet\\1" ^
+           "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
+          s
+        in
+        let s = Str.replace_first
+          (Str.regexp "^nat\nsizef\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          ("nat tmp_sizef\\1" ^
+           "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
+          s
+        in
+        s)
+    {|
+      forest f0 = emptyf;
+      tree t1 = node(f0);
+      forest f1 = consf(t1, f0);
+      forest f2 = consf(t1, f1);
+      assert(sizef(f2) == 2);
+      assert(sizet_count == 0); /* sizet is not called because a private version of sizet is generated for sizef. */
+      assert(sizef_count == 5);
+    |}
+
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2773,6 +2821,7 @@ let suite : OUnit2.test =
     "test_multifunc_noargument" >:: test_multifunc_noargument;
     "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
     "test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup;
+    "test_mutual_sizet_sizef_nodedup" >:: test_mutual_sizet_sizef_nodedup;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;

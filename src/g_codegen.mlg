@@ -180,6 +180,11 @@ VERNAC ARGUMENT EXTEND string_or_none
 | [ "None" ] -> { None }
 END
 
+VERNAC ARGUMENT EXTEND genflag
+| [ "DisableDependencyResolver" ] -> { DisableDependencyResolver }
+| [ "DisableMutualRecursionDetection" ] -> { DisableMutualRecursionDetection }
+END
+
 VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
     | [ "Print" "CodeGen" "Inductive" constr_list(coq_type_list)] ->
       { command_print_inductive coq_type_list }
@@ -220,8 +225,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Header" "File" string_or_none(fnopt) ] -> { current_header_filename := fnopt }
     | [ "CodeGen" "Source" "File" string_or_none(fnopt) ] -> { current_source_filename := fnopt }
 
-    | [ "CodeGen" "GenerateFile" ] -> { command_generate_file () }
-    | [ "CodeGen" "GenerateFile" "NoDependencies" ] -> { command_generate_file_no_dependencies () }
+    | [ "CodeGen" "GenerateFile" genflag_list(gflist) ] -> { command_generate_file gflist }
     | [ "CodeGen" "GenerateTest" ] -> { command_generate_test () }
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->

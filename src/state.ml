@@ -224,3 +224,7 @@ let codegen_add_header_generation (generation : code_generation) : unit =
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"
 let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"CodegenLocalInline"
+
+type genflag = DisableDependencyResolver
+             | DisableMutualRecursionDetection
+

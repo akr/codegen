@@ -1822,19 +1822,17 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
 let gen_test (gen_list : code_generation list) : unit =
   gen_pp_iter Feedback.msg_info gen_list
 
-let command_generate_file () : unit =
+let command_generate_file (gflist : genflag list) : unit =
   let gen_map = !generation_map in
-  let gen_map = CString.Map.map codegen_resolve_dependencies gen_map in
-  let gen_map = CString.Map.map codegen_detect_mutual_recursion gen_map in
+  let gen_map =
+    if List.mem DisableDependencyResolver gflist then gen_map
+    else CString.Map.map codegen_resolve_dependencies gen_map in
+  let gen_map =
+    if List.mem DisableMutualRecursionDetection gflist then gen_map
+    else CString.Map.map codegen_detect_mutual_recursion gen_map in
   List.iter
     (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
     (CString.Map.bindings gen_map);
-  generation_map := CString.Map.empty
-
-let command_generate_file_no_dependencies () : unit =
-  List.iter
-    (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
-    (CString.Map.bindings !generation_map);
   generation_map := CString.Map.empty
 
 let command_generate_test () : unit =
