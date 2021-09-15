@@ -2743,7 +2743,7 @@ let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
 
 let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] cannot match linear variable without destructor:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] cannot match linear variable without deallocator:") ctx
     (unit_src ^ bool_src ^
      Str.global_replace (Str.regexp "CodeGen DeallocatorType boolbox .*\n") "" boolbox_src ^
     {|

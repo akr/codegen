@@ -132,21 +132,25 @@ CodeGen Primitive eqn => "eqn".
 CodeGen Inductive Type bits => "bits".
 CodeGen Inductive Type DArr => "DArr".
 CodeGen Inductive Type MDArr => "MDArr".
+CodeGen DeallocatorType MDArr => "dealloc_MDArr".
 
 CodeGen Inductive Type MDArr*MDArr => "pair_MDArr_MDArr".
 CodeGen Inductive Match MDArr*MDArr => ""
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
+CodeGen DeallocatorType (MDArr * MDArr) => "dealloc_MDArr_MDArr".
 
 CodeGen Inductive Type MDArr*nat => "pair_MDArr_nat".
 CodeGen Inductive Match MDArr*nat => ""
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
+CodeGen DeallocatorType (MDArr * nat) => "dealloc_MDArr_nat".
 
 CodeGen Inductive Type MDArr*MDArr*nat => "pair_2MDArr_nat".
 CodeGen Inductive Match MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
+CodeGen DeallocatorType (MDArr * MDArr * nat) => "dealloc_2MDArr_nat".
 
 CodeGen Inductive Type Aux => "Aux".
 CodeGen Inductive Match Aux => ""

@@ -23,7 +23,7 @@ fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
   nat v6_n;
   nat v7_n;
   nat v8_n;
-  entry_fixfunc1_fastpow_iter:
+  entry_fastpow_iter:
   switch (v2_k)
   {
     case 0:
@@ -37,13 +37,13 @@ fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
           v6_n = muln(v1_a, v3_x);
           v2_k = v4_k_;
           v3_x = v6_n;
-          goto entry_fixfunc1_fastpow_iter;
+          goto entry_fastpow_iter;
         case 0:
           v7_n = muln(v1_a, v1_a);
           v8_n = uphalf(v4_k_);
           v1_a = v7_n;
           v2_k = v8_n;
-          goto entry_fixfunc1_fastpow_iter;
+          goto entry_fastpow_iter;
       }
   }
 }

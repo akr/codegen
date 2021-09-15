@@ -893,7 +893,8 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   let c_deallocation =
     if Linear.is_linear env sigma (EConstr.of_constr item_type) then
       match ConstrMap.find_opt item_type !deallocator_cfunc_of_type with
-      | None -> user_err (str "[codegen] cannot match linear variable without destructor:" +++ Printer.pr_econstr_env env sigma item)
+      | None -> user_err (Pp.hov 2 (str "[codegen] cannot match linear variable without deallocator:" +++
+          Pp.hov 0 (Printer.pr_econstr_env env sigma item +++ Pp.str ":" +++ Printer.pr_type_env env sigma item_type)))
       | Some dealloc_cfunc ->
           str dealloc_cfunc ++ str "(" ++ str item_cvar ++ str ");"
     else

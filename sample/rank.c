@@ -126,6 +126,7 @@ typedef struct {
   bits s;
 } DArr;
 #define MDArr DArr
+#define dealloc_MDArr(x)
 
 DArr emptyD(nat w)
 {
@@ -156,6 +157,7 @@ typedef struct {
 #define make_pair_MDArr_MDArr(D1, D2) ((pair_MDArr_MDArr){ (D1), (D2) })
 #define pair_MDArr_MDArr_D1(x) ((x).D1)
 #define pair_MDArr_MDArr_D2(x) ((x).D2)
+#define dealloc_MDArr_MDArr(x)
 
 typedef struct {
   MDArr D;
@@ -164,6 +166,7 @@ typedef struct {
 #define make_pair_MDArr_nat(D, n) ((pair_MDArr_nat){ (D), (n) })
 #define pair_MDArr_nat_D(x) ((x).D)
 #define pair_MDArr_nat_n(x) ((x).n)
+#define dealloc_MDArr_nat(x)
 
 typedef struct {
   pair_MDArr_MDArr D12;
@@ -173,6 +176,7 @@ typedef struct {
   ((pair_2MDArr_nat){ (D12), (n) })
 #define pair_2MDArr_nat_D12(x) ((x).D12)
 #define pair_2MDArr_nat_n(x) ((x).n)
+#define dealloc_2MDArr_nat(x)
 
 static inline nat
 bitlen(nat n)
