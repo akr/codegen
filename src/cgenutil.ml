@@ -347,6 +347,15 @@ let pp_postjoin_list sep l =
     (mt ())
     l
 
+let hbrace (pp : Pp.t) : Pp.t =
+  h (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+
+let hovbrace (pp : Pp.t) : Pp.t =
+  hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+
+let vbrace (pp : Pp.t) : Pp.t =
+  v 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+
 let msg_info_hov pp =
   Feedback.msg_info (Pp.hov 2 pp)
 

@@ -196,15 +196,6 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ctnt, ty, body)
 
-let hbrace (pp : Pp.t) : Pp.t =
-  h (str "{" +++ pp ++ brk (1,-2) ++ str "}")
-
-let hovbrace (pp : Pp.t) : Pp.t =
-  hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
-
-let vbrace (pp : Pp.t) : Pp.t =
-  v 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
-
 let local_vars : ((string * string) list ref) list ref = ref []
 
 let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
