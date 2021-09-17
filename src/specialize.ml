@@ -603,25 +603,20 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
   | _ ->
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
-      match EConstr.kind sigma ty with
-      | Prod _ ->
-          let (args, result_type) = decompose_prod sigma ty in
-          (* (Name.t Context.binder_annot * t) list * t *)
-          let args' = List.map
-            (fun (arg_name, arg_ty) ->
-              let arg_name' =
-                Context.map_annot
-                  (Namegen.named_hd env sigma arg_ty)
-                  arg_name
-              in
-              (arg_name', arg_ty))
-            args
+      let (args, result_type) = decompose_prod sigma ty in
+      let args' = List.map
+        (fun (arg_name, arg_ty) ->
+          let arg_name' =
+            Context.map_annot
+              (Namegen.named_hd env sigma arg_ty)
+              arg_name
           in
-          let n = List.length args in
-          let term' = Vars.lift n (search_fix_to_expand_eta env sigma term) in
-          compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
-      | _ ->
-          search_fix_to_expand_eta env sigma term
+          (arg_name', arg_ty))
+        args
+      in
+      let n = List.length args in
+      let term' = Vars.lift n (search_fix_to_expand_eta env sigma term) in
+      compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
 and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
@@ -644,8 +639,9 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
       let b' = search_fix_to_expand_eta env2 sigma b in
       mkLetIn (x, e', t, b')
   | Case (ci, p, iv, item, branches) ->
+      let item' = search_fix_to_expand_eta env sigma item in
       let branches' = Array.map (search_fix_to_expand_eta env sigma) branches in
-      mkCase (ci, p, iv, item, branches')
+      mkCase (ci, p, iv, item', branches')
   | Proj (proj, e) ->
       let e' = search_fix_to_expand_eta env sigma e in
       mkProj (proj, e')
