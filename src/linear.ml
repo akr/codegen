@@ -88,17 +88,19 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
 let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
-  | Sort _ ->
-      (* types cannot be linear. *)
-      (* delete_unused_let uses is_linear.  the input term for it can contains sort bindings. *)
-      false
   | Prod (name, namety, body) ->
       ignore (is_linear_type env sigma namety);
       ignore (is_linear_type env sigma body);
       false (* function (closure) must not reference outside linear variables *)
   | Ind iu -> is_linear_ind1 env sigma ty
   | App (f, argsary) when isInd sigma f -> is_linear_ind1 env sigma ty
-  | _ -> user_err (str "[codegen] sort, prod, ind or app of ind expected:" +++ Printer.pr_econstr_env env sigma ty)
+  | _ ->
+      (* We treat unexpected types as unrestricted.
+        Since these types are not code-generatable,
+        they should be removed in delete_unused_let.
+        If we treat them as linear, delete_unused_let cannot delete them. *)
+      false
+
 and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
