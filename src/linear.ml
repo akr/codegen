@@ -85,20 +85,33 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
   let (names, tys, body) = destProdX_rec sigma term in
   (Array.of_list names, Array.of_list tys, body)
 
+(*
+  is_linear_type env sigma ty returns true if
+  ty is code generatable and it is linear.
+  It returns false otherwise.
+
+  - code generatable means that the type is inductive type or
+    function type.
+  - linear type is
+    - a inductive type which is registered with CodeGen Linear, or
+    - a inductive type which has (possibly indirectly) have a component which type is linear.
+  - function type is always unrestricted.
+*)
 let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Prod (name, namety, body) ->
-      ignore (is_linear_type env sigma namety);
-      ignore (is_linear_type env sigma body);
+      (* function type can be code-generatable or not.
+        - forall (x:nat), nat is code-generatable when we'll support closures but
+        - forall (x:nat), Set is not code-generatable.
+        When it is code-generable,
+        function type cannot be linear.
+        So false is returned anyway.  *)
       false (* function (closure) must not reference outside linear variables *)
   | Ind iu -> is_linear_ind1 env sigma ty
   | App (f, argsary) when isInd sigma f -> is_linear_ind1 env sigma ty
   | _ ->
-      (* We treat unexpected types as unrestricted.
-        Since these types are not code-generatable,
-        they should be removed in delete_unused_let.
-        If we treat them as linear, delete_unused_let cannot delete them. *)
+      (* not code-generatable. *)
       false
 
 and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
