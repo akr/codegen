@@ -582,6 +582,82 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       mkProj (proj, e)
 *)
 
+let rec expand_eta_top (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : EConstr.t =
+  let result = expand_eta_top1 env sigma term in
+  check_convertible "expand_eta_top" env sigma term result;
+  result
+and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Cast (e,ck,t) -> expand_eta_top env sigma e (* strip cast *)
+  | Lambda (x,ty,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, ty, expand_eta_top env2 sigma b)
+  | Fix ((ia, i), (nameary, tyary, funary)) ->
+      let prec = (nameary, tyary, funary) in
+      let env2 = push_rec_types prec env in
+      let funary' = Array.map (expand_eta_top env2 sigma) funary in
+      mkFix ((ia, i), (nameary, tyary, funary'))
+  | _ ->
+      let ty = Retyping.get_type_of env sigma term in
+      let ty = Reductionops.nf_all env sigma ty in
+      match EConstr.kind sigma ty with
+      | Prod _ ->
+          let (args, result_type) = decompose_prod sigma ty in
+          (* (Name.t Context.binder_annot * t) list * t *)
+          let args' = List.map
+            (fun (arg_name, arg_ty) ->
+              let arg_name' =
+                Context.map_annot
+                  (Namegen.named_hd env sigma arg_ty)
+                  arg_name
+              in
+              (arg_name', arg_ty))
+            args
+          in
+          let n = List.length args in
+          let term' = Vars.lift n term in
+          compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
+      | _ ->
+          search_fix_to_expand_eta env sigma term
+and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel _ | Const _ | Construct _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ -> term
+  | Var _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Var:" +++ Printer.pr_econstr_env env sigma term)
+  | Evar _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Evar:" +++ Printer.pr_econstr_env env sigma term)
+  | Prod _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Prod:" +++ Printer.pr_econstr_env env sigma term)
+  | CoFix _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected CoFix:" +++ Printer.pr_econstr_env env sigma term)
+  | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
+  | Cast (e,ck,t) -> search_fix_to_expand_eta env sigma e (* strip cast *)
+  | Lambda (x, t, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let b' = search_fix_to_expand_eta env2 sigma b in
+      mkLambda (x, t, b')
+  | LetIn (x, e, t, b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      let e' = search_fix_to_expand_eta env sigma e in
+      let b' = search_fix_to_expand_eta env2 sigma b in
+      mkLetIn (x, e', t, b')
+  | Case (ci, p, iv, item, branches) ->
+      let branches' = Array.map (search_fix_to_expand_eta env sigma) branches in
+      mkCase (ci, p, iv, item, branches')
+  | Proj (proj, e) ->
+      let e' = search_fix_to_expand_eta env sigma e in
+      mkProj (proj, e')
+  | App (f, args) ->
+      let f' = search_fix_to_expand_eta env sigma f in
+      let args' = Array.map (search_fix_to_expand_eta env sigma) args in
+      mkApp (f', args')
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary' = Array.map (expand_eta_top env2 sigma) fary in
+      mkFix ((ks, j), (nary, tary, fary'))
+
 let rec normalizeV (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   (if !opt_debug_normalizeV then
@@ -1312,18 +1388,19 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let env2 = EConstr.push_rel decl env in
       let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
       let declared_var_used = IntSet.mem (Environ.nb_rel env) fvsb in
-      let linear_var_declared = Linear.is_linear env sigma t in
       let (fvse, fe) = delete_unused_let_rec env sigma e in
       let (fvst, ft) = delete_unused_let_rec env sigma t in
-      let linear_var_used =
-        IntSet.exists
+      let retain =
+        declared_var_used ||
+        (Linear.is_linear env sigma t) ||
+        (IntSet.exists
           (fun i ->
             let rel = EConstr.lookup_rel (Environ.nb_rel env - i) env in
             let ty = Context.Rel.Declaration.get_type rel in
             Linear.is_linear env sigma ty)
-          fvse
+          fvse)
       in
-      if declared_var_used || linear_var_declared || linear_var_used then
+      if retain then
         let fvs = IntSet.union (IntSet.remove (Environ.nb_rel env) fvsb) (IntSet.union fvse fvst) in
         (fvs, fun vars_used -> mkLetIn (x, fe vars_used, ft vars_used, fb (true :: vars_used)))
       else
@@ -1877,7 +1954,7 @@ let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : stri
   if !opt_debug_simplification then
     (let old = !specialization_time in
     let now = Unix.times () in
-    msg_debug_hov (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term)));
     specialization_time := now)
 
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
@@ -1919,6 +1996,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let term = inline env sigma inline_pred epresimp in
   debug_simplification env sigma "inline" term;
   (*let term = strip_cast env sigma term in*)
+  let term = expand_eta_top env sigma term in
+  debug_simplification env sigma "expand_eta_top" term;
   let term = normalizeV env sigma term in
   debug_simplification env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in

@@ -116,4 +116,6 @@ CodeGen Linear buffer.
 CodeGen Static Function sprintf _ "%d + %d is %d".
 CodeGen Static Function add_mesg.
 
+(*Set Debug CodeGen Simplification.
+Set Debug CodeGen Reduction.*)
 CodeGen GenerateFile.

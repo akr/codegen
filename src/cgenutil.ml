@@ -373,6 +373,17 @@ let msg_info_hov pp =
 let msg_debug_hov pp =
   Feedback.msg_debug (Pp.hov 2 pp)
 
+let format_deep (pp : Pp.t) : string =
+  let buf = Buffer.create 0 in
+  let fmt = Format.formatter_of_buffer buf in
+  Format.pp_set_max_boxes fmt max_int;
+  Pp.pp_with fmt pp;
+  Format.pp_print_flush fmt ();
+  Buffer.contents buf
+
+let pr_deep (pp : Pp.t) : Pp.t =
+  Pp.str (format_deep pp)
+
 let new_env_with_rels (env : Environ.env) : Environ.env =
   let n = Environ.nb_rel env in
   let r = ref (Global.env ()) in
