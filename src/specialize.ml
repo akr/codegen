@@ -618,7 +618,7 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
             args
           in
           let n = List.length args in
-          let term' = Vars.lift n term in
+          let term' = Vars.lift n (search_fix_to_expand_eta env sigma term) in
           compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
       | _ ->
           search_fix_to_expand_eta env sigma term
