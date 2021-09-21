@@ -190,7 +190,7 @@ let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty 
   match EConstr.kind sigma ty with
   | Prod (x,t,b) ->
       let t = Reductionops.whd_all env sigma t in
-      let is_type_arg = EConstr.isSort sigma t in
+      let is_type_arg = not (is_monomorphic_type env sigma t) in
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env = EConstr.push_rel decl env in
       is_type_arg :: determine_type_arguments env sigma b
