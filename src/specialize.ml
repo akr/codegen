@@ -231,17 +231,6 @@ let command_auto_arguments (func_list : Libnames.qualid list) : unit =
   let sigma = Evd.from_env env in
   List.iter (codegen_auto_arguments_1 env sigma) func_list
 
-let rec is_monomorphic_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  match EConstr.kind sigma ty with
-  | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      is_monomorphic_type env sigma t &&
-      is_monomorphic_type env2 sigma b
-  | Ind _ -> true
-  | App (f,args) when isInd sigma f -> true
-  | _ -> false
-
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
