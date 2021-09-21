@@ -393,6 +393,7 @@ let rec is_monomorphic_type (env : Environ.env) (sigma : Evd.evar_map) (ty : ECo
       is_monomorphic_type env2 sigma b
   | Ind _ -> true
   | App (f,args) when isInd sigma f -> true
+  | Rel _ -> true (* type variable *)
   | _ -> false
 
 let new_env_with_rels (env : Environ.env) : Environ.env =
