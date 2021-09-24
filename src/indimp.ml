@@ -25,7 +25,6 @@ open Cgenutil
 open State
 open Induc
 open Specialize
-open Genc
 open Snippet
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =

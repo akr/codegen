@@ -29,68 +29,6 @@ open Specialize
 
 let abort (x : 'a) : 'a = assert false
 
-let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
-  let printed_type = mangle_term env sigma t in
-  let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
-  let numcons = Array.length oneind_body.Declarations.mind_consnames in
-  let cstr_caselabel_accessors_list =
-    List.init numcons
-      (fun j0 ->
-        let j = j0 + 1 in
-        let consname = oneind_body.Declarations.mind_consnames.(j0) in
-        let cstr = mkConstruct ((mutind, i), j) in
-        let args = CArray.map_of_list EConstr.of_constr args in
-        let consterm = mkApp (cstr, args) in
-        let s = mangle_term env sigma consterm in
-        let caselabel =
-          if j = 1 then "default" else "case " ^ s ^ "_tag"
-        in
-        let numargs = oneind_body.Declarations.mind_consnrealargs.(j0) in
-        let accessors =
-          List.init numargs
-            (fun k -> s ^ "_get_member_" ^ string_of_int k)
-        in
-        (consname, caselabel, accessors))
-  in
-  let ind_cfg = register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list in
-  Feedback.msg_info (v 2
-    (Pp.str "[codegen] match-expression translation automatically configured:" +++
-     hv 0 (pr_inductive_match env sigma ind_cfg)));
-  ind_cfg
-
-let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
-  match EConstr.kind sigma t with
-  | Prod _ -> "codegen_closure_t" (* codegen_closure_t is not used yet *)
-  | _ -> (get_ind_config env sigma t).c_type
-
-let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
-  let ind_cfg = get_ind_config env sigma t in
-  match ind_cfg.c_swfunc with
-  | Some c_swfunc -> c_swfunc
-  | None ->
-      match (generate_ind_match env sigma t).c_swfunc with
-      | Some c_swfunc -> c_swfunc
-      | None -> user_err (Pp.str "[codegen:bug] generate_ind_match doesn't generate c_swfunc")
-
-let case_cstrlabel (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string =
-  let ind_cfg = get_ind_config env sigma t in
-  let ind_cfg =
-    match ind_cfg.c_swfunc with
-    | Some _ -> ind_cfg
-    | None -> generate_ind_match env sigma t
-  in
-  ind_cfg.cstr_configs.(j-1).c_caselabel
-
-let case_cstrmember (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) (k : int) : string =
-  let ind_cfg = get_ind_config env sigma t in
-  let ind_cfg =
-    match ind_cfg.c_swfunc with
-    | Some _ -> ind_cfg
-    | None -> generate_ind_match env sigma t
-  in
-  ind_cfg.cstr_configs.(j-1).c_accessors.(k)
-
 let local_gensym_id : (int ref) list ref = ref []
 
 let local_gensym_with (f : unit -> 'a) : 'a =
