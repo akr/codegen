@@ -700,7 +700,7 @@ let obtain_function_bodies
      (*labels*)string list *
      Environ.env *
      EConstr.t) array =
-  let gen_labels fixes =
+  let gen_labels stacked_fixfuncs =
     unique_string_list
       (CList.map_filter
         (fun fix_name ->
@@ -709,19 +709,17 @@ let obtain_function_bodies
             Some ("entry_" ^ fix_usage.fixfunc_c_name)
           else
             None)
-        fixes)
+        stacked_fixfuncs)
   in
-  let add_labels (args, fixes, env2, body) = (args, gen_labels fixes, env2, body) in
-  let result_whole_body =
-    Array.map add_labels (obtain_function_bodies_rec env sigma [] [] term)
-  in
-  let results_top_fixterms =
+  let add_labels (args, stacked_fixfuncs, env2, body) = (args, gen_labels stacked_fixfuncs, env2, body) in
+  let results =
     List.map
-      (fun (outer_variables, env1, fix) ->
-        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
-      (detect_top_fixterms ~fixterms ~fixfuncinfo)
+      (fun (outer_variables, env1, term) ->
+        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term))
+      (([], env, term) ::
+       detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
-  Array.concat (result_whole_body :: results_top_fixterms)
+  Array.concat results
 
 let local_gensym_id : (int ref) list ref = ref []
 
