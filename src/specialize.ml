@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 open Names
 open GlobRef
-open Pp
 
 (* open Term *)
 open Constr
@@ -331,7 +330,7 @@ let codegen_define_instance
   (if (icommand = CodeGenConstant) &&
       not (isInd sigma (fst (decompose_app sigma presimp_type))) then
     user_err (Pp.str "[codegen] CodeGen Constant needs a constant:" +++
-      Printer.pr_constr_env env sigma presimp +++ str ":" +++
+      Printer.pr_constr_env env sigma presimp +++ Pp.str ":" +++
       Printer.pr_econstr_env env sigma presimp_type));
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));

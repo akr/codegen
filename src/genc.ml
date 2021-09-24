@@ -17,7 +17,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open Names
-open Pp
 open CErrors
 open Constr
 open EConstr
@@ -44,18 +43,18 @@ let local_gensym () : string =
   "tmp" ^ string_of_int n
 
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
-  Pp.hov 0 (lhs +++ str "=" +++ rhs ++ str ";")
+  Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
 
 let gen_return (arg : Pp.t) : Pp.t =
-  hov 0 (str "return" +++ arg ++ str ";")
+  Pp.hov 0 (Pp.str "return" +++ arg ++ Pp.str ";")
 
 let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  genc_assign (str retvar) arg +++ str "return;"
+  genc_assign (Pp.str retvar) arg +++ Pp.str "return;"
 
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
-  str c_fname ++ str "(" ++
-  pp_join_ary (str "," ++ spc ()) (Array.map Pp.str argvars) ++
-  str ")"
+  Pp.str c_fname ++ Pp.str "(" ++
+  pp_join_ary (Pp.str "," ++ Pp.spc ()) (Array.map Pp.str argvars) ++
+  Pp.str ")"
 
 let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
   let sp_inst =
@@ -74,7 +73,7 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
   let c_fname = sp_inst.sp_cfunc_name in
   let gen_constant = Array.length argvars = 0 && sp_inst.sp_icommand = CodeGenConstant in
   if gen_constant then
-    str c_fname
+    Pp.str c_fname
   else
     gen_funcall c_fname argvars
 
@@ -179,7 +178,7 @@ let show_fixfuncinfo (env : Environ.env) (sigma : Evd.evar_map) (fixfuncinfo : f
         Pp.str "top_call=" ++ (match info.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
         Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
         Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables ++ Pp.str ")" +++
-        mt ()
+        Pp.mt ()
       ))
     fixfuncinfo
 
@@ -754,18 +753,18 @@ let compute_called_fixfuncs (fixfuncinfo : fixfuncinfo_t) : fixfunc_info list =
     []
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
-  v 0 (
-  hov 0 (str "switch" +++ str "(" ++ swexpr ++ str ")") +++
+  Pp.v 0 (
+  Pp.hov 0 (Pp.str "switch" +++ Pp.str "(" ++ swexpr ++ Pp.str ")") +++
   vbrace (pp_sjoinmap_ary
     (fun (caselabel, pp_branch) ->
-      str caselabel ++ str ":" ++ Pp.brk (1,2) ++ v 0 pp_branch)
+      Pp.str caselabel ++ Pp.str ":" ++ Pp.brk (1,2) ++ Pp.v 0 pp_branch)
     branches))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   gen_switch_without_break swexpr
     (Array.map
       (fun (caselabel, pp_branch) ->
-        (caselabel, pp_branch +++ str "break;"))
+        (caselabel, pp_branch +++ Pp.str "break;"))
       branches)
 
 let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
@@ -784,12 +783,12 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   let c_deallocation =
     if Linear.is_linear env sigma (EConstr.of_constr item_type) then
       match ConstrMap.find_opt item_type !deallocator_cfunc_of_type with
-      | None -> user_err (Pp.hov 2 (str "[codegen] cannot match linear variable without deallocator:" +++
+      | None -> user_err (Pp.hov 2 (Pp.str "[codegen] cannot match linear variable without deallocator:" +++
           Pp.hov 0 (Printer.pr_econstr_env env sigma item +++ Pp.str ":" +++ Printer.pr_type_env env sigma item_type)))
       | Some dealloc_cfunc ->
-          str dealloc_cfunc ++ str "(" ++ str item_cvar ++ str ");"
+          Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");"
     else
-      mt ()
+      Pp.mt ()
   in
   let gen_branch accessors br =
     let m = Array.length accessors in
@@ -813,10 +812,10 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
         (Array.map2
           (fun c_var access ->
             if Id.Set.mem (Id.of_string c_var) used then
-              genc_assign (str c_var)
-                (str access ++ str "(" ++ str item_cvar ++ str ")")
+              genc_assign (Pp.str c_var)
+                (Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")")
             else
-              mt ())
+              Pp.mt ())
           c_vars accessors)
     in
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
@@ -843,7 +842,10 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
-    let swexpr = if swfunc = "" then str item_cvar else str swfunc ++ str "(" ++ str item_cvar ++ str ")" in
+    let swexpr = if swfunc = "" then
+                   Pp.str item_cvar
+                 else
+                   Pp.str swfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")" in
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
       (Array.map2
@@ -857,12 +859,12 @@ let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   let item_cvar = carg_of_garg env item_relindex in
   let accessor = case_cstrmember env sigma (EConstr.of_constr item_type) 1 (Projection.arg pr) in
-  str accessor ++ str "(" ++ str item_cvar ++ str ")"
+  Pp.str accessor ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")"
 
 let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
   let assign = Array.to_list assignments in
   let assign = List.filter (fun (lhs, rhs, ty) -> lhs <> rhs) assign in
-  let rpp = ref (mt ()) in
+  let rpp = ref (Pp.mt ()) in
   (* better algorithm using topological sort? *)
   let rec loop assign =
     match assign with
@@ -875,7 +877,7 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
         if nonblocked_assign <> [] then
           (List.iter
             (fun (lhs, rhs, ty) ->
-              let pp = genc_assign (str lhs) (str rhs) in
+              let pp = genc_assign (Pp.str lhs) (Pp.str rhs) in
               rpp := !rpp +++ pp)
             nonblocked_assign;
           loop blocked_assign)
@@ -883,7 +885,7 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
           (let (a_lhs, a_rhs, a_ty) = a in
           let tmp = local_gensym () in
           add_local_var a_ty tmp;
-          let pp = genc_assign (str tmp) (str a_lhs) in
+          let pp = genc_assign (Pp.str tmp) (Pp.str a_lhs) in
           (rpp := !rpp +++ pp);
           let assign2 = List.map
             (fun (lhs, rhs, ty) ->
@@ -903,7 +905,7 @@ type assign_cont = {
 let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
   genc_assign (Pp.str cont.assign_cont_ret_var) rhs +++
   match cont.assign_cont_exit_label with
-  | None -> mt ()
+  | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
 let rec gen_assign ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
@@ -919,7 +921,7 @@ and gen_assign1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(cont : assig
   | Evar _ | Prod _
   | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
-      user_err (str "[codegen:gen_assign] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_assign] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -967,7 +969,7 @@ and gen_assign1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(cont : assig
       gen_match used gen_switch (gen_assign ~fixfuncinfo ~used ~cont) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
-        user_err (str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
       gen_assign_cont cont (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
@@ -1060,7 +1062,7 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(gen_ret : Pp.t
   | Evar _ | Prod _
   | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
-      user_err (str "[codegen:gen_tail] unsupported term (" ++ str (constr_name sigma term) ++ str "): " ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -1105,7 +1107,7 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(gen_ret : Pp.t
       gen_match used gen_switch_without_break (gen_tail ~fixfuncinfo ~used ~gen_ret) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
-        user_err (str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
       gen_ret (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
@@ -1241,13 +1243,13 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
     Pp.str "(" ++
     (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
       (fun (c_arg, t) ->
-        hov 0 (Pp.str t +++ Pp.str c_arg))
+        Pp.hov 0 (Pp.str t +++ Pp.str c_arg))
       formal_arguments) ++
     Pp.str ")"
   in
-  hov 0 pp_return_type +++
+  Pp.hov 0 pp_return_type +++
   Pp.str c_name ++
-  hov 0 (pp_parameters)
+  Pp.hov 0 (pp_parameters)
 
 let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
@@ -1277,11 +1279,11 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
     local_vars
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
-  v 0 (
+  Pp.v 0 (
   gen_function_header static return_type primary_cfunc c_fargs +++
   vbrace (
     pp_sjoinmap_list
-      (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
+      (fun (c_type, c_var) -> Pp.hov 0 (Pp.str c_type +++ Pp.str c_var ++ Pp.str ";"))
       local_vars
     +++
     pp_body))
@@ -1301,7 +1303,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     List.map (fun info -> (true, info)) called_fixfuncs
   in
   let pp_enum =
-    hov 0 (
+    Pp.hov 0 (
       Pp.str "enum" +++
       Pp.str func_index_type +++
       hovbrace (
@@ -1315,10 +1317,10 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
   let pp_struct_args =
     let pr_members args =
       pp_sjoinmap_list
-        (fun (c_arg, t) -> hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
+        (fun (c_arg, t) -> Pp.hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
         args
     in
-    hv 0 (
+    Pp.hv 0 (
     Pp.str ("struct codegen_args_" ^ primary_cfunc) +++
     hovbrace (
     pr_members formal_arguments +++
@@ -1326,10 +1328,10 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
       (* empty struct is undefined behavior *)
       Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
     else
-      mt ())) ++ Pp.str ";") +++
+      Pp.mt ())) ++ Pp.str ";") +++
     pp_sjoinmap_list
       (fun (static1, info) ->
-        hv 0 (
+        Pp.hv 0 (
         Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
         hovbrace (
         pr_members info.fixfunc_outer_variables +++
@@ -1339,11 +1341,11 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           (* empty struct is undefined behavior *)
           Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
         else
-          mt ())) ++ Pp.str ";"))
+          Pp.mt ())) ++ Pp.str ";"))
       other_topfuncs_and_called_fixfuncs
   in
   let pp_forward_decl =
-    hv 0 (
+    Pp.hv 0 (
       Pp.str "static void" +++
       Pp.str ("codegen_functions_" ^ primary_cfunc) ++
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
@@ -1374,13 +1376,13 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
       let pp_return =
         Pp.str "return codegen_ret;"
       in
-      v 0 (
+      Pp.v 0 (
         gen_function_header static return_type c_name formal_arguments +++
         vbrace (
-          hov 0 (pp_vardecl_args) +++
-          hov 0 (pp_vardecl_ret) +++
-          hov 0 pp_call +++
-          hov 0 pp_return))
+          Pp.hov 0 (pp_vardecl_args) +++
+          Pp.hov 0 (pp_vardecl_ret) +++
+          Pp.hov 0 pp_call +++
+          Pp.hov 0 pp_return))
     in
     pr_entry_function static primary_cfunc (func_index_prefix ^ primary_cfunc)
       formal_arguments return_type +++
@@ -1402,14 +1404,14 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             (List.rev args);
-          v 0 (
+          Pp.v 0 (
             pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
             gen_tail ~fixfuncinfo ~used ~gen_ret env2 sigma body []))
         bodies)
   in
   let pp_local_variables_decls =
     pp_sjoinmap_list
-      (fun (c_type, c_var) -> hov 0 (str c_type +++ str c_var ++ str ";"))
+      (fun (c_type, c_var) -> Pp.hov 0 (Pp.str c_type +++ Pp.str c_var ++ Pp.str ";"))
       local_vars
   in
   let pp_switch_cases =
@@ -1421,7 +1423,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         let pp_assign_outer =
           pp_sjoinmap_list
             (fun (c_arg, t) ->
-              hov 0 (
+              Pp.hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
                 Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
@@ -1431,7 +1433,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
         let pp_assign_args =
           pp_sjoinmap_list
             (fun (c_arg, t) ->
-              hov 0 (
+              Pp.hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
                 Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
@@ -1442,11 +1444,11 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
           Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
         in
         let pp_result =
-          hov 0 pp_case ++ Pp.brk (1,2) ++
-          v 0 (
+          Pp.hov 0 pp_case ++ Pp.brk (1,2) ++
+          Pp.v 0 (
             pp_assign_outer +++
             pp_assign_args +++
-            hov 0 pp_goto)
+            Pp.hov 0 pp_goto)
         in
         pp_result)
       other_topfuncs_and_called_fixfuncs
@@ -1458,7 +1460,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     else
       pp_sjoinmap_list
         (fun (c_arg, t) ->
-          hov 0 (
+          Pp.hov 0 (
             Pp.str c_arg +++
             Pp.str "=" +++
             Pp.str ("((struct codegen_args_" ^ primary_cfunc ^ " *)codegen_args)->" ^ c_arg) ++
@@ -1467,15 +1469,15 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
   in
   let pp_switch_body =
     pp_switch_cases +++
-    hov 0 pp_switch_default ++ Pp.brk (1,2) ++
-    v 0 pp_assign_args_default
+    Pp.hov 0 pp_switch_default ++ Pp.brk (1,2) ++
+    Pp.v 0 pp_assign_args_default
   in
   let pp_switch =
-    hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
+    Pp.hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
     vbrace pp_switch_body
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
-  v 0 (
+  Pp.v 0 (
     pp_enum +++
     pp_struct_args +++
     pp_forward_decl +++
@@ -1688,7 +1690,7 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Format.pp_print_flush fmt ();
   close_out ch;
   Sys.rename temp_fn fn;
-  msg_info_hov (str ("[codegen] file generated: " ^ fn)))
+  msg_info_hov (Pp.str ("[codegen] file generated: " ^ fn)))
 
 let gen_test (gen_list : code_generation list) : unit =
   gen_pp_iter Feedback.msg_info gen_list

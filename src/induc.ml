@@ -18,7 +18,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 open Names
 (*open Globnames*)
-open Pp
 open CErrors
 open Constr
 open EConstr
@@ -34,32 +33,32 @@ let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.co
   (sigma, t)
 
 let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
-  Feedback.msg_info (str "CodeGen Inductive Type" +++
+  Feedback.msg_info (Pp.str "CodeGen Inductive Type" +++
     Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-    str (quote_coq_string ind_cfg.c_type) ++ str ".")
+    Pp.str (quote_coq_string ind_cfg.c_type) ++ Pp.str ".")
 
 let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
   let f cstr_cfg =
     Pp.hv 2 (
       Pp.str "|" +++
       Ppconstr.pr_id cstr_cfg.coq_cstr +++
-      str "=>" +++
-      str (quote_coq_string cstr_cfg.c_caselabel) +++
+      Pp.str "=>" +++
+      Pp.str (quote_coq_string cstr_cfg.c_caselabel) +++
       pp_sjoinmap_ary
-        (fun accessor -> str (quote_coq_string accessor))
+        (fun accessor -> Pp.str (quote_coq_string accessor))
         cstr_cfg.c_accessors)
   in
   match ind_cfg.c_swfunc with
   | Some c_swfunc ->
       Pp.hv 2 (
-        str "CodeGen Inductive Match" +++
+        Pp.str "CodeGen Inductive Match" +++
           Pp.hv 2 (
             Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-            str "=>" +++
-            str (quote_coq_string c_swfunc))) +++
+            Pp.str "=>" +++
+            Pp.str (quote_coq_string c_swfunc))) +++
       pp_sjoinmap_ary f ind_cfg.cstr_configs ++
-      str "."
-  | None -> mt ()
+      Pp.str "."
+  | None -> Pp.mt ()
 
 let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   match ind_cfg.c_swfunc with
@@ -147,9 +146,9 @@ let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.
   let printed_type = mangle_term env sigma t in
   let c_name = c_id (squeeze_white_spaces printed_type) in
   let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
-  Feedback.msg_info (v 2
+  Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] inductive type translation automatically configured:" +++
-     (hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
+     (Pp.hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
      Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
   ind_cfg
 
@@ -233,9 +232,9 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         (consname, caselabel, accessors))
   in
   let ind_cfg = register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list in
-  Feedback.msg_info (v 2
+  Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
-     hv 0 (pr_inductive_match env sigma ind_cfg)));
+     Pp.hv 0 (pr_inductive_match env sigma ind_cfg)));
   ind_cfg
 
 let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =

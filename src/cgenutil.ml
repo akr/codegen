@@ -19,7 +19,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 module IntSet = Set.Make(Int)
 
 open Names
-open Pp
 open CErrors
 open Constr
 open EConstr
@@ -291,6 +290,8 @@ let merge_range (r1 : (int*int) option) (r2 : (int*int) option) : (int*int) opti
 let merge_range3 (r1 : (int*int) option) (r2 : (int*int) option) (r3 : (int*int) option) : (int*int) option =
   merge_range (merge_range r1 r2) r3
 
+let (++) = Pp.app
+
 let (+++) d1 d2 =
   if Pp.ismt d1 then
     d2
@@ -302,30 +303,30 @@ let (+++) d1 d2 =
 let pp_sjoin_ary (ary : Pp.t array) : Pp.t =
   Array.fold_left
     (fun pp elt -> pp +++ elt)
-    (mt ())
+    (Pp.mt ())
     ary
 
 let pp_sjoin_list (l : Pp.t list) : Pp.t =
   List.fold_left
     (fun pp elt -> pp +++ elt)
-    (mt ())
+    (Pp.mt ())
     l
 
 let pp_sjoinmap_ary (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
   Array.fold_left
     (fun pp elt -> pp +++ f elt)
-    (mt ())
+    (Pp.mt ())
     ary
 
 let pp_sjoinmap_list (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
   List.fold_left
     (fun pp elt -> pp +++ f elt)
-    (mt ())
+    (Pp.mt ())
     l
 
 let pp_join_ary (sep : Pp.t) (ary : Pp.t array) : Pp.t =
   if Array.length ary = 0 then
-    mt ()
+    Pp.mt ()
   else
     Array.fold_left
       (fun pp elt -> pp ++ sep ++ elt)
@@ -335,7 +336,7 @@ let pp_join_ary (sep : Pp.t) (ary : Pp.t array) : Pp.t =
 let pp_join_list (sep : Pp.t) (l : Pp.t list) : Pp.t =
   match l with
   | [] ->
-    mt ()
+    Pp.mt ()
   | elt :: rest ->
     List.fold_left
       (fun pp elt -> pp ++ sep ++ elt)
@@ -344,7 +345,7 @@ let pp_join_list (sep : Pp.t) (l : Pp.t list) : Pp.t =
 
 let pp_joinmap_ary (sep : Pp.t) (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
   if Array.length ary = 0 then
-    mt ()
+    Pp.mt ()
   else
     Array.fold_left
       (fun pp elt -> pp ++ sep ++ f elt)
@@ -354,7 +355,7 @@ let pp_joinmap_ary (sep : Pp.t) (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
 let pp_joinmap_list (sep : Pp.t) (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
   match l with
   | [] ->
-    mt ()
+    Pp.mt ()
   | elt :: rest ->
     List.fold_left
       (fun pp elt -> pp ++ sep ++ f elt)
@@ -364,35 +365,35 @@ let pp_joinmap_list (sep : Pp.t) (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
 let pp_prejoin_ary sep ary =
   Array.fold_left
     (fun pp elt -> pp ++ sep ++ elt)
-    (mt ())
+    (Pp.mt ())
     ary
 
 let pp_prejoin_list sep l =
   List.fold_left
     (fun pp elt -> pp ++ sep ++ elt)
-    (mt ())
+    (Pp.mt ())
     l
 
 let pp_postjoin_ary sep ary =
   Array.fold_left
-    (fun pp elt -> if ismt elt then pp else pp ++ elt ++ sep)
-    (mt ())
+    (fun pp elt -> if Pp.ismt elt then pp else pp ++ elt ++ sep)
+    (Pp.mt ())
     ary
 
 let pp_postjoin_list sep l =
   List.fold_left
     (fun pp elt -> pp ++ elt ++ sep)
-    (mt ())
+    (Pp.mt ())
     l
 
 let hbrace (pp : Pp.t) : Pp.t =
-  h (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+  Pp.h (Pp.str "{" +++ pp ++ Pp.brk (1,-2) ++ Pp.str "}")
 
 let hovbrace (pp : Pp.t) : Pp.t =
-  hv 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+  Pp.hv 2 (Pp.str "{" +++ pp ++ Pp.brk (1,-2) ++ Pp.str "}")
 
 let vbrace (pp : Pp.t) : Pp.t =
-  v 2 (str "{" +++ pp ++ brk (1,-2) ++ str "}")
+  Pp.v 2 (Pp.str "{" +++ pp ++ Pp.brk (1,-2) ++ Pp.str "}")
 
 let msg_info_hov pp =
   Feedback.msg_info (Pp.hov 2 pp)
@@ -441,7 +442,7 @@ let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int)
         let env2 = EConstr.push_rel decl env in
         decompose_lam_n_env env2 sigma (n-1) e
     | _ ->
-      user_err (str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term: " ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term: " ++ Printer.pr_econstr_env env sigma term)
 
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg: " ++ Printer.pr_econstr_env env sigma t);*)
