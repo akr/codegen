@@ -26,65 +26,6 @@ open State
 open Induc
 open Specialize
 
-let is_static_function_icommand (icommand : instance_command) : bool =
-  match icommand with
-  | CodeGenFunction -> false
-  | CodeGenStaticFunction -> true
-  | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
-  | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
-
-let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
-    (*static*)bool * Constant.t * Constr.types * Constr.t =
-  let (sp_cfg, sp_inst) =
-    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-    | None ->
-        user_err (Pp.str "[codegen] C function name not found:" +++
-                  Pp.str cfunc_name)
-    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
-  in
-  let static = is_static_function_icommand sp_inst.sp_icommand in
-  let (env, ctnt) =
-    match sp_inst.sp_simplified_status with
-    | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
-    | SpExpectedId id ->
-        let (env, declared_ctnt, referred_cfuncs) = codegen_simplify cfunc_name in (* modify global env *)
-        (env, declared_ctnt)
-    | SpDefined (ctnt, _) -> (Global.env (), ctnt)
-  in
-  (*msg_debug_hov (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
-  let cdef = Environ.lookup_constant ctnt env in
-  let ty = cdef.Declarations.const_type in
-  match Global.body_of_constant_body Library.indirect_accessor cdef with
-  | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
-                      Printer.pr_constant env ctnt)
-  | Some (body,_, _) -> (static, ctnt, ty, body)
-
-let local_vars : ((string * string) list ref) list ref = ref []
-
-let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
-  let vars = ref [] in
-  let old = !local_vars in
-  local_vars := vars :: old;
-  let ret = f () in
-  local_vars := old;
-  (List.rev !vars, ret)
-
-let add_local_var (c_type : string) (c_var : string) : unit =
-  if !local_vars = [] then
-    user_err (Pp.str "[codegen:bug] add_local_var is called outside of local_vars_with");
-  let vars = List.hd !local_vars in
-  match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
-  | Some (c_type1, c_var1) ->
-      if c_type1 <> c_type then
-        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable")
-      else
-        ()
-  | None -> vars := (c_type, c_var) :: !vars
-
-let carg_of_garg (env : Environ.env) (i : int) : string =
-  let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-  str_of_name x
-
 type fixterm_info = {
   fixterm_term_id: Id.t;
   fixterm_tail_position: bool;
@@ -795,6 +736,32 @@ let local_gensym () : string =
   let n = !idref in
   idref := n + 1;
   "tmp" ^ string_of_int n
+
+let local_vars : ((string * string) list ref) list ref = ref []
+
+let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
+  let vars = ref [] in
+  let old = !local_vars in
+  local_vars := vars :: old;
+  let ret = f () in
+  local_vars := old;
+  (List.rev !vars, ret)
+
+let add_local_var (c_type : string) (c_var : string) : unit =
+  if !local_vars = [] then
+    user_err (Pp.str "[codegen:bug] add_local_var is called outside of local_vars_with");
+  let vars = List.hd !local_vars in
+  match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
+  | Some (c_type1, c_var1) ->
+      if c_type1 <> c_type then
+        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable")
+      else
+        ()
+  | None -> vars := (c_type, c_var) :: !vars
+
+let carg_of_garg (env : Environ.env) (i : int) : string =
+  let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+  str_of_name x
 
 let gen_assignment (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
@@ -1536,6 +1503,39 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           Id.Set.empty
           args)
   | Proj (proj, e) -> used_variables env sigma e
+
+let is_static_function_icommand (icommand : instance_command) : bool =
+  match icommand with
+  | CodeGenFunction -> false
+  | CodeGenStaticFunction -> true
+  | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
+  | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
+
+let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
+    (*static*)bool * Constant.t * Constr.types * Constr.t =
+  let (sp_cfg, sp_inst) =
+    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+    | None ->
+        user_err (Pp.str "[codegen] C function name not found:" +++
+                  Pp.str cfunc_name)
+    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
+  in
+  let static = is_static_function_icommand sp_inst.sp_icommand in
+  let (env, ctnt) =
+    match sp_inst.sp_simplified_status with
+    | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
+    | SpExpectedId id ->
+        let (env, declared_ctnt, referred_cfuncs) = codegen_simplify cfunc_name in (* modify global env *)
+        (env, declared_ctnt)
+    | SpDefined (ctnt, _) -> (Global.env (), ctnt)
+  in
+  (*msg_debug_hov (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
+  let cdef = Environ.lookup_constant ctnt env in
+  let ty = cdef.Declarations.const_type in
+  match Global.body_of_constant_body Library.indirect_accessor cdef with
+  | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
+                      Printer.pr_constant env ctnt)
+  | Some (body,_, _) -> (static, ctnt, ty, body)
 
 let gen_func_sub (primary_cfunc : string) (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
