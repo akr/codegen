@@ -27,22 +27,6 @@ open Cgenutil
 open State
 (*open Linear*)
 
-let quote_coq_string (s : string) : string =
-  let buf = Buffer.create (String.length s + 2) in
-  let rec f i =
-    match String.index_from_opt s i '"' with
-    | None ->
-        Buffer.add_substring buf s i (String.length s - i)
-    | Some j ->
-        Buffer.add_substring buf s i (j - i);
-        Buffer.add_string buf "\"\"";
-        f (j+1)
-  in
-  Buffer.add_char buf '"';
-  f 0;
-  Buffer.add_char buf '"';
-  Buffer.contents buf
-
 let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
   let (sigma, t) = Constrintern.interp_type_evars env sigma t in
   let t = Reductionops.nf_all env sigma t in
