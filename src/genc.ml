@@ -701,6 +701,87 @@ let compute_called_fixfuncs (fixfuncinfo : fixfuncinfo_t) : fixfunc_info list =
     fixfuncinfo
     []
 
+type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
+
+let detect_top_fixterms
+    ~(fixterms : fixterm_info list)
+    ~(fixfuncinfo : fixfuncinfo_t) :
+    top_fixterm_t list =
+  let non_inlinable_non_tail_position_fixterms =
+    List.filter
+      (fun fixterm ->
+        not fixterm.fixterm_inlinable &&
+        not fixterm.fixterm_tail_position)
+    fixterms
+  in
+  List.map
+    (fun fixterm ->
+      let fixterm_id = fixterm.fixterm_term_id in
+      let outer_variables = (Hashtbl.find fixfuncinfo fixterm_id).fixfunc_outer_variables in
+      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
+    non_inlinable_non_tail_position_fixterms
+
+let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
+    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) array =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let c_var = (str_of_annotated_name x, c_typename env sigma t) in
+      obtain_function_bodies_rec env2 sigma (c_var :: fargs) fixfuncs b
+  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let bodies = Array.mapi
+        (fun j nj ->
+          let fixfunc_name = str_of_annotated_name nj in
+          let fj = fary.(j) in
+          if i = j then
+            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj
+          else
+            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: []) fj)
+        nary
+      in
+      let reordered_bodies = Array.copy bodies in
+      Array.blit bodies 0 reordered_bodies 1 i;
+      reordered_bodies.(0) <- bodies.(i);
+      array_flatten reordered_bodies
+  | _ ->
+      [|(fargs, fixfuncs, env, term)|]
+
+let obtain_function_bodies
+    ~(fixterms : fixterm_info list)
+    ~(fixfuncinfo : fixfuncinfo_t)
+    ~(primary_cfunc : string)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) :
+    (((*varname*)string * (*vartype*)string) list *
+     (*labels*)string list *
+     Environ.env *
+     EConstr.t) array =
+  let gen_labels fixes =
+    unique_string_list
+      (CList.map_filter
+        (fun fix_name ->
+          let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
+          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
+            Some ("entry_" ^ fix_usage.fixfunc_c_name)
+          else
+            None)
+        fixes)
+  in
+  let add_labels (args, fixes, env2, body) = (args, gen_labels fixes, env2, body) in
+  let result_whole_body =
+    Array.map add_labels (obtain_function_bodies_rec env sigma [] [] term)
+  in
+  let results_top_fixterms =
+    List.map
+      (fun (outer_variables, env1, fix) ->
+        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
+      (detect_top_fixterms ~fixterms ~fixfuncinfo)
+  in
+  Array.concat (result_whole_body :: results_top_fixterms)
+
 let local_gensym_id : (int ref) list ref = ref []
 
 let local_gensym_with (f : unit -> 'a) : 'a =
@@ -1149,87 +1230,6 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used : Id.Set.t) ~(gen_ret : Pp.t
       Array.blit pp_bodies 0 reordered_pp_bodies 1 i;
       reordered_pp_bodies.(0) <- pp_bodies.(i);
       pp_assignments +++ pp_sjoin_ary reordered_pp_bodies
-
-type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
-
-let detect_top_fixterms
-    ~(fixterms : fixterm_info list)
-    ~(fixfuncinfo : fixfuncinfo_t) :
-    top_fixterm_t list =
-  let non_inlinable_non_tail_position_fixterms =
-    List.filter
-      (fun fixterm ->
-        not fixterm.fixterm_inlinable &&
-        not fixterm.fixterm_tail_position)
-    fixterms
-  in
-  List.map
-    (fun fixterm ->
-      let fixterm_id = fixterm.fixterm_term_id in
-      let outer_variables = (Hashtbl.find fixfuncinfo fixterm_id).fixfunc_outer_variables in
-      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
-    non_inlinable_non_tail_position_fixterms
-
-let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) array =
-  match EConstr.kind sigma term with
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let c_var = (str_of_annotated_name x, c_typename env sigma t) in
-      obtain_function_bodies_rec env2 sigma (c_var :: fargs) fixfuncs b
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let bodies = Array.mapi
-        (fun j nj ->
-          let fixfunc_name = str_of_annotated_name nj in
-          let fj = fary.(j) in
-          if i = j then
-            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj
-          else
-            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: []) fj)
-        nary
-      in
-      let reordered_bodies = Array.copy bodies in
-      Array.blit bodies 0 reordered_bodies 1 i;
-      reordered_bodies.(0) <- bodies.(i);
-      array_flatten reordered_bodies
-  | _ ->
-      [|(fargs, fixfuncs, env, term)|]
-
-let obtain_function_bodies
-    ~(fixterms : fixterm_info list)
-    ~(fixfuncinfo : fixfuncinfo_t)
-    ~(primary_cfunc : string)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) array =
-  let gen_labels fixes =
-    unique_string_list
-      (CList.map_filter
-        (fun fix_name ->
-          let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
-          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
-            Some ("entry_" ^ fix_usage.fixfunc_c_name)
-          else
-            None)
-        fixes)
-  in
-  let add_labels (args, fixes, env2, body) = (args, gen_labels fixes, env2, body) in
-  let result_whole_body =
-    Array.map add_labels (obtain_function_bodies_rec env sigma [] [] term)
-  in
-  let results_top_fixterms =
-    List.map
-      (fun (outer_variables, env1, fix) ->
-        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] fix))
-      (detect_top_fixterms ~fixterms ~fixfuncinfo)
-  in
-  Array.concat (result_whole_body :: results_top_fixterms)
 
 let gen_function_header (static : bool) (return_type : string) (c_name : string)
     (formal_arguments : (string * string) list) : Pp.t =
