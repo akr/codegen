@@ -237,10 +237,21 @@ let quote_coq_string (s : string) : string =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let string_of_name name =
+let id_of_name (name : Name.t) : Id.t =
   match name with
+  | Name.Anonymous -> user_err (Pp.str "[codegen:bug] id_of_name require non-anonymous Name")
+  | Name.Name id -> id
+
+let id_of_annotated_name (name : Name.t Context.binder_annot) : Id.t =
+  id_of_name (Context.binder_name name)
+
+let str_of_name (name : Name.t) : string =
+  match name with
+  | Name.Anonymous -> user_err (Pp.str "[codegen] str_of_name with anonymous name")
   | Name.Name id -> Id.to_string id
-  | Name.Anonymous -> "_"
+
+let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
+  str_of_name (Context.binder_name name)
 
 let iota_ary (m : int) (n : int) : int array =
   Array.init n (fun i -> m + i)

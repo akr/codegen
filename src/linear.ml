@@ -205,11 +205,6 @@ let rec ntimes n f v =
   else
     ntimes (n-1) f (f v)
 
-let string_of_name (name : Names.Name.t) : string =
-  match name with
-  | Names.Name.Name id -> Names.Id.to_string id
-  | Names.Name.Anonymous -> "_"
-
 let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     (decl : EConstr.rel_declaration) (linear_vars : bool list)
     (numvars_innermost_function : int)

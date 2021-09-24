@@ -43,14 +43,6 @@ let local_gensym () : string =
   idref := n + 1;
   "tmp" ^ string_of_int n
 
-let str_of_name (name : Name.t) : string =
-  match name with
-  | Name.Anonymous -> user_err (Pp.str "[codegen] str_of_name with anonymous name")
-  | Name.Name id -> Id.to_string id
-
-let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
-  str_of_name (Context.binder_name name)
-
 let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ str "=" +++ rhs ++ str ";")
 
@@ -141,19 +133,9 @@ let add_local_var (c_type : string) (c_var : string) : unit =
         ()
   | None -> vars := (c_type, c_var) :: !vars
 
-let id_of_name (name : Name.t) : Id.t =
-  match name with
-  | Name.Anonymous -> user_err (Pp.str "[codegen:bug] id_of_name require non-anonymous Name")
-  | Name.Name id -> id
-
-let id_of_annotated_name (name : Name.t Context.binder_annot) : Id.t =
-  id_of_name (Context.binder_name name)
-
 let carg_of_garg (env : Environ.env) (i : int) : string =
   let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-  match x with
-  | Name.Anonymous -> user_err (Pp.str "[codegen:bug] carg_of_garg require non-anonymous Name")
-  | Name.Name id -> Id.to_string id
+  str_of_name x
 
 type fixterm_info = {
   fixterm_term_id: Id.t;
