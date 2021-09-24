@@ -157,9 +157,7 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
 
 type fixterm_info = {
   fixterm_term_id: Id.t;
-  fixterm_func_ids: Id.t array;
   fixterm_tail_position: bool;
-  fixterm_numargs: int;
   fixterm_term_env: Environ.env;
   fixterm_term: EConstr.t;
   fixterm_inlinable: bool;
@@ -168,9 +166,7 @@ type fixterm_info = {
 type fixfunc_info = {
   fixfunc_func_id: Id.t;
   fixfunc_term_id: Id.t;
-  fixfunc_func_index: int;
   fixfunc_term_env: Environ.env;
-  fixfunc_func_env: Environ.env;
   fixfunc_func: EConstr.t;
   fixfunc_inlinable: bool;
   fixfunc_used_as_call: bool;
@@ -508,9 +504,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       in
       let fixterm = {
         fixterm_term_id = fixterm_id;
-        fixterm_func_ids = Array.map id_of_annotated_name nary;
         fixterm_tail_position = tail_position;
-        fixterm_numargs = numargs;
         fixterm_term_env = env;
         fixterm_term = term;
         fixterm_inlinable = inlinable;
@@ -523,9 +517,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
               {
                 fixfunc_func_id = id_of_annotated_name nary.(j);
                 fixfunc_term_id = id_of_annotated_name nary.(i);
-                fixfunc_func_index = j;
                 fixfunc_term_env = env;
-                fixfunc_func_env = env2;
                 fixfunc_func = fary.(j);
                 fixfunc_inlinable = inlinable;
                 fixfunc_used_as_call = !(List.nth used_as_call2 (h - j - 1));
