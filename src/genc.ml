@@ -715,14 +715,14 @@ let local_gensym () : string =
   idref := n + 1;
   "tmp" ^ string_of_int n
 
-let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
+let gen_assignment (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
 
 let gen_return (arg : Pp.t) : Pp.t =
   Pp.hov 0 (Pp.str "return" +++ arg ++ Pp.str ";")
 
 let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  genc_assign (Pp.str retvar) arg +++ Pp.str "return;"
+  gen_assignment (Pp.str retvar) arg +++ Pp.str "return;"
 
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
   Pp.str c_fname ++ Pp.str "(" ++
@@ -810,7 +810,7 @@ let gen_match (used : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> P
         (Array.map2
           (fun c_var access ->
             if Id.Set.mem (Id.of_string c_var) used then
-              genc_assign (Pp.str c_var)
+              gen_assignment (Pp.str c_var)
                 (Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")")
             else
               Pp.mt ())
@@ -875,7 +875,7 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
         if nonblocked_assign <> [] then
           (List.iter
             (fun (lhs, rhs, ty) ->
-              let pp = genc_assign (Pp.str lhs) (Pp.str rhs) in
+              let pp = gen_assignment (Pp.str lhs) (Pp.str rhs) in
               rpp := !rpp +++ pp)
             nonblocked_assign;
           loop blocked_assign)
@@ -883,7 +883,7 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
           (let (a_lhs, a_rhs, a_ty) = a in
           let tmp = local_gensym () in
           add_local_var a_ty tmp;
-          let pp = genc_assign (Pp.str tmp) (Pp.str a_lhs) in
+          let pp = gen_assignment (Pp.str tmp) (Pp.str a_lhs) in
           (rpp := !rpp +++ pp);
           let assign2 = List.map
             (fun (lhs, rhs, ty) ->
@@ -901,7 +901,7 @@ type assign_cont = {
 }
 
 let gen_assign_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
-  genc_assign (Pp.str cont.assign_cont_ret_var) rhs +++
+  gen_assignment (Pp.str cont.assign_cont_ret_var) rhs +++
   match cont.assign_cont_exit_label with
   | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
