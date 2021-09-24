@@ -664,7 +664,7 @@ let detect_top_fixterms
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) Seq.t =
+    (((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) Seq.t =
   match EConstr.kind sigma term with
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
