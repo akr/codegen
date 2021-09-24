@@ -976,7 +976,7 @@ and gen_assign1 ~(fixfuncinfo : fixfuncinfo_t) ~(used_vars : Id.Set.t) ~(cont : 
   | Evar _ | Prod _
   | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
-      user_err (Pp.str "[codegen:gen_assign] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_assign] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -1024,7 +1024,7 @@ and gen_assign1 ~(fixfuncinfo : fixfuncinfo_t) ~(used_vars : Id.Set.t) ~(cont : 
       gen_match used_vars gen_switch (gen_assign ~fixfuncinfo ~used_vars ~cont) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
-        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_assign_cont cont (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
@@ -1117,7 +1117,7 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used_vars : Id.Set.t) ~(gen_ret :
   | Evar _ | Prod _
   | Int _ | Float _ | Array _
   | Cast _ | CoFix _ ->
-      user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -1162,7 +1162,7 @@ and gen_tail1 ~(fixfuncinfo : fixfuncinfo_t) ~(used_vars : Id.Set.t) ~(gen_ret :
       gen_match used_vars gen_switch_without_break (gen_tail ~fixfuncinfo ~used_vars ~gen_ret) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
-        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet: " ++ Printer.pr_econstr_env env sigma term));
+        user_err (Pp.str "[codegen:gen_assign] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_ret (gen_proj env sigma pr item))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in

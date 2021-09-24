@@ -251,7 +251,7 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
   | Var _ | Meta _ | Evar _
   | Sort _ | Prod _ | Ind _
   | CoFix _ | Array _ ->
-      user_err (Pp.str "[codegen:linearcheck_exp] unexpected " ++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:linearcheck_exp] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.nth linear_vars (i-1) then
         IntMap.singleton (Environ.nb_rel env - i) 1

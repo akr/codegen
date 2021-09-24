@@ -543,9 +543,9 @@ let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : E
 
 (* useless ?
 let rec strip_cast (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (* msg_info_hov (Pp.str "strip_cast arg: " ++ Printer.pr_econstr_env env sigma term); *)
+  (* msg_info_hov (Pp.str "strip_cast arg:" +++ Printer.pr_econstr_env env sigma term); *)
   let result = strip_cast1 env sigma term in
-  (* msg_info_hov (Pp.str "strip_cast ret: " ++ Printer.pr_econstr_env env sigma result); *)
+  (* msg_info_hov (Pp.str "strip_cast ret:" +++ Printer.pr_econstr_env env sigma result); *)
   check_convertible "strip_cast" env sigma term result;
   result
 and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -659,10 +659,10 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
 let rec normalizeV (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   (if !opt_debug_normalizeV then
-    msg_debug_hov (Pp.str "[codegen] normalizeV arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] normalizeV arg:" +++ Printer.pr_econstr_env env sigma term));
   let result = normalizeV1 env sigma term in
   (if !opt_debug_normalizeV then
-    msg_debug_hov (Pp.str "[codegen] normalizeV ret: " ++ Printer.pr_econstr_env env sigma result));
+    msg_debug_hov (Pp.str "[codegen] normalizeV ret:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "normalizeV" env sigma term result;
   result
 and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
@@ -952,11 +952,11 @@ let try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let t1 = Unix.times () in
   (if !opt_debug_reduce_exp then (* Set Debug CodeGen ReduceExp. *)
-    msg_debug_hov (Pp.str "[codegen] reduce_exp arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] reduce_exp arg:" +++ Printer.pr_econstr_env env sigma term));
   let result = reduce_exp1 env sigma term in
   (if !opt_debug_reduce_exp then
     let t2 = Unix.times () in
-    msg_debug_hov (Pp.str "[codegen] reduce_exp ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma result));
+    msg_debug_hov (Pp.str "[codegen] reduce_exp ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_exp" env sigma term result;
   result
 
@@ -1062,11 +1062,11 @@ and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_
   let t1 = Unix.times () in
   let term = mkApp (f, args_nf) in
   (if !opt_debug_reduce_app then (* Set Debug CodeGen ReduceApp. *)
-    msg_debug_hov (Pp.str "[codegen] reduce_app arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] reduce_app arg:" +++ Printer.pr_econstr_env env sigma term));
   let result = reduce_app1 env sigma f args_nf in
   (if !opt_debug_reduce_app then
     let t2 = Unix.times () in
-    msg_debug_hov (Pp.str "[codegen] reduce_app ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "): " ++ Printer.pr_econstr_env env sigma result));
+    msg_debug_hov (Pp.str "[codegen] reduce_app ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_app" env sigma term result;
   result
 and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
@@ -1350,7 +1350,7 @@ let rec count_false_in_prefix (n : int) (vars_used : bool list) : int =
 
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   (if !opt_debug_delete_let then
-    msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg:" +++ Printer.pr_econstr_env env sigma term));
   let (fvs, retf) = delete_unused_let_rec1 env sigma term in
   (fvs,
    fun vars_used ->
@@ -1469,12 +1469,12 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
 
 let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_delete_let then
-    msg_debug_hov (Pp.str "[codegen] delete_unused_let arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] delete_unused_let arg:" +++ Printer.pr_econstr_env env sigma term));
   assert (Environ.nb_rel env = 0);
   let (fvs, f) = delete_unused_let_rec env sigma term in
   let result = f [] in
   (if !opt_debug_delete_let then
-    msg_debug_hov (Pp.str "[codegen] delete_unused_let ret: " ++ Printer.pr_econstr_env env sigma result));
+    msg_debug_hov (Pp.str "[codegen] delete_unused_let ret:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "specialize" env sigma term result;
   result
 
@@ -1524,7 +1524,7 @@ let has_fv sigma term : bool =
 
 (* func must be a constant or constructor *)
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t * string =
-  (* msg_info_hov (Pp.str "[codegen] replace_app: " ++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
+  (* msg_info_hov (Pp.str "[codegen] replace_app:" +++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
   let sp_cfg = codegen_auto_arguments_internal ~cfunc env sigma func in
   let sd_list = drop_trailing_d sp_cfg.sp_sd_list in
   (if Array.length args < List.length sd_list then
@@ -1556,7 +1556,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args in
-  (*msg_info_hov (Pp.str "[codegen] replace presimp: " ++ Printer.pr_constr_env env sigma presimp);*)
+  (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
         let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenStaticFunction in
@@ -1573,10 +1573,10 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
    arguments of App and item of Case. *)
 let rec replace ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t * StringSet.t =
   (if !opt_debug_replace then
-    msg_debug_hov (Pp.str "[codegen] replace arg: " ++ Printer.pr_econstr_env env sigma term));
+    msg_debug_hov (Pp.str "[codegen] replace arg:" +++ Printer.pr_econstr_env env sigma term));
   let (env, result, referred_cfuncs) = replace1 ~cfunc env sigma term in
   (if !opt_debug_replace then
-    msg_debug_hov (Pp.str "[codegen] replace ret: " ++ Printer.pr_econstr_env env sigma result));
+    msg_debug_hov (Pp.str "[codegen] replace ret:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "replace" env sigma term result;
   (env, result, referred_cfuncs)
 and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t * StringSet.t =
