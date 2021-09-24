@@ -1649,6 +1649,15 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
           f (Pp.str str ++ Pp.fnl ()))
     gen_list
 
+let finalize_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t) : (code_generation list) CString.Map.t =
+  let gen_map =
+    if List.mem DisableDependencyResolver gflist then gen_map
+    else CString.Map.map codegen_resolve_dependencies gen_map in
+  let gen_map =
+    if List.mem DisableMutualRecursionDetection gflist then gen_map
+    else CString.Map.map codegen_detect_mutual_recursion gen_map in
+  gen_map
+
 (* Vernacular commands *)
 
 let command_gen (cfunc_list : string_or_qualid list) : unit =
@@ -1690,23 +1699,17 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
   Sys.rename temp_fn fn;
   msg_info_hov (Pp.str ("[codegen] file generated: " ^ fn)))
 
-let gen_test (gen_list : code_generation list) : unit =
-  gen_pp_iter Feedback.msg_info gen_list
-
 let command_generate_file (gflist : genflag list) : unit =
-  let gen_map = !generation_map in
-  let gen_map =
-    if List.mem DisableDependencyResolver gflist then gen_map
-    else CString.Map.map codegen_resolve_dependencies gen_map in
-  let gen_map =
-    if List.mem DisableMutualRecursionDetection gflist then gen_map
-    else CString.Map.map codegen_detect_mutual_recursion gen_map in
+  let gen_map = finalize_gen_map gflist !generation_map in
   List.iter
     (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
     (CString.Map.bindings gen_map);
   generation_map := CString.Map.empty
 
-let command_generate_test () : unit =
+let command_generate_test (gflist : genflag list) : unit =
+  let gen_map = finalize_gen_map gflist !generation_map in
   List.iter
-    (fun (fn, gen_list) -> Feedback.msg_info (Pp.str fn); gen_test (List.rev gen_list))
-    (CString.Map.bindings !generation_map)
+    (fun (fn, gen_list) ->
+      Feedback.msg_info (Pp.str fn);
+      gen_pp_iter Feedback.msg_info (List.rev gen_list))
+    (CString.Map.bindings gen_map)
