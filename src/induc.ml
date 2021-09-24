@@ -140,15 +140,6 @@ let check_ind_coq_type_not_registered (coq_type : Constr.t) : unit =
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_constr_env env sigma coq_type)
 
-let get_ind_config (coq_type : Constr.t) : ind_config =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  match ConstrMap.find_opt coq_type !ind_config_map with
-  | Some ind_cfg -> ind_cfg
-  | None ->
-      user_err (Pp.str "[codegen] inductive type not registered:" +++
-      Printer.pr_constr_env env sigma coq_type)
-
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : string) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
@@ -166,6 +157,21 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
   ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
   ind_cfg
 
+let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  let printed_type = mangle_term env sigma t in
+  let c_name = c_id (squeeze_white_spaces printed_type) in
+  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
+  Feedback.msg_info (v 2
+    (Pp.str "[codegen] inductive type translation automatically configured:" +++
+     (hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
+     Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
+  ind_cfg
+
+let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
+  | Some ind_cfg -> ind_cfg
+  | None -> generate_ind_config env sigma t
+
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -175,7 +181,7 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : string) 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
-  let ind_cfg = get_ind_config coq_type in
+  let ind_cfg = get_ind_config env sigma (EConstr.of_constr coq_type) in
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (
       Pp.str "[codegen] inductive match configuration already registered:" +++

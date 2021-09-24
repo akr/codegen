@@ -29,16 +29,6 @@ open Specialize
 
 let abort (x : 'a) : 'a = assert false
 
-let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let printed_type = mangle_term env sigma t in
-  let c_name = c_id (squeeze_white_spaces printed_type) in
-  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name in
-  Feedback.msg_info (v 2
-    (Pp.str "[codegen] inductive type translation automatically configured:" +++
-     (hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
-     Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
-  ind_cfg
-
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
   let printed_type = mangle_term env sigma t in
@@ -68,11 +58,6 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
      hv 0 (pr_inductive_match env sigma ind_cfg)));
   ind_cfg
-
-let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
-  | Some ind_cfg -> ind_cfg
-  | None -> generate_ind_config env sigma t
 
 let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   match EConstr.kind sigma t with
