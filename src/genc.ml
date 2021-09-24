@@ -26,55 +26,6 @@ open State
 open Induc
 open Specialize
 
-let local_gensym_id : (int ref) list ref = ref []
-
-let local_gensym_with (f : unit -> 'a) : 'a =
-  local_gensym_id := (ref 0) :: !local_gensym_id;
-  let ret = f () in
-  local_gensym_id := List.tl !local_gensym_id;
-  ret
-
-let local_gensym () : string =
-  let idref = List.hd !local_gensym_id in
-  let n = !idref in
-  idref := n + 1;
-  "tmp" ^ string_of_int n
-
-let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
-  Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
-
-let gen_return (arg : Pp.t) : Pp.t =
-  Pp.hov 0 (Pp.str "return" +++ arg ++ Pp.str ";")
-
-let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  genc_assign (Pp.str retvar) arg +++ Pp.str "return;"
-
-let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
-  Pp.str c_fname ++ Pp.str "(" ++
-  pp_join_ary (Pp.str "," ++ Pp.spc ()) (Array.map Pp.str argvars) ++
-  Pp.str ")"
-
-let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
-  let sp_inst =
-    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
-    | None ->
-        (match EConstr.kind sigma f with
-        | Constr.Const (ctnt, _) ->
-            user_err (Pp.str "[codegen] C function name not configured:" +++ Printer.pr_constant env ctnt)
-        | Constr.Construct (cstr, _) ->
-            user_err (Pp.str "[codegen] C constructor name not configured:" +++ Printer.pr_constructor env cstr)
-        | _ ->
-            user_err (Pp.str "[codegen:bug] gen_app_const_construct expects Const or Construct"))
-    | Some (sp_cfg, sp_inst) ->
-        sp_inst
-  in
-  let c_fname = sp_inst.sp_cfunc_name in
-  let gen_constant = Array.length argvars = 0 && sp_inst.sp_icommand = CodeGenConstant in
-  if gen_constant then
-    Pp.str c_fname
-  else
-    gen_funcall c_fname argvars
-
 let is_static_function_icommand (icommand : instance_command) : bool =
   match icommand with
   | CodeGenFunction -> false
@@ -749,6 +700,55 @@ let compute_called_fixfuncs (fixfuncinfo : fixfuncinfo_t) : fixfunc_info list =
         fixfuncs)
     fixfuncinfo
     []
+
+let local_gensym_id : (int ref) list ref = ref []
+
+let local_gensym_with (f : unit -> 'a) : 'a =
+  local_gensym_id := (ref 0) :: !local_gensym_id;
+  let ret = f () in
+  local_gensym_id := List.tl !local_gensym_id;
+  ret
+
+let local_gensym () : string =
+  let idref = List.hd !local_gensym_id in
+  let n = !idref in
+  idref := n + 1;
+  "tmp" ^ string_of_int n
+
+let genc_assign (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
+  Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
+
+let gen_return (arg : Pp.t) : Pp.t =
+  Pp.hov 0 (Pp.str "return" +++ arg ++ Pp.str ";")
+
+let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
+  genc_assign (Pp.str retvar) arg +++ Pp.str "return;"
+
+let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
+  Pp.str c_fname ++ Pp.str "(" ++
+  pp_join_ary (Pp.str "," ++ Pp.spc ()) (Array.map Pp.str argvars) ++
+  Pp.str ")"
+
+let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
+  let sp_inst =
+    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
+    | None ->
+        (match EConstr.kind sigma f with
+        | Constr.Const (ctnt, _) ->
+            user_err (Pp.str "[codegen] C function name not configured:" +++ Printer.pr_constant env ctnt)
+        | Constr.Construct (cstr, _) ->
+            user_err (Pp.str "[codegen] C constructor name not configured:" +++ Printer.pr_constructor env cstr)
+        | _ ->
+            user_err (Pp.str "[codegen:bug] gen_app_const_construct expects Const or Construct"))
+    | Some (sp_cfg, sp_inst) ->
+        sp_inst
+  in
+  let c_fname = sp_inst.sp_cfunc_name in
+  let gen_constant = Array.length argvars = 0 && sp_inst.sp_icommand = CodeGenConstant in
+  if gen_constant then
+    Pp.str c_fname
+  else
+    gen_funcall c_fname argvars
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
   Pp.v 0 (
