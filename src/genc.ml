@@ -722,14 +722,14 @@ let detect_top_fixterms
     non_inlinable_non_tail_position_fixterms
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
-    (fargs : ((*varname*)string * (*vartype*)string) list) (fixfuncs : string list) (term : EConstr.t) :
+    (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
     (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) array =
   match EConstr.kind sigma term with
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       let c_var = (str_of_annotated_name x, c_typename env sigma t) in
-      obtain_function_bodies_rec env2 sigma (c_var :: fargs) fixfuncs b
+      obtain_function_bodies_rec env2 sigma (c_var :: fargs) stacked_fixfuncs b
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let bodies = Array.mapi
@@ -737,7 +737,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
           let fixfunc_name = str_of_annotated_name nj in
           let fj = fary.(j) in
           if i = j then
-            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: fixfuncs) fj
+            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fj
           else
             obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: []) fj)
         nary
@@ -747,7 +747,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
       reordered_bodies.(0) <- bodies.(i);
       array_flatten reordered_bodies
   | _ ->
-      [|(fargs, fixfuncs, env, term)|]
+      [|(fargs, stacked_fixfuncs, env, term)|]
 
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
