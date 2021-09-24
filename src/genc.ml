@@ -664,7 +664,7 @@ let detect_top_fixterms
 
 let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) array =
+    (((*varname*)string * (*vartype*)string) list * string list * Environ.env * EConstr.t) Seq.t =
   match EConstr.kind sigma term with
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
@@ -686,9 +686,9 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
       let reordered_bodies = Array.copy bodies in
       Array.blit bodies 0 reordered_bodies 1 i;
       reordered_bodies.(0) <- bodies.(i);
-      array_flatten reordered_bodies
+      concat_array_seq reordered_bodies
   | _ ->
-      [|(fargs, stacked_fixfuncs, env, term)|]
+      Seq.return (fargs, stacked_fixfuncs, env, term)
 
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
@@ -699,7 +699,7 @@ let obtain_function_bodies
     (((*varname*)string * (*vartype*)string) list *
      (*labels*)string list *
      Environ.env *
-     EConstr.t) array =
+     EConstr.t) list =
   let gen_labels stacked_fixfuncs =
     unique_string_list
       (CList.map_filter
@@ -715,11 +715,11 @@ let obtain_function_bodies
   let results =
     List.map
       (fun (outer_variables, env1, term) ->
-        Array.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term))
+        Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term))
       (([], env, term) ::
        detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
-  Array.concat results
+  List.of_seq (concat_list_seq results)
 
 let local_gensym_id : (int ref) list ref = ref []
 
@@ -1221,7 +1221,7 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
   let bodies = obtain_function_bodies ~fixterms ~fixfuncinfo ~primary_cfunc env sigma whole_body in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
-      pp_sjoinmap_ary
+      pp_sjoinmap_list
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
@@ -1231,7 +1231,7 @@ let gen_func_single ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_
         bodies)
   in
   let c_fargs =
-    let (first_args, _, _, _) = bodies.(0) in
+    let (first_args, _, _, _) = List.hd bodies in
     List.rev first_args
   in
   let local_vars = List.filter
@@ -1362,7 +1362,7 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)codegen_ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
-      pp_sjoinmap_ary
+      pp_sjoinmap_list
         (fun (args, labels, env2, body) ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
