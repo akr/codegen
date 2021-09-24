@@ -695,11 +695,11 @@ let obtain_function_bodies1
     ~(fixfuncinfo : fixfuncinfo_t)
     ~(primary_cfunc : string)
     (sigma : Evd.evar_map)
-    (triples_of_outer_env_term : ((string * string) list * Environ.env * EConstr.t) list) :
+    ((outer_variables, env1, term1) : (string * string) list * Environ.env * EConstr.t) :
     (((*varname*)string * (*vartype*)string) list *
      (*labels*)string list *
      Environ.env *
-     EConstr.t) list =
+     EConstr.t) Seq.t =
   let gen_labels stacked_fixfuncs =
     unique_string_list
       (CList.map_filter
@@ -712,13 +712,7 @@ let obtain_function_bodies1
         stacked_fixfuncs)
   in
   let add_labels (args, stacked_fixfuncs, env2, body) = (args, gen_labels stacked_fixfuncs, env2, body) in
-  let results =
-    List.map
-      (fun (outer_variables, env1, term1) ->
-        Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term1))
-      triples_of_outer_env_term
-  in
-  List.of_seq (concat_list_seq results)
+  Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term1)
 
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
@@ -730,10 +724,13 @@ let obtain_function_bodies
      (*labels*)string list *
      Environ.env *
      EConstr.t) list =
-  obtain_function_bodies1
-    ~fixterms ~fixfuncinfo ~primary_cfunc sigma
-    (([], env, term) ::
-     detect_top_fixterms ~fixterms ~fixfuncinfo)
+  let results =
+    List.map
+      (obtain_function_bodies1 ~fixterms ~fixfuncinfo ~primary_cfunc sigma)
+      (([], env, term) ::
+       detect_top_fixterms ~fixterms ~fixfuncinfo)
+  in
+  List.of_seq (concat_list_seq results)
 
 let local_gensym_id : (int ref) list ref = ref []
 
