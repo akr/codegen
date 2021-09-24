@@ -714,8 +714,8 @@ let obtain_function_bodies
   let add_labels (args, stacked_fixfuncs, env2, body) = (args, gen_labels stacked_fixfuncs, env2, body) in
   let results =
     List.map
-      (fun (outer_variables, env1, term) ->
-        Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term))
+      (fun (outer_variables, env1, term1) ->
+        Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term1))
       (([], env, term) ::
        detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
