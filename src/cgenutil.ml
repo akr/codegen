@@ -25,6 +25,8 @@ open EConstr
 
 open State
 
+let abort (x : 'a) : 'a = assert false
+
 exception CodeGenError of string
 
 let array_rev a =

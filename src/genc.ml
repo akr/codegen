@@ -26,8 +26,6 @@ open State
 open Induc
 open Specialize
 
-let abort (x : 'a) : 'a = assert false
-
 let local_gensym_id : (int ref) list ref = ref []
 
 let local_gensym_with (f : unit -> 'a) : 'a =
