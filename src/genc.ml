@@ -549,11 +549,6 @@ let collect_fix_usage
   let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] in
   (List.of_seq fixterms, List.of_seq fixfuncs)
 
-let fixterm_table (fixterms : fixterm_info list) : fixterminfo_t =
-  let fixterminfo = Hashtbl.create 0 in
-  List.iter (fun fixterm -> Hashtbl.add fixterminfo fixterm.fixterm_term_id fixterm) fixterms;
-  fixterminfo
-
 let fixfunc_table (fixfuncs : fixfunc_info list) : fixfuncinfo_t =
   let fixfuncinfo = Hashtbl.create 0 in
   List.iter (fun fixfunc -> Hashtbl.add fixfuncinfo fixfunc.fixfunc_func_id fixfunc) fixfuncs;
@@ -766,7 +761,6 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
-  (*let fixterminfo = fixterm_table fixterms in*)
   let fixfuncinfo = fixfunc_table fixfuncs in
   detect_top_calls env sigma name term other_topfuncs ~fixfuncinfo;
   determine_fixfunc_c_names fixfuncinfo;
