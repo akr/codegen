@@ -943,25 +943,25 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
   loop assign;
   !rpp
 
-type assign_cont = {
-  assign_cont_ret_var: string;
-  assign_cont_exit_label: string option;
+type head_cont = {
+  head_cont_ret_var: string;
+  head_cont_exit_label: string option;
 }
 
-let gen_head_cont (cont : assign_cont) (rhs : Pp.t) : Pp.t =
-  gen_assignment (Pp.str cont.assign_cont_ret_var) rhs +++
-  match cont.assign_cont_exit_label with
+let gen_head_cont (cont : head_cont) (rhs : Pp.t) : Pp.t =
+  gen_assignment (Pp.str cont.head_cont_ret_var) rhs +++
+  match cont.head_cont_exit_label with
   | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
-let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   let pp = gen_head1 ~fixfunc_tbl ~used_vars ~cont env sigma term cargs in
   (*msg_debug_hov (Pp.str "[codegen] gen_head:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
   pp
-and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : assign_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
+and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string list) : Pp.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
   | Evar _ | Prod _
@@ -1008,7 +1008,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : as
       gen_head ~fixfunc_tbl ~used_vars ~cont env sigma f cargs2
   | Case (ci,predicate,iv,item,branches) ->
       let gen_switch =
-        match cont.assign_cont_exit_label with
+        match cont.head_cont_exit_label with
         | None -> gen_switch_with_break
         | Some _ -> gen_switch_without_break
       in
@@ -1022,8 +1022,8 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : as
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
-      let cont1 = { assign_cont_ret_var = c_var;
-                    assign_cont_exit_label = None; } in
+      let cont1 = { head_cont_ret_var = c_var;
+                    head_cont_exit_label = None; } in
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e [] +++
       gen_head ~fixfunc_tbl ~used_vars ~cont env2 sigma b cargs
 
@@ -1045,12 +1045,12 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : as
         let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) ni_formal_arguments cargs in
         let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
         let exit_label = "exit_" ^ ni_funcname in
-        let cont2 = match cont.assign_cont_exit_label with
-                    | None -> { cont with assign_cont_exit_label = Some exit_label }
+        let cont2 = match cont.head_cont_exit_label with
+                    | None -> { cont with head_cont_exit_label = Some exit_label }
                     | Some _ -> cont
         in
         let pp_exit =
-          match cont.assign_cont_exit_label with
+          match cont.head_cont_exit_label with
           | None -> Pp.hov 0 (Pp.str exit_label ++ Pp.str ":")
           | Some _ -> Pp.mt ()
         in
@@ -1160,8 +1160,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
       add_local_var (c_typename env sigma t) c_var;
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
-      let cont1 = { assign_cont_ret_var = c_var;
-                    assign_cont_exit_label = None; } in
+      let cont1 = { head_cont_ret_var = c_var;
+                    head_cont_exit_label = None; } in
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e [] +++
       gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma b cargs
 
