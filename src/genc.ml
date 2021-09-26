@@ -605,14 +605,16 @@ let fixfunc_initialize_outer_variables
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let fixterm_id = fixfunc.fixfunc_term_id in
       let ov = outer_variables_from_env ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
-      if fixfunc.fixfunc_top_call <> None then
-        Some { fixfunc with fixfunc_outer_variables = ov }
-      else
-        let ov = List.filter
-          (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
+      let ov2 =
+        if fixfunc.fixfunc_top_call <> None then
           ov
-        in
-        Some { fixfunc with fixfunc_outer_variables = ov })
+        else
+          List.filter
+            (fun (varname, vartype) ->
+              Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
+            ov
+      in
+      Some { fixfunc with fixfunc_outer_variables = ov2 })
     fixfunc_tbl
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
