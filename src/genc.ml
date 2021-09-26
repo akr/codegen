@@ -1556,7 +1556,7 @@ let another_topfunc_for_mutual_recursion (cfunc : string) : (bool * string * int
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
   | Fix ((ks, j), (nary, tary, fary)) -> Some (static, cfunc, j, id_of_annotated_name nary.(j))
-  | _ -> None
+  | _ -> None (* not reached *)
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
