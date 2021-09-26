@@ -419,7 +419,7 @@ let collect_fix_usage
 
 let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
-    (other_topfuncs : (bool * string * int * Id.t) list option)
+    (other_topfuncs : (bool * string * int * Id.t) list)
     ~(fixfunc_tbl : fixfunc_table) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
@@ -428,23 +428,20 @@ let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       fixfunc_initialize_top_calls env2 sigma top_c_func_name e other_topfuncs ~fixfunc_tbl
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      fixfunc_initialize_top_calls env2 sigma top_c_func_name fary.(i) None ~fixfunc_tbl;
+      fixfunc_initialize_top_calls env2 sigma top_c_func_name fary.(i) [] ~fixfunc_tbl;
       let key = id_of_annotated_name nary.(i) in
       let fixfunc = Hashtbl.find fixfunc_tbl key in
       Hashtbl.replace fixfunc_tbl key { fixfunc with fixfunc_top_call = Some top_c_func_name };
-      (match other_topfuncs with
-      | None -> ()
-      | Some other_topfunc_list ->
-          List.iter
-            (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
-              fixfunc_initialize_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfunc_tbl;
-              let key = id_of_annotated_name nary.(j) in
-              let fixfunc = Hashtbl.find fixfunc_tbl key in
-              Hashtbl.replace fixfunc_tbl key
-                { fixfunc with
-                  fixfunc_top_call = Some another_top_cfunc_name;
-                  fixfunc_used_as_call = true })
-            other_topfunc_list)
+      (List.iter
+        (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
+          fixfunc_initialize_top_calls env2 sigma another_top_cfunc_name fary.(j) [] ~fixfunc_tbl;
+          let key = id_of_annotated_name nary.(j) in
+          let fixfunc = Hashtbl.find fixfunc_tbl key in
+          Hashtbl.replace fixfunc_tbl key
+            { fixfunc with
+              fixfunc_top_call = Some another_top_cfunc_name;
+              fixfunc_used_as_call = true })
+        other_topfuncs)
   (* xxx: consider App *)
   | _ -> ()
 
@@ -620,7 +617,7 @@ let fixfunc_initialize_outer_variables
     fixfunc_tbl
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
-    (other_topfuncs : (bool * string * int * Id.t) list option) : fixterm_t list * fixfunc_table =
+    (other_topfuncs : (bool * string * int * Id.t) list) : fixterm_t list * fixfunc_table =
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
@@ -1257,14 +1254,11 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (used_vars : Id.Set.t) (called_fixfuncs : fixfunc_t list)
-    (other_topfuncs : (bool * string * int * Id.t) list option) : Pp.t =
+    (other_topfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
   let other_topfuncs_and_called_fixfuncs =
-    (match other_topfuncs with
-    | None -> []
-    | Some other_topfunc_list ->
-        (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) other_topfunc_list)) @
+    (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) other_topfuncs) @
     List.map (fun fixfunc -> (true, fixfunc)) called_fixfuncs
   in
   let pp_enum =
@@ -1537,7 +1531,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ctnt, ty, body)
 
-let gen_func_sub (primary_cfunc : string) (other_topfuncs : (bool * string * int * Id.t) list option) : Pp.t =
+let gen_func_sub (primary_cfunc : string) (other_topfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -1549,13 +1543,13 @@ let gen_func_sub (primary_cfunc : string) (other_topfuncs : (bool * string * int
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_body in
   let called_fixfuncs = compute_called_fixfuncs fixfunc_tbl in
-  (if called_fixfuncs <> [] || other_topfuncs <> None then
+  (if called_fixfuncs <> [] || other_topfuncs <> [] then
     gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body formal_arguments return_type used_vars called_fixfuncs other_topfuncs
   else
     gen_func_single ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body return_type used_vars) ++
   Pp.fnl ()
 
-let gen_function ?(other_topfuncs : (bool * string * int * Id.t) list option) (primary_cfunc : string) : Pp.t =
+let gen_function ?(other_topfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc other_topfuncs)
 
 let fixfunc_for_mutual_recursion (cfunc : string) : (bool * string * int * Id.t) option =
