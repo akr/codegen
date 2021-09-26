@@ -1122,7 +1122,7 @@ let test_let_add (ctx : test_ctxt) : unit =
       assert(add3(1,2,3) == 6);
     |}
 
-(* gen_assign Case *)
+(* gen_head Case *)
 let test_let_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -1136,7 +1136,7 @@ let test_let_match (ctx : test_ctxt) : unit =
       assert(tst(false) == false);
     |}
 
-(* gen_assign LetIn *)
+(* gen_head LetIn *)
 let test_let_match_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -1150,7 +1150,7 @@ let test_let_match_let (ctx : test_ctxt) : unit =
       assert(tst(true) == 2);
     |}
 
-(* gen_assign LetIn, cargs != [] *)
+(* gen_head LetIn, cargs != [] *)
 let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -1495,7 +1495,7 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
       assert(sum(s, 0) == 10);
     |}
 
-(* gen_assign Fix, multiple loops *)
+(* gen_head Fix, multiple loops *)
 let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
