@@ -57,16 +57,16 @@ type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
-    (fun fixfunc info ->
-      msg_debug_hov (Pp.str (Id.to_string fixfunc) ++ Pp.str ":" +++
-        Pp.str "inlinable=" ++ Pp.bool info.fixfunc_inlinable +++
-        Pp.str "used_as_call=" ++ Pp.bool info.fixfunc_used_as_call +++
-        Pp.str "used_as_goto=" ++ Pp.bool info.fixfunc_used_as_goto +++
-        Pp.str "formal_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_formal_arguments ++ Pp.str ")" +++
-        Pp.str "return_type=" ++ Pp.str info.fixfunc_return_type +++
-        Pp.str "top_call=" ++ (match info.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
-        Pp.str "c_name=" ++ Pp.str info.fixfunc_c_name +++
-        Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) info.fixfunc_outer_variables ++ Pp.str ")" +++
+    (fun fixfunc_id fixfunc ->
+      msg_debug_hov (Pp.str (Id.to_string fixfunc_id) ++ Pp.str ":" +++
+        Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_inlinable +++
+        Pp.str "used_as_call=" ++ Pp.bool fixfunc.fixfunc_used_as_call +++
+        Pp.str "used_as_goto=" ++ Pp.bool fixfunc.fixfunc_used_as_goto +++
+        Pp.str "formal_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) fixfunc.fixfunc_formal_arguments ++ Pp.str ")" +++
+        Pp.str "return_type=" ++ Pp.str fixfunc.fixfunc_return_type +++
+        Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
+        Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
+        Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str ty) fixfunc.fixfunc_outer_variables ++ Pp.str ")" +++
         Pp.mt ()
       ))
     fixfunc_tbl
@@ -429,8 +429,8 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rec_types prec env in
       detect_top_calls env2 sigma top_c_func_name fary.(i) None ~fixfunc_tbl;
       let key = id_of_annotated_name nary.(i) in
-      let usage = Hashtbl.find fixfunc_tbl key in
-      Hashtbl.replace fixfunc_tbl key { usage with fixfunc_top_call = Some top_c_func_name };
+      let fixfunc = Hashtbl.find fixfunc_tbl key in
+      Hashtbl.replace fixfunc_tbl key { fixfunc with fixfunc_top_call = Some top_c_func_name };
       (match other_topfuncs with
       | None -> ()
       | Some other_topfunc_list ->
@@ -438,9 +438,9 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
             (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
               detect_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfunc_tbl;
               let key = id_of_annotated_name nary.(j) in
-              let usage = Hashtbl.find fixfunc_tbl key in
+              let fixfunc = Hashtbl.find fixfunc_tbl key in
               Hashtbl.replace fixfunc_tbl key
-                { usage with
+                { fixfunc with
                   fixfunc_top_call = Some another_top_cfunc_name;
                   fixfunc_used_as_call = true })
             other_topfunc_list)
@@ -449,17 +449,17 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
 
 let determine_fixfunc_c_names (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.filter_map_inplace
-    (fun (fixfunc_id : Id.t) (info : fixfunc_t) ->
+    (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let c_name =
-        match info.fixfunc_top_call with
+        match fixfunc.fixfunc_top_call with
         | Some cfunc -> cfunc
         | None ->
-            if info.fixfunc_used_as_call then
+            if fixfunc.fixfunc_used_as_call then
               global_gensym_with_id fixfunc_id
             else
               Id.to_string fixfunc_id
       in
-      Some { info with fixfunc_c_name = c_name })
+      Some { fixfunc with fixfunc_c_name = c_name })
     fixfunc_tbl
 
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
@@ -605,17 +605,17 @@ let update_outer_variables_in_fixfunc_table
   let fixterm_free_variables = fixterm_free_variables env sigma term in
   let outer_variables = compute_outer_variables ~fixfunc_tbl env sigma fixterm_free_variables in
   Hashtbl.filter_map_inplace
-    (fun (fixfunc_id : Id.t) (info : fixfunc_t) ->
-      let fixterm_id = info.fixfunc_term_id in
-      let ov = outer_variables_from_env ~fixfunc_tbl info.fixfunc_term_env sigma in
-      if info.fixfunc_top_call <> None then
-        Some { info with fixfunc_outer_variables = ov }
+    (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
+      let fixterm_id = fixfunc.fixfunc_term_id in
+      let ov = outer_variables_from_env ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
+      if fixfunc.fixfunc_top_call <> None then
+        Some { fixfunc with fixfunc_outer_variables = ov }
       else
         let ov = List.filter
           (fun (varname, vartype) -> Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
           ov
         in
-        Some { info with fixfunc_outer_variables = ov })
+        Some { fixfunc with fixfunc_outer_variables = ov })
     fixfunc_tbl
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
@@ -631,10 +631,10 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
 
 let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
   Hashtbl.fold
-    (fun fixfunc_id info fixfuncs ->
-      if info.fixfunc_used_as_call &&
-         info.fixfunc_top_call = None then
-        info :: fixfuncs
+    (fun fixfunc_id fixfunc fixfuncs ->
+      if fixfunc.fixfunc_used_as_call &&
+         fixfunc.fixfunc_top_call = None then
+        fixfunc :: fixfuncs
       else
         fixfuncs)
     fixfunc_tbl
@@ -667,9 +667,9 @@ let labels_for_stacked_fixfuncs
   unique_string_list
     (CList.map_filter
       (fun fix_name ->
-        let fix_usage = Hashtbl.find fixfunc_tbl (Id.of_string fix_name) in
-        if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
-          Some ("entry_" ^ fix_usage.fixfunc_c_name)
+        let fixfunc = Hashtbl.find fixfunc_tbl (Id.of_string fix_name) in
+        if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
+          Some ("entry_" ^ fixfunc.fixfunc_c_name)
         else
           None)
       stacked_fixfuncs)
@@ -977,22 +977,22 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : as
         let decl = Environ.lookup_rel i env in
         let name = Context.Rel.Declaration.get_name decl in
         (match Hashtbl.find_opt fixfunc_tbl (id_of_name name) with
-        | Some info ->
+        | Some fixfunc ->
             let fname =
-              match info.fixfunc_top_call with
+              match fixfunc.fixfunc_top_call with
               | Some top_func_name -> top_func_name
-              | None -> info.fixfunc_c_name
+              | None -> fixfunc.fixfunc_c_name
             in
-            if info.fixfunc_inlinable then
-              let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) info.fixfunc_formal_arguments cargs in
+            if fixfunc.fixfunc_inlinable then
+              let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) fixfunc.fixfunc_formal_arguments cargs in
               let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ fixfunc.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
                 (gen_funcall fname
                   (Array.append
-                    (Array.of_list (List.map fst info.fixfunc_outer_variables))
+                    (Array.of_list (List.map fst fixfunc.fixfunc_outer_variables))
                     (Array.of_list cargs)))
         | None ->
           user_err (Pp.str "[codegen:gen_head] fix/closure call not supported yet"))
@@ -1266,7 +1266,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     | None -> []
     | Some other_topfunc_list ->
         (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) other_topfunc_list)) @
-    List.map (fun info -> (true, info)) called_fixfuncs
+    List.map (fun fixfunc -> (true, fixfunc)) called_fixfuncs
   in
   let pp_enum =
     Pp.hov 0 (
@@ -1276,7 +1276,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         pp_join_list (Pp.str "," ++ Pp.spc ())
           (Pp.str (func_index_prefix ^ primary_cfunc) ::
            List.map
-             (fun (static1, info) -> Pp.str (func_index_prefix ^ info.fixfunc_c_name))
+             (fun (static1, fixfunc) -> Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name))
              other_topfuncs_and_called_fixfuncs)) ++
       Pp.str ";")
   in
@@ -1292,20 +1292,20 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     pr_members formal_arguments +++
     (if CList.is_empty formal_arguments then
       (* empty struct is undefined behavior *)
-      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
+      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because fixfunc_formal_arguments cannot be empty. *)
     else
       Pp.mt ())) ++ Pp.str ";") +++
     pp_sjoinmap_list
-      (fun (static1, info) ->
+      (fun (static1, fixfunc) ->
         Pp.hv 0 (
-        Pp.str ("struct codegen_args_" ^ info.fixfunc_c_name) +++
+        Pp.str ("struct codegen_args_" ^ fixfunc.fixfunc_c_name) +++
         hovbrace (
-        pr_members info.fixfunc_outer_variables +++
-        pr_members info.fixfunc_formal_arguments +++
-        (if CList.is_empty info.fixfunc_outer_variables &&
-            CList.is_empty info.fixfunc_formal_arguments then
+        pr_members fixfunc.fixfunc_outer_variables +++
+        pr_members fixfunc.fixfunc_formal_arguments +++
+        (if CList.is_empty fixfunc.fixfunc_outer_variables &&
+            CList.is_empty fixfunc.fixfunc_formal_arguments then
           (* empty struct is undefined behavior *)
-          Pp.str "int" +++ Pp.str "dummy;" (* Not reached because info.fixfunc_formal_arguments cannot be empty. *)
+          Pp.str "int" +++ Pp.str "dummy;" (* Not reached because fixfunc_formal_arguments cannot be empty. *)
         else
           Pp.mt ())) ++ Pp.str ";"))
       other_topfuncs_and_called_fixfuncs
@@ -1353,12 +1353,12 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     pr_entry_function static primary_cfunc (func_index_prefix ^ primary_cfunc)
       formal_arguments return_type +++
     pp_sjoinmap_list
-      (fun (static1, info) ->
-        pr_entry_function static1 info.fixfunc_c_name (func_index_prefix ^ info.fixfunc_c_name)
+      (fun (static1, fixfunc) ->
+        pr_entry_function static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
           (List.append
-            info.fixfunc_outer_variables
-            info.fixfunc_formal_arguments)
-          info.fixfunc_return_type)
+            fixfunc.fixfunc_outer_variables
+            fixfunc.fixfunc_formal_arguments)
+          fixfunc.fixfunc_return_type)
       other_topfuncs_and_called_fixfuncs
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_body in
@@ -1382,9 +1382,9 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
   in
   let pp_switch_cases =
     pp_sjoinmap_list
-      (fun (static1, info) ->
+      (fun (static1, fixfunc) ->
         let pp_case =
-          Pp.str "case" +++ Pp.str (func_index_prefix ^ info.fixfunc_c_name) ++ Pp.str ":"
+          Pp.str "case" +++ Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name) ++ Pp.str ":"
         in
         let pp_assign_outer =
           pp_sjoinmap_list
@@ -1392,9 +1392,9 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
               Pp.hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
+                Pp.str ("((struct codegen_args_" ^ fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
                 Pp.str ";"))
-            info.fixfunc_outer_variables
+            fixfunc.fixfunc_outer_variables
         in
         let pp_assign_args =
           pp_sjoinmap_list
@@ -1402,12 +1402,12 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
               Pp.hov 0 (
                 Pp.str c_arg +++
                 Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ info.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
+                Pp.str ("((struct codegen_args_" ^ fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
                 Pp.str ";"))
-            info.fixfunc_formal_arguments
+            fixfunc.fixfunc_formal_arguments
         in
         let pp_goto =
-          Pp.str "goto" +++ Pp.str ("entry_" ^ info.fixfunc_c_name) ++ Pp.str ";"
+          Pp.str "goto" +++ Pp.str ("entry_" ^ fixfunc.fixfunc_c_name) ++ Pp.str ";"
         in
         let pp_result =
           Pp.hov 0 pp_case ++ Pp.brk (1,2) ++
