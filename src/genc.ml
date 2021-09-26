@@ -435,9 +435,8 @@ let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       (List.iter
         (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
           fixfunc_initialize_top_calls env2 sigma another_top_cfunc_name fary.(j) [] ~fixfunc_tbl;
-          let key = id_of_annotated_name nary.(j) in
-          let fixfunc = Hashtbl.find fixfunc_tbl key in
-          Hashtbl.replace fixfunc_tbl key
+          let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+          Hashtbl.replace fixfunc_tbl fixfunc_id
             { fixfunc with
               fixfunc_top_call = Some another_top_cfunc_name;
               fixfunc_used_as_call = true })
