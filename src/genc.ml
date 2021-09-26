@@ -1552,7 +1552,7 @@ let gen_func_sub (primary_cfunc : string) (other_topfuncs : (bool * string * int
 let gen_function ?(other_topfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc other_topfuncs)
 
-let fixfunc_for_mutual_recursion (cfunc : string) : (bool * string * int * Id.t) option =
+let another_topfunc_for_mutual_recursion (cfunc : string) : (bool * string * int * Id.t) option =
   let (static, ctnt, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
@@ -1564,7 +1564,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
   | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
   | cfunc :: other_cfuncs ->
       let other_topfuncs =
-        CList.map_filter fixfunc_for_mutual_recursion other_cfuncs
+        CList.map_filter another_topfunc_for_mutual_recursion other_cfuncs
       in
       gen_function ~other_topfuncs cfunc
 
