@@ -640,12 +640,10 @@ let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
     fixfunc_tbl
     []
 
-type top_fixterm_t = (*outer_variables*)((string * string) list) * Environ.env * EConstr.t
-
 let detect_top_fixterms
     ~(fixterms : fixterm_t list)
     ~(fixfunc_tbl : fixfunc_table) :
-    top_fixterm_t list =
+    ((*outer_variables*)((string * string) list) * Environ.env * EConstr.t) list =
   let non_inlinable_non_tail_position_fixterms =
     List.filter
       (fun fixterm ->
