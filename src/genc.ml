@@ -1615,8 +1615,8 @@ let codegen_detect_mutual_recursion (gen_list : code_generation list) : code_gen
               | [] -> assert false
               | [(cfunc, j)] -> Some (GenFunc cfunc)
               | _ ->
-                  let njs = List.sort (fun (_,j1) (_,j2) -> Int.compare j1 j2) njs in
                   map := ConstrMap.remove key !map;
+                  let njs = List.sort (fun (_,j1) (_,j2) -> Int.compare j1 j2) njs in
                   let cfuncs = List.map fst njs in
                   msg_info_hov (Pp.str "[codegen] mutually recursive functions detected:" +++ pp_sjoinmap_list Pp.str cfuncs);
                   Some (GenMutual cfuncs))
