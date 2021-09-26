@@ -403,18 +403,18 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       (Seq.cons fixterm (concat_array_seq (Array.map fst results)),
        Seq.append fixfuncs (concat_array_seq (Array.map snd results)))
 
+let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
+  let fixfunc_tbl = Hashtbl.create 0 in
+  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_func_id fixfunc) fixfuncs;
+  fixfunc_tbl
+
 let collect_fix_usage
     ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
-    fixterm_t list * fixfunc_t list =
+    fixterm_t list * fixfunc_table =
   let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] in
-  (List.of_seq fixterms, List.of_seq fixfuncs)
-
-let fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
-  let fixfunc_tbl = Hashtbl.create 0 in
-  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_func_id fixfunc) fixfuncs;
-  fixfunc_tbl
+  (List.of_seq fixterms, make_fixfunc_table (List.of_seq fixfuncs))
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
@@ -622,8 +622,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
     (other_topfuncs : (bool * string * int * Id.t) list option) : fixterm_t list * fixfunc_table =
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
-  let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
-  let fixfunc_tbl = fixfunc_table fixfuncs in
+  let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
   detect_top_calls env sigma name term other_topfuncs ~fixfunc_tbl;
   determine_fixfunc_c_names fixfunc_tbl;
   update_outer_variables_in_fixfunc_table env sigma term ~fixfunc_tbl;
