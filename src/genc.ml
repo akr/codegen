@@ -419,7 +419,7 @@ let fixfunc_table (fixfuncs : fixfunc_info list) : fixfuncinfo_t =
 
 let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
-    (other_topfuncs : (string * int * Id.t) list option)
+    (other_topfuncs : (bool * string * int * Id.t) list option)
     ~(fixfuncinfo : fixfuncinfo_t) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
@@ -436,7 +436,7 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       | None -> ()
       | Some other_topfunc_list ->
           List.iter
-            (fun (another_top_cfunc_name, j, fixfunc_id) ->
+            (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
               detect_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfuncinfo;
               let key = id_of_annotated_name nary.(j) in
               let usage = Hashtbl.find fixfuncinfo key in
@@ -620,7 +620,7 @@ let set_fixfuncinfo_outer_variables
     fixfuncinfo
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
-    (other_topfuncs : (string * int * Id.t) list option) : fixterm_info list * fixfuncinfo_t =
+    (other_topfuncs : (bool * string * int * Id.t) list option) : fixterm_info list * fixfuncinfo_t =
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfuncs) = collect_fix_usage ~inlinable_fixterms env sigma term in
@@ -1266,14 +1266,14 @@ let gen_func_multi ~(fixterms : fixterm_info list) ~(fixfuncinfo : fixfuncinfo_t
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (used_vars : Id.Set.t) (called_fixfuncs : fixfunc_info list)
-    (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
+    (other_topfuncs : (bool * string * int * Id.t) list option) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
   let other_topfuncs_and_called_fixfuncs =
     (match other_topfuncs with
     | None -> []
     | Some other_topfunc_list ->
-        (List.map (fun (another_top_cfunc_name, j, fixfunc_id) -> (static, Hashtbl.find fixfuncinfo fixfunc_id)) other_topfunc_list)) @
+        (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfuncinfo fixfunc_id)) other_topfunc_list)) @
     List.map (fun info -> (true, info)) called_fixfuncs
   in
   let pp_enum =
@@ -1546,7 +1546,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ctnt, ty, body)
 
-let gen_func_sub (primary_cfunc : string) (other_topfuncs : (string * int * Id.t) list option) : Pp.t =
+let gen_func_sub (primary_cfunc : string) (other_topfuncs : (bool * string * int * Id.t) list option) : Pp.t =
   let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -1564,14 +1564,14 @@ let gen_func_sub (primary_cfunc : string) (other_topfuncs : (string * int * Id.t
     gen_func_single ~fixterms ~fixfuncinfo ~static ~primary_cfunc env sigma whole_body return_type used_vars) ++
   Pp.fnl ()
 
-let gen_function ?(other_topfuncs : (string * int * Id.t) list option) (primary_cfunc : string) : Pp.t =
+let gen_function ?(other_topfuncs : (bool * string * int * Id.t) list option) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc other_topfuncs)
 
-let fixfunc_for_mutual_recursion (cfunc : string) : (int * Id.t) option =
+let fixfunc_for_mutual_recursion (cfunc : string) : (bool * int * Id.t) option =
   let (static, ctnt, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
-  | Fix ((ks, j), (nary, tary, fary)) -> Some (j, id_of_annotated_name nary.(j))
+  | Fix ((ks, j), (nary, tary, fary)) -> Some (static, j, id_of_annotated_name nary.(j))
   | _ -> None
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
@@ -1583,7 +1583,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
           (fun cfunc ->
             match fixfunc_for_mutual_recursion cfunc with
             | None -> None
-            | Some (j, fixfunc_id) -> Some (cfunc, j, fixfunc_id))
+            | Some (static, j, fixfunc_id) -> Some (static, cfunc, j, fixfunc_id))
           other_cfuncs
       in
       gen_function ~other_topfuncs cfunc

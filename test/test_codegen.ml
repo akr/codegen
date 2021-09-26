@@ -1791,6 +1791,54 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
       assert(sizef_count == 5);
     |}
 
+let test_mutual_static1 (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint idnat1 n :=
+        match n with
+        | O => O
+        | S m => S (idnat2 m)
+        end
+      with idnat2 n :=
+        match n with
+        | O => O
+        | S m => S (idnat1 m)
+        end.
+      CodeGen Snippet "extern nat idnat1(nat v1_n);".
+      CodeGen Function idnat1.
+      CodeGen Static Function idnat2.
+      CodeGen Snippet "static nat idnat2(nat v1_n);".
+    |})
+    {|
+      assert(idnat1(3) == 3);
+      assert(idnat2(4) == 4);
+    |}
+
+let test_mutual_static2 (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint idnat1 n :=
+        match n with
+        | O => O
+        | S m => S (idnat2 m)
+        end
+      with idnat2 n :=
+        match n with
+        | O => O
+        | S m => S (idnat1 m)
+        end.
+      CodeGen Snippet "extern nat idnat2(nat v1_n);".
+      CodeGen Static Function idnat1.
+      CodeGen Function idnat2.
+      CodeGen Snippet "static nat idnat1(nat v1_n);".
+    |})
+    {|
+      assert(idnat1(3) == 3);
+      assert(idnat2(4) == 4);
+    |}
+
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2822,6 +2870,8 @@ let suite : OUnit2.test =
     "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
     "test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup;
     "test_mutual_sizet_sizef_nodedup" >:: test_mutual_sizet_sizef_nodedup;
+    "test_mutual_static1" >:: test_mutual_static1;
+    "test_mutual_static2" >:: test_mutual_static2;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
