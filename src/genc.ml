@@ -721,41 +721,46 @@ let obtain_function_bodies
   in
   List.of_seq (concat_list_seq results)
 
-let local_gensym_id : (int ref) list ref = ref []
+let local_gensym_id : (int ref) option ref = ref None
 
 let local_gensym_with (f : unit -> 'a) : 'a =
-  local_gensym_id := (ref 0) :: !local_gensym_id;
+  (if !local_gensym_id <> None then
+    user_err (Pp.str "[codegen:bug] nested invocation of local_gensym_with"));
+  local_gensym_id := Some (ref 0);
   let ret = f () in
-  local_gensym_id := List.tl !local_gensym_id;
+  local_gensym_id := None;
   ret
 
 let local_gensym () : string =
-  let idref = List.hd !local_gensym_id in
-  let n = !idref in
-  idref := n + 1;
-  "tmp" ^ string_of_int n
+  match !local_gensym_id with
+  | None -> user_err (Pp.str "[codegen:bug] local_gensym is called outside of local_gensym_with");
+  | Some idref ->
+      (let n = !idref in
+      idref := n + 1;
+      "tmp" ^ string_of_int n)
 
-let local_vars : ((string * string) list ref) list ref = ref []
+let local_vars : ((string * string) list ref) option ref = ref None
 
 let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
+  (if !local_vars <> None then
+    user_err (Pp.str "[codegen:bug] nested invocation of local_vars_with"));
   let vars = ref [] in
-  let old = !local_vars in
-  local_vars := vars :: old;
+  local_vars := Some vars;
   let ret = f () in
-  local_vars := old;
+  local_vars := None;
   (List.rev !vars, ret)
 
 let add_local_var (c_type : string) (c_var : string) : unit =
-  if !local_vars = [] then
-    user_err (Pp.str "[codegen:bug] add_local_var is called outside of local_vars_with");
-  let vars = List.hd !local_vars in
-  match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
-  | Some (c_type1, c_var1) ->
-      if c_type1 <> c_type then
-        user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable")
-      else
-        ()
-  | None -> vars := (c_type, c_var) :: !vars
+  match !local_vars with
+  | None -> user_err (Pp.str "[codegen:bug] add_local_var is called outside of local_vars_with");
+  | Some vars ->
+      (match List.find_opt (fun (c_type1, c_var1) -> c_var1 = c_var) !vars with
+      | Some (c_type1, c_var1) ->
+          if c_type1 <> c_type then
+            user_err (Pp.str "[codegen:bug] add_local_var : inconsistent typed variable")
+          else
+            ()
+      | None -> vars := (c_type, c_var) :: !vars)
 
 let carg_of_garg (env : Environ.env) (i : int) : string =
   let x = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
