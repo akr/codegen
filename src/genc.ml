@@ -44,10 +44,11 @@ type fixfunc_t = {
   fixfunc_used_as_goto: bool;
   fixfunc_formal_arguments: (string * string) list; (* [(varname1, vartype1); ...] *)
   fixfunc_return_type: string;
-  fixfunc_top_call: string option; (* by detect_top_calls *)
-  fixfunc_c_name: string; (* by determine_fixfunc_c_names *)
 
-  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by update_outer_variables_in_fixfunc_table *)
+  fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
+  fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
+
+  fixfunc_outer_variables: (string * string) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_outer_variables *)
   (* outer variables are mostly same for fix-bouded functions in a fix-term.
     However, they can be different when some of them have Some X for fixfunc_top_call.
     In such case, outer variables are all bounded variables by lambda and let-in and not filtered. *)
@@ -394,9 +395,9 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                 fixfunc_used_as_goto = !(List.nth used_as_goto2 (h - j - 1));
                 fixfunc_formal_arguments = formal_arguments;
                 fixfunc_return_type = return_type;
-                fixfunc_top_call = None; (* dummy. updated by detect_top_calls *)
-                fixfunc_c_name = "dummy"; (* dummy. updated by determine_fixfunc_c_names *)
-                fixfunc_outer_variables = []; (* dummy. updated by set_fixfuncinfo_naive_outer_variables *)
+                fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
+                fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
+                fixfunc_outer_variables = []; (* dummy. updated by fixfunc_initialize_outer_variables *)
               })
             nary tary)
       in
@@ -416,7 +417,7 @@ let collect_fix_usage
   let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] in
   (List.of_seq fixterms, make_fixfunc_table (List.of_seq fixfuncs))
 
-let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
+let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
     (other_topfuncs : (bool * string * int * Id.t) list option)
     ~(fixfunc_tbl : fixfunc_table) : unit =
@@ -424,10 +425,10 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      detect_top_calls env2 sigma top_c_func_name e other_topfuncs ~fixfunc_tbl
+      fixfunc_initialize_top_calls env2 sigma top_c_func_name e other_topfuncs ~fixfunc_tbl
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      detect_top_calls env2 sigma top_c_func_name fary.(i) None ~fixfunc_tbl;
+      fixfunc_initialize_top_calls env2 sigma top_c_func_name fary.(i) None ~fixfunc_tbl;
       let key = id_of_annotated_name nary.(i) in
       let fixfunc = Hashtbl.find fixfunc_tbl key in
       Hashtbl.replace fixfunc_tbl key { fixfunc with fixfunc_top_call = Some top_c_func_name };
@@ -436,7 +437,7 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       | Some other_topfunc_list ->
           List.iter
             (fun (static, another_top_cfunc_name, j, fixfunc_id) ->
-              detect_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfunc_tbl;
+              fixfunc_initialize_top_calls env2 sigma another_top_cfunc_name fary.(j) None ~fixfunc_tbl;
               let key = id_of_annotated_name nary.(j) in
               let fixfunc = Hashtbl.find fixfunc_tbl key in
               Hashtbl.replace fixfunc_tbl key
@@ -447,7 +448,7 @@ let rec detect_top_calls (env : Environ.env) (sigma : Evd.evar_map)
   (* xxx: consider App *)
   | _ -> ()
 
-let determine_fixfunc_c_names (fixfunc_tbl : fixfunc_table) : unit =
+let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let c_name =
@@ -599,7 +600,7 @@ let compute_outer_variables
     fixterm_free_variables;
   fixterm_outer_variables
 
-let update_outer_variables_in_fixfunc_table
+let fixfunc_initialize_outer_variables
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     ~(fixfunc_tbl : fixfunc_table) : unit =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
@@ -623,9 +624,9 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let numargs = numargs_of_exp env sigma term in
   let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
   let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
-  detect_top_calls env sigma name term other_topfuncs ~fixfunc_tbl;
-  determine_fixfunc_c_names fixfunc_tbl;
-  update_outer_variables_in_fixfunc_table env sigma term ~fixfunc_tbl;
+  fixfunc_initialize_top_calls env sigma name term other_topfuncs ~fixfunc_tbl;
+  fixfunc_initialize_c_names fixfunc_tbl;
+  fixfunc_initialize_outer_variables env sigma term ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   (fixterms, fixfunc_tbl)
 
