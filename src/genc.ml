@@ -662,7 +662,24 @@ let detect_top_fixterms
       (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
     non_inlinable_non_tail_position_fixterms
 
-let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
+let labels_for_stacked_fixfuncs
+    ~(fixfuncinfo : fixfuncinfo_t)
+    ~(primary_cfunc : string)
+    (stacked_fixfuncs : string list) : string list =
+  unique_string_list
+    (CList.map_filter
+      (fun fix_name ->
+        let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
+        if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
+          Some ("entry_" ^ fix_usage.fixfunc_c_name)
+        else
+          None)
+      stacked_fixfuncs)
+
+let rec obtain_function_bodies_rec
+    ~(fixfuncinfo : fixfuncinfo_t)
+    ~(primary_cfunc : string)
+    (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
     (((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) Seq.t =
   match EConstr.kind sigma term with
@@ -670,7 +687,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       let c_var = (str_of_annotated_name x, c_typename env sigma t) in
-      obtain_function_bodies_rec env2 sigma (c_var :: fargs) stacked_fixfuncs b
+      obtain_function_bodies_rec ~fixfuncinfo ~primary_cfunc env2 sigma (c_var :: fargs) stacked_fixfuncs b
   | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let bodies = Array.mapi
@@ -678,9 +695,9 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
           let fixfunc_name = str_of_annotated_name nj in
           let fj = fary.(j) in
           if i = j then
-            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fj
+            obtain_function_bodies_rec ~fixfuncinfo ~primary_cfunc env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fj
           else
-            obtain_function_bodies_rec env2 sigma fargs (fixfunc_name :: []) fj)
+            obtain_function_bodies_rec ~fixfuncinfo ~primary_cfunc env2 sigma fargs (fixfunc_name :: []) fj)
         nary
       in
       let reordered_bodies = Array.copy bodies in
@@ -688,31 +705,7 @@ let rec obtain_function_bodies_rec (env : Environ.env) (sigma : Evd.evar_map)
       reordered_bodies.(0) <- bodies.(i);
       concat_array_seq reordered_bodies
   | _ ->
-      Seq.return (fargs, stacked_fixfuncs, env, term)
-
-let obtain_function_bodies1
-    ~(fixterms : fixterm_info list)
-    ~(fixfuncinfo : fixfuncinfo_t)
-    ~(primary_cfunc : string)
-    (sigma : Evd.evar_map)
-    ((outer_variables, env1, term1) : (string * string) list * Environ.env * EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) Seq.t =
-  let gen_labels stacked_fixfuncs =
-    unique_string_list
-      (CList.map_filter
-        (fun fix_name ->
-          let fix_usage = Hashtbl.find fixfuncinfo (Id.of_string fix_name) in
-          if fix_usage.fixfunc_used_as_goto || fix_usage.fixfunc_top_call <> Some primary_cfunc then
-            Some ("entry_" ^ fix_usage.fixfunc_c_name)
-          else
-            None)
-        stacked_fixfuncs)
-  in
-  let add_labels (args, stacked_fixfuncs, env2, body) = (args, gen_labels stacked_fixfuncs, env2, body) in
-  Seq.map add_labels (obtain_function_bodies_rec env1 sigma outer_variables [] term1)
+      Seq.return (fargs, labels_for_stacked_fixfuncs ~fixfuncinfo ~primary_cfunc stacked_fixfuncs, env, term)
 
 let obtain_function_bodies
     ~(fixterms : fixterm_info list)
@@ -726,7 +719,8 @@ let obtain_function_bodies
      EConstr.t) list =
   let results =
     List.map
-      (obtain_function_bodies1 ~fixterms ~fixfuncinfo ~primary_cfunc sigma)
+      (fun (outer_variables, env1, term1) ->
+        obtain_function_bodies_rec ~fixfuncinfo ~primary_cfunc env1 sigma outer_variables [] term1)
       (([], env, term) ::
        detect_top_fixterms ~fixterms ~fixfuncinfo)
   in
