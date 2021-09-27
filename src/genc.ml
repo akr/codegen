@@ -1232,9 +1232,9 @@ let obtain_function_bodies
 
 let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
-    (whole_body : EConstr.t) (return_type : string)
+    (whole_term : EConstr.t) (return_type : string)
     (used_vars : Id.Set.t) : Pp.t =
-  let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -1269,7 +1269,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
 
 let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
-    (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
+    (whole_term : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
     (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
@@ -1371,7 +1371,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           fixfunc.fixfunc_return_type)
       sibling_and_internal_entfuncs
   in
-  let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_body in
+  let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)codegen_ret)")) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1549,21 +1549,21 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
   | Some (body,_, _) -> (static, ctnt, ty, body)
 
 let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
-  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
+  let (static, ctnt, ty, whole_term) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let whole_body = EConstr.of_constr whole_body in
+  let whole_term = EConstr.of_constr whole_term in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let (fixterms, fixfunc_tbl) = collect_fix_info env sigma primary_cfunc whole_body sibling_entfuncs in
+  let (fixterms, fixfunc_tbl) = collect_fix_info env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
-  let used_vars = used_variables env sigma whole_body in
+  let used_vars = used_variables env sigma whole_term in
   let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
   (if internal_entfuncs <> [] || sibling_entfuncs <> [] then
-    gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body formal_arguments return_type used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_term formal_arguments return_type used_vars internal_entfuncs sibling_entfuncs
   else
-    gen_func_single ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body return_type used_vars) ++
+    gen_func_single ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
   Pp.fnl ()
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
@@ -1586,7 +1586,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
       gen_function ~sibling_entfuncs primary_cfunc
 
 let gen_prototype (cfunc_name : string) : Pp.t =
-  let (static, ctnt, ty, whole_body) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
+  let (static, ctnt, ty, whole_term) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
