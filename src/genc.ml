@@ -641,7 +641,15 @@ let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
     fixfunc_tbl
     []
 
-let detect_top_fixterms
+(*
+  detect_fixterms_for_code_generation returns
+  non-tail non-inlinable fixterms.
+
+  gen_head generates code for non-tail position.
+  However it's doesn't generate code for non-inlinable fixterms.
+  They should be generated separatedly.
+*)
+let detect_fixterms_for_code_generation
     ~(fixterms : fixterm_t list)
     ~(fixfunc_tbl : fixfunc_table) :
     ((*outer_variables*)((string * string) list) * Environ.env * EConstr.t) list =
@@ -719,7 +727,7 @@ let obtain_function_bodies
       (fun (outer_variables, env1, term1) ->
         obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env1 sigma outer_variables [] term1)
       (([], env, term) ::
-       detect_top_fixterms ~fixterms ~fixfunc_tbl)
+       detect_fixterms_for_code_generation ~fixterms ~fixfunc_tbl)
   in
   List.of_seq (concat_list_seq results)
 
