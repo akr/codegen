@@ -1522,7 +1522,7 @@ let is_static_function_icommand (icommand : instance_command) : bool =
   | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
   | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
 
-let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
+let make_simplified_for_cfunc (cfunc_name : string) :
     (*static*)bool * Constr.types * Constr.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
@@ -1540,7 +1540,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
         (env, declared_ctnt)
     | SpDefined (ctnt, _) -> (Global.env (), ctnt)
   in
-  (*msg_debug_hov (Pp.str "[codegen:get_ctnt_type_body_from_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
+  (*msg_debug_hov (Pp.str "[codegen:make_simplified_for_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
   let ty = cdef.Declarations.const_type in
   match Global.body_of_constant_body Library.indirect_accessor cdef with
@@ -1549,7 +1549,7 @@ let get_ctnt_type_body_from_cfunc (cfunc_name : string) :
   | Some (body,_, _) -> (static, ty, body)
 
 let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
-  let (static, ty, whole_term) = get_ctnt_type_body_from_cfunc primary_cfunc in (* modify global env *)
+  let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_term = EConstr.of_constr whole_term in
@@ -1570,7 +1570,7 @@ let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (p
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
 let entfunc_of_sibling_cfunc (cfunc : string) : (bool * string * int * Id.t) option =
-  let (static, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
+  let (static, ty, term) = make_simplified_for_cfunc cfunc in (* modify global env *)
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
   | Fix ((ks, j), (nary, tary, fary)) -> Some (static, cfunc, j, id_of_annotated_name nary.(j))
@@ -1586,7 +1586,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
       gen_function ~sibling_entfuncs primary_cfunc
 
 let gen_prototype (cfunc_name : string) : Pp.t =
-  let (static, ty, whole_term) = get_ctnt_type_body_from_cfunc cfunc_name in (* modify global env *)
+  let (static, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
@@ -1607,7 +1607,7 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
       gen,
       (match gen with
       | GenFunc cfunc ->
-          let (static, ty, term) = get_ctnt_type_body_from_cfunc cfunc in
+          let (static, ty, term) = make_simplified_for_cfunc cfunc in
           (match common_key_for_siblings term with
           | Some (j, key) as v ->
               map := ConstrMap.update
