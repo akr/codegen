@@ -1569,7 +1569,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
-let another_topfunc_for_mutual_recursion (cfunc : string) : (bool * string * int * Id.t) option =
+let entfunc_of_sibling_cfunc (cfunc : string) : (bool * string * int * Id.t) option =
   let (static, ctnt, ty, term) = get_ctnt_type_body_from_cfunc cfunc in (* modify global env *)
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
@@ -1581,7 +1581,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
   | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
   | primary_cfunc :: sibling_cfuncs ->
       let sibling_entfuncs =
-        CList.map_filter another_topfunc_for_mutual_recursion sibling_cfuncs
+        CList.map_filter entfunc_of_sibling_cfunc sibling_cfuncs
       in
       gen_function ~sibling_entfuncs primary_cfunc
 
@@ -1593,14 +1593,14 @@ let gen_prototype (cfunc_name : string) : Pp.t =
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   gen_function_header static return_type cfunc_name formal_arguments ++ Pp.str ";"
 
-let common_key_for_mutual_recursion (term : Constr.t) : (int * Constr.t) option =
+let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lam term in
   match Constr.kind body with
   | Fix ((ks, j), (nary, tary, fary)) ->
       Some (j, Term.compose_lam args (Constr.mkFix ((ks, 0), (nary, tary, fary))))
   | _ -> None
 
-let codegen_detect_mutual_recursion (gen_list : code_generation list) : code_generation list =
+let codegen_detect_siblings (gen_list : code_generation list) : code_generation list =
   let map = ref ConstrMap.empty in
   let gens = List.map
     (fun gen ->
@@ -1608,7 +1608,7 @@ let codegen_detect_mutual_recursion (gen_list : code_generation list) : code_gen
       (match gen with
       | GenFunc cfunc ->
           let (static, ctnt, ty, body) = get_ctnt_type_body_from_cfunc cfunc in
-          (match common_key_for_mutual_recursion body with
+          (match common_key_for_siblings body with
           | Some (j, key) as v ->
               map := ConstrMap.update
                 key
@@ -1661,7 +1661,7 @@ let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) C
     else CString.Map.map codegen_resolve_dependencies gen_map in
   let gen_map =
     if List.mem DisableMutualRecursionDetection gflist then gen_map
-    else CString.Map.map codegen_detect_mutual_recursion gen_map in
+    else CString.Map.map codegen_detect_siblings gen_map in
   gen_map
 
 (* Vernacular commands *)
@@ -1691,7 +1691,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
   (* Don't call codegen_resolve_dependencies.
      CodeGen Gen is used to test code generation of specified functions.
      Generating non-specified functions would make result longer with uninteresting functions. *)
-  let gen_list = codegen_detect_mutual_recursion gen_list in
+  let gen_list = codegen_detect_siblings gen_list in
   gen_pp_iter Feedback.msg_info gen_list
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
