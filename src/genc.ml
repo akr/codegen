@@ -544,10 +544,11 @@ let check_eq_outer_variables outer1 outer2 =
     user_err (Pp.str "[codegen:bug] outer length differ:" +++ pr_outer_variable outer1 +++ Pp.str "<>" +++ pr_outer_variable outer2)
 
 (*
-  outer_variables_from_env computes outer variables in "naive" way:
+  compute_naive_outer_variables computes outer variables in "naive" way:
   It may contain unused variables.
+  Note that the result is ordered from outside to inside of the term.
 *)
-let outer_variables_from_env ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) (sigma : Evd.evar_map) : (string * string) list =
+let compute_naive_outer_variables ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) (sigma : Evd.evar_map) : (string * string) list =
   let n = Environ.nb_rel env in
   let outer = ref [] in
   for i = 1 to n do
@@ -560,7 +561,7 @@ let outer_variables_from_env ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) 
   done;
   !outer
 
-let compute_outer_variables
+let compute_precise_outer_variables
     ~(fixfunc_tbl : fixfunc_table)
     (env : Environ.env) (sigma : Evd.evar_map)
     (fixterm_free_variables : (Id.t, Id.Set.t) Hashtbl.t) :
@@ -600,18 +601,19 @@ let fixfunc_initialize_outer_variables
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     ~(fixfunc_tbl : fixfunc_table) : unit =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
-  let outer_variables = compute_outer_variables ~fixfunc_tbl env sigma fixterm_free_variables in
+  let outer_variables = compute_precise_outer_variables ~fixfunc_tbl env sigma fixterm_free_variables in
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let fixterm_id = fixfunc.fixfunc_term_id in
-      let ov = outer_variables_from_env ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
+      let ov = compute_naive_outer_variables ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
       let ov2 =
         if fixfunc.fixfunc_top_call <> None then
           ov
         else
+          let precise_outer_variables = Hashtbl.find outer_variables fixterm_id in
           List.filter
             (fun (varname, vartype) ->
-              Id.Set.mem (Id.of_string varname) (Hashtbl.find outer_variables fixterm_id))
+              Id.Set.mem (Id.of_string varname) precise_outer_variables)
             ov
       in
       Some { fixfunc with fixfunc_outer_variables = ov2 })
