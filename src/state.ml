@@ -211,7 +211,7 @@ let codegen_add_generation filename (generation : code_generation) : unit =
 
 let codegen_add_source_generation (generation : code_generation) : unit =
   match !current_source_filename with
-  | None -> ()
+  | None -> Feedback.msg_warning (Pp.str "[codegen] no code will be generated because no CodeGen Source File.")
   | Some filename ->
       codegen_add_generation filename generation
 
