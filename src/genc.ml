@@ -565,7 +565,7 @@ let compute_outer_variables
     (env : Environ.env) (sigma : Evd.evar_map)
     (fixterm_free_variables : (Id.t, Id.Set.t) Hashtbl.t) :
     ((*fixterm_id*)Id.t, (*outer_variables*)Id.Set.t) Hashtbl.t =
-  let fixfuncs =
+  let fixfunc_ids =
     Hashtbl.fold
       (fun fixfunc_id fixfunc set ->
         Id.Set.add fixfunc_id set)
@@ -592,7 +592,7 @@ let compute_outer_variables
                 q := Id.Set.union !q fv)
       done;
       Hashtbl.add fixterm_outer_variables fixterm_id
-        (Id.Set.diff !outer_variables fixfuncs))
+        (Id.Set.diff !outer_variables fixfunc_ids))
     fixterm_free_variables;
   fixterm_outer_variables
 
