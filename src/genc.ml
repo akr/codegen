@@ -1128,8 +1128,8 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
   Pp.str c_name ++
   Pp.hov 0 (pp_parameters)
 
-(* fixfuncs for entry functions *)
-let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
+(* internal entry functions *)
+let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
   Hashtbl.fold
     (fun fixfunc_id fixfunc fixfuncs ->
       if fixfunc.fixfunc_used_as_call &&
@@ -1270,13 +1270,13 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
 let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_body : EConstr.t) (formal_arguments : (string * string) list) (return_type : string)
-    (used_vars : Id.Set.t) (called_fixfuncs : fixfunc_t list)
+    (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
-  let sibling_entfuncs_and_called_fixfuncs =
+  let sibling_and_internal_entfuncs =
     (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) sibling_entfuncs) @
-    List.map (fun fixfunc -> (true, fixfunc)) called_fixfuncs
+    List.map (fun fixfunc -> (true, fixfunc)) internal_entfuncs
   in
   let pp_enum =
     Pp.hov 0 (
@@ -1287,7 +1287,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           (Pp.str (func_index_prefix ^ primary_cfunc) ::
            List.map
              (fun (static1, fixfunc) -> Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name))
-             sibling_entfuncs_and_called_fixfuncs)) ++
+             sibling_and_internal_entfuncs)) ++
       Pp.str ";")
   in
   let pp_struct_args =
@@ -1318,7 +1318,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           Pp.str "int" +++ Pp.str "dummy;" (* Not reached because fixfunc_formal_arguments cannot be empty. *)
         else
           Pp.mt ())) ++ Pp.str ";"))
-      sibling_entfuncs_and_called_fixfuncs
+      sibling_and_internal_entfuncs
   in
   let pp_forward_decl =
     Pp.hv 0 (
@@ -1369,7 +1369,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
             fixfunc.fixfunc_outer_variables
             fixfunc.fixfunc_formal_arguments)
           fixfunc.fixfunc_return_type)
-      sibling_entfuncs_and_called_fixfuncs
+      sibling_and_internal_entfuncs
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_body in
   let gen_ret = (gen_void_return ("(*(" ^ return_type ^ " *)codegen_ret)")) in
@@ -1427,7 +1427,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
             Pp.hov 0 pp_goto)
         in
         pp_result)
-      sibling_entfuncs_and_called_fixfuncs
+      sibling_and_internal_entfuncs
   in
   let pp_switch_default = Pp.str "default:" in
   let pp_assign_args_default =
@@ -1559,9 +1559,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let (fixterms, fixfunc_tbl) = collect_fix_info env sigma primary_cfunc whole_body sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_body in
-  let called_fixfuncs = compute_called_fixfuncs fixfunc_tbl in
-  (if called_fixfuncs <> [] || sibling_entfuncs <> [] then
-    gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body formal_arguments return_type used_vars called_fixfuncs sibling_entfuncs
+  let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
+  (if internal_entfuncs <> [] || sibling_entfuncs <> [] then
+    gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body formal_arguments return_type used_vars internal_entfuncs sibling_entfuncs
   else
     gen_func_single ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_body return_type used_vars) ++
   Pp.fnl ()
