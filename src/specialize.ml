@@ -597,11 +597,11 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, expand_eta_top env2 sigma b)
-  | Fix ((ks, j), (nameary, tyary, funary)) ->
-      let prec = (nameary, tyary, funary) in
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (expand_eta_top env2 sigma) funary in
-      mkFix ((ks, j), (nameary, tyary, funary'))
+      let fary' = Array.map (expand_eta_top env2 sigma) fary in
+      mkFix ((ks, j), (nary, tary, fary'))
   | _ ->
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
@@ -689,16 +689,16 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, normalizeV env2 sigma b)
-  | Fix ((ks, j), (nameary, tyary, funary)) ->
-      let prec = (nameary, tyary, funary) in
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeV env2 sigma) funary in
-      mkFix ((ks, j), (nameary, tyary, funary'))
-  | CoFix (i, (nameary, tyary, funary)) ->
-      let prec = (nameary, tyary, funary) in
+      let fary' = Array.map (normalizeV env2 sigma) fary in
+      mkFix ((ks, j), (nary, tary, fary'))
+  | CoFix (i, (nary, tary, fary)) ->
+      let prec = (nary, tary, fary) in
       let env2 = push_rec_types prec env in
-      let funary' = Array.map (normalizeV env2 sigma) funary in
-      mkCoFix (i, (nameary, tyary, funary'))
+      let fary' = Array.map (normalizeV env2 sigma) fary in
+      mkCoFix (i, (nary, tary, fary'))
   | LetIn (x,e,ty,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
@@ -1249,16 +1249,16 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let t' = Reductionops.nf_all env sigma t in
       let e' = normalize_types env2 sigma e in
       mkLambda (x, t', e')
-  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
-      let funary' = Array.map (normalize_types env2 sigma) funary in
-      mkFix ((ks, j), (nameary, tyary', funary'))
-  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
+      let tary' = Array.map (Reductionops.nf_all env sigma) tary in
+      let fary' = Array.map (normalize_types env2 sigma) fary in
+      mkFix ((ks, j), (nary, tary', fary'))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
-      let funary' = Array.map (normalize_types env2 sigma) funary in
-      mkCoFix (i, (nameary, tyary', funary'))
+      let tary' = Array.map (Reductionops.nf_all env sigma) tary in
+      let fary' = Array.map (normalize_types env2 sigma) fary in
+      mkCoFix (i, (nary, tary', fary'))
 
 (*
   "normalize_static_arguments" breaks V-normal form but it is not a problem
@@ -1426,15 +1426,15 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let (fvse, fe) = delete_unused_let_rec env2 sigma e in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvse) in
       (fvs, fun vars_used -> mkLambda (x, ft vars_used, fe (true :: vars_used)))
-  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
-      let h = Array.length funary in
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let h = Array.length fary in
       let env2 = push_rec_types prec env in
-      let ftyary2 = Array.map (delete_unused_let_rec env sigma) tyary in
-      let ftyary = Array.map snd ftyary2 in
-      let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftyary2) in
-      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma) funary in
-      let ffunary = Array.map snd ffunary2 in
-      let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffunary2) in
+      let ftary2 = Array.map (delete_unused_let_rec env sigma) tary in
+      let ftary = Array.map snd ftary2 in
+      let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftary2) in
+      let ffary2 = Array.map (delete_unused_let_rec env2 sigma) fary in
+      let ffary = Array.map snd ffary2 in
+      let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffary2) in
       let fvs =
         let n = Environ.nb_rel env in
         IntSet.union fvst (IntSet.filter (fun i -> i < n) fvsf)
@@ -1443,18 +1443,18 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
        fun vars_used ->
          let vars_used' = CList.addn h true vars_used in
          mkFix ((ks, j),
-                (nameary,
-                 Array.map (fun g -> g vars_used) ftyary,
-                 Array.map (fun g -> g vars_used') ffunary)))
-  | CoFix (i, ((nameary, tyary, funary) as prec)) ->
-      let h = Array.length funary in
+                (nary,
+                 Array.map (fun g -> g vars_used) ftary,
+                 Array.map (fun g -> g vars_used') ffary)))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let h = Array.length fary in
       let env2 = push_rec_types prec env in
-      let ftyary2 = Array.map (delete_unused_let_rec env sigma) tyary in
-      let ftyary = Array.map snd ftyary2 in
-      let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftyary2) in
-      let ffunary2 = Array.map (delete_unused_let_rec env2 sigma) funary in
-      let ffunary = Array.map snd ffunary2 in
-      let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffunary2) in
+      let ftary2 = Array.map (delete_unused_let_rec env sigma) tary in
+      let ftary = Array.map snd ftary2 in
+      let fvst = Array.fold_left IntSet.union IntSet.empty (Array.map fst ftary2) in
+      let ffary2 = Array.map (delete_unused_let_rec env2 sigma) fary in
+      let ffary = Array.map snd ffary2 in
+      let fvsf = Array.fold_left IntSet.union IntSet.empty (Array.map fst ffary2) in
       let fvs =
         let n = Environ.nb_rel env in
         IntSet.union fvst (IntSet.filter (fun i -> i < n) fvsf)
@@ -1463,9 +1463,9 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
        fun vars_used ->
         let vars_used' = CList.addn h true vars_used in
         mkCoFix (i,
-                 (nameary,
-                  Array.map (fun g -> g vars_used) ftyary,
-                  Array.map (fun g -> g vars_used') ffunary)))
+                 (nary,
+                  Array.map (fun g -> g vars_used) ftary,
+                  Array.map (fun g -> g vars_used') ffary)))
 
 let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_delete_let then
@@ -1507,14 +1507,14 @@ let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) :
   | Lambda (x,t,b) ->
       shortcut_option_or (first_fv_rec sigma numrels t)
         (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
-  | Fix ((ks, j), (nameary, tyary, funary)) ->
-      let n = Array.length funary in
-      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
-        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
-  | CoFix (i, (nameary, tyary, funary)) ->
-      let n = Array.length funary in
-      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
-        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      let n = Array.length fary in
+      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
+        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) fary))
+  | CoFix (i, (nary, tary, fary)) ->
+      let n = Array.length fary in
+      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
+        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) fary))
 
 let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
   first_fv_rec sigma 0 term

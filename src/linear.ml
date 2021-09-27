@@ -66,8 +66,8 @@ let rec hasRel (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   | Ind iu -> false
   | Construct cstru -> false
   | Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
-  | Fix ((ks, j), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
-  | CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
+  | Fix ((ks, j), (nary, tary, fary)) -> Array.exists (hasRel sigma) tary || Array.exists (hasRel sigma) fary
+  | CoFix (i, (nary, tary, fary)) -> Array.exists (hasRel sigma) tary || Array.exists (hasRel sigma) fary
   | Proj (proj, expr) -> hasRel sigma expr
   | Int n -> false
   | Float n -> false
@@ -320,14 +320,14 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
             user_err (Pp.str "[codegen] inconsistent linear variable use in match branches:" +++ pp_sjoin_list pp_vars))
         counts;
       merge_count count0 counts.(0))
-  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
-      (let n = Array.length funary in
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      (let n = Array.length fary in
       let env2 = push_rec_types prec env in
       let linear_vars2 = ntimes n (List.cons false) linear_vars in
-      Array.iter (check_type_linearity env sigma) tyary;
+      Array.iter (check_type_linearity env sigma) tary;
       (* Since fix-bounded funcitons can be evaluated 0 or more times,
         they cannot reference linear variables declared outside of the fix-expression. *)
-      Array.iter (fun f -> linearcheck_function env2 sigma linear_vars2 f) funary;
+      Array.iter (fun f -> linearcheck_function env2 sigma linear_vars2 f) fary;
       IntMap.empty)
   | Proj (proj, expr) ->
       linearcheck_exp env sigma linear_vars numvars_innermost_function expr 0
