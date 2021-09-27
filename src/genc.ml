@@ -1031,17 +1031,17 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
       gen_head ~fixfunc_tbl ~used_vars ~cont env2 sigma b cargs
 
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let uj = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments = uj.fixfunc_formal_arguments in
+      let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
+      let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
       if List.length cargs < List.length nj_formal_arguments then
         user_err (Pp.str "[codegen] gen_head: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
-      let nj_funcname = uj.fixfunc_c_name in
-      if not uj.fixfunc_inlinable then
+      let nj_funcname = fixfunc_j.fixfunc_c_name in
+      if not fixfunc_j.fixfunc_inlinable then
         gen_head_cont cont
           (gen_funcall nj_funcname
             (Array.append
-              (Array.of_list (List.map fst uj.fixfunc_outer_variables))
+              (Array.of_list (List.map fst fixfunc_j.fixfunc_outer_variables))
               (Array.of_list cargs)))
       else
         let env2 = EConstr.push_rec_types prec env in
@@ -1061,16 +1061,16 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
           Array.mapi
             (fun i ni ->
               let fi = fary.(i) in
-              let ui = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
-              let ni_formal_arguments = ui.fixfunc_formal_arguments in
+              let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
+              let ni_formal_arguments = fixfunc_i.fixfunc_formal_arguments in
               List.iter
                 (fun (c_arg, t) -> add_local_var t c_arg)
                 ni_formal_arguments;
               let ni_formal_argvars = List.map fst ni_formal_arguments in
-              let ni_funcname = ui.fixfunc_c_name in
+              let ni_funcname = fixfunc_i.fixfunc_c_name in
               let pp_label =
-                if ui.fixfunc_used_as_goto ||
-                   (ui.fixfunc_used_as_call && ui.fixfunc_top_call = None) then
+                if fixfunc_i.fixfunc_used_as_goto ||
+                   (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
                   Pp.str ("entry_" ^ ni_funcname)  ++ Pp.str ":"
                 else
                   Pp.mt ()
@@ -1118,17 +1118,17 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
         gen_ret (Pp.str str)
       else
         let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        let uopt = Hashtbl.find_opt fixfunc_tbl (id_of_name key) in
-        (match uopt with
+        let fixfunc_opt = Hashtbl.find_opt fixfunc_tbl (id_of_name key) in
+        (match fixfunc_opt with
         | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
-        | Some u ->
-            let formal_arguments = u.fixfunc_formal_arguments in
+        | Some fixfunc ->
+            let formal_arguments = fixfunc.fixfunc_formal_arguments in
             if List.length cargs < List.length formal_arguments then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
             let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) formal_arguments cargs in
             let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
-            let funcname = u.fixfunc_c_name in
+            let funcname = fixfunc.fixfunc_c_name in
             let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
   | Const (ctnt,_) ->
@@ -1170,8 +1170,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
 
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let uj = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments = uj.fixfunc_formal_arguments in
+      let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
+      let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
       if List.length cargs < List.length nj_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
@@ -1181,15 +1181,15 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
         Array.mapi
           (fun i ni ->
             let fi = fary.(i) in
-            let ui = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
-            let ni_formal_arguments = ui.fixfunc_formal_arguments in
+            let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
+            let ni_formal_arguments = fixfunc_i.fixfunc_formal_arguments in
             List.iter
               (fun (c_arg, t) -> add_local_var t c_arg)
               ni_formal_arguments;
             let ni_formal_argvars = List.map fst ni_formal_arguments in
-            let ni_funcname = ui.fixfunc_c_name in
+            let ni_funcname = fixfunc_i.fixfunc_c_name in
             let pp_label =
-              if ui.fixfunc_used_as_goto || ui.fixfunc_top_call = None then
+              if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
                 Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ":"
               else
                 Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
