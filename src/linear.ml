@@ -66,7 +66,7 @@ let rec hasRel (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   | Ind iu -> false
   | Construct cstru -> false
   | Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
-  | Fix ((ks, i), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
+  | Fix ((ks, j), (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
   | CoFix (i, (nameary, tyary, funary)) -> Array.exists (hasRel sigma) tyary || Array.exists (hasRel sigma) funary
   | Proj (proj, expr) -> hasRel sigma expr
   | Int n -> false
@@ -320,7 +320,7 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
             user_err (Pp.str "[codegen] inconsistent linear variable use in match branches:" +++ pp_sjoin_list pp_vars))
         counts;
       merge_count count0 counts.(0))
-  | Fix ((ks, i), ((nameary, tyary, funary) as prec)) ->
+  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
       (let n = Array.length funary in
       let env2 = push_rec_types prec env in
       let linear_vars2 = ntimes n (List.cons false) linear_vars in

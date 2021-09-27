@@ -556,10 +556,10 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, t, strip_cast env2 sigma b)
-  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (strip_cast env2 sigma) fary in
-      mkFix ((ks, i), (nary, tary, fary'))
+      mkFix ((ks, j), (nary, tary, fary'))
   | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (strip_cast env2 sigma) fary in
@@ -597,11 +597,11 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, expand_eta_top env2 sigma b)
-  | Fix ((ks, i), (nameary, tyary, funary)) ->
+  | Fix ((ks, j), (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
       let funary' = Array.map (expand_eta_top env2 sigma) funary in
-      mkFix ((ks, i), (nameary, tyary, funary'))
+      mkFix ((ks, j), (nameary, tyary, funary'))
   | _ ->
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
@@ -689,11 +689,11 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, normalizeV env2 sigma b)
-  | Fix ((ks, i), (nameary, tyary, funary)) ->
+  | Fix ((ks, j), (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
       let funary' = Array.map (normalizeV env2 sigma) funary in
-      mkFix ((ks, i), (nameary, tyary, funary'))
+      mkFix ((ks, j), (nameary, tyary, funary'))
   | CoFix (i, (nameary, tyary, funary)) ->
       let prec = (nameary, tyary, funary) in
       let env2 = push_rec_types prec env in
@@ -828,7 +828,7 @@ let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) 
       merge_range
         (fv_range_rec sigma numlocal t)
         (fv_range_rec sigma (numlocal+1) b)
-  | Fix ((ks, i), (nary, tary, fary)) ->
+  | Fix ((ks, j), (nary, tary, fary)) ->
       merge_range
         (fv_range_array sigma numlocal tary)
         (fv_range_array sigma (numlocal + Array.length fary) fary)
@@ -851,17 +851,17 @@ let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
     Printer.pr_econstr_env env sigma (mkFix ((ks,0),prec)));*)
   let n = Array.length ks in
   let vals_opt =
-    let rec loop j acc =
-      if n <= j then
+    let rec loop i acc =
+      if n <= i then
         Some acc
       else
-        match EConstr.lookup_rel (k + j) env with
+        match EConstr.lookup_rel (k + i) env with
         | Context.Rel.Declaration.LocalAssum _ -> None
         | Context.Rel.Declaration.LocalDef (_,e,_) ->
             match EConstr.kind sigma e with
-            | Fix ((ks', i'), prec') ->
-                if i' = n - j - 1 then
-                  loop (j+1) (e :: acc)
+            | Fix ((ks', j'), prec') ->
+                if j' = n - i - 1 then
+                  loop (i+1) (e :: acc)
                 else
                   None
             | _ -> None
@@ -873,8 +873,8 @@ let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
   | None -> false
   | Some vals ->
       CList.for_all_i
-        (fun i e -> EConstr.eq_constr sigma e
-          (lift (-(k+n-1-i)) (mkFix ((ks, i), prec))))
+        (fun j e -> EConstr.eq_constr sigma e
+          (lift (-(k+n-1-j)) (mkFix ((ks, j), prec))))
         0 vals
 
 (* This function returns (Some i) where i is the de Bruijn index that
@@ -1048,9 +1048,9 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
               check_convertible "reduction(iota-proj)" env sigma term term2;
               reduce_exp env sigma term2
           | _ -> default ()))
-  | Fix ((ks,i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkFix ((ks, i), (nary, tary, Array.map (reduce_exp env2 sigma) fary))
+      mkFix ((ks, j), (nary, tary, Array.map (reduce_exp env2 sigma) fary))
   | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
@@ -1153,9 +1153,9 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
           check_convertible "reduction(iota-match)" env sigma f term2;
           reduce_app env sigma branch (Array.append args args_nf))
         (fun () -> mkApp (mkCase (ci, p, iv, item', Array.map (reduce_exp env sigma) branches), args_nf))
-  | Fix ((ks,i), ((nary, tary, fary) as prec)) ->
-      if ks.(i) < Array.length args_nf then
-        let decarg_var = args_nf.(ks.(i)) in
+  | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
+      if ks.(j) < Array.length args_nf then
+        let decarg_var = args_nf.(ks.(j)) in
         let decarg_decl = EConstr.lookup_rel (destRel sigma decarg_var) env in
         (match decarg_decl with
         | Context.Rel.Declaration.LocalAssum _ -> default ()
@@ -1163,13 +1163,13 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
             let (decarg_f, decarg_args) = decompose_app sigma decarg_val in
             if isConstruct sigma decarg_f then
               let n = Array.length fary in
-              let fi = fary.(i) in
+              let fj = fary.(j) in
               match find_bounded_fix env sigma ks prec with
               | Some bounded_fix ->
                   (* reduction: iota-fix' *)
                   (*msg_info_hov (Pp.str "[codegen] bounded_fix: " ++ Printer.pr_rel_decl (Environ.pop_rel_context bounded_fix env) sigma (Environ.lookup_rel bounded_fix env));*)
-                  let fi_subst = Vars.substl (List.map (fun j -> mkRel j) (iota_list (bounded_fix-n+1) n)) fi in
-                  let term2 = mkApp (fi_subst, args_nf) in
+                  let fj_subst = Vars.substl (List.map (fun i -> mkRel i) (iota_list (bounded_fix-n+1) n)) fj in
+                  let term2 = mkApp (fj_subst, args_nf) in
                   debug_reduction "iota-fix-reuse" (fun () ->
                     let env2 = Environ.pop_rel_context (destRel sigma decarg_var) env in
                     let nf_decarg_val = Reductionops.nf_all env2 sigma decarg_val in
@@ -1181,16 +1181,16 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
                   check_convertible "reduction(iota-fix-reuse)" env sigma term1 term2;
-                  reduce_app env sigma fi_subst args_nf
+                  reduce_app env sigma fj_subst args_nf
               | None ->
                   (* reduction: iota-fix *)
                   let args_nf_lifted = Array.map (Vars.lift n) args_nf in
                   let (_, defs) = CArray.fold_left2_map
-                    (fun j x t -> (j+1, (x, Vars.lift j (mkFix ((ks,j), prec)), Vars.lift j t)))
+                    (fun j' x t -> (j'+1, (x, Vars.lift j' (mkFix ((ks,j'), prec)), Vars.lift j' t)))
                     0 nary tary
                   in
                   let defs = Array.to_list (array_rev defs) in
-                  let term2 = compose_lets defs (mkApp (fi, args_nf_lifted)) in
+                  let term2 = compose_lets defs (mkApp (fj, args_nf_lifted)) in
                   debug_reduction "iota-fix" (fun () ->
                     Pp.str "decreasing-argument = " ++
                     Printer.pr_econstr_env env sigma decarg_var ++ Pp.str " = " ++
@@ -1201,7 +1201,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                   check_convertible "reduction(iota-fix)" env sigma term1 term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
-                  let b = reduce_app env2 sigma fi args_nf_lifted in
+                  let b = reduce_app env2 sigma fj args_nf_lifted in
                   compose_lets defs b
             else
               default ())
@@ -1249,11 +1249,11 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let t' = Reductionops.nf_all env sigma t in
       let e' = normalize_types env2 sigma e in
       mkLambda (x, t', e')
-  | Fix ((ks, i), ((nameary, tyary, funary) as prec)) ->
+  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
       let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
       let funary' = Array.map (normalize_types env2 sigma) funary in
-      mkFix ((ks, i), (nameary, tyary', funary'))
+      mkFix ((ks, j), (nameary, tyary', funary'))
   | CoFix (i, ((nameary, tyary, funary) as prec)) ->
       let env2 = push_rec_types prec env in
       let tyary' = Array.map (Reductionops.nf_all env sigma) tyary in
@@ -1283,10 +1283,10 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       let env2 = EConstr.push_rel decl env in
       let b' = normalize_static_arguments env2 sigma b in
       mkLambda (x, t, b')
-  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (normalize_static_arguments env2 sigma) fary in
-      mkFix ((ks, i), (nary, tary, fary'))
+      mkFix ((ks, j), (nary, tary, fary'))
   | LetIn (x, e, t, b) ->
       let e' = normalize_static_arguments env sigma e in
       let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
@@ -1426,7 +1426,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let (fvse, fe) = delete_unused_let_rec env2 sigma e in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvse) in
       (fvs, fun vars_used -> mkLambda (x, ft vars_used, fe (true :: vars_used)))
-  | Fix ((ks, i), ((nameary, tyary, funary) as prec)) ->
+  | Fix ((ks, j), ((nameary, tyary, funary) as prec)) ->
       let h = Array.length funary in
       let env2 = push_rec_types prec env in
       let ftyary2 = Array.map (delete_unused_let_rec env sigma) tyary in
@@ -1442,7 +1442,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       (fvs,
        fun vars_used ->
          let vars_used' = CList.addn h true vars_used in
-         mkFix ((ks, i),
+         mkFix ((ks, j),
                 (nameary,
                  Array.map (fun g -> g vars_used) ftyary,
                  Array.map (fun g -> g vars_used') ffunary)))
@@ -1507,7 +1507,7 @@ let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) :
   | Lambda (x,t,b) ->
       shortcut_option_or (first_fv_rec sigma numrels t)
         (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
-  | Fix ((ks, i), (nameary, tyary, funary)) ->
+  | Fix ((ks, j), (nameary, tyary, funary)) ->
       let n = Array.length funary in
       shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tyary)
         (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) funary))
@@ -1590,7 +1590,7 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       let (env2', e', referred_cfuncs) = replace ~cfunc env2 sigma e in
       let env' = Environ.pop_rel_context 1 env2' in
       (env', mkLambda (x, t, e'), referred_cfuncs)
-  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let ((env2', referred_cfuncs), fary') = CArray.fold_left_map
         (fun (env3, referred_cfuncs) f ->
@@ -1599,7 +1599,7 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
         (env2, StringSet.empty) fary
       in
       let env' = Environ.pop_rel_context (Array.length nary) env2' in
-      (env', mkFix ((ks, i), (nary, tary, fary')), referred_cfuncs)
+      (env', mkFix ((ks, j), (nary, tary, fary')), referred_cfuncs)
   | CoFix _ ->
       user_err (Pp.str "[codegen] codegen doesn't support CoFix.")
   | LetIn (x, e, t, b) ->
@@ -1662,7 +1662,7 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         let decl = Context.Rel.Declaration.LocalAssum (x, t) in
         let env2 = EConstr.push_rel decl env in
         mkLambda (x, t, complete_args_fun env2 sigma e (p-1))
-    | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+    | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let env2 = push_rec_types prec env in
         let fary2 = Array.map2
           (fun t f ->
@@ -1670,7 +1670,7 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
             complete_args_fun env2 sigma f p')
           tary fary
         in
-        mkFix ((ks, i), (nary, tary, fary2))
+        mkFix ((ks, j), (nary, tary, fary2))
     | _ ->
         (* reduction/expansion: eta-expansion *)
         let t = Retyping.get_type_of env sigma term in
@@ -1817,19 +1817,19 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
               complete_args_branch env sigma br ci.ci_cstr_nargs.(i) (p+q))
             branches),
         Array.map (fun j -> mkRel j) vs)
-  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       mkApp (
-        mkFix ((ks, i),
+        mkFix ((ks, j),
           (nary,
            tary,
            Array.mapi
-             (fun j f ->
-               let t = tary.(j) in
+             (fun i f ->
+               let t = tary.(i) in
                let n = numargs_of_type env sigma t in
                complete_args_fun env2 sigma f n)
              fary)),
-        Array.map (fun j -> mkRel j) vs)
+        Array.map (fun i -> mkRel i) vs)
   | Proj (proj, e) ->
       mkApp (
         mkProj (proj,
@@ -1854,9 +1854,9 @@ let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term :
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       x :: formal_argument_names env2 sigma e
-  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      formal_argument_names env2 sigma fary.(i)
+      formal_argument_names env2 sigma fary.(j)
   | _ -> []
 
 let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
@@ -1895,7 +1895,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let decl = Context.Rel.Declaration.LocalDef (x2, e, t) in
         let env2 = EConstr.push_rel decl env in
         mkLetIn (x2, r env e [], t, r env2 b vars)
-    | Fix ((ks, i), (nary, tary, fary)) ->
+    | Fix ((ks, j), (nary, tary, fary)) ->
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
         let env2 = push_rec_types (nary2, tary, fary) env in
         let fary2 = Array.map (fun e -> r env2 e []) fary in
@@ -1909,7 +1909,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             compose_prod args2 result_type)
           tary
         in
-        mkFix ((ks, i), (nary2, tary2, fary2))
+        mkFix ((ks, j), (nary2, tary2, fary2))
     | App (f,args) ->
         let vars2 =
           (List.append
