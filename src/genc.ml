@@ -630,107 +630,6 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   (fixterms, fixfunc_tbl)
 
-let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
-  Hashtbl.fold
-    (fun fixfunc_id fixfunc fixfuncs ->
-      if fixfunc.fixfunc_used_as_call &&
-         fixfunc.fixfunc_top_call = None then
-        fixfunc :: fixfuncs
-      else
-        fixfuncs)
-    fixfunc_tbl
-    []
-
-(*
-  detect_fixterms_for_code_generation returns
-  non-tail non-inlinable fixterms.
-
-  gen_head generates code for non-tail position.
-  However it's doesn't generate code for non-inlinable fixterms.
-  They should be generated separatedly.
-*)
-let detect_fixterms_for_code_generation
-    ~(fixterms : fixterm_t list)
-    ~(fixfunc_tbl : fixfunc_table) :
-    ((*outer_variables*)((string * string) list) * Environ.env * EConstr.t) list =
-  let non_inlinable_non_tail_position_fixterms =
-    List.filter
-      (fun fixterm ->
-        not fixterm.fixterm_inlinable &&
-        not fixterm.fixterm_tail_position)
-    fixterms
-  in
-  List.map
-    (fun fixterm ->
-      let fixterm_id = fixterm.fixterm_term_id in
-      let outer_variables = (Hashtbl.find fixfunc_tbl fixterm_id).fixfunc_outer_variables in
-      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
-    non_inlinable_non_tail_position_fixterms
-
-let labels_for_stacked_fixfuncs
-    ~(fixfunc_tbl : fixfunc_table)
-    ~(primary_cfunc : string)
-    (stacked_fixfuncs : string list) : string list =
-  unique_string_list
-    (CList.map_filter
-      (fun fix_name ->
-        let fixfunc = Hashtbl.find fixfunc_tbl (Id.of_string fix_name) in
-        if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
-          Some ("entry_" ^ fixfunc.fixfunc_c_name)
-        else
-          None)
-      stacked_fixfuncs)
-
-let rec obtain_function_bodies_rec
-    ~(fixfunc_tbl : fixfunc_table)
-    ~(primary_cfunc : string)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) Seq.t =
-  match EConstr.kind sigma term with
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let c_var = (str_of_annotated_name x, c_typename env sigma t) in
-      obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma (c_var :: fargs) stacked_fixfuncs b
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let bodies = Array.mapi
-        (fun i ni ->
-          let fixfunc_name = str_of_annotated_name ni in
-          let fi = fary.(i) in
-          if j = i then
-            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fi
-          else
-            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: []) fi)
-        nary
-      in
-      let reordered_bodies = Array.copy bodies in
-      Array.blit bodies 0 reordered_bodies 1 j;
-      reordered_bodies.(0) <- bodies.(j);
-      concat_array_seq reordered_bodies
-  | _ ->
-      Seq.return (fargs, labels_for_stacked_fixfuncs ~fixfunc_tbl ~primary_cfunc stacked_fixfuncs, env, term)
-
-let obtain_function_bodies
-    ~(fixterms : fixterm_t list)
-    ~(fixfunc_tbl : fixfunc_table)
-    ~(primary_cfunc : string)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) :
-    (((*varname*)string * (*vartype*)string) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) list =
-  let results =
-    List.map
-      (fun (outer_variables, env1, term1) ->
-        obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env1 sigma outer_variables [] term1)
-      (([], env, term) ::
-       detect_fixterms_for_code_generation ~fixterms ~fixfunc_tbl)
-  in
-  List.of_seq (concat_list_seq results)
-
 let local_gensym_id : (int ref) option ref = ref None
 
 let local_gensym_with (f : unit -> 'a) : 'a =
@@ -1228,6 +1127,107 @@ let gen_function_header (static : bool) (return_type : string) (c_name : string)
   Pp.hov 0 pp_return_type +++
   Pp.str c_name ++
   Pp.hov 0 (pp_parameters)
+
+let compute_called_fixfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
+  Hashtbl.fold
+    (fun fixfunc_id fixfunc fixfuncs ->
+      if fixfunc.fixfunc_used_as_call &&
+         fixfunc.fixfunc_top_call = None then
+        fixfunc :: fixfuncs
+      else
+        fixfuncs)
+    fixfunc_tbl
+    []
+
+(*
+  detect_fixterms_for_code_generation returns
+  non-tail non-inlinable fixterms.
+
+  gen_head generates code for non-tail position.
+  However it's doesn't generate code for non-inlinable fixterms.
+  They should be generated separatedly.
+*)
+let detect_fixterms_for_code_generation
+    ~(fixterms : fixterm_t list)
+    ~(fixfunc_tbl : fixfunc_table) :
+    ((*outer_variables*)((string * string) list) * Environ.env * EConstr.t) list =
+  let non_inlinable_non_tail_position_fixterms =
+    List.filter
+      (fun fixterm ->
+        not fixterm.fixterm_inlinable &&
+        not fixterm.fixterm_tail_position)
+    fixterms
+  in
+  List.map
+    (fun fixterm ->
+      let fixterm_id = fixterm.fixterm_term_id in
+      let outer_variables = (Hashtbl.find fixfunc_tbl fixterm_id).fixfunc_outer_variables in
+      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
+    non_inlinable_non_tail_position_fixterms
+
+let labels_for_stacked_fixfuncs
+    ~(fixfunc_tbl : fixfunc_table)
+    ~(primary_cfunc : string)
+    (stacked_fixfuncs : string list) : string list =
+  unique_string_list
+    (CList.map_filter
+      (fun fix_name ->
+        let fixfunc = Hashtbl.find fixfunc_tbl (Id.of_string fix_name) in
+        if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
+          Some ("entry_" ^ fixfunc.fixfunc_c_name)
+        else
+          None)
+      stacked_fixfuncs)
+
+let rec obtain_function_bodies_rec
+    ~(fixfunc_tbl : fixfunc_table)
+    ~(primary_cfunc : string)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
+    (((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) Seq.t =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      let c_var = (str_of_annotated_name x, c_typename env sigma t) in
+      obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma (c_var :: fargs) stacked_fixfuncs b
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let bodies = Array.mapi
+        (fun i ni ->
+          let fixfunc_name = str_of_annotated_name ni in
+          let fi = fary.(i) in
+          if j = i then
+            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fi
+          else
+            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: []) fi)
+        nary
+      in
+      let reordered_bodies = Array.copy bodies in
+      Array.blit bodies 0 reordered_bodies 1 j;
+      reordered_bodies.(0) <- bodies.(j);
+      concat_array_seq reordered_bodies
+  | _ ->
+      Seq.return (fargs, labels_for_stacked_fixfuncs ~fixfunc_tbl ~primary_cfunc stacked_fixfuncs, env, term)
+
+let obtain_function_bodies
+    ~(fixterms : fixterm_t list)
+    ~(fixfunc_tbl : fixfunc_table)
+    ~(primary_cfunc : string)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) :
+    (((*varname*)string * (*vartype*)string) list *
+     (*labels*)string list *
+     Environ.env *
+     EConstr.t) list =
+  let results =
+    List.map
+      (fun (outer_variables, env1, term1) ->
+        obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env1 sigma outer_variables [] term1)
+      (([], env, term) ::
+       detect_fixterms_for_code_generation ~fixterms ~fixfunc_tbl)
+  in
+  List.of_seq (concat_list_seq results)
 
 let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
