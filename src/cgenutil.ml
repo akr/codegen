@@ -497,7 +497,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | LetIn (name, expr, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:letin:")
   | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" +++ Printer.pr_econstr_env env sigma ty)
   | Case (ci, tyf, iv, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
-  | Fix ((ia, i), (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
+  | Fix ((ks, i), (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
   | CoFix (i, (nameary, tyary, funary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
   | Proj (proj, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
   | Int n -> user_err (Pp.str "[codegen] mangle_term_buf:int:")

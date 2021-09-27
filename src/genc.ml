@@ -206,7 +206,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
         let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
         let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
         (inlinable_b, nontailset_b, tailset_b)
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
       let fixfuncs_result = Array.map2
@@ -346,7 +346,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma term) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
       else
         collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let fixterm_id = id_of_annotated_name nary.(i) in
       let inlinable = Id.Map.find (id_of_annotated_name nary.(i)) inlinable_fixterms in
       let h = Array.length nary in
@@ -426,7 +426,7 @@ let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       fixfunc_initialize_top_calls env2 sigma top_c_func_name e other_topfuncs ~fixfunc_tbl
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       fixfunc_initialize_top_calls env2 sigma top_c_func_name fary.(i) [] ~fixfunc_tbl;
       let key = id_of_annotated_name nary.(i) in
@@ -512,7 +512,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       let id = id_of_annotated_name x in
       let fv_b = fixterm_free_variables_rec env2 sigma b ~result in
       Id.Set.remove id fv_b
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let ids = Array.map id_of_annotated_name nary in
       let fv_fary =
@@ -683,7 +683,7 @@ let rec obtain_function_bodies_rec
       let env2 = EConstr.push_rel decl env in
       let c_var = (str_of_annotated_name x, c_typename env sigma t) in
       obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma (c_var :: fargs) stacked_fixfuncs b
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let bodies = Array.mapi
         (fun j nj ->
@@ -1030,7 +1030,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e [] +++
       gen_head ~fixfunc_tbl ~used_vars ~cont env2 sigma b cargs
 
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let ui = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(i)) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
       if List.length cargs < List.length ni_formal_arguments then
@@ -1168,7 +1168,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e [] +++
       gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma b cargs
 
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let ui = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(i)) in
       let ni_formal_arguments = ui.fixfunc_formal_arguments in
@@ -1476,7 +1476,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       used_variables env2 sigma b
-  | Fix ((ia, i), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, i), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       Array.fold_left
         (fun set f -> Id.Set.union set (used_variables env2 sigma f))
