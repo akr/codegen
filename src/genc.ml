@@ -196,7 +196,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let env2 = EConstr.push_rel decl env in
       if numargs = 0 then
         (* closure creation *)
-        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b (numargs_of_exp env sigma term) in
+        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b (numargs_of_exp env sigma b) in
         let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
         let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
         let nontailset = IntSet.union tailset_b nontailset_b in
@@ -343,7 +343,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let used_as_goto2 = ref false :: used_as_goto in
       if numargs = 0 then
         (* closure creation *)
-        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma term) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
+        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma b) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
       else
         collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
