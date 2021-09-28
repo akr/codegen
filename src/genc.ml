@@ -780,7 +780,7 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     c_member_access +++ c_deallocation +++ c_branch_body
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_match:3");*)
-  let n = Array.length branches in
+  let h = Array.length branches in
   let caselabel_accessors =
     Array.map
       (fun j ->
@@ -789,10 +789,10 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
          Array.map
            (case_cstrmember env sigma (EConstr.of_constr item_type) j)
            (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
-      (iota_ary 1 n)
+      (iota_ary 1 h)
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_match:4");*)
-  if n = 1 then
+  if h = 1 then
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
     let accessors = snd caselabel_accessors.(0) in
     let br = branches.(0) in

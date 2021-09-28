@@ -844,40 +844,39 @@ and fv_range_array (sigma : Evd.evar_map) (numlocal : int) (terms : EConstr.t ar
 let fv_range (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
   fv_range_rec sigma 0 term
 
-let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (k : int)
+let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     (lift : int -> EConstr.t -> EConstr.t) (ks : int array)
     (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) =
-  (*msg_info_hov (Pp.str "test_bounded_fix: k=" ++ Pp.int k +++
+  (*msg_info_hov (Pp.str "test_bounded_fix: n=" ++ Pp.int n +++
     Printer.pr_econstr_env env sigma (mkFix ((ks,0),prec)));*)
-  let n = Array.length ks in
+  let h = Array.length ks in
   let vals_opt =
-    let rec loop i acc =
-      if n <= i then
+    let rec check_consecutive_fixes i acc =
+      if h <= i then
         Some acc
       else
-        match EConstr.lookup_rel (k + i) env with
+        match EConstr.lookup_rel (n + i) env with
         | Context.Rel.Declaration.LocalAssum _ -> None
         | Context.Rel.Declaration.LocalDef (_,e,_) ->
             match EConstr.kind sigma e with
             | Fix ((ks', j'), prec') ->
-                if j' = n - i - 1 then
-                  loop (i+1) (e :: acc)
+                if j' = h - i - 1 then
+                  check_consecutive_fixes (i+1) (e :: acc)
                 else
                   None
             | _ -> None
-
     in
-    loop 0 []
+    check_consecutive_fixes 0 []
   in
   match vals_opt with
   | None -> false
   | Some vals ->
       CList.for_all_i
         (fun j e -> EConstr.eq_constr sigma e
-          (lift (-(k+n-1-j)) (mkFix ((ks, j), prec))))
+          (lift (-(n+h-1-j)) (mkFix ((ks, j), prec))))
         0 vals
 
-(* This function returns (Some i) where i is the de Bruijn index that
+(* find_bounded_fix returns (Some i) where i is the de Bruijn index that
     env[i] is (mkFix ((ks,0),prec)),
     env[i-1] is (mkFix ((ks,1),prec)), ...
     env[i-n+1] is (mkFix ((ks,n-1),prec))
@@ -891,33 +890,33 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ks : int array)
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix:" +++
         Printer.pr_econstr_env env sigma (mkFix ((ks,0),prec)));*)
   let (nary, tary, fary) = prec in
-  let n = Array.length fary in
+  let h = Array.length fary in
   let nb_rel = Environ.nb_rel env in
   match fv_range sigma (mkFix ((ks,0),prec)) with
   | None ->
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix: fv_range=None");*)
       let lift _ term = term in
-      let rec loop k =
-        if nb_rel < k + n - 1 then
+      let rec loop n =
+        if nb_rel < n + h - 1 then
           None
         else
-          if test_bounded_fix env sigma k lift ks prec then
-            Some (k + n - 1)
+          if test_bounded_fix env sigma n lift ks prec then
+            Some (n + h - 1)
           else
-            loop (k+1)
+            loop (n+1)
       in
       loop 1
   | Some (fv_min, fv_max) ->
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix: fv_range=Some (" ++ Pp.int fv_min ++ Pp.str "," ++ Pp.int fv_max ++ Pp.str ")");*)
       let lift = Vars.lift in
-      let rec loop k =
-        if fv_min <= k + n - 1 then
+      let rec loop n =
+        if fv_min <= n + h - 1 then
           None
         else
-          if test_bounded_fix env sigma k lift ks prec then
-            Some (k + n - 1)
+          if test_bounded_fix env sigma n lift ks prec then
+            Some (n + h - 1)
           else
-            loop (k+1)
+            loop (n+1)
       in
       loop 1
 
@@ -1162,13 +1161,13 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         | Context.Rel.Declaration.LocalDef (_,decarg_val,_) ->
             let (decarg_f, decarg_args) = decompose_app sigma decarg_val in
             if isConstruct sigma decarg_f then
-              let n = Array.length fary in
+              let h = Array.length fary in
               let fj = fary.(j) in
               match find_bounded_fix env sigma ks prec with
               | Some bounded_fix ->
                   (* reduction: iota-fix' *)
                   (*msg_info_hov (Pp.str "[codegen] bounded_fix: " ++ Printer.pr_rel_decl (Environ.pop_rel_context bounded_fix env) sigma (Environ.lookup_rel bounded_fix env));*)
-                  let fj_subst = Vars.substl (List.map (fun i -> mkRel i) (iota_list (bounded_fix-n+1) n)) fj in
+                  let fj_subst = Vars.substl (List.map (fun i -> mkRel i) (iota_list (bounded_fix-h+1) h)) fj in
                   let term2 = mkApp (fj_subst, args_nf) in
                   debug_reduction "iota-fix-reuse" (fun () ->
                     let env2 = Environ.pop_rel_context (destRel sigma decarg_var) env in
@@ -1184,7 +1183,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                   reduce_app env sigma fj_subst args_nf
               | None ->
                   (* reduction: iota-fix *)
-                  let args_nf_lifted = Array.map (Vars.lift n) args_nf in
+                  let args_nf_lifted = Array.map (Vars.lift h) args_nf in
                   let (_, defs) = CArray.fold_left2_map
                     (fun j' x t -> (j'+1, (x, Vars.lift j' (mkFix ((ks,j'), prec)), Vars.lift j' t)))
                     0 nary tary
@@ -1508,13 +1507,13 @@ let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) :
       shortcut_option_or (first_fv_rec sigma numrels t)
         (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
   | Fix ((ks, j), (nary, tary, fary)) ->
-      let n = Array.length fary in
+      let h = Array.length fary in
       shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) fary))
+        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec sigma (numrels+h)) fary))
   | CoFix (i, (nary, tary, fary)) ->
-      let n = Array.length fary in
+      let h = Array.length fary in
       shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-n) (array_option_exists (first_fv_rec sigma (numrels+n)) fary))
+        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec sigma (numrels+h)) fary))
 
 let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
   first_fv_rec sigma 0 term
