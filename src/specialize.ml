@@ -597,8 +597,7 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, expand_eta_top env2 sigma b)
-  | Fix ((ks, j), (nary, tary, fary)) ->
-      let prec = (nary, tary, fary) in
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (expand_eta_top env2 sigma) fary in
       mkFix ((ks, j), (nary, tary, fary'))
@@ -689,13 +688,11 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
       mkLambda (x, ty, normalizeV env2 sigma b)
-  | Fix ((ks, j), (nary, tary, fary)) ->
-      let prec = (nary, tary, fary) in
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (normalizeV env2 sigma) fary in
       mkFix ((ks, j), (nary, tary, fary'))
-  | CoFix (i, (nary, tary, fary)) ->
-      let prec = (nary, tary, fary) in
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       let fary' = Array.map (normalizeV env2 sigma) fary in
       mkCoFix (i, (nary, tary, fary'))
