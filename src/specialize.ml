@@ -1819,12 +1819,11 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         mkFix ((ks, j),
           (nary,
            tary,
-           Array.mapi
-             (fun i f ->
-               let t = tary.(i) in
+           Array.map2
+             (fun t f ->
                let n = numargs_of_type env sigma t in
                complete_args_fun env2 sigma f n)
-             fary)),
+             tary fary)),
         Array.map (fun i -> mkRel i) vs)
   | Proj (proj, e) ->
       mkApp (
