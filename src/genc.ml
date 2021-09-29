@@ -967,9 +967,8 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
           | Some _ -> Pp.mt ()
         in
         let pp_bodies =
-          Array.mapi
-            (fun i ni ->
-              let fi = fary.(i) in
+          Array.map2
+            (fun ni fi ->
               let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
               let ni_formal_arguments = fixfunc_i.fixfunc_formal_arguments in
               List.iter
@@ -985,7 +984,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                   Pp.mt ()
               in
               pp_label +++ gen_head ~fixfunc_tbl ~used_vars ~cont:cont2 env2 sigma fi ni_formal_argvars)
-            nary in
+            nary fary in
         let reordered_pp_bodies = Array.copy pp_bodies in
         Array.blit pp_bodies 0 reordered_pp_bodies 1 j;
         reordered_pp_bodies.(0) <- pp_bodies.(j);
@@ -1087,9 +1086,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
       let assginments = List.map2 (fun (lhs, t) rhs -> (lhs, rhs, t)) nj_formal_arguments cargs in
       let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
       let pp_bodies =
-        Array.mapi
-          (fun i ni ->
-            let fi = fary.(i) in
+        Array.map2
+          (fun ni fi ->
             let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
             let ni_formal_arguments = fixfunc_i.fixfunc_formal_arguments in
             List.iter
@@ -1104,7 +1102,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
                 Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
             in
             pp_label +++ gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma fi ni_formal_argvars)
-          nary in
+          nary fary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 j;
       reordered_pp_bodies.(0) <- pp_bodies.(j);
