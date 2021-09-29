@@ -1808,10 +1808,10 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Case (ci, epred, iv, item, branches) ->
       mkApp (
         mkCase (ci, epred, iv, item,
-          Array.mapi
-            (fun i br ->
-              complete_args_branch env sigma br ci.ci_cstr_nargs.(i) (p+q))
-            branches),
+          Array.map2
+            (fun br cstr_nargs ->
+              complete_args_branch env sigma br cstr_nargs (p+q))
+            branches ci.ci_cstr_nargs),
         Array.map (fun j -> mkRel j) vs)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -1894,15 +1894,14 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
         let env2 = push_rec_types (nary2, tary, fary) env in
         let fary2 = Array.map (fun e -> r env2 e []) fary in
-        let tary2 = Array.mapi (fun i t ->
-            let f = fary2.(i) in
+        let tary2 = Array.map2 (fun t f ->
             let argnames = List.rev (formal_argument_names env2 sigma f) in
             let (args, result_type) = decompose_prod sigma t in
             (if List.length argnames <> List.length args then
               user_err (Pp.str "[codegen:rename_vars:bug] unexpected length of formal arguments:"));
             let args2 = List.map2 (fun (arg_name, arg_type) arg_name2 -> (arg_name2, arg_type)) args argnames in
             compose_prod args2 result_type)
-          tary
+          tary fary2
         in
         mkFix ((ks, j), (nary2, tary2, fary2))
     | App (f,args) ->
@@ -1922,13 +1921,13 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
     | Construct _ -> term
     | Case (ci, epred, iv, item, branches) ->
         mkCase (ci, epred, iv, item,
-          Array.mapi
-            (fun i br ->
+          Array.map2
+            (fun br cstr_nargs ->
               r env br
                 (List.append
-                  (List.init ci.ci_cstr_nargs.(i) (fun _ -> Context.anonR))
+                  (List.init cstr_nargs (fun _ -> Context.anonR))
                   vars))
-            branches)
+            branches ci.ci_cstr_nargs)
     | Proj _ -> term
     | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
     | CoFix _ | Int _ | Float _ | Array _ ->
