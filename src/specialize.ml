@@ -503,8 +503,15 @@ let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map
 
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
+  let sigma = Evd.from_env env in
   let funcs = List.map (func_of_qualid env) func_qualids in
-  let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
+  let ctnts = List.map
+    (fun func ->
+      match Constr.kind func with
+      | Const (ctnt, _) -> ctnt
+      | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
+    funcs
+  in
   let f pred ctnt = Cpred.add ctnt pred in
   specialize_global_inline := List.fold_left f !specialize_global_inline ctnts
 
@@ -515,10 +522,16 @@ let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
   let ctnt =
     match Constr.kind func with
     | Const (ctnt, _) -> ctnt
-    | _ -> user_err (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
+    | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
   in
   let funcs = List.map (func_of_qualid env) func_qualids in
-  let ctnts = List.filter_map (fun func -> match Constr.kind func with Const (ctnt, _) -> Some ctnt | _ -> None) funcs in
+  let ctnts = List.map
+    (fun func ->
+      match Constr.kind func with
+      | Const (ctnt, _) -> ctnt
+      | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
+    funcs
+  in
   let local_inline = !specialize_local_inline in
   let pred = match Cmap.find_opt ctnt local_inline with
              | None -> Cpred.empty
