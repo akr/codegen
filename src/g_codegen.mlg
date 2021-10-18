@@ -255,4 +255,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "DeallocatorType" lconstr(t) "=>" string(cfunc) ] ->
       { command_deallocator_type t cfunc }
+
+    (*| [ "CodeGen" "ShowLocalGensymID" ] -> { command_show_local_gensym_id () }*)
 END

@@ -632,13 +632,25 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
 
 let local_gensym_id : (int ref) option ref = ref None
 
+(*
+let command_show_local_gensym_id () =
+  match !local_gensym_id with
+  | None -> Feedback.msg_info (Pp.str "[codegen] local_gensym_id = None")
+  | Some _ -> Feedback.msg_info (Pp.str "[codegen] local_gensym_id = Some")
+*)
+
 let local_gensym_with (f : unit -> 'a) : 'a =
   (if !local_gensym_id <> None then
     user_err (Pp.str "[codegen:bug] nested invocation of local_gensym_with"));
   local_gensym_id := Some (ref 0);
-  let ret = f () in
-  local_gensym_id := None;
-  ret
+  try
+    let ret = f () in
+    local_gensym_id := None;
+    ret
+  with
+    ex ->
+      (local_gensym_id := None;
+      raise ex)
 
 let local_gensym () : string =
   match !local_gensym_id with
@@ -655,9 +667,14 @@ let local_vars_with (f : unit -> 'a) : (string * string) list * 'a =
     user_err (Pp.str "[codegen:bug] nested invocation of local_vars_with"));
   let vars = ref [] in
   local_vars := Some vars;
-  let ret = f () in
-  local_vars := None;
-  (List.rev !vars, ret)
+  try
+    let ret = f () in
+    local_vars := None;
+    (List.rev !vars, ret)
+  with
+    ex ->
+      (local_vars := None;
+      raise ex)
 
 let add_local_var (c_type : string) (c_var : string) : unit =
   match !local_vars with
