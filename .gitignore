@@ -19,6 +19,7 @@ oUnit-*
 *.cmi
 *.cmo
 *.cmt
+*.cmti
 *.vo
 *.vos
 *.vok
