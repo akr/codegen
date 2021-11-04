@@ -50,28 +50,43 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
   | Context.Rel.Declaration.LocalDef _ -> false
 
-let rec hasRel (sigma : Evd.evar_map) (term : EConstr.t) : bool =
+let rec hasRel (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   match EConstr.kind sigma term with
   | Rel i -> true
   | Var name -> false
   | Meta i -> false
-  | Evar (ekey, terms) -> List.exists (hasRel sigma) terms
+  | Evar (ekey, terms) -> List.exists (hasRel env sigma) terms
   | Sort s -> false
-  | Cast (expr, kind, ty) -> hasRel sigma expr || hasRel sigma ty
-  | Prod (name, ty, body) -> hasRel sigma ty || hasRel sigma body
-  | Lambda (name, ty, body) -> hasRel sigma ty || hasRel sigma body
-  | LetIn (name, expr, ty, body) -> hasRel sigma expr || hasRel sigma ty || hasRel sigma body
-  | App (f, argsary) -> hasRel sigma f || Array.exists (hasRel sigma) argsary
+  | Cast (expr, kind, ty) -> hasRel env sigma expr || hasRel env sigma ty
+  | Prod (name, ty, body) -> hasRel env sigma ty ||
+      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+      let env2 = EConstr.push_rel decl env in
+      hasRel env2 sigma body
+  | Lambda (name, ty, body) -> hasRel env sigma ty ||
+      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
+      let env2 = EConstr.push_rel decl env in
+      hasRel env2 sigma body
+  | LetIn (name, expr, ty, body) -> hasRel env sigma expr || hasRel env sigma ty ||
+      let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
+      let env2 = EConstr.push_rel decl env in
+      hasRel env2 sigma body
+  | App (f, argsary) -> hasRel env sigma f || Array.exists (hasRel env sigma) argsary
   | Const ctntu -> false
   | Ind iu -> false
   | Construct cstru -> false
-  | Case (ci, tyf, iv, expr, brs) -> hasRel sigma tyf || hasRel sigma expr || Array.exists (hasRel sigma) brs
-  | Fix ((ks, j), (nary, tary, fary)) -> Array.exists (hasRel sigma) tary || Array.exists (hasRel sigma) fary
-  | CoFix (i, (nary, tary, fary)) -> Array.exists (hasRel sigma) tary || Array.exists (hasRel sigma) fary
-  | Proj (proj, expr) -> hasRel sigma expr
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, tyf, iv, expr, brs) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+      hasRel env sigma tyf || hasRel env sigma expr || Array.exists (hasRel env sigma) brs
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) -> Array.exists (hasRel env sigma) tary ||
+      let env2 = push_rec_types prec env in
+      Array.exists (hasRel env2 sigma) fary
+  | CoFix (i, ((nary, tary, fary) as prec)) -> Array.exists (hasRel env sigma) tary ||
+      let env2 = push_rec_types prec env in
+      Array.exists (hasRel env2 sigma) fary
+  | Proj (proj, expr) -> hasRel env sigma expr
   | Int n -> false
   | Float n -> false
-  | Array (u,t,def,ty) -> Array.exists (hasRel sigma) t || hasRel sigma def || hasRel sigma ty
+  | Array (u,t,def,ty) -> Array.exists (hasRel env sigma) t || hasRel env sigma def || hasRel env sigma ty
 
 let rec destProdX_rec (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot list * EConstr.t list * EConstr.t =
   match EConstr.kind sigma term with
@@ -174,7 +189,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
       let user_lc1 = prod_appvect sigma user_lc params in (* apply type parameters *)
       let user_lc = nf_all env sigma user_lc1 in (* apply type parameters *)
       (*Feedback.msg_debug (str "[codegen] user_lc2:" ++ str (constr_name sigma user_lc) ++ str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
-      (if hasRel sigma user_lc then
+      (if hasRel env sigma user_lc then
         user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
       (* cparam_tys and body can be interpreted under env because they have no Rel *)
       let (cparam_names, cparam_tys, body) = destProdX sigma user_lc in
@@ -287,7 +302,8 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
       Array.fold_left merge_count count counts
   | Const ctntu -> IntMap.empty
   | Construct cstru -> IntMap.empty
-  | Case (ci, tyf, iv, expr, brs) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, tyf, iv, expr, brs) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       ((* tyf is not checked because it is not a target of code generation.
           check tyf is (fun _ -> termty) ? *)
       let count0 = linearcheck_exp env sigma linear_vars numvars_innermost_function expr 0 in

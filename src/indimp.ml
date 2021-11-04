@@ -52,14 +52,14 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
               (match decl with
               | Context.Rel.Declaration.LocalAssum (name, ty) ->
                   let ty = EConstr.of_constr ty in
-                  if Array.mem true (free_variables_without sigma ntypes k ty) then
+                  if Array.mem true (free_variables_without env sigma ntypes k ty) then
                     raise RecursionFound
               | Context.Rel.Declaration.LocalDef (name, expr, ty) ->
                   let expr = EConstr.of_constr expr in
                   let ty = EConstr.of_constr ty in
-                  if Array.mem true (free_variables_without sigma ntypes k expr) then
+                  if Array.mem true (free_variables_without env sigma ntypes k expr) then
                     raise RecursionFound;
-                  if Array.mem true (free_variables_without sigma ntypes k ty) then
+                  if Array.mem true (free_variables_without env sigma ntypes k ty) then
                     raise RecursionFound);
               k+1)
             ctxt

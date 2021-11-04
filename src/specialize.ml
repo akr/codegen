@@ -652,10 +652,11 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
       let e' = search_fix_to_expand_eta env sigma e in
       let b' = search_fix_to_expand_eta env2 sigma b in
       mkLetIn (x, e', t, b')
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       let item' = search_fix_to_expand_eta env sigma item in
       let branches' = Array.map (search_fix_to_expand_eta env sigma) branches in
-      mkCase (ci, p, iv, item', branches')
+      mkCase (EConstr.contract_case env sigma (ci, p, iv, item', branches'))
   | Proj (proj, e) ->
       let e' = search_fix_to_expand_eta env sigma e in
       mkProj (proj, e')
@@ -715,18 +716,20 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       let e' = normalizeV env sigma e in
       let b' = normalizeV env2 sigma b in
       mkLetIn (x, e', ty, b')
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       if isRel sigma item then
-        mkCase (ci, p, iv, item, Array.map (normalizeV env sigma) branches)
+        mkCase (EConstr.contract_case env sigma (ci, p, iv, item, Array.map (normalizeV env sigma) branches))
       else
         let term =
-          mkCase (ci,
+          mkCase (EConstr.contract_case env sigma
+                  (ci,
                   Vars.lift 1 p,
                   iv,
                   mkRel 1,
                   Array.map
                     (fun branch -> Vars.lift 1 (normalizeV env sigma branch))
-                    branches)
+                    branches))
         in
         wrap_lets [item] term
   | App (f,args) ->
@@ -799,7 +802,7 @@ let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     msg_debug_hov (Pp.str ("[codegen] reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
-let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) : (int*int) option =
+let rec fv_range_rec (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) : (int*int) option =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
   | Const _ | Construct _ -> None
@@ -809,50 +812,59 @@ let rec fv_range_rec (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) 
       else
         None
   | Evar (ev, es) ->
-      fv_range_array sigma numlocal (Array.of_list es)
+      fv_range_array env sigma numlocal (Array.of_list es)
   | Proj (proj, e) ->
-      fv_range_rec sigma numlocal e
+      fv_range_rec env sigma numlocal e
   | Cast (e,ck,t) ->
       merge_range
-        (fv_range_rec sigma numlocal e)
-        (fv_range_rec sigma numlocal t)
+        (fv_range_rec env sigma numlocal e)
+        (fv_range_rec env sigma numlocal t)
   | App (f, args) ->
       merge_range
-        (fv_range_rec sigma numlocal f)
-        (fv_range_array sigma numlocal args)
+        (fv_range_rec env sigma numlocal f)
+        (fv_range_array env sigma numlocal args)
   | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
       merge_range3
-        (fv_range_rec sigma numlocal e)
-        (fv_range_rec sigma numlocal t)
-        (fv_range_rec sigma (numlocal+1) b)
-  | Case (ci, p, iv, item, branches) ->
+        (fv_range_rec env sigma numlocal e)
+        (fv_range_rec env sigma numlocal t)
+        (fv_range_rec env2 sigma (numlocal+1) b)
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       merge_range3
-        (fv_range_rec sigma numlocal p)
-        (fv_range_rec sigma numlocal item)
-        (fv_range_array sigma numlocal branches)
+        (fv_range_rec env sigma numlocal p)
+        (fv_range_rec env sigma numlocal item)
+        (fv_range_array env sigma numlocal branches)
   | Prod (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
       merge_range
-        (fv_range_rec sigma numlocal t)
-        (fv_range_rec sigma (numlocal+1) b)
+        (fv_range_rec env sigma numlocal t)
+        (fv_range_rec env2 sigma (numlocal+1) b)
   | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
       merge_range
-        (fv_range_rec sigma numlocal t)
-        (fv_range_rec sigma (numlocal+1) b)
-  | Fix ((ks, j), (nary, tary, fary)) ->
+        (fv_range_rec env sigma numlocal t)
+        (fv_range_rec env2 sigma (numlocal+1) b)
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
       merge_range
-        (fv_range_array sigma numlocal tary)
-        (fv_range_array sigma (numlocal + Array.length fary) fary)
-  | CoFix (i, (nary, tary, fary)) ->
+        (fv_range_array env sigma numlocal tary)
+        (fv_range_array env2 sigma (numlocal + Array.length fary) fary)
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
       merge_range
-        (fv_range_array sigma numlocal tary)
-        (fv_range_array sigma (numlocal + Array.length fary) fary)
-and fv_range_array (sigma : Evd.evar_map) (numlocal : int) (terms : EConstr.t array) : (int*int) option =
+        (fv_range_array env sigma numlocal tary)
+        (fv_range_array env2 sigma (numlocal + Array.length fary) fary)
+and fv_range_array (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (terms : EConstr.t array) : (int*int) option =
   Array.fold_left
-    (fun acc term -> merge_range acc (fv_range_rec sigma numlocal term))
+    (fun acc term -> merge_range acc (fv_range_rec env sigma numlocal term))
     None terms
 
-let fv_range (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
-  fv_range_rec sigma 0 term
+let fv_range (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
+  fv_range_rec env sigma 0 term
 
 let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     (lift : int -> EConstr.t -> EConstr.t) (ks : int array)
@@ -902,7 +914,7 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ks : int array)
   let (nary, tary, fary) = prec in
   let h = Array.length fary in
   let nb_rel = Environ.nb_rel env in
-  match fv_range sigma (mkFix ((ks,0),prec)) with
+  match fv_range env sigma (mkFix ((ks,0),prec)) with
   | None ->
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix: fv_range=None");*)
       let lift _ term = term in
@@ -939,7 +951,7 @@ let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   | _ -> false
 
 let try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
-    (ci : case_info) (p : EConstr.t) (iv : (EConstr.t, EInstance.t) case_invert)
+    (ci : case_info) (p : EConstr.t) (iv : EConstr.case_invert)
     (item : EConstr.t) (branches : EConstr.t array)
     (success : Environ.env -> EConstr.t -> EConstr.t -> EConstr.t array -> 'a) (failure : unit -> 'result) =
   let i = destRel sigma item in
@@ -1014,13 +1026,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
         let env2 = EConstr.push_rel decl env in
         mkLetIn (x, e', t, reduce_exp env2 sigma b)
-  | Case (ci,p,iv,item,branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       let item' = reduce_arg env sigma item in
       try_iota_match env sigma ci p iv item' branches
         (fun item_env item_content branch args ->
           let term2 = mkApp (branch, args) in
           debug_reduction "iota-match" (fun () ->
-            let term1 = mkCase (ci, p, iv, item', branches) in
+            let term1 = mkCase (EConstr.contract_case env sigma (ci, p, iv, item', branches)) in
             Pp.str "match-item = " ++
             Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
             Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
@@ -1029,7 +1042,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(iota-match)" env sigma term term2;
           reduce_exp env sigma term2)
-        (fun () -> mkCase (ci, p, iv, item', Array.map (reduce_exp env sigma) branches))
+        (fun () -> mkCase (EConstr.contract_case env sigma (ci, p, iv, item', Array.map (reduce_exp env sigma) branches)))
   | Proj (pr,item) ->
       let item' = reduce_arg env sigma item in
       let default () = mkProj (pr, item') in
@@ -1146,13 +1159,15 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(zeta-app)" env sigma term1 term2;
       reduce_exp env sigma term2
-  | Case (ci,p,iv,item,branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
       let item' = reduce_arg env sigma item in
       try_iota_match env sigma ci p iv item' branches
         (fun item_env item_content branch args ->
           let term2 = mkApp (branch, args) in
           debug_reduction "iota-match" (fun () ->
-            let term1 = mkCase (ci, p, iv, item', branches) in
+            let term1 = mkCase (EConstr.contract_case env sigma (ci, p, iv, item', branches)) in
             Pp.str "match-item = " ++
             Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
             Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
@@ -1161,7 +1176,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
             Printer.pr_econstr_env env sigma term2);
           check_convertible "reduction(iota-match)" env sigma f term2;
           reduce_app env sigma branch (Array.append args args_nf))
-        (fun () -> mkApp (mkCase (ci, p, iv, item', Array.map (reduce_exp env sigma) branches), args_nf))
+        (fun () -> mkApp (mkCase (EConstr.contract_case env sigma (ci, p, iv, item', Array.map (reduce_exp env sigma) branches)), args_nf))
   | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       if ks.(j) < Array.length args_nf then
         let decarg_var = args_nf.(ks.(j)) in
@@ -1241,11 +1256,13 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let t' = Reductionops.nf_all env sigma t in
       let b' = normalize_types env2 sigma b in
       mkLetIn (x, e', t', b')
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
       let p' = Reductionops.nf_all env sigma p in
       let item' = normalize_types env sigma item in
       let branches' = Array.map (normalize_types env sigma) branches in
-      mkCase (ci, p', iv, item', branches')
+      mkCase (EConstr.contract_case env sigma (ci, p', iv, item', branches'))
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1302,9 +1319,11 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       let env2 = EConstr.push_rel decl env in
       let b' = normalize_static_arguments env2 sigma b in
       mkLetIn (x, e', t, b')
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
       let branches' = Array.map (normalize_static_arguments env sigma) branches in
-      mkCase (ci, p, iv, item, branches')
+      mkCase (EConstr.contract_case env sigma (ci, p, iv, item, branches'))
   | Proj (proj, e) ->
       term (* e is a variable because V-normal form *)
   | Const (ctnt, u) ->
@@ -1413,14 +1432,16 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       else
         (* reduction: zeta-del *)
         (fvsb, fun vars_used -> fb (false :: vars_used))
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
       let (fvsp, fp) = delete_unused_let_rec env sigma p in
       let (fvsitem, fitem) = delete_unused_let_rec env sigma item in
       let fbranches2 = Array.map (delete_unused_let_rec env sigma) branches in
       let fbranches = Array.map snd fbranches2 in
       let fvsbrances = Array.fold_left IntSet.union IntSet.empty (Array.map fst fbranches2) in
       let fvs = IntSet.union fvsp (IntSet.union fvsitem fvsbrances) in
-      (fvs, fun vars_used -> mkCase (ci, fp vars_used, iv, fitem vars_used, Array.map (fun g -> g vars_used) fbranches))
+      (fvs, fun vars_used -> mkCase (EConstr.contract_case env sigma (ci, fp vars_used, iv, fitem vars_used, Array.map (fun g -> g vars_used) fbranches)))
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1487,49 +1508,59 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let rec first_fv_rec (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
+let rec first_fv_rec (env : Environ.env) (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
   | Const _ | Construct _ -> None
   | Rel i -> if numrels < i then Some i else None
   | Evar (ev, es) ->
-      array_option_exists (first_fv_rec sigma numrels) (Array.of_list es)
+      array_option_exists (first_fv_rec env sigma numrels) (Array.of_list es)
   | Proj (proj, e) ->
-      first_fv_rec sigma numrels e
+      first_fv_rec env sigma numrels e
   | Cast (e,ck,t) ->
-      shortcut_option_or (first_fv_rec sigma numrels e)
-        (fun () -> first_fv_rec sigma numrels t)
+      shortcut_option_or (first_fv_rec env sigma numrels e)
+        (fun () -> first_fv_rec env sigma numrels t)
   | App (f, args) ->
-      shortcut_option_or (first_fv_rec sigma numrels f)
-        (fun () -> array_option_exists (first_fv_rec sigma numrels) args)
+      shortcut_option_or (first_fv_rec env sigma numrels f)
+        (fun () -> array_option_exists (first_fv_rec env sigma numrels) args)
   | LetIn (x,e,t,b) ->
-      shortcut_option_or (first_fv_rec sigma numrels e)
-        (fun () -> shortcut_option_or (first_fv_rec sigma numrels t)
-          (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b)))
-  | Case (ci, p, iv, item, branches) ->
-      shortcut_option_or (first_fv_rec sigma numrels p)
-        (fun () -> shortcut_option_or (first_fv_rec sigma numrels item)
-          (fun () -> array_option_exists (first_fv_rec sigma numrels) branches))
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      shortcut_option_or (first_fv_rec env sigma numrels e)
+        (fun () -> shortcut_option_or (first_fv_rec env sigma numrels t)
+          (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b)))
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
+      shortcut_option_or (first_fv_rec env sigma numrels p)
+        (fun () -> shortcut_option_or (first_fv_rec env sigma numrels item)
+          (fun () -> array_option_exists (first_fv_rec env sigma numrels) branches))
   | Prod (x,t,b) ->
-      shortcut_option_or (first_fv_rec sigma numrels t)
-        (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      shortcut_option_or (first_fv_rec env sigma numrels t)
+        (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b))
   | Lambda (x,t,b) ->
-      shortcut_option_or (first_fv_rec sigma numrels t)
-        (fun () -> Option.map int_pred (first_fv_rec sigma (numrels+1) b))
-  | Fix ((ks, j), (nary, tary, fary)) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      shortcut_option_or (first_fv_rec env sigma numrels t)
+        (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b))
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
       let h = Array.length fary in
-      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec sigma (numrels+h)) fary))
-  | CoFix (i, (nary, tary, fary)) ->
+      shortcut_option_or (array_option_exists (first_fv_rec env sigma numrels) tary)
+        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec env2 sigma (numrels+h)) fary))
+  | CoFix (i, ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
       let h = Array.length fary in
-      shortcut_option_or (array_option_exists (first_fv_rec sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec sigma (numrels+h)) fary))
+      shortcut_option_or (array_option_exists (first_fv_rec env sigma numrels) tary)
+        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec env2 sigma (numrels+h)) fary))
 
-let first_fv (sigma : Evd.evar_map) (term : EConstr.t) : int option =
-  first_fv_rec sigma 0 term
+let first_fv (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int option =
+  first_fv_rec env sigma 0 term
 
-let has_fv sigma term : bool =
-  first_fv sigma term <> None
+let has_fv env sigma term : bool =
+  first_fv env sigma term <> None
 
 (* func must be a constant or constructor *)
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t * string =
@@ -1548,7 +1579,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let nf_static_args = CArray.filter_with static_flags args in (* static arguments are already normalized by normalize_static_arguments *)
   (Array.iteri (fun i nf_arg ->
-    let fv_opt = first_fv sigma nf_arg in
+    let fv_opt = first_fv env sigma nf_arg in
     match fv_opt with
     | None -> ()
     | Some k ->
@@ -1619,14 +1650,16 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       let env'' = Environ.pop_rel_context 1 env2' in
       let referred_cfuncs = StringSet.union referred_cfuncs1 referred_cfuncs2 in
       (env'', mkLetIn (x, e', t, b'), referred_cfuncs)
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
+,p,iv,c,bl) in
       let ((env', referred_cfuncs), branches') = CArray.fold_left_map
         (fun (env2, referred_cfuncs) f ->
           let (env3, f', referred_cfuncs') = replace ~cfunc env2 sigma f in
           ((env3, StringSet.union referred_cfuncs referred_cfuncs'), f'))
         (env, StringSet.empty) branches
       in
-      (env', mkCase (ci, p, iv, item, branches'), referred_cfuncs)
+      (env', mkCase (EConstr.contract_case env sigma (ci, p, iv, item, branches')), referred_cfuncs)
   | Const (ctnt, u) ->
       let f' = Constr.mkConst ctnt in
       let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
@@ -1818,13 +1851,14 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         complete_args_exp env sigma e [||] 0,
         t,
         complete_args_exp env2 sigma b vs' q)
-  | Case (ci, epred, iv, item, branches) ->
+  | Case (ci,u,pms,epred,iv,c,bl) ->
+      let (ci, epred, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,epred,iv,c,bl) in
       mkApp (
-        mkCase (ci, epred, iv, item,
+        mkCase (EConstr.contract_case env sigma (ci, epred, iv, item,
           Array.map2
             (fun br cstr_nargs ->
               complete_args_branch env sigma br cstr_nargs (p+q))
-            branches ci.ci_cstr_nargs),
+            branches ci.ci_cstr_nargs)),
         Array.map (fun j -> mkRel j) vs)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -1932,15 +1966,16 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
     | Rel i -> term
     | Const _ -> term
     | Construct _ -> term
-    | Case (ci, epred, iv, item, branches) ->
-        mkCase (ci, epred, iv, item,
+    | Case (ci,u,pms,epred,iv,c,bl) ->
+        let (ci, epred, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,epred,iv,c,bl) in
+        mkCase (EConstr.contract_case env sigma (ci, epred, iv, item,
           Array.map2
             (fun br cstr_nargs ->
               r env br
                 (List.append
                   (List.init cstr_nargs (fun _ -> Context.anonR))
                   vars))
-            branches ci.ci_cstr_nargs)
+            branches ci.ci_cstr_nargs))
     | Proj _ -> term
     | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
     | CoFix _ | Int _ | Float _ | Array _ ->

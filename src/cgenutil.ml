@@ -351,7 +351,7 @@ let pp_joinmap_ary (sep : Pp.t) (f : 'a -> Pp.t) (ary : 'a array) : Pp.t =
   else
     Array.fold_left
       (fun pp elt -> pp ++ sep ++ f elt)
-      ary.(0)
+      (f ary.(0))
       (Array.sub ary 1 (Array.length ary - 1))
 
 let pp_joinmap_list (sep : Pp.t) (f : 'a -> Pp.t) (l : 'a list) : Pp.t =
@@ -498,7 +498,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Lambda (name, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:lambda:")
   | LetIn (name, expr, ty, body) -> user_err (Pp.str "[codegen] mangle_term_buf:letin:")
   | Const cu -> user_err (Pp.str "[codegen] mangle_term_buf:const:" +++ Printer.pr_econstr_env env sigma ty)
-  | Case (ci, tyf, iv, expr, brs) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
+  | Case (ci,u,pms,p,iv,c,bl) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
   | Fix ((ks, j), (nary, tary, fary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
   | CoFix (i, (nary, tary, fary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
   | Proj (proj, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
@@ -582,7 +582,7 @@ let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : E
   | [] -> b
   | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
 
-let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
+let rec free_variables_rec (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
   | Const _ | Construct _ -> ()
@@ -590,40 +590,46 @@ let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool ar
       if numlocal < i then
         fv.(i-numlocal-1) <- true
   | Evar (ev, es) ->
-      List.iter (free_variables_rec sigma numlocal fv) es
+      List.iter (free_variables_rec env sigma numlocal fv) es
   | Proj (proj, e) ->
-      free_variables_rec sigma numlocal fv e
+      free_variables_rec env sigma numlocal fv e
   | Cast (e,ck,t) ->
-      free_variables_rec sigma numlocal fv e;
-      free_variables_rec sigma numlocal fv t
+      free_variables_rec env sigma numlocal fv e;
+      free_variables_rec env sigma numlocal fv t
   | App (f, args) ->
-      free_variables_rec sigma numlocal fv f;
-      Array.iter (free_variables_rec sigma numlocal fv) args
+      free_variables_rec env sigma numlocal fv f;
+      Array.iter (free_variables_rec env sigma numlocal fv) args
   | LetIn (x,e,t,b) ->
-      free_variables_rec sigma numlocal fv e;
-      free_variables_rec sigma numlocal fv t;
-      free_variables_rec sigma (numlocal+1) fv b
-  | Case (ci, p, iv, item, branches) ->
-      free_variables_rec sigma numlocal fv p;
-      free_variables_rec sigma numlocal fv item;
-      Array.iter (free_variables_rec sigma numlocal fv) branches
+      free_variables_rec env sigma numlocal fv e;
+      free_variables_rec env sigma numlocal fv t;
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      free_variables_rec env2 sigma (numlocal+1) fv b
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+      free_variables_rec env sigma numlocal fv p;
+      free_variables_rec env sigma numlocal fv item;
+      Array.iter (free_variables_rec env sigma numlocal fv) branches
   | Prod (x,t,b) | Lambda (x,t,b) ->
-      free_variables_rec sigma numlocal fv t;
-      free_variables_rec sigma (numlocal+1) fv b
-  | Fix (_, (nary, tary, fary)) | CoFix (_, (nary, tary, fary)) ->
-      Array.iter (free_variables_rec sigma numlocal fv) tary;
+      free_variables_rec env sigma numlocal fv t;
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      free_variables_rec env2 sigma (numlocal+1) fv b
+  | Fix (_, ((nary, tary, fary) as prec)) | CoFix (_, ((nary, tary, fary) as prec)) ->
+      Array.iter (free_variables_rec env sigma numlocal fv) tary;
+      let env2 = push_rec_types prec env in
       let numlocal2 = numlocal + Array.length fary in
-      Array.iter (free_variables_rec sigma numlocal2 fv) fary
+      Array.iter (free_variables_rec env2 sigma numlocal2 fv) fary
 
 (* nb_rel + nb_local should be Environ.nb_rel env *)
-let free_variables_without (sigma : Evd.evar_map) (nb_rel : int) (nb_local : int) (term : EConstr.t) : bool array =
+let free_variables_without (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : int) (nb_local : int) (term : EConstr.t) : bool array =
   let fv = Array.make nb_rel false in
-  free_variables_rec sigma nb_local fv term;
+  free_variables_rec env sigma nb_local fv term;
   fv
 
 (* nb_rel should be Environ.nb_rel env *)
-let free_variables (sigma : Evd.evar_map) (nb_rel : int) (term : EConstr.t) : bool array =
-  free_variables_without sigma nb_rel 0 term
+let free_variables (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : int) (term : EConstr.t) : bool array =
+  free_variables_without env sigma nb_rel 0 term
 
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with

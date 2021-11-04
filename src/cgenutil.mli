@@ -95,10 +95,10 @@ val compose_prod :
   (Names.Name.t Context.binder_annot * EConstr.t) list ->
   EConstr.t -> EConstr.t
 val free_variables_rec :
-  Evd.evar_map -> int -> bool array -> EConstr.t -> unit
+  Environ.env -> Evd.evar_map -> int -> bool array -> EConstr.t -> unit
 val free_variables_without :
-  Evd.evar_map -> int -> int -> EConstr.t -> bool array
-val free_variables : Evd.evar_map -> int -> EConstr.t -> bool array
+  Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
+val free_variables : Environ.env -> Evd.evar_map -> int -> EConstr.t -> bool array
 val constr_name : Evd.evar_map -> EConstr.t -> string
 val constr_expr_cstr_name : Constrexpr.constr_expr -> string
 val global_gensym : ?prefix:string -> unit -> string

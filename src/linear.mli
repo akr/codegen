@@ -10,7 +10,7 @@ val type_of_inductive_arity :
   Declarations.declaration_arity -> Constr.t
 val valid_type_param :
   Environ.env -> Evd.evar_map -> Constr.rel_declaration -> bool
-val hasRel : Evd.evar_map -> EConstr.t -> bool
+val hasRel : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val destProdX_rec :
   Evd.evar_map ->
   EConstr.t ->

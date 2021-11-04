@@ -164,7 +164,8 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       in
       let inlinable = disjoint_id_map_union inlinable_e inlinable_b in
       (inlinable, nontailset, tailset_b)
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       (* item must be a Rel which type is inductive (non-function) type *)
       let branches_result = Array.map2
         (fun cstr_nargs br -> detect_inlinable_fixterm_rec env sigma br
@@ -326,7 +327,8 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let (fixterms1, fixfuncs1) = collect_fix_usage_rec ~inlinable_fixterms env sigma false e 0 ~used_as_call ~used_as_goto in
       let (fixterms2, fixfuncs2) = collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 in
       (Seq.append fixterms1 fixterms2, Seq.append fixfuncs1 fixfuncs2)
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       (* item must be a Rel which type is inductive (non-function) type *)
       let results =
         Array.map2
@@ -495,7 +497,8 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       let fv_e = fixterm_free_variables_rec env sigma e ~result in
       let fv_b = fixterm_free_variables_rec env2 sigma b ~result in
       Id.Set.union fv_e (Id.Set.remove id fv_b)
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       let item_id =
         let i = destRel sigma item in
         let decl = Environ.lookup_rel i env in
@@ -935,7 +938,8 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
           cargs
       in
       gen_head ~fixfunc_tbl ~used_vars ~cont env sigma f cargs2
-  | Case (ci,predicate,iv,item,branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci,predicate, iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       let gen_switch =
         match cont.head_cont_exit_label with
         | None -> gen_switch_with_break
@@ -1077,7 +1081,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
           let decl = Context.Rel.Declaration.LocalAssum (Context.nameR (Id.of_string arg), t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma b rest)
-  | Case (ci,predicate,iv,item,branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci,predicate,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~gen_ret) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
@@ -1514,7 +1519,8 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       Id.Set.union
         (used_variables env sigma e)
         (used_variables env2 sigma b)
-  | Case (ci, p, iv, item, branches) ->
+  | Case (ci,u,pms,p,iv,c,bl) ->
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       Id.Set.union
         (used_variables env sigma item)
         (Array.fold_left

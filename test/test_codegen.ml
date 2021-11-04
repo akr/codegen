@@ -242,10 +242,10 @@ let codegen_test_template
   match goal with
   | UntilCoq -> ()
   | UntilCC ->
-      assert_command ctx cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx cc ["-o"; exe_fn; main_fn];
   | UntilExe ->
-      assert_command ctx cc ["-o"; exe_fn; main_fn];
-      assert_command ctx exe_fn []
+      assert_command ~ctxt:ctx cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx exe_fn []
 
 let template_coq_success
     ?(coq_output_regexp : Str.regexp option)

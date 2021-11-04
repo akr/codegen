@@ -97,10 +97,10 @@ val compose_lets :
   EConstr.t -> EConstr.t
 val reduce_arg : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
 val debug_reduction : string -> (unit -> Pp.t) -> unit
-val fv_range_rec : Evd.evar_map -> int -> EConstr.t -> (int * int) option
+val fv_range_rec : Environ.env -> Evd.evar_map -> int -> EConstr.t -> (int * int) option
 val fv_range_array :
-  Evd.evar_map -> int -> EConstr.t array -> (int * int) option
-val fv_range : Evd.evar_map -> EConstr.t -> (int * int) option
+  Environ.env -> Evd.evar_map -> int -> EConstr.t array -> (int * int) option
+val fv_range : Environ.env -> Evd.evar_map -> EConstr.t -> (int * int) option
 val test_bounded_fix :
   Environ.env ->
   Evd.evar_map ->
@@ -121,7 +121,7 @@ val try_iota_match :
   Evd.evar_map ->
   Constr.case_info ->
   EConstr.t ->
-  (EConstr.t, EConstr.EInstance.t) Constr.case_invert ->
+  EConstr.case_invert ->
   EConstr.t ->
   EConstr.t array ->
   (Environ.env -> EConstr.t -> EConstr.t -> EConstr.t array -> 'result) ->
@@ -145,9 +145,9 @@ val delete_unused_let_rec1 :
   Environ.env ->
   Evd.evar_map -> EConstr.t -> Cgenutil.IntSet.t * (bool list -> EConstr.t)
 val delete_unused_let : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
-val first_fv_rec : Evd.evar_map -> int -> EConstr.t -> int option
-val first_fv : Evd.evar_map -> EConstr.t -> int option
-val has_fv : Evd.evar_map -> EConstr.t -> bool
+val first_fv_rec : Environ.env -> Evd.evar_map -> int -> EConstr.t -> int option
+val first_fv : Environ.env -> Evd.evar_map -> EConstr.t -> int option
+val has_fv : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val replace_app :
   cfunc:string ->
   Environ.env ->
