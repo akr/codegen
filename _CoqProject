@@ -5,13 +5,22 @@
 -Q src codegen
 
 src/codegen_plugin.mlpack
+src/state.mli
 src/state.ml
+src/cgenutil.mli
 src/cgenutil.ml
+src/induc.mli
 src/induc.ml
+src/specialize.mli
 src/specialize.ml
+src/linear.mli
 src/linear.ml
+src/genc.mli
 src/genc.ml
+src/snippet.mli
 src/snippet.ml
+src/indimp.mli
 src/indimp.ml
+src/g_codegen.mli
 src/g_codegen.mlg
 theories/codegen.v
