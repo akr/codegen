@@ -69,6 +69,14 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_replace);
           optwrite = (:=) opt_debug_replace }
 
+(* Set/Unset Debug CodeGen CompleteArguments. *)
+let opt_debug_complete_arguments = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optkey   = ["Debug";"CodeGen";"CompleteArguments"];
+          optread  = (fun () -> !opt_debug_complete_arguments);
+          optwrite = (:=) opt_debug_complete_arguments }
+
 (* Set/Unset Debug CodeGen ExpandEta. *)
 let opt_debug_expand_eta = ref false
 let () = let open Goptions in declare_bool_option

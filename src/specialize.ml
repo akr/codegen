@@ -1690,9 +1690,11 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
   - complete_args_fun is used for top-level functions and closure creations.
 *)
 let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) : EConstr.t =
-  (*msg_debug_hov (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str ")");*)
+  (if !opt_debug_complete_arguments then
+    msg_debug_hov (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str ")"));
   let result = complete_args_fun1 env sigma term p in
-  (*msg_debug_hov (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result);*)
+  (if !opt_debug_complete_arguments then
+    msg_debug_hov (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "complete_args_fun" env sigma term result;
   result
 and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) : EConstr.t =
@@ -1732,9 +1734,11 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   - p <= numargs_of_exp env sigma term
 *)
 and complete_args_branch (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  (*msg_debug_hov (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")");*)
+  (if !opt_debug_complete_arguments then
+    msg_debug_hov (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")"));
   let result = complete_args_branch1 env sigma term p q in
-  (*msg_debug_hov (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result);*)
+  (if !opt_debug_complete_arguments then
+    msg_debug_hov (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "complete_args_branch" env sigma term result;
   result
 and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =

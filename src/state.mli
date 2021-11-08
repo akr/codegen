@@ -8,6 +8,7 @@ val opt_debug_reduction : bool ref
 val opt_debug_reduce_exp : bool ref
 val opt_debug_reduce_app : bool ref
 val opt_debug_replace : bool ref
+val opt_debug_complete_arguments : bool ref
 val opt_debug_expand_eta : bool ref
 val opt_debug_delete_let : bool ref
 val gensym_id : int ref
