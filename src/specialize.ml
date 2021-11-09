@@ -554,6 +554,75 @@ let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : E
   check_convertible "inline" env sigma term result;
   result
 
+(*
+  Coq 8.14 changes the representation of match-expression.
+  (dev/doc/case-repr.md in Coq source)
+  It forces that binders of case-branches must be same as the type of
+  constructors, including let-ins in the binders.
+  However codegen transforms let-ins: V-normalization introduces let-ins,
+  arguments completion moves let-ins.
+  Also, our code generator assumes that case-branches must start
+  with sequence of lambdas, without let-in.
+  So we don't support let-ins in constructor type now.
+  check_letin_in_cstr_type validates this condition.
+
+  We may support let-ins in constructor in future.
+  codegen would copy let-ins into the body of case-branches.
+*)
+let rec check_letin_in_cstr_type (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : unit =
+  check_letin_in_cstr_type1 env sigma term
+and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
+    (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Rel _ | Const _ | Construct _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ -> ()
+  | Var _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Var:" +++ Printer.pr_econstr_env env sigma term)
+  | Evar _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Evar:" +++ Printer.pr_econstr_env env sigma term)
+  | Prod _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Prod:" +++ Printer.pr_econstr_env env sigma term)
+  | CoFix _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected CoFix:" +++ Printer.pr_econstr_env env sigma term)
+  | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
+  | Cast (e,ck,t) -> check_letin_in_cstr_type env sigma e
+  | Lambda (x, t, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      check_letin_in_cstr_type env2 sigma b
+  | LetIn (x, e, t, b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      check_letin_in_cstr_type env sigma e;
+      check_letin_in_cstr_type env2 sigma b
+  | Case (ci, u, pms, p, iv, item, brs) ->
+      let (ci, _, pms, p0, _, item, brs0) =
+        EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, brs) in
+      Array.iter
+        (fun (ctx, br) ->
+          List.iteri
+            (fun i -> function
+            | Context.Rel.Declaration.LocalAssum _ -> ()
+            | Context.Rel.Declaration.LocalDef (x,e,t) ->
+                let cstr = (ci.ci_ind, i) in
+                user_err_hov
+                  (Pp.str "[codegen] constructor type contains let-in:" +++
+                  Printer.pr_constructor env cstr +++
+                  Pp.str "of" +++
+                  Printer.pr_inductive env ci.ci_ind))
+            ctx)
+        brs0;
+      check_letin_in_cstr_type env sigma item;
+      Array.iter
+        (fun (ctx, br) ->
+          let env2 = List.fold_right EConstr.push_rel ctx env in
+          check_letin_in_cstr_type env2 sigma br)
+        brs0
+  | Proj (proj, e) ->
+      check_letin_in_cstr_type env sigma e
+  | App (f, args) ->
+      check_letin_in_cstr_type env sigma f;
+      Array.iter (check_letin_in_cstr_type env sigma) args
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      Array.iter (check_letin_in_cstr_type env2 sigma) fary
+
 (* useless ?
 let rec strip_cast (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (* msg_info_hov (Pp.str "strip_cast arg:" +++ Printer.pr_econstr_env env sigma term); *)
@@ -2039,6 +2108,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "pre-simplified" epresimp;
   let term = inline env sigma inline_pred epresimp in
   debug_simplification env sigma "inline" term;
+  let () = check_letin_in_cstr_type env sigma term in
   (*let term = strip_cast env sigma term in*)
   let term = expand_eta_top env sigma term in
   debug_simplification env sigma "expand_eta_top" term;

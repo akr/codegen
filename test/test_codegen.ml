@@ -1556,12 +1556,24 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
       CodeGen Inductive Type bool*bool => "pair_bool_bool".
       CodeGen Inductive Match bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-
       Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
       Definition swap_bb p := @swap bool bool p.
       CodeGen Function swap_bb.
       CodeGen Gen "swap_bb".
     |})
+
+let test_letin_in_constructor_type (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] constructor type contains let-in:")
+    ctx
+    {|
+      Inductive TestInd := TestConstructor : forall (x := 0) (y : nat), TestInd.
+      Definition f (v : TestInd) :=
+        match v with
+        | TestConstructor x y => x
+        end.
+      CodeGen Gen f. (* should fail *)
+    |} {| |}
 
 let test_command_gen_qualid (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -2865,6 +2877,7 @@ let suite : OUnit2.test =
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
+    "test_letin_in_constructor_type" >:: test_letin_in_constructor_type;
     "test_mftest" >:: test_mftest;
     "test_multifunc_noargument" >:: test_multifunc_noargument;
     "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
