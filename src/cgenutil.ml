@@ -628,8 +628,8 @@ let free_variables_without (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : 
   fv
 
 (* nb_rel should be Environ.nb_rel env *)
-let free_variables (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : int) (term : EConstr.t) : bool array =
-  free_variables_without env sigma nb_rel 0 term
+let free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool array =
+  free_variables_without env sigma (Environ.nb_rel env) 0 term
 
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with
