@@ -1733,8 +1733,7 @@ let rec first_fv_rec (env : Environ.env) (sigma : Evd.evar_map) (numrels : int) 
         (fun () -> shortcut_option_or (first_fv_rec env sigma numrels t)
           (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b)))
   | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms
-,p,iv,c,bl) in
+      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       shortcut_option_or (first_fv_rec env sigma numrels p)
         (fun () -> shortcut_option_or (first_fv_rec env sigma numrels item)
           (fun () -> array_option_exists (first_fv_rec env sigma numrels) branches))
