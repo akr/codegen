@@ -627,9 +627,29 @@ let free_variables_without (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : 
   free_variables_rec env sigma nb_local fv term;
   fv
 
-(* nb_rel should be Environ.nb_rel env *)
 let free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool array =
   free_variables_without env sigma (Environ.nb_rel env) 0 term
+
+(* set of de Bruijn indexes of free variables *)
+let free_variables_index_set (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : IntSet.t =
+  let fv = free_variables env sigma term in
+  let r = ref IntSet.empty in
+  for i = 0 to Array.length fv - 1 do
+    if fv.(i) then
+      r := IntSet.add (i + 1) !r
+  done;
+  !r
+
+(* set of de Bruijn levels of free variables *)
+let free_variables_level_set ?(without : int = 0) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : IntSet.t =
+  let nb_rel = Environ.nb_rel env in
+  let fv = free_variables_without env sigma (nb_rel - without) without term in
+  let r = ref IntSet.empty in
+  for i = 0 to Array.length fv - 1 do
+    if fv.(i) then
+      r := IntSet.add (nb_rel - (i + 1)) !r
+  done;
+  !r
 
 let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   match EConstr.kind sigma term with

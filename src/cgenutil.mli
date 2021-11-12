@@ -98,7 +98,8 @@ val free_variables_rec :
   Environ.env -> Evd.evar_map -> int -> bool array -> EConstr.t -> unit
 val free_variables_without :
   Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
-val free_variables : Environ.env -> Evd.evar_map -> EConstr.t -> bool array
+val free_variables_index_set : Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
+val free_variables_level_set : ?without:int -> Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
 val constr_name : Evd.evar_map -> EConstr.t -> string
 val constr_expr_cstr_name : Constrexpr.constr_expr -> string
 val global_gensym : ?prefix:string -> unit -> string

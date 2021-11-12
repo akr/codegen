@@ -1492,6 +1492,57 @@ let rec count_false_in_prefix (n : int) (vars_used : bool list) : int =
         else
           1 + count_false_in_prefix (n-1) rest
 
+let unlift_unused (sigma : Evd.evar_map) (vars_used : bool list) (term : EConstr.t) : EConstr.t =
+  let rec aux (vars_used : bool list) (term : EConstr.t) : EConstr.t =
+    match EConstr.kind sigma term with
+    | Var _ -> user_err (Pp.str "[codegen] codegen doesn't support Var.")
+    | Evar _ -> user_err (Pp.str "[codegen] codegen doesn't support Evar.")
+    | Meta _ -> user_err (Pp.str "[codegen] codegen doesn't support Meta.")
+    | Int _ -> user_err (Pp.str "[codegen] codegen doesn't support Int.")
+    | Float _ -> user_err (Pp.str "[codegen] codegen doesn't support Float.")
+    | Array _ -> user_err (Pp.str "[codegen] codegen doesn't support Array.")
+    | CoFix _ -> user_err (Pp.str "[codegen] codegen doesn't support CoFix.")
+    | Sort _ | Ind _ | Const _ | Construct _ -> term
+    | Rel i ->
+        if not (List.nth vars_used (i-1)) then
+          user_err (Pp.str "[codegen:bug] unlift_unused found that vars_used is invalid");
+        mkRel (i - count_false_in_prefix (i-1) vars_used)
+    | Proj (proj, e) ->
+        mkProj (proj, aux vars_used e)
+    | Cast (e,ck,t) ->
+        mkCast (aux vars_used e, ck, aux vars_used t)
+    | App (f, args) ->
+        mkApp (aux vars_used f, Array.map (aux vars_used) args)
+    | LetIn (x,e,t,b) ->
+        mkLetIn (x, aux vars_used e, aux vars_used e, aux (true :: vars_used) e)
+    | Case (ci,u,pms,p,iv,item,bl) ->
+       let pms' = Array.map (aux vars_used) pms in
+       let p' =
+         let (nas,body) = p in
+         let body' = aux (CList.addn (Array.length nas) true vars_used) body in
+         (nas,body')
+       in
+       let iv' = map_invert (aux vars_used) iv in
+       let item' = aux vars_used item in
+       let bl' = Array.map
+         (fun (nas,body) -> (nas, aux (CList.addn (Array.length nas) true vars_used) body))
+         bl
+       in
+       mkCase (ci, u, pms', p', iv', item', bl')
+    | Prod (x,t,b) ->
+        mkProd (x, aux vars_used t, aux (true :: vars_used) b)
+    | Lambda (x,t,b) ->
+        mkLambda (x, aux vars_used t, aux (true :: vars_used) b)
+    | Fix ((ks, j), (nary, tary, fary)) ->
+        let h = Array.length fary in
+        let vars_used' = CList.addn h true vars_used in
+        mkFix ((ks, j),
+               (nary,
+                Array.map (aux vars_used) tary,
+                Array.map (aux vars_used') fary))
+  in
+  aux vars_used term
+
 let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   (if !opt_debug_delete_let then
     msg_debug_hov (Pp.str "[codegen] delete_unused_let_rec arg:" +++ Printer.pr_econstr_env env sigma term));
@@ -1543,20 +1594,56 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
           fvse)
       in
       if retain then
+        (* Environ.nb_rel env, same as Environ.nb_rel env2 - 1,
+          means the bound variable with this let-in. *)
         let fvs = IntSet.union (IntSet.remove (Environ.nb_rel env) fvsb) (IntSet.union fvse fvst) in
         (fvs, fun vars_used -> mkLetIn (x, fe vars_used, ft vars_used, fb (true :: vars_used)))
       else
         (* reduction: zeta-del *)
         (fvsb, fun vars_used -> fb (false :: vars_used))
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      let (fvsp, fp) = delete_unused_let_rec env sigma p in
-      let (fvsitem, fitem) = delete_unused_let_rec env sigma item in
-      let fbranches2 = Array.map (delete_unused_let_rec env sigma) branches in
-      let fbranches = Array.map snd fbranches2 in
-      let fvsbrances = Array.fold_left IntSet.union IntSet.empty (Array.map fst fbranches2) in
-      let fvs = IntSet.union fvsp (IntSet.union fvsitem fvsbrances) in
-      (fvs, fun vars_used -> mkCase (EConstr.contract_case env sigma (ci, fp vars_used, iv, fitem vars_used, Array.map (fun g -> g vars_used) fbranches)))
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let fv =
+        Array.fold_left
+          (fun fv pm -> IntSet.union fv (free_variables_level_set env sigma pm))
+          IntSet.empty pms
+      in
+      let fv = IntSet.union fv
+        (let (nas,body), (ctx,_) = p, p0 in
+        let env2 = List.fold_right EConstr.push_rel ctx env in
+        free_variables_level_set ~without:(Array.length nas) env2 sigma body)
+      in
+      let fv =
+        Constr.fold_invert
+          (fun fv e -> IntSet.union fv (free_variables_level_set env sigma e))
+          fv iv
+      in
+      let fv = IntSet.union fv (free_variables_level_set env sigma item) in
+      let branches2 =
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = List.fold_right EConstr.push_rel ctx env in
+            let (fv_br, g) = delete_unused_let_rec env2 sigma body in
+            let fv_br' = IntSet.filter (fun l -> l < Environ.nb_rel env) fv_br in
+            (fv_br', g))
+          bl bl0
+      in
+      let fv = Array.fold_left (fun fv (fv_br,_) -> IntSet.union fv fv_br) fv branches2 in
+      (fv,
+       fun vars_used ->
+         let pms' = Array.map (unlift_unused sigma vars_used) pms in
+         let p' =
+           let (nas,body) = p in
+           let body' = unlift_unused sigma (CList.addn (Array.length nas) true vars_used) body in
+           (nas,body')
+         in
+         let iv' = map_invert (unlift_unused sigma vars_used) iv in
+         let item' = unlift_unused sigma vars_used item in
+         let bl' = Array.map2
+           (fun (nas,_) (_,g) -> (nas, g (CList.addn (Array.length nas) true vars_used)))
+           bl branches2
+         in
+         mkCase (ci, u, pms', p', iv', item', bl'))
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
