@@ -1045,25 +1045,6 @@ let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   | App (f, args) -> isInd sigma f
   | _ -> false
 
-let try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
-    (ci : case_info)
-    (item : EConstr.t) (branches : EConstr.t array)
-    (success : Environ.env -> EConstr.t -> EConstr.t -> EConstr.t array -> 'a) (failure : unit -> 'result) =
-  let i = destRel sigma item in
-  (match EConstr.lookup_rel i env with
-  | Context.Rel.Declaration.LocalAssum _ -> failure ()
-  | Context.Rel.Declaration.LocalDef (x,e,t) ->
-      let (f, args) = decompose_app sigma e in
-      (match EConstr.kind sigma f with
-      | Construct ((ind, j), _) ->
-          (* reduction: iota-match *)
-          let branch = branches.(j-1) in
-          let args = (Array.of_list (CList.skipn ci.ci_npar args)) in
-          let args = Array.map (Vars.lift i) args in
-          let item_env = Environ.pop_rel_context i env in
-          success item_env e branch args
-      | _ -> failure ()))
-
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let t1 = Unix.times () in
@@ -1121,23 +1102,10 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
         let env2 = EConstr.push_rel decl env in
         mkLetIn (x, e', t, reduce_exp env2 sigma b)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      let item' = reduce_arg env sigma item in
-      try_iota_match env sigma ci item' branches
-        (fun item_env item_content branch args ->
-          let term2 = mkApp (branch, args) in
-          debug_reduction "iota-match" (fun () ->
-            let term1 = mkCase (EConstr.contract_case env sigma (ci, p, iv, item', branches)) in
-            Pp.str "match-item = " ++
-            Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
-            Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
-            Pp.str "->" ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term2);
-          check_convertible "reduction(iota-match)" env sigma term term2;
-          reduce_exp env sigma term2)
-        (fun () -> mkCase (EConstr.contract_case env sigma (ci, p, iv, item', Array.map (reduce_exp env sigma) branches)))
+  | Case _ ->
+      try_iota_match env sigma term
+        (fun term2 -> reduce_exp env sigma term2)
+        (fun term2 -> term2)
   | Proj (pr,item) ->
       let item' = reduce_arg env sigma item in
       let default () = mkProj (pr, item') in
@@ -1254,24 +1222,10 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(zeta-app)" env sigma term1 term2;
       reduce_exp env sigma term2
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms
-,p,iv,c,bl) in
-      let item' = reduce_arg env sigma item in
-      try_iota_match env sigma ci item' branches
-        (fun item_env item_content branch args ->
-          let term2 = mkApp (branch, args) in
-          debug_reduction "iota-match" (fun () ->
-            let term1 = mkCase (EConstr.contract_case env sigma (ci, p, iv, item', branches)) in
-            Pp.str "match-item = " ++
-            Printer.pr_econstr_env env sigma item ++ Pp.str " = " ++
-            Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
-            Pp.str "->" ++ Pp.fnl () ++
-            Printer.pr_econstr_env env sigma term2);
-          check_convertible "reduction(iota-match)" env sigma f term2;
-          reduce_app env sigma branch (Array.append args args_nf))
-        (fun () -> mkApp (mkCase (EConstr.contract_case env sigma (ci, p, iv, item', Array.map (reduce_exp env sigma) branches)), args_nf))
+  | Case _ ->
+      try_iota_match env sigma f
+        (fun term2 -> reduce_app env sigma term2 args_nf)
+        (fun term2 -> mkApp (term2, args_nf))
   | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       if ks.(j) < Array.length args_nf then
         let decarg_var = args_nf.(ks.(j)) in
@@ -1327,6 +1281,53 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
       else
         default ()
   | _ -> default ()
+
+and try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
+    (term1 : EConstr.t)
+    (success : EConstr.t -> 'result)
+    (failure : EConstr.t -> 'result) =
+  let (ci,u,pms,p,iv,item,bl) = destCase sigma term1 in
+  let item' = reduce_arg env sigma item in
+  let failure2 () =
+    let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+    let term2 = mkCase (ci, u, pms, p, iv, item',
+      Array.map2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          (nas, reduce_exp env2 sigma body))
+        bl bl0)
+    in
+    failure term2
+  in
+  let i = destRel sigma item' in
+  (match EConstr.lookup_rel i env with
+  | Context.Rel.Declaration.LocalAssum _ -> failure2 ()
+  | Context.Rel.Declaration.LocalDef (x,item_content,t) ->
+      let (f, args) = decompose_app sigma item_content in
+      (match EConstr.kind sigma f with
+      | Construct ((ind, j), _) ->
+          (* reduction: iota-match *)
+          let args = (Array.of_list (CList.skipn ci.ci_npar args)) in
+          let args = Array.map (Vars.lift i) args in
+          let (nas, branch) = bl.(j-1) in
+          if Array.length nas <> Array.length args then
+            user_err (Pp.str "[codegen:bug] Array.length nas <> Array.length args");
+          let term2 = Vars.substl (CArray.rev_to_list args) branch in (* xxx: let-in in constructor types not supported *)
+          debug_reduction "iota-match" (fun () ->
+            let item_env = Environ.pop_rel_context i env in
+            Pp.str "match-item =" +++
+            Printer.pr_econstr_env env sigma item +++ Pp.str "=" +++
+            (if destRel sigma item <> destRel sigma item' then
+              Printer.pr_econstr_env env sigma item' +++ Pp.str "="
+            else Pp.mt ()) +++
+            Printer.pr_econstr_env item_env sigma item_content ++ Pp.fnl () ++
+            Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
+            Pp.str "->" ++ Pp.fnl () ++
+            Printer.pr_econstr_env env sigma term2);
+          check_convertible "reduction(iota-match)" env sigma term1 term2;
+          success term2
+      | _ ->
+          failure2 ()))
 
 let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
