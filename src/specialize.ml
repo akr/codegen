@@ -1852,15 +1852,17 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       let env'' = Environ.pop_rel_context 1 env2' in
       let referred_cfuncs = StringSet.union referred_cfuncs1 referred_cfuncs2 in
       (env'', mkLetIn (x, e', t, b'), referred_cfuncs)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      let ((env', referred_cfuncs), branches') = CArray.fold_left_map
-        (fun (env2, referred_cfuncs) f ->
-          let (env3, f', referred_cfuncs') = replace ~cfunc env2 sigma f in
-          ((env3, StringSet.union referred_cfuncs referred_cfuncs'), f'))
-        (env, StringSet.empty) branches
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let ((env', referred_cfuncs), bl') = CArray.fold_left2_map
+        (fun (env2, referred_cfuncs) (nas,body) (ctx,_) ->
+          let env2x = List.fold_right EConstr.push_rel ctx env2 in
+          let (env3x, body', referred_cfuncs') = replace ~cfunc env2x sigma body in
+          let env3 = Environ.pop_rel_context (Array.length nas) env3x in
+          ((env3, StringSet.union referred_cfuncs referred_cfuncs'), (nas,body')))
+        (env, StringSet.empty) bl bl0
       in
-      (env', mkCase (EConstr.contract_case env sigma (ci, p, iv, item, branches')), referred_cfuncs)
+      (env', mkCase (ci,u,pms,p,iv,item,bl'), referred_cfuncs)
   | Const (ctnt, u) ->
       let f' = Constr.mkConst ctnt in
       let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
