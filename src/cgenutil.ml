@@ -131,11 +131,7 @@ let array_flatten (v : 'a array array) : 'a array =
     done;
     u
 
-let rec ncons n x s =
-  if n = 0 then
-    s
-  else
-    x :: (ncons (n-1) x s)
+let ncons n x s = CList.addn n x s
 
 let rec list_rev_map_append (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
   match l1 with
