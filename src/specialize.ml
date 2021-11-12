@@ -1046,7 +1046,7 @@ let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   | _ -> false
 
 let try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
-    (ci : case_info) (p : EConstr.t) (iv : EConstr.case_invert)
+    (ci : case_info)
     (item : EConstr.t) (branches : EConstr.t array)
     (success : Environ.env -> EConstr.t -> EConstr.t -> EConstr.t array -> 'a) (failure : unit -> 'result) =
   let i = destRel sigma item in
@@ -1124,7 +1124,7 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Case (ci,u,pms,p,iv,c,bl) ->
       let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
       let item' = reduce_arg env sigma item in
-      try_iota_match env sigma ci p iv item' branches
+      try_iota_match env sigma ci item' branches
         (fun item_env item_content branch args ->
           let term2 = mkApp (branch, args) in
           debug_reduction "iota-match" (fun () ->
@@ -1258,7 +1258,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
       let (ci,p,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms
 ,p,iv,c,bl) in
       let item' = reduce_arg env sigma item in
-      try_iota_match env sigma ci p iv item' branches
+      try_iota_match env sigma ci item' branches
         (fun item_env item_content branch args ->
           let term2 = mkApp (branch, args) in
           debug_reduction "iota-match" (fun () ->

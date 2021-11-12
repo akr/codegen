@@ -116,16 +116,6 @@ val find_bounded_fix :
   Names.Name.t Context.binder_annot array * EConstr.types array *
   EConstr.t array -> int option
 val is_ind_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
-val try_iota_match :
-  Environ.env ->
-  Evd.evar_map ->
-  Constr.case_info ->
-  EConstr.t ->
-  EConstr.case_invert ->
-  EConstr.t ->
-  EConstr.t array ->
-  (Environ.env -> EConstr.t -> EConstr.t -> EConstr.t array -> 'result) ->
-  (unit -> 'result) -> 'result
 val reduce_exp : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
 val reduce_exp1 : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
 val reduce_app :
