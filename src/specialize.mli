@@ -165,10 +165,6 @@ val complete_args_fun :
   Environ.env -> Evd.evar_map -> EConstr.t -> int -> EConstr.t
 val complete_args_fun1 :
   Environ.env -> Evd.evar_map -> EConstr.t -> int -> EConstr.t
-val complete_args_branch :
-  Environ.env -> Evd.evar_map -> EConstr.t -> int -> int -> EConstr.t
-val complete_args_branch1 :
-  Environ.env -> Evd.evar_map -> EConstr.t -> int -> int -> EConstr.t
 val complete_args_exp :
   Environ.env -> Evd.evar_map -> EConstr.t -> int array -> int -> EConstr.t
 val complete_args_exp1 :

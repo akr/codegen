@@ -1930,42 +1930,6 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         compose_lam fargs term''
 
 (*
-  - complete_args_branch translates "term" to begin with p lambdas.
-  - Unlike complete_args_fun, it doesn't permt fix in the lambdas.
-    This is because code generation for match-expression needs
-    a lambda-expression for each assignment of constructor arguments.
-  - p <= numargs_of_exp env sigma term
-*)
-and complete_args_branch (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  (if !opt_debug_complete_arguments then
-    msg_debug_hov (Pp.str "[codegen] complete_args_branch arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")"));
-  let result = complete_args_branch1 env sigma term p q in
-  (if !opt_debug_complete_arguments then
-    msg_debug_hov (Pp.str "[codegen] complete_args_branch result:" +++ Printer.pr_econstr_env env sigma result));
-  check_convertible "complete_args_branch" env sigma term result;
-  result
-and complete_args_branch1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) (q : int) : EConstr.t =
-  if p = 0 then
-    complete_args_exp env sigma term [||] q
-  else
-    match EConstr.kind sigma term with
-    | Lambda (x,t,e) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
-        mkLambda (x, t, complete_args_branch env2 sigma e (p-1) q)
-    | _ ->
-        (* reduction/expansion: eta-expansion *)
-        let t = Retyping.get_type_of env sigma term in
-        let t = Reductionops.nf_all env sigma t in
-        let (fargs, result_type) = decompose_prod sigma t in
-        let fargs' = CList.lastn p fargs in
-        let term' = Vars.lift p term in
-        let vs = array_rev (iota_ary 1 p) in
-        let env2 = EConstr.push_rel_context (List.map (fun (x, t) -> Context.Rel.Declaration.LocalAssum (x,t)) fargs') env in
-        let term'' = complete_args_exp env2 sigma term' vs q in
-        compose_lam fargs' term''
-
-(*
   - complete_args_exp transforms closure creation expressions in "term vs" to
     lambda-expressions with all arguments. (fix-term is permitted.)
   - "term" is evaluated with argument variables denoted by vs and q unknown values.
@@ -2060,14 +2024,15 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         complete_args_exp env sigma e [||] 0,
         t,
         complete_args_exp env2 sigma b vs' q)
-  | Case (ci,u,pms,epred,iv,c,bl) ->
-      let (ci, epred, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,epred,iv,c,bl) in
+  | Case (ci,u,pms,mpred,iv,item,bl) ->
+      let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
       mkApp (
-        mkCase (EConstr.contract_case env sigma (ci, epred, iv, item,
+        mkCase (ci,u,pms,mpred,iv,item,
           Array.map2
-            (fun br cstr_nargs ->
-              complete_args_branch env sigma br cstr_nargs (p+q))
-            branches ci.ci_cstr_nargs)),
+            (fun (nas,body) (ctx,_) ->
+              let env2 = List.fold_right EConstr.push_rel ctx env in
+              (nas, complete_args_exp env2 sigma body [||] (p+q)))
+            bl bl0),
         Array.map (fun j -> mkRel j) vs)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
