@@ -2140,16 +2140,15 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
     | Rel i -> term
     | Const _ -> term
     | Construct _ -> term
-    | Case (ci,u,pms,epred,iv,c,bl) ->
-        let (ci, epred, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,epred,iv,c,bl) in
-        mkCase (EConstr.contract_case env sigma (ci, epred, iv, item,
+    | Case (ci,u,pms,mpred,iv,item,bl) ->
+        let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
+        mkCase (ci, u, pms, mpred, iv, item,
           Array.map2
-            (fun br cstr_nargs ->
-              r env br
-                (List.append
-                  (List.init cstr_nargs (fun _ -> Context.anonR))
-                  vars))
-            branches ci.ci_cstr_nargs))
+            (fun (nas,body) (ctx,_) ->
+              let env2 = List.fold_right EConstr.push_rel ctx env in
+              let nas' = Array.map make_new_var nas in
+              (nas', r env2 body vars))
+            bl bl0)
     | Proj _ -> term
     | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
     | CoFix _ | Int _ | Float _ | Array _ ->
