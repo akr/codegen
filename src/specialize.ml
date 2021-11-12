@@ -611,7 +611,7 @@ and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
       check_letin_in_cstr_type env sigma item;
       Array.iter
         (fun (ctx, br) ->
-          let env2 = List.fold_right EConstr.push_rel ctx env in
+          let env2 = EConstr.push_rel_context ctx env in
           check_letin_in_cstr_type env2 sigma br)
         brs0
   | Proj (proj, e) ->
@@ -726,7 +726,7 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
       let bl' =
         Array.map2
           (fun (nas, body) (ctx, _) ->
-            let env2 = List.fold_right EConstr.push_rel ctx env in
+            let env2 = EConstr.push_rel_context ctx env in
             (nas, search_fix_to_expand_eta env2 sigma body))
           bl bl0
       in
@@ -807,7 +807,7 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
         let bl' =
           Array.map2
             (fun (nas, body) (ctx, _) ->
-              let env2 = List.fold_right EConstr.push_rel ctx env in
+              let env2 = EConstr.push_rel_context ctx env in
               (nas, normalizeV env2 sigma body))
             bl bl0
         in
@@ -822,7 +822,7 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
             mkRel 1,
             Array.map2
               (fun (nas, body) (ctx, _) ->
-                let env2 = List.fold_right EConstr.push_rel ctx env in
+                let env2 = EConstr.push_rel_context ctx env in
                 (nas, Vars.liftn 1 (List.length ctx + 1) (normalizeV env2 sigma body)))
               bl bl0)
         in
@@ -1361,7 +1361,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let pms' = Array.map (Reductionops.nf_all env sigma) pms in
       let p' =
         let (nas,body), (ctx,_) = p, p0 in
-        let env2 = List.fold_right EConstr.push_rel ctx env in
+        let env2 = EConstr.push_rel_context ctx env in
         (nas, Reductionops.nf_all env2 sigma body)
       in
       let iv' = map_invert (Reductionops.nf_all env sigma) iv in
@@ -1369,7 +1369,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let bl' =
         Array.map2
           (fun (nas,body) (ctx,_) ->
-            let env2 = List.fold_right EConstr.push_rel ctx env in
+            let env2 = EConstr.push_rel_context ctx env in
             (nas, normalize_types env2 sigma body))
           bl bl0
       in
@@ -1435,7 +1435,7 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       let bl' =
         Array.map2
           (fun (nas,body) (ctx,_) ->
-            let env2 = List.fold_right EConstr.push_rel ctx env in
+            let env2 = EConstr.push_rel_context ctx env in
             (nas, normalize_static_arguments env2 sigma body))
           bl bl0
       in
@@ -1610,7 +1610,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       in
       let fv = IntSet.union fv
         (let (nas,body), (ctx,_) = p, p0 in
-        let env2 = List.fold_right EConstr.push_rel ctx env in
+        let env2 = EConstr.push_rel_context ctx env in
         free_variables_level_set ~without:(Array.length nas) env2 sigma body)
       in
       let fv =
@@ -1622,7 +1622,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let branches2 =
         Array.map2
           (fun (nas,body) (ctx,_) ->
-            let env2 = List.fold_right EConstr.push_rel ctx env in
+            let env2 = EConstr.push_rel_context ctx env in
             let (fv_br, g) = delete_unused_let_rec env2 sigma body in
             let fv_br' = IntSet.filter (fun l -> l < Environ.nb_rel env) fv_br in
             (fv_br', g))
@@ -1856,7 +1856,7 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let ((env', referred_cfuncs), bl') = CArray.fold_left2_map
         (fun (env2, referred_cfuncs) (nas,body) (ctx,_) ->
-          let env2x = List.fold_right EConstr.push_rel ctx env2 in
+          let env2x = EConstr.push_rel_context ctx env2 in
           let (env3x, body', referred_cfuncs') = replace ~cfunc env2x sigma body in
           let env3 = Environ.pop_rel_context (Array.length nas) env3x in
           ((env3, StringSet.union referred_cfuncs referred_cfuncs'), (nas,body')))
@@ -2030,7 +2030,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         mkCase (ci,u,pms,mpred,iv,item,
           Array.map2
             (fun (nas,body) (ctx,_) ->
-              let env2 = List.fold_right EConstr.push_rel ctx env in
+              let env2 = EConstr.push_rel_context ctx env in
               (nas, complete_args_exp env2 sigma body [||] (p+q)))
             bl bl0),
         Array.map (fun j -> mkRel j) vs)
@@ -2145,7 +2145,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         mkCase (ci, u, pms, mpred, iv, item,
           Array.map2
             (fun (nas,body) (ctx,_) ->
-              let env2 = List.fold_right EConstr.push_rel ctx env in
+              let env2 = EConstr.push_rel_context ctx env in
               let nas' = Array.map make_new_var nas in
               (nas', r env2 body vars))
             bl bl0)
