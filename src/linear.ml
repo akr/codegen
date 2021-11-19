@@ -104,8 +104,9 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
   ty is code generatable and it is linear.
   It returns false otherwise.
 
-  - code generatable means that the type is inductive type or
+  - code-generatable means that the type is inductive type or
     function type.
+    other types, such as sorts, are not code-generatable.
   - linear type is
     - a inductive type which is registered with CodeGen Linear, or
     - a inductive type which has (possibly indirectly) have a component which type is linear.
