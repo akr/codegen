@@ -100,12 +100,19 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
   (Array.of_list names, Array.of_list tys, body)
 
 let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array) (f : Environ.env -> EConstr.t array -> (Constr.rel_context * Constr.types) -> unit) : unit =
+  (*Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] ind:" +++ Printer.pr_inductive env ind);
+  for i = 0 to Array.length argsary - 1 do
+    Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] argsary[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma argsary.(i))
+  done;*)
   let (mutind, i) = ind in
   let mind_body = Environ.lookup_mind mutind env in
   if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
     user_err (Pp.str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_inductive env ind);
   if mind_body.Declarations.mind_nparams <> Array.length argsary then
-    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++ Printer.pr_inductive env ind);
+    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++ Printer.pr_inductive env ind +++
+              Pp.hv 0 (
+                Pp.str "(" ++ Pp.int mind_body.Declarations.mind_nparams +++ Pp.str "arguments expected but" +++
+                Pp.int (Array.length argsary) +++ Pp.str "given)"));
   if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
     user_err (Pp.str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_inductive env ind);
   let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
@@ -122,6 +129,32 @@ let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (
     ) env in
   let oind_body = mind_body.Declarations.mind_packets.(i) in
   Array.iter (f env params) oind_body.Declarations.mind_nf_lc
+
+let nflc_carg_iter (env : Environ.env) (sigma : Evd.evar_map) (params : EConstr.t array) (nf_lc : Constr.rel_context * Constr.types) (f : Environ.env -> Constr.types -> unit) : unit =
+  let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
+  (*for i = 0 to Array.length params - 1 do
+    Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] params[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma params.(i))
+  done;
+  Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] context:" +++ Printer.pr_rel_context env sigma ctx +++
+                      Pp.str "type:" +++ Printer.pr_type_env (Environ.push_rel_context ctx env) sigma t);*)
+  (* ctx is a list from inside declaration to outside declaration *)
+  let env = ref env in
+  let params = ref (CArray.map_to_list (EConstr.to_constr sigma) params) in
+  List.iter
+    (fun decl ->
+      (*Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] decl:" +++ Printer.pr_rel_decl !env sigma decl);*)
+      match decl with
+      | Context.Rel.Declaration.LocalDef (name, expr, ty) ->
+          env := Environ.push_rel decl !env
+      | Context.Rel.Declaration.LocalAssum (name, ty) ->
+          (match !params with
+          | param :: rest ->
+              params := rest;
+              env := Environ.push_rel (Context.Rel.Declaration.LocalDef (name, param, ty)) !env
+          | [] ->
+              f !env ty;
+              env := Environ.push_rel decl !env))
+    (List.rev ctx)
 
 (*
   is_linear_type env sigma ty returns true if
@@ -153,7 +186,7 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
       false
 
 and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
   | Some Linear -> true
   | Some Unrestricted -> false
@@ -169,41 +202,29 @@ and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.type
         type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Unrestricted !type_linearity_map;
         false))
 and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   let (ind_f, argsary) =
     match EConstr.kind sigma ty with
     | App (f, argsary) -> (f, argsary)
     | _ -> (ty, [| |])
   in
+  Array.iter
+    (fun arg ->
+      if hasRel env sigma arg then
+        user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
+    argsary;
   let exception FoundLinear in
   try
     ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
       (fun env params nf_lc ->
-        let user_lc =
-          let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
-          Context.Rel.fold_inside
-            (fun (t : Constr.t) (decl : Constr.rel_declaration) ->
-              match decl with
-              | Context.Rel.Declaration.LocalAssum (name, ty) -> Constr.mkProd (name, ty, t)
-              | Context.Rel.Declaration.LocalDef (name, expr, ty) -> Constr.mkLetIn (name, expr, ty, t))
-            ~init:t ctx
-        in
-        let user_lc = EConstr.of_constr user_lc in
-        (*Feedback.msg_debug (Pp.str "[codegen] user_lc:" ++ Pp.str (constr_name sigma user_lc) ++ Pp.str ":" ++ Printer.pr_econstr_env env sigma user_lc);
-        Feedback.msg_debug (Pp.str "[codegen] params:" +++ pp_sjoinmap_ary (Printer.pr_econstr_env env sigma) params);*)
-        let user_lc1 = prod_appvect sigma user_lc params in (* apply type parameters *)
-        let user_lc = nf_all env sigma user_lc1 in (* apply type parameters *)
-        (*Feedback.msg_debug (Pp.str "[codegen] user_lc2:" ++ Pp.str (constr_name sigma user_lc) ++ Pp.str ":" ++ Printer.pr_econstr_env env sigma user_lc);*)
-        (if hasRel env sigma user_lc then
-          user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma user_lc));
-        (* cparam_tys and body can be interpreted under env because they have no Rel *)
-        let (cparam_names, cparam_tys, body) = destProdX sigma user_lc in
-        (if not (eq_constr sigma body ty) then
-          user_err (Pp.str "[codegen] unexpected constructor body type:" +++ Printer.pr_econstr_env env sigma body +++ Pp.str "(expected:" +++ Printer.pr_econstr_env env sigma ty ++ Pp.str ")"));
-        (if Array.exists (isSort sigma) cparam_tys then
-          user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument"));
-        Array.iter (fun argty -> if is_linear_type env sigma argty then raise FoundLinear) cparam_tys);
-      false
+        nflc_carg_iter env sigma params nf_lc
+          (fun env argty ->
+            let argty = EConstr.of_constr argty in
+            let argty = nf_all env sigma argty in
+            if isSort sigma argty then
+              user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument");
+            if is_linear_type env sigma argty then raise FoundLinear));
+    false
   with
     FoundLinear -> true
 
