@@ -99,7 +99,7 @@ let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.b
   let (names, tys, body) = destProdX_rec sigma term in
   (Array.of_list names, Array.of_list tys, body)
 
-let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array) (f : Environ.env -> EConstr.t array -> (Constr.rel_context * Constr.types) -> unit) : unit =
+let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array) (f : Environ.env -> Id.t -> EConstr.t array -> Id.t -> (Constr.rel_context * Constr.types) -> unit) : unit =
   (*Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] ind:" +++ Printer.pr_inductive env ind);
   for i = 0 to Array.length argsary - 1 do
     Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] argsary[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma argsary.(i))
@@ -128,7 +128,7 @@ let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (
         (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
     ) env in
   let oind_body = mind_body.Declarations.mind_packets.(i) in
-  Array.iter (f env params) oind_body.Declarations.mind_nf_lc
+  Array.iter2 (f env oind_body.Declarations.mind_typename params) oind_body.Declarations.mind_consnames oind_body.Declarations.mind_nf_lc
 
 let nflc_carg_iter (env : Environ.env) (sigma : Evd.evar_map) (params : EConstr.t array) (nf_lc : Constr.rel_context * Constr.types) (f : Environ.env -> Constr.types -> unit) : unit =
   let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
@@ -210,20 +210,42 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   in
   Array.iter
     (fun arg ->
-      if hasRel env sigma arg then
+      if hasRel env sigma arg then (* hasRel is too strong.  No free variables is enough *)
         user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
     argsary;
   let exception FoundLinear in
   try
     ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
-      (fun env params nf_lc ->
+      (fun env ind_id params cstr_id nf_lc ->
+        (*Feedback.msg_debug (Pp.str "[codegen:is_linear_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++ Pp.str "cstr=" ++ Id.print cstr_id);*)
+        let nbrel_until_ind = Environ.nb_rel env in
         nflc_carg_iter env sigma params nf_lc
           (fun env argty ->
             let argty = EConstr.of_constr argty in
-            let argty = nf_all env sigma argty in
-            if isSort sigma argty then
-              user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument");
-            if is_linear_type env sigma argty then raise FoundLinear));
+            (*Feedback.msg_debug (Pp.str "[codegen:is_linear_ind] argty=" ++ Printer.pr_econstr_env env sigma argty +++ Pp.str "argty_type=" ++ Pp.str (constr_name sigma argty));*)
+            match EConstr.kind sigma argty with
+            | Rel i ->
+                (* Since nf_lc is a head normalized constructor types,
+                  Rel is only used for recursive references of inductive types or
+                  references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                  if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
+            | App (f, args) when isRel sigma f ->
+                (* Same as above Rel *)
+                let i = destRel sigma f in
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                  if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
+            | Sort _ ->
+                user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument")
+            | Prod (x, ty, b) ->
+                (* function type argument of a constructor is non-linear or non-code-generatable *)
+                ()
+            | Ind (ind, univ) ->
+                if is_linear_type env sigma argty then raise FoundLinear
+            | App (f, args) when isInd sigma f ->
+                if is_linear_type env sigma argty then raise FoundLinear
+            | _ ->
+                user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty)));
     false
   with
     FoundLinear -> true
