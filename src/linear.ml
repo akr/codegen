@@ -127,8 +127,11 @@ let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (
            type_of_inductive_arity oind_body.Declarations.mind_arity))
         (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
     ) env in
-  let oind_body = mind_body.Declarations.mind_packets.(i) in
-  Array.iter2 (f env oind_body.Declarations.mind_typename params) oind_body.Declarations.mind_consnames oind_body.Declarations.mind_nf_lc
+  Array.iter
+    (fun oind_body ->
+      Array.iter2 (f env oind_body.Declarations.mind_typename params)
+        oind_body.Declarations.mind_consnames oind_body.Declarations.mind_nf_lc)
+    mind_body.Declarations.mind_packets
 
 let nflc_carg_iter (env : Environ.env) (sigma : Evd.evar_map) (params : EConstr.t array) (nf_lc : Constr.rel_context * Constr.types) (f : Environ.env -> Constr.types -> unit) : unit =
   let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
