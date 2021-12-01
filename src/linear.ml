@@ -193,7 +193,7 @@ and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.type
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
   | Some Linear -> true
   | Some Unrestricted -> false
-  | Some Investigating -> false
+  | Some Investigating -> user_err (Pp.str "[codegen:bug] type linearity checker is calld with a type currently checking:" +++ Printer.pr_econstr_env env sigma ty)
   | None ->
       (type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Investigating !type_linearity_map;
       if is_linear_ind env sigma ty then
