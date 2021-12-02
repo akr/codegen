@@ -199,6 +199,7 @@ let codegen_test_template
     ?(modify_generated_source : (string -> string) option)
     ?(resolve_dependencies : bool = true)
     ?(mutual_recursion_detection : bool = true)
+    ?(cc_exit_code : Unix.process_status option)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -242,9 +243,9 @@ let codegen_test_template
   match goal with
   | UntilCoq -> ()
   | UntilCC ->
-      assert_command ~ctxt:ctx cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc ["-o"; exe_fn; main_fn];
   | UntilExe ->
-      assert_command ~ctxt:ctx cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc ["-o"; exe_fn; main_fn];
       assert_command ~ctxt:ctx exe_fn []
 
 let template_coq_success
@@ -1612,6 +1613,39 @@ let test_mftest (ctx : test_ctxt) : unit =
       assert(mftest(5) == 2);
     |}
 
+let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      CodeGen Snippet "
+      typedef struct { int b; } mybool;
+      #define mytrue ((mybool){ 1 })
+      #define myfalse ((mybool){ 0 })
+      ".
+      Inductive mybool : Set := mytrue | myfalse.
+      Definition f (n : nat) : mybool :=
+        let
+          y := (fix g (n : nat) : nat :=
+                match n with
+                | O => O
+                | S m => S (g m)
+                end) n
+        in
+        match y with
+        | O => myfalse
+        | S _ => mytrue
+        end.
+      CodeGen Function f.
+
+      CodeGen Inductive Type mybool => "mybool".
+      CodeGen Constant mytrue => "mytrue".
+      CodeGen Constant myfalse => "myfalse".
+    |}) {|
+      assert(f(0).b == 0);
+      assert(f(1).b == 1);
+      assert(f(2).b == 1);
+    |}
+
 let test_multifunc_noargument (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -2901,6 +2935,7 @@ let suite : OUnit2.test =
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_letin_in_constructor_type" >:: test_letin_in_constructor_type;
     "test_mftest" >:: test_mftest;
+    "test_multifunc_different_return_types" >:: test_multifunc_different_return_types;
     "test_multifunc_noargument" >:: test_multifunc_noargument;
     "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
     "test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup;

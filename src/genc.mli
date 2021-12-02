@@ -157,23 +157,6 @@ val detect_fixterms_for_bodies :
 val labels_for_stacked_fixfuncs :
   fixfunc_tbl:fixfunc_table ->
   primary_cfunc:string -> string list -> string list
-val obtain_function_bodies_rec :
-  fixfunc_tbl:fixfunc_table ->
-  primary_cfunc:string ->
-  Environ.env ->
-  Evd.evar_map ->
-  (string * string) list ->
-  string list ->
-  EConstr.t ->
-  ((string * string) list * string list * Environ.env * EConstr.t) Seq.t
-val obtain_function_bodies :
-  fixterms:fixterm_t list ->
-  fixfunc_tbl:fixfunc_table ->
-  primary_cfunc:string ->
-  Environ.env ->
-  Evd.evar_map ->
-  EConstr.t ->
-  ((string * string) list * string list * Environ.env * EConstr.t) list
 val gen_func_single :
   fixterms:fixterm_t list ->
   fixfunc_tbl:fixfunc_table ->
