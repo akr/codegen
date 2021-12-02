@@ -137,6 +137,10 @@ let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLine
 let deallocator_cfunc_of_type = Summary.ref
   (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncOfType"
 
+type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
+let type_downward_map = Summary.ref
+  (ConstrMap.empty : type_downward ConstrMap.t) ~name:"CodeGenDownwardTypeMap"
+
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)
 | SpExpectedId of Id.t

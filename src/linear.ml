@@ -40,6 +40,19 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) LinearityIsLinear !type_linearity_map;
   Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
+let command_downward (ty : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
+  let ty4 = nf_all env sigma ty2 in
+  (if not (is_concrete_inductive_type env sigma ty4) then
+    user_err (Pp.str "[codegen] downward: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
+  (match ConstrMap.find_opt (EConstr.to_constr sigma ty4) !type_downward_map with
+  | Some _ -> user_err (Pp.str "[codegen] downwardness already defined:" +++ Printer.pr_econstr_env env sigma ty4)
+  | None -> ());
+  type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty4) DownwardOnly !type_downward_map;
+  Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
+
 let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
   match mind_arity with
   | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
@@ -190,7 +203,7 @@ and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.type
         type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsLinear !type_linearity_map;
         true)
       else
-        (Feedback.msg_info (Pp.str "[codegen] Unrestricted type registered:" +++ Printer.pr_econstr_env env sigma ty);
+        (Feedback.msg_info (Pp.str "[codegen] Non-linear (unrestricted) type registered:" +++ Printer.pr_econstr_env env sigma ty);
         type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsUnrestricted !type_linearity_map;
         false))
 and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
@@ -252,6 +265,105 @@ let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : 
 
 let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   ignore (is_linear env sigma ty)
+
+(*
+  is_downward_type env sigma ty returns true if
+  ty is code generatable and it is DownwardOnly.
+  It returns false otherwise.
+
+  - code-generatable means that the type is inductive type or function type.
+    other types, such as sorts, are not code-generatable.
+  - downward type is
+    - a inductive type which is registered with CodeGen Downward, or
+    - a inductive type which has (possibly indirectly) have a component which type is DownwardOnly.
+  - function type is always DownwardOnly.
+*)
+let rec is_downward_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
+  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  match EConstr.kind sigma ty with
+  | Prod (name, namety, body) ->
+      true (* function (closure) must be DownwardOnly *)
+  | Ind iu -> is_downward_ind1 env sigma ty
+  | App (f, argsary) when isInd sigma f -> is_downward_ind1 env sigma ty
+  | _ ->
+      (* not code-generatable. *)
+      false
+
+and is_downward_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_downward_map with
+  | Some DownwardOnly -> true
+  | Some DownwardUnrestricted -> false
+  | Some DownwardInvestigating -> user_err (Pp.str "[codegen:bug] type downwardness checker is calld with a type currently checking:" +++ Printer.pr_econstr_env env sigma ty)
+  | None ->
+      (type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardInvestigating !type_downward_map;
+      if is_downward_ind env sigma ty then
+        (Feedback.msg_info (Pp.str "[codegen] Downward type registered:" +++ Printer.pr_econstr_env env sigma ty);
+        type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardOnly !type_downward_map;
+        true)
+      else
+        (Feedback.msg_info (Pp.str "[codegen] Non-downward (unrestricted) type registered:" +++ Printer.pr_econstr_env env sigma ty);
+        type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardUnrestricted !type_downward_map;
+        false))
+and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
+  let (ind_f, argsary) =
+    match EConstr.kind sigma ty with
+    | App (f, argsary) -> (f, argsary)
+    | _ -> (ty, [| |])
+  in
+  Array.iter
+    (fun arg ->
+      if hasRel env sigma arg then (* hasRel is too strong.  No free variables is enough *)
+        user_err (Pp.str "[codegen] is_downward_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
+    argsary;
+  let exception FoundDownward in
+  try
+    ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
+      (fun env ind_id params cstr_id nf_lc ->
+        (*Feedback.msg_debug (Pp.str "[codegen:is_downward_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++ Pp.str "cstr=" ++ Id.print cstr_id);*)
+        let nbrel_until_ind = Environ.nb_rel env in
+        nflc_carg_iter env sigma params nf_lc
+          (fun env argty ->
+            let argty = EConstr.of_constr argty in
+            (*Feedback.msg_debug (Pp.str "[codegen:is_downward_ind] argty=" ++ Printer.pr_econstr_env env sigma argty +++ Pp.str "argty_type=" ++ Pp.str (constr_name sigma argty));*)
+            match EConstr.kind sigma argty with
+            | Rel i ->
+                (* Since nf_lc is a head normalized constructor types,
+                  Rel is only used for recursive references of inductive types or
+                  references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                  if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
+            | App (f, args) when isRel sigma f ->
+                (* Same as above Rel *)
+                let i = destRel sigma f in
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                  if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
+            | Sort _ ->
+                user_err (Pp.str "[codegen] is_downward_ind: constructor has type argument")
+            | Prod (x, ty, b) ->
+                (* function type argument of a constructor means DownwardOnly *)
+                raise FoundDownward
+            | Ind (ind, univ) ->
+                if is_downward_type env sigma argty then raise FoundDownward
+            | App (f, args) when isInd sigma f ->
+                if is_downward_type env sigma argty then raise FoundDownward
+            | _ ->
+                user_err (Pp.str "[codegen:is_downward_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty)));
+    false
+  with
+    FoundDownward -> true
+
+let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  (*Feedback.msg_debug (str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
+  let sort = Retyping.get_type_of env sigma ty in
+  if not (isSort sigma sort) then
+    user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);
+  let ty2 = nf_all env sigma ty in
+  is_downward_type env sigma ty2
+
+(*let check_type_downwardness (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
+  ignore (is_downward env sigma ty)*)
 
 let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     (decl : EConstr.rel_declaration) (linear_vars : bool list)
@@ -387,6 +499,12 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
 let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
   if not (ConstrMap.is_empty !type_linearity_map) then
     linearcheck_function env sigma [] term
+
+let check_function_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
+  let termty = Retyping.get_type_of env sigma term in
+  let (argtys, retty) = EConstr.decompose_prod sigma termty in
+  if is_downward env sigma retty then
+    user_err (Pp.str "[codegen] function returns downward value:" +++ Pp.str cfunc)
 
 let linear_type_check_single (libref : Libnames.qualid) : unit =
   let gref = Smartlocate.global_with_alias libref in

@@ -2814,6 +2814,28 @@ let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
+let test_downward_simple (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] function returns downward value:") ctx
+    (bool_src ^
+    {|
+      Inductive D : Set := C.
+      Definition f (x : bool) : D := C.
+      CodeGen Downward D.
+      CodeGen Function f.
+    |}) {| |}
+
+let test_downward_in_pair (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] function returns downward value:") ctx
+    (bool_src ^
+    {|
+      Inductive D : Set := C.
+      Definition f (x : bool) : (bool * D) := (x, C).
+      CodeGen Downward D.
+      CodeGen Function f.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2925,6 +2947,8 @@ let suite : OUnit2.test =
     "test_linear_dellet_match" >:: test_linear_dellet_match;
     "test_linear_match_with_deallocator" >:: test_linear_match_with_deallocator;
     "test_linear_match_without_deallocator" >:: test_linear_match_without_deallocator;
+    "test_downward_simple" >:: test_downward_simple;
+    "test_downward_in_pair" >:: test_downward_in_pair;
   ]
 
 let () =
