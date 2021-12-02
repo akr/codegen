@@ -253,12 +253,6 @@ let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : 
 let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   ignore (is_linear env sigma ty)
 
-let rec ntimes n f v =
-  if n = 0 then
-    v
-  else
-    ntimes (n-1) f (f v)
-
 let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     (decl : EConstr.rel_declaration) (linear_vars : bool list)
     (numvars_innermost_function : int)

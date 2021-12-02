@@ -17,7 +17,6 @@ val is_linear_ind : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val is_linear : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val check_type_linearity :
   Environ.env -> Evd.evar_map -> EConstr.types -> unit
-val ntimes : int -> ('a -> 'a) -> 'a -> 'a
 val with_local_var :
   Environ.env ->
   Evd.evar_map ->

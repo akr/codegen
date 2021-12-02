@@ -19,6 +19,7 @@ val array_find_index : ('a -> bool) -> 'a array -> int
 val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
 val ncons : int -> 'a -> 'a list -> 'a list
+val ntimes : int -> ('a -> 'a) -> 'a -> 'a
 val list_rev_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_find_index : ('a -> bool) -> 'a list -> int
