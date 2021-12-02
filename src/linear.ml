@@ -373,7 +373,7 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       (let h = Array.length fary in
       let env2 = push_rec_types prec env in
-      let linear_vars2 = ntimes h (List.cons false) linear_vars in
+      let linear_vars2 = CList.addn h false linear_vars in
       Array.iter (check_type_linearity env sigma) tary;
       (* Since fix-bounded funcitons can be evaluated 0 or more times,
         they cannot reference linear variables declared outside of the fix-expression. *)
