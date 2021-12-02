@@ -233,12 +233,12 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
                 (* Since nf_lc is a head normalized constructor types,
                   Rel is only used for recursive references of inductive types or
                   references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
                   if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
             | App (f, args) when isRel sigma f ->
                 (* Same as above Rel *)
                 let i = destRel sigma f in
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
                   if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
             | Sort _ ->
                 user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument")
@@ -332,12 +332,12 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
                 (* Since nf_lc is a head normalized constructor types,
                   Rel is only used for recursive references of inductive types or
                   references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
                   if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
             | App (f, args) when isRel sigma f ->
                 (* Same as above Rel *)
                 let i = destRel sigma f in
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations *)
+                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
                   if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
             | Sort _ ->
                 user_err (Pp.str "[codegen] is_downward_ind: constructor has type argument")
