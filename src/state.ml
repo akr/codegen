@@ -130,7 +130,7 @@ type ind_constructor = {
 
 let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
 
-type type_linearity = Linear | Unrestricted | Investigating
+type type_linearity = LinearityIsLinear | LinearityIsUnrestricted | LinearityIsInvestigating
 let type_linearity_map_empty : type_linearity ConstrMap.t = ConstrMap.empty
 let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLinearTypeMap"
 

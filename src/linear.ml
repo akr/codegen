@@ -37,7 +37,7 @@ let command_linear (ty : Constrexpr.constr_expr) : unit =
   (match ConstrMap.find_opt (EConstr.to_constr sigma ty4) !type_linearity_map with
   | Some _ -> user_err (Pp.str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty4)
   | None -> ());
-  type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) Linear !type_linearity_map;
+  type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) LinearityIsLinear !type_linearity_map;
   Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
 let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
@@ -191,18 +191,18 @@ let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t
 and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
-  | Some Linear -> true
-  | Some Unrestricted -> false
-  | Some Investigating -> user_err (Pp.str "[codegen:bug] type linearity checker is calld with a type currently checking:" +++ Printer.pr_econstr_env env sigma ty)
+  | Some LinearityIsLinear -> true
+  | Some LinearityIsUnrestricted -> false
+  | Some LinearityIsInvestigating -> user_err (Pp.str "[codegen:bug] type linearity checker is calld with a type currently checking:" +++ Printer.pr_econstr_env env sigma ty)
   | None ->
-      (type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Investigating !type_linearity_map;
+      (type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsInvestigating !type_linearity_map;
       if is_linear_ind env sigma ty then
         (Feedback.msg_info (Pp.str "[codegen] Linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Linear !type_linearity_map;
+        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsLinear !type_linearity_map;
         true)
       else
         (Feedback.msg_info (Pp.str "[codegen] Unrestricted type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) Unrestricted !type_linearity_map;
+        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsUnrestricted !type_linearity_map;
         false))
 and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
