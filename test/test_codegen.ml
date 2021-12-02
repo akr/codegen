@@ -1618,6 +1618,7 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
     (bool_src ^ nat_src ^
     {|
       CodeGen Snippet "
+      /* mybool is incompatible with uint64_t unlike bool.*/
       typedef struct { int b; } mybool;
       #define mytrue ((mybool){ 1 })
       #define myfalse ((mybool){ 0 })
@@ -1636,7 +1637,6 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
         | S _ => mytrue
         end.
       CodeGen Function f.
-
       CodeGen Inductive Type mybool => "mybool".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
@@ -2870,6 +2870,27 @@ let test_downward_in_pair (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
+let test_downward_fixfunc (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] fixpoint function returns downward value:") ctx
+    ({|
+      Inductive D : Set := C0 : D | C1 : D -> D.
+      Definition f (n : nat) : nat :=
+	let d :=
+	  (fix g (m : nat) : D :=
+	    match m with
+	    | O => C0
+	    | S m' => C1 (g m')
+	    end) n
+	in
+	match d with
+	| C0 => 0
+	| C1 _ => 1
+	end.
+      CodeGen Downward D.
+      CodeGen Function f.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -2984,6 +3005,7 @@ let suite : OUnit2.test =
     "test_linear_match_without_deallocator" >:: test_linear_match_without_deallocator;
     "test_downward_simple" >:: test_downward_simple;
     "test_downward_in_pair" >:: test_downward_in_pair;
+    "test_downward_fixfunc" >:: test_downward_fixfunc;
   ]
 
 let () =

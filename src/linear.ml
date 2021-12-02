@@ -500,11 +500,54 @@ let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EC
   if not (ConstrMap.is_empty !type_linearity_map) then
     linearcheck_function env sigma [] term
 
+let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _
+  | Sort _ | Prod _ | Ind _
+  | CoFix _ | Array _
+  | Cast _ | Int _ | Float _
+  ->
+      user_err (Pp.str "[codegen:check_fix_downwardness] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
+  | Rel _ | Const _ | Construct _
+  -> ()
+  | Lambda (x, ty, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
+      let env2 = EConstr.push_rel decl env in
+      check_fix_downwardness env2 sigma cfunc b
+  | LetIn (x, e, ty, b) ->
+      check_fix_downwardness env sigma cfunc e;
+      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
+      let env2 = EConstr.push_rel decl env in
+      check_fix_downwardness env2 sigma cfunc b
+  | App (f, argsary) ->
+      check_fix_downwardness env sigma cfunc f;
+      Array.iter (check_fix_downwardness env sigma cfunc) argsary
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      check_fix_downwardness env sigma cfunc item;
+      Array.iter2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          check_fix_downwardness env2 sigma cfunc body)
+        bl bl0
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      Array.iter2
+        (fun n ty ->
+          let (_, retty) = decompose_prod sigma ty in
+          if is_downward env sigma retty then
+            user_err (Pp.str "[codegen] fixpoint function returns downward value:" +++ Id.print (id_of_name (Context.binder_name n)) +++ Pp.str "in" +++ Pp.str cfunc))
+        nary tary;
+      let env2 = EConstr.push_rec_types prec env in
+      Array.iter (check_fix_downwardness env2 sigma cfunc) fary
+  | Proj (proj, expr) ->
+      check_fix_downwardness env sigma cfunc expr
+
 let check_function_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
   let termty = Retyping.get_type_of env sigma term in
   let (argtys, retty) = EConstr.decompose_prod sigma termty in
   if is_downward env sigma retty then
-    user_err (Pp.str "[codegen] function returns downward value:" +++ Pp.str cfunc)
+    user_err (Pp.str "[codegen] function returns downward value:" +++ Pp.str cfunc);
+  check_fix_downwardness env sigma cfunc term
 
 let linear_type_check_single (libref : Libnames.qualid) : unit =
   let gref = Smartlocate.global_with_alias libref in
