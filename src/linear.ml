@@ -88,17 +88,6 @@ let rec hasRel (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : b
   | Float n -> false
   | Array (u,t,def,ty) -> Array.exists (hasRel env sigma) t || hasRel env sigma def || hasRel env sigma ty
 
-let rec destProdX_rec (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot list * EConstr.t list * EConstr.t =
-  match EConstr.kind sigma term with
-  | Prod (name, ty, body) ->
-      let (names, tys, body) = destProdX_rec sigma body in
-      (name :: names, ty :: tys, body)
-  | _ -> ([], [], term)
-
-let destProdX (sigma : Evd.evar_map) (term : EConstr.t) : Names.Name.t Context.binder_annot array * EConstr.t array * EConstr.t =
-  let (names, tys, body) = destProdX_rec sigma term in
-  (Array.of_list names, Array.of_list tys, body)
-
 let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array) (f : Environ.env -> Id.t -> EConstr.t array -> Id.t -> (Constr.rel_context * Constr.types) -> unit) : unit =
   (*Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] ind:" +++ Printer.pr_inductive env ind);
   for i = 0 to Array.length argsary - 1 do

@@ -11,14 +11,6 @@ val type_of_inductive_arity :
 val valid_type_param :
   Environ.env -> Evd.evar_map -> Constr.rel_declaration -> bool
 val hasRel : Environ.env -> Evd.evar_map -> EConstr.t -> bool
-val destProdX_rec :
-  Evd.evar_map ->
-  EConstr.t ->
-  Names.Name.t Context.binder_annot list * EConstr.t list * EConstr.t
-val destProdX :
-  Evd.evar_map ->
-  EConstr.t ->
-  Names.Name.t Context.binder_annot array * EConstr.t array * EConstr.t
 val is_linear_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val is_linear_ind1 : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val is_linear_ind : Environ.env -> Evd.evar_map -> EConstr.types -> bool
