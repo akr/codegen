@@ -141,6 +141,9 @@ type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
 let type_downward_map = Summary.ref
   (ConstrMap.empty : type_downward ConstrMap.t) ~name:"CodeGenDownwardTypeMap"
 
+let borrow_function_set = Summary.ref
+  (Cset.empty : Cset.t) ~name:"CodeGenBorrowFunctionSet"
+
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)
 | SpExpectedId of Id.t

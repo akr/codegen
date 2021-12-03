@@ -43,6 +43,7 @@ val type_linearity_map : type_linearity ConstrMap.t ref
 val deallocator_cfunc_of_type : string ConstrMap.t ref
 type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
 val type_downward_map : type_downward ConstrMap.t ref
+val borrow_function_set : Names.Cset.t ref
 
 type simplified_status =
     SpNoSimplification

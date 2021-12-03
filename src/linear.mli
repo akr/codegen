@@ -41,4 +41,4 @@ val command_test_linear : Constrexpr.constr_expr -> unit
 val command_test_unrestricted : Constrexpr.constr_expr -> unit
 val command_linear_test :
   Constrexpr.constr_expr -> Constrexpr.constr_expr -> unit
-(*val command_borrow_function : Libnames.qualid -> unit*)
+val command_borrow_function : Libnames.qualid -> unit

@@ -563,8 +563,54 @@ let linear_type_check_single (libref : Libnames.qualid) : unit =
         linearcheck_function env sigma [] eterm;
         Feedback.msg_info (Pp.str "[codegen] linearity check passed:" +++ Printer.pr_constant env ctnt);
         ()
-      | _ -> user_err (Pp.str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
-      | _ -> user_err (Pp.str "[codegen] not constant")
+      | (_, _, _) -> user_err (Pp.str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
+  | _ -> user_err (Pp.str "[codegen] not a constant reference:" +++ Printer.pr_global gref)
+
+let command_borrow_function (libref : Libnames.qualid) : unit =
+  let set_linear env sigma ty =
+    match ConstrMap.find_opt ty !type_linearity_map with
+    | Some LinearityIsLinear -> ()
+    | Some LinearityIsUnrestricted -> user_err (Pp.str "[codegen] the linearity of the argument of borrow function is non-linear:" +++ Printer.pr_constr_env env sigma ty)
+    | Some LinearityIsInvestigating -> user_err (Pp.str "[codegen:bug] LinearityIsInvestigating found")
+    | None ->
+        Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_constr_env env sigma ty);
+        type_linearity_map := ConstrMap.add ty LinearityIsLinear !type_linearity_map
+  in
+  let set_downward env sigma ty =
+    match ConstrMap.find_opt ty !type_downward_map with
+    | Some DownwardOnly -> ()
+    | Some DownwardUnrestricted -> user_err (Pp.str "[codegen] the downwardness of the return type of borrow function is non-downward:" +++ Printer.pr_constr_env env sigma ty)
+    | Some DownwardInvestigating -> user_err (Pp.str "[codegen:bug] DownwardInvestigating found")
+    | None ->
+        Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_constr_env env sigma ty);
+        type_downward_map := ConstrMap.add ty DownwardOnly !type_downward_map
+  in
+  let set_borrow ctnt =
+    if Cset.mem ctnt !borrow_function_set then
+      ()
+    else
+      borrow_function_set := Cset.add ctnt !borrow_function_set
+  in
+  let gref = Smartlocate.global_with_alias libref in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  match gref with
+  | ConstRef ctnt ->
+      (let fctntu = Univ.in_punivs ctnt in
+      let (ty, u) = Environ.constant_type env fctntu in
+      let ty = nf_all env sigma (EConstr.of_constr ty) in
+      let ty = EConstr.to_constr sigma ty in
+      (match Constr.kind ty with
+      | Prod (x, argty, retty) ->
+          if not (Constr.isInd (fst (Constr.decompose_app argty))) then
+            user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which argument type is an inductive type:" +++ Printer.pr_constant env ctnt);
+          if not (Constr.isInd (fst (Constr.decompose_app retty))) then
+            user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which return type is an inductive type:" +++ Printer.pr_constant env ctnt);
+          set_borrow ctnt;
+          set_linear env sigma argty;
+          set_downward env sigma retty
+      | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
+  | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)
 
 let command_linear_check (libref_list : Libnames.qualid list) : unit =
   List.iter linear_type_check_single libref_list

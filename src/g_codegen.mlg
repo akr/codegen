@@ -257,6 +257,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_deallocator_type t cfunc }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
+    | [ "CodeGen" "BorrowFunction" ref(f) ] -> { command_borrow_function f }
 
     (*| [ "CodeGen" "ShowLocalGensymID" ] -> { command_show_local_gensym_id () }*)
 END
