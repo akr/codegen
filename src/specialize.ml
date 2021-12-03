@@ -1957,12 +1957,13 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
       fst (decompose_prod sigma ty))
+      (* fargs is a list from innermost formal argument to outermost formal argument *)
   in
   let r = lazy (List.length (Lazy.force fargs) - p - q) in
   let mkClosure () =
     let lazy fargs = fargs in
     let lazy r = r in
-    let fargs' = CList.firstn (q+r) fargs in
+    let fargs' = CList.firstn (q+r) fargs in (* innermost q+r formal arguments *)
     let term' = Vars.lift (q+r) term in
     let args =
       Array.append
@@ -1972,10 +1973,13 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     (* reduction/expansion: eta-expansion *)
     compose_lam fargs' (mkApp (term', args))
   in
+  let mkOriginalApp () =
+    mkApp (term, Array.map (fun j -> mkRel j) vs)
+  in
   let mkAppOrClosure () =
     let lazy r = r in
     if r = 0 then
-      mkApp (term, Array.map (fun j -> mkRel j) vs)
+      mkOriginalApp ()
     else
       mkClosure ()
   in
@@ -1995,12 +1999,15 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       (* p = 0, q = 0, r = 0 is not possible because Lambda is a function *)
-      if p = 0 && q = 0 then
-        (* p = 0, q = 0, r > 0
-           closure creation found. *)
-        let lazy r = r in
-        mkLambda (x, t, complete_args_fun env2 sigma e (p+q+r-1))
-      else if p > 0 && (Lazy.force r) = 0 then
+      let lazy r = r in
+      if r > 0 then
+        (* r > 0 means partial application i.e. closure creation found.
+           p = 0, q = 0, r > 0
+           p = 0, q > 0, r > 0
+           p > 0, q = 0, r > 0
+           p > 0, q > 0, r > 0 *)
+        complete_args_fun env sigma (mkOriginalApp ()) (p+q+r)
+      else if p > 0 then
         (* p > 0, q = 0, r = 0
            p > 0, q > 0, r = 0
            apply beta-var reduction.
@@ -2009,10 +2016,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
       else
-        (* p = 0, q > 0, r = 0
-           p = 0, q > 0, r > 0
-           p > 0, q = 0, r > 0
-           p > 0, q > 0, r > 0 *)
+        (* p = 0, q > 0, r = 0 *)
         mkApp (
           mkLambda (x, t, complete_args_exp env2 sigma e [||] (p+q-1)),
           Array.map (fun j -> mkRel j) vs)
@@ -2035,17 +2039,21 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
             bl bl0),
         Array.map (fun j -> mkRel j) vs)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      mkApp (
-        mkFix ((ks, j),
-          (nary,
-           tary,
-           Array.map2
-             (fun t f ->
-               let n = numargs_of_type env sigma t in
-               complete_args_fun env2 sigma f n)
-             tary fary)),
-        Array.map (fun i -> mkRel i) vs)
+      let lazy r = r in
+      if r > 0 then
+        complete_args_fun env sigma (mkOriginalApp ()) (p+q+r)
+      else
+        let env2 = push_rec_types prec env in
+        mkApp (
+          mkFix ((ks, j),
+            (nary,
+             tary,
+             Array.map2
+               (fun t f ->
+                 let n = numargs_of_type env sigma t in
+                 complete_args_fun env2 sigma f n)
+               tary fary)),
+          Array.map (fun i -> mkRel i) vs)
   | Proj (proj, e) ->
       mkApp (
         mkProj (proj,
