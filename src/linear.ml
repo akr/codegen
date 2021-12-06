@@ -438,14 +438,20 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
         (fun env2 linear_vars2 numvars_innermost_function2 -> linearcheck_exp env2 sigma linear_vars2 numvars_innermost_function2 body numargs) in
       merge_count count1 count2)
   | App (f, argsary) ->
-      let count = linearcheck_exp env sigma linear_vars numvars_innermost_function f (Array.length argsary + numargs) in
-      let counts = Array.map (fun arg -> linearcheck_exp env sigma linear_vars numvars_innermost_function arg 0) argsary in
-      (* no partial application after argument completion? *)
-      if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
-                       is_linear env sigma ty) argsary &&
-         isProd sigma (Retyping.get_type_of env sigma term) then
-           user_err (Pp.str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term);
-      Array.fold_left merge_count count counts
+      if isConst sigma f && Cset.mem (fst (destConst sigma f)) !borrow_function_set then
+        (* borrow function application found.
+           We don't count the linear variable reference of the argument of a borrow function application.
+           The defer validity checking of borrow function to borrow checker. *)
+        IntMap.empty
+      else
+        let count = linearcheck_exp env sigma linear_vars numvars_innermost_function f (Array.length argsary + numargs) in
+        let counts = Array.map (fun arg -> linearcheck_exp env sigma linear_vars numvars_innermost_function arg 0) argsary in
+        (* no partial application after argument completion? *)
+        if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
+                         is_linear env sigma ty) argsary &&
+           isProd sigma (Retyping.get_type_of env sigma term) then
+             user_err (Pp.str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term);
+        Array.fold_left merge_count count counts
   | Const ctntu -> IntMap.empty
   | Construct cstru -> IntMap.empty
   | Case (ci,u,pms,p,iv,c,bl) ->
