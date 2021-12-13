@@ -139,6 +139,22 @@ let rec ntimes n f v =
   else
     ntimes (n-1) f (f v)
 
+let list_prepend_map_rev (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
+  let rec aux l1 result =
+    match l1 with
+    | [] -> result
+    | e :: rest -> aux rest ((f e) :: result)
+  in
+  aux l1 []
+
+let list_prepend_mapi_rev (f : int -> 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
+  let rec aux i l1 result =
+    match l1 with
+    | [] -> result
+    | e :: rest -> aux (i+1) rest ((f i e) :: result)
+  in
+  aux 0 l1 []
+
 let rec list_rev_map_append (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
   match l1 with
   | [] -> l2
@@ -293,6 +309,13 @@ let merge_range (r1 : (int*int) option) (r2 : (int*int) option) : (int*int) opti
 
 let merge_range3 (r1 : (int*int) option) (r2 : (int*int) option) (r3 : (int*int) option) : (int*int) option =
   merge_range (merge_range r1 r2) r3
+
+let intset_union_ary (sets : IntSet.t array) : IntSet.t =
+  let result = ref IntSet.empty in
+  for i = 0 to Array.length sets - 1 do
+    result := IntSet.union !result sets.(i)
+  done;
+  !result
 
 let (++) = Pp.app
 

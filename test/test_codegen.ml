@@ -2891,6 +2891,348 @@ let test_downward_fixfunc (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
+let test_borrowcheck_constructor (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      CodeGen TestBorrowCheck fun (x : nat) => 0.
+    |}) {| |}
+
+let test_borrowcheck_constant (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Definition c := 0.
+      CodeGen TestBorrowCheck fun (n : nat) => c.
+    |}) {| |}
+
+let test_borrowcheck_linear_id (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck fun (x : L) => x.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_linear_arg_out_of_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument out of fix-term:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+        fix f (n : nat) := match n with O => O | S m => S (f m) end.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_lambda (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument not consumed:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+	0.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_free_linear_var_in_lambda (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] function cannot refer free linear variables:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (u : unit) (x : L) =>
+	  let f := fun (u : unit) => x in
+	  f u.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_letin (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable not consumed:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (u : unit) =>
+	let x := LC in
+	0.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_dealloc_twice (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables used multiply:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Definition dealloc (x : L) : unit := tt.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+	let y := dealloc x in
+	let z := dealloc x in
+	0.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_arguments (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables used multiply in arguments:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Definition twoarg (x y : L) : nat := 0.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (x : L) => twoarg x x.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_match_item (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear match-item is used in match-branch:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+	match x with
+	| LC => x
+	end.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_match_branches (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] match-branches uses linear variables inconsistently:") ctx
+    ({|
+      Inductive L : Set := LC.
+      CodeGen Linear L.
+      CodeGen TestBorrowCheck
+	fun (b : bool) (x : L) =>
+	match b with
+	| true => x
+	| false => LC
+	end.
+    |}) {| |}
+
+let test_borrowcheck_invalid_linearity_match_member (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear member not consumed:") ctx
+    ({|
+      Inductive lseq (A : Type) : Type :=
+      | lnil : lseq A
+      | lcons : A -> lseq A -> lseq A.
+      Arguments lnil {_}.
+      Arguments lcons {_} _ _.
+      CodeGen Linear lseq bool.
+      CodeGen TestBorrowCheck
+	fun (x : lseq bool) =>
+	match x with
+	| lnil => 0
+	| lcons v y => 0
+	end.
+    |}) {| |}
+
+let test_borrowcheck_simple_borrow (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (x : L) =>
+        let b := borrow x in
+        let _ := dealloc x in
+        0.
+    |}) {| |}
+
+let test_borrowcheck_proj (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      Set Primitive Projections.
+      Record TestRecord : Set := mk { f0 : B; f1 : nat }.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (n : nat) (x : L) =>
+        let b := borrow x in
+        let d := mk b n in
+        let e := f1 d in
+        let _ := dealloc x in
+        e.
+    |}) {| |}
+
+let test_borrowcheck_lambda_out_of_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive lseq (A : Type) : Type :=
+      | lnil : lseq A
+      | lcons : A -> lseq A -> lseq A.
+      Arguments lnil {_}.
+      Arguments lcons {_} _ _.
+      CodeGen Linear lseq bool.
+      CodeGen TestBorrowCheck
+        fun (n : nat) =>
+        fix f (l : lseq bool) :=
+        match l with
+        | lnil => n
+        | lcons b l' => f l'
+        end.
+    |}) {| |}
+
+let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (n : nat) (x : L) =>
+        let b := borrow x in
+        let f := fun (m : nat) => b in
+        let r := f n in
+        let _ := dealloc x in
+        r.
+    |}) {| |}
+
+let test_borrowcheck_fix_closure (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (n : nat) (x : L) =>
+        let b := borrow x in
+        let f := fix g (m : nat) := match m with O => b | S m' => g m' end in
+        let r := f n in
+        let _ := dealloc x in
+        r.
+    |}) {| |}
+
+let test_borrowcheck_invalid_borrow_used_after_dealloc (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (x : L) =>
+        let b := borrow x in
+        let _ := dealloc x in
+        b.
+    |}) {| |}
+
+let test_borrowcheck_invalid_borrow_application (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used both in an application:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      Definition g (x : L) (b : B) := tt.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+	  let b := borrow x in
+	  g x b.
+    |}) {| |}
+
+let test_borrowcheck_invalid_borrow_match (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in match:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+	fun (x : L) =>
+	let b := borrow x in
+	match x with
+	| LC => b
+	end.
+    |}) {| |}
+
+let test_borrowcheck_invalid_borrow_proj (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Set Primitive Projections.
+      Record TestRecord : Set := mk { f0 : B }.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+        fun (n : nat) (x : L) =>
+        let b := borrow x in
+        let d := mk b in
+        let e := f0 d in
+        let _ := dealloc x in
+        e.
+    |}) {| |}
+
+let test_borrowcheck_list_bool_has_true (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive lseq (A : Type) : Type :=
+      | lnil : lseq A
+      | lcons : A -> lseq A -> lseq A.
+      Arguments lnil {_}.
+      Arguments lcons {_} _ _.
+      Definition lcons_bool (b : bool) (l : lseq bool) := lcons b l.
+      Fixpoint borrow_lseq_bool (l : lseq bool) : list bool :=
+	match l with
+	| lnil => nil
+	| lcons x l' => cons x (borrow_lseq_bool l')
+	end.
+      Fixpoint dealloc_lseq_bool (l : lseq bool) : unit :=
+	match l with
+	| lnil => tt
+	| lcons x l' => dealloc_lseq_bool l'
+	end.
+      CodeGen BorrowFunction borrow_lseq_bool.
+      CodeGen TestBorrowCheck
+	fun (l : lseq bool) =>
+	let l' := borrow_lseq_bool l in
+	let has_true :=
+	  (fix loop (bs : list bool) : bool :=
+	    match bs with
+	    | nil => false
+	    | cons b bs' => if b then true else loop bs'
+	    end) l'
+	in
+	let _ := dealloc_lseq_bool l in
+	has_true.
+    |}) {| |}
+
+let test_borrowcheck_invalid_borrow_lambda_in_match (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+	fun (u : unit) (x : L) =>
+	let b := match u with tt => fun y => borrow y end x in
+	let _ := dealloc x in
+	b.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3006,6 +3348,29 @@ let suite : OUnit2.test =
     "test_downward_simple" >:: test_downward_simple;
     "test_downward_in_pair" >:: test_downward_in_pair;
     "test_downward_fixfunc" >:: test_downward_fixfunc;
+    "test_borrowcheck_constructor" >:: test_borrowcheck_constructor;
+    "test_borrowcheck_constant" >:: test_borrowcheck_constant;
+    "test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id;
+    "test_borrowcheck_invalid_linearity_linear_arg_out_of_fix" >:: test_borrowcheck_invalid_linearity_linear_arg_out_of_fix;
+    "test_borrowcheck_invalid_linearity_lambda" >:: test_borrowcheck_invalid_linearity_lambda;
+    "test_borrowcheck_invalid_linearity_free_linear_var_in_lambda" >:: test_borrowcheck_invalid_linearity_free_linear_var_in_lambda;
+    "test_borrowcheck_invalid_linearity_letin" >:: test_borrowcheck_invalid_linearity_letin;
+    "test_borrowcheck_invalid_linearity_dealloc_twice" >:: test_borrowcheck_invalid_linearity_dealloc_twice;
+    "test_borrowcheck_invalid_linearity_arguments" >:: test_borrowcheck_invalid_linearity_arguments;
+    "test_borrowcheck_invalid_linearity_match_item" >:: test_borrowcheck_invalid_linearity_match_item;
+    "test_borrowcheck_invalid_linearity_match_branches" >:: test_borrowcheck_invalid_linearity_match_branches;
+    "test_borrowcheck_invalid_linearity_match_member" >:: test_borrowcheck_invalid_linearity_match_member;
+    "test_borrowcheck_simple_borrow" >:: test_borrowcheck_simple_borrow;
+    "test_borrowcheck_proj" >:: test_borrowcheck_proj;
+    "test_borrowcheck_lambda_out_of_fix" >:: test_borrowcheck_lambda_out_of_fix;
+    "test_borrowcheck_lambda_closure" >:: test_borrowcheck_lambda_closure;
+    "test_borrowcheck_fix_closure" >:: test_borrowcheck_fix_closure;
+    "test_borrowcheck_invalid_borrow_used_after_dealloc" >:: test_borrowcheck_invalid_borrow_used_after_dealloc;
+    "test_borrowcheck_invalid_borrow_application" >:: test_borrowcheck_invalid_borrow_application;
+    "test_borrowcheck_invalid_borrow_match" >:: test_borrowcheck_invalid_borrow_match;
+    "test_borrowcheck_invalid_borrow_proj" >:: test_borrowcheck_invalid_borrow_proj;
+    "test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true;
+    "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
   ]
 
 let () =

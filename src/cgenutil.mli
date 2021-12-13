@@ -20,6 +20,8 @@ val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
 val ncons : int -> 'a -> 'a list -> 'a list
 val ntimes : int -> ('a -> 'a) -> 'a -> 'a
+val list_prepend_map_rev : ('a -> 'b) -> 'a list -> 'b list -> 'b list
+val list_prepend_mapi_rev : (int -> 'a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_rev_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_find_index : ('a -> bool) -> 'a list -> int
@@ -54,6 +56,7 @@ val merge_range :
 val merge_range3 :
   (int * int) option ->
   (int * int) option -> (int * int) option -> (int * int) option
+val intset_union_ary : IntSet.t array -> IntSet.t
 val ( ++ ) : Pp.t -> Pp.t -> Pp.t
 val ( +++ ) : Pp.t -> Pp.t -> Pp.t
 val pp_sjoin_ary : Pp.t array -> Pp.t
