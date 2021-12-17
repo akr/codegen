@@ -6,6 +6,7 @@ val is_concrete_inductive_type :
   Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val command_linear : Constrexpr.constr_expr -> unit
 val command_downward : Constrexpr.constr_expr -> unit
+val command_borrow_type : Constrexpr.constr_expr -> unit
 val type_of_inductive_arity :
   (Declarations.regular_inductive_arity, Declarations.template_arity)
   Declarations.declaration_arity -> Constr.t

@@ -3081,7 +3081,8 @@ let test_borrowcheck_lambda_out_of_fix (ctx : test_ctxt) : unit =
     |}) {| |}
 
 let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
-  codegen_test_template ~goal:UntilCoq ctx
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
     ({|
       Inductive L : Set := LC.
       Inductive B : Set := BC.
@@ -3098,7 +3099,8 @@ let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
     |}) {| |}
 
 let test_borrowcheck_fix_closure (ctx : test_ctxt) : unit =
-  codegen_test_template ~goal:UntilCoq ctx
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
     ({|
       Inductive L : Set := LC.
       Inductive B : Set := BC.

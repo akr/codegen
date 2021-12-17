@@ -1,6 +1,6 @@
 module ConstrMap : CMap.ExtS with type key = Constr.t
+module ConstrSet : CSet.S with type elt = Constr.t
 module StringSet : CSet.S with type elt = String.t
-                          and type t = Set.Make(String).t
 
 val opt_debug_simplification : bool ref
 val opt_debug_normalizeV : bool ref
@@ -44,6 +44,7 @@ val deallocator_cfunc_of_type : string ConstrMap.t ref
 type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
 val type_downward_map : type_downward ConstrMap.t ref
 val borrow_function_set : Names.Cset.t ref
+val borrow_type_set : ConstrSet.t ref
 
 type simplified_status =
     SpNoSimplification

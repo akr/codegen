@@ -135,9 +135,6 @@ val delete_unused_let_rec1 :
   Environ.env ->
   Evd.evar_map -> EConstr.t -> Cgenutil.IntSet.t * (bool list -> EConstr.t)
 val delete_unused_let : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
-val first_fv_rec : Environ.env -> Evd.evar_map -> int -> EConstr.t -> int option
-val first_fv : Environ.env -> Evd.evar_map -> EConstr.t -> int option
-val has_fv : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val replace_app :
   cfunc:string ->
   Environ.env ->

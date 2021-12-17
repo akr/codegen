@@ -1711,59 +1711,6 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
-let rec first_fv_rec (env : Environ.env) (sigma : Evd.evar_map) (numrels : int) (term : EConstr.t) : int option =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
-  | Const _ | Construct _ -> None
-  | Rel i -> if numrels < i then Some i else None
-  | Evar (ev, es) ->
-      array_option_exists (first_fv_rec env sigma numrels) (Array.of_list es)
-  | Proj (proj, e) ->
-      first_fv_rec env sigma numrels e
-  | Cast (e,ck,t) ->
-      shortcut_option_or (first_fv_rec env sigma numrels e)
-        (fun () -> first_fv_rec env sigma numrels t)
-  | App (f, args) ->
-      shortcut_option_or (first_fv_rec env sigma numrels f)
-        (fun () -> array_option_exists (first_fv_rec env sigma numrels) args)
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      shortcut_option_or (first_fv_rec env sigma numrels e)
-        (fun () -> shortcut_option_or (first_fv_rec env sigma numrels t)
-          (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b)))
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      shortcut_option_or (first_fv_rec env sigma numrels p)
-        (fun () -> shortcut_option_or (first_fv_rec env sigma numrels item)
-          (fun () -> array_option_exists (first_fv_rec env sigma numrels) branches))
-  | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      shortcut_option_or (first_fv_rec env sigma numrels t)
-        (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b))
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      shortcut_option_or (first_fv_rec env sigma numrels t)
-        (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b))
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let h = Array.length fary in
-      shortcut_option_or (array_option_exists (first_fv_rec env sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec env2 sigma (numrels+h)) fary))
-  | CoFix (i, ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      let h = Array.length fary in
-      shortcut_option_or (array_option_exists (first_fv_rec env sigma numrels) tary)
-        (fun () -> Option.map (fun i -> i-h) (array_option_exists (first_fv_rec env2 sigma (numrels+h)) fary))
-
-let first_fv (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : int option =
-  first_fv_rec env sigma 0 term
-
-let has_fv env sigma term : bool =
-  first_fv env sigma term <> None
-
 (* func must be a constant or constructor *)
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t * string =
   (* msg_info_hov (Pp.str "[codegen] replace_app:" +++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)

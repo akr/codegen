@@ -43,6 +43,7 @@ val id_of_name : Names.Name.t -> Names.Id.t
 val id_of_annotated_name : Names.Name.t Context.binder_annot -> Names.Id.t
 val str_of_name : Names.Name.t -> string
 val str_of_annotated_name : Names.Name.t Context.binder_annot -> string
+val str_of_name_permissive : Names.Name.t -> string
 val iota_ary : int -> int -> int array
 val iota_list : int -> int -> int list
 val array_option_exists_rec :
@@ -104,6 +105,8 @@ val free_variables_without :
   Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
 val free_variables_index_set : Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
 val free_variables_level_set : ?without:int -> Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
+val first_fv : Environ.env -> Evd.evar_map -> EConstr.t -> int option
+val has_fv : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val constr_name : Evd.evar_map -> EConstr.t -> string
 val constr_expr_cstr_name : Constrexpr.constr_expr -> string
 val global_gensym : ?prefix:string -> unit -> string

@@ -19,6 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 open Names
 
 module ConstrMap = HMap.Make(Constr)
+module ConstrSet = CSet.Make(Constr)
 module StringSet = CSet.Make(String)
 
 (* Set/Unset Debug CodeGen Simplification. *)
@@ -143,6 +144,9 @@ let type_downward_map = Summary.ref
 
 let borrow_function_set = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFunctionSet"
+
+let borrow_type_set = Summary.ref
+  (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
 
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)
