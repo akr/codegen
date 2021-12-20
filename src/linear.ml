@@ -101,107 +101,113 @@ let rec hasRel (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : b
   | Float n -> false
   | Array (u,t,def,ty) -> Array.exists (hasRel env sigma) t || hasRel env sigma def || hasRel env sigma ty
 
-let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array)
-  (f : Environ.env -> (*typename*)Id.t -> EConstr.t array -> (*consname*)Id.t ->
-       (*nf_lc*)(Constr.rel_context * Constr.types) -> unit) : unit =
+let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
+  (f : Environ.env -> (*typename*)Id.t -> (*consname*)Id.t ->
+       (*argtype*)EConstr.types -> (*subst_ind*)Vars.substl -> unit) : unit =
   let open Declarations in
-  (*Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] ind:" +++ Printer.pr_inductive env ind);
-  for i = 0 to Array.length argsary - 1 do
-    Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] argsary[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma argsary.(i))
-  done;*)
-  let (mutind, i) = ind in
+  let open Context.Rel.Declaration in
   let mind_body = Environ.lookup_mind mutind env in
-  if mind_body.mind_nparams <> mind_body.mind_nparams_rec then
-    user_err (Pp.str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_inductive env ind);
-  if (Array.exists (fun oind_body -> oind_body.mind_nrealargs <> 0) mind_body.mind_packets) then
-    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++
+  let pp_ind_names =
+    pp_sjoinmap_ary
+      (fun oind_body ->
+        if oind_body.mind_nrealargs <> 0 then
+          Id.print oind_body.mind_typename
+        else
+          Pp.mt ())
+      mind_body.mind_packets
+  in
+  if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
+    user_err (Pp.str "[codegen] non-uniform inductive type:" +++
               pp_sjoinmap_ary
-                (fun oind_body ->
-                  if oind_body.mind_nrealargs <> 0 then
-                    Id.print oind_body.mind_typename
-                  else
-                    Pp.mt ())
+                (fun oind_body -> Id.print oind_body.mind_typename)
                 mind_body.mind_packets);
-  if not (List.for_all (valid_type_param env sigma) mind_body.mind_params_ctxt) then
-    user_err (Pp.str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_inductive env ind);
-  let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
-      (iota_ary 0 (Array.length mind_body.mind_packets)) in
-  let params = argsary in
+  if (Array.exists (fun oind_body -> oind_body.mind_nrealargs <> 0) mind_body.mind_packets) then
+    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++ pp_ind_names);
+  if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
+    user_err (Pp.str "[codegen] is_linear_ind: non-type parameter:" +++ pp_ind_names);
+  let subst_ind = CArray.map_to_list (fun j -> EConstr.mkInd (mutind, j))
+    (array_rev (iota_ary 0 mind_body.mind_ntypes)) in
   let env2 = Environ.push_rel_context
               (Array.to_list
-                (Array.map2 (fun oind_body ind ->
-                  Context.Rel.Declaration.LocalDef
+                (Array.map (fun oind_body ->
+                  Context.Rel.Declaration.LocalAssum
                     (Context.annotR (Names.Name.Name oind_body.mind_typename),
-                     ind,
                      type_of_inductive_arity oind_body.mind_arity))
-                  (array_rev mind_body.mind_packets)
-                  (array_rev ind_ary)))
+                  (array_rev mind_body.mind_packets)))
               env
   in
   Array.iter
     (fun oind_body ->
       Array.iter
         (fun k ->
-          (*msg_debug_hov (Pp.str "[codegen:ind_nflc_iter] check env2" +++
+          (*msg_debug_hov (Pp.str "[codegen:mutind_nflc_iter] check env2" +++
                          Pp.str "typename=" ++ Id.print oind_body.mind_typename +++
                          Pp.str "consname=" ++ Id.print (oind_body.mind_consnames.(k)) +++
                          Pp.str "constype=" ++ Printer.pr_constr_env env2 sigma (oind_body.mind_user_lc.(k)));*)
           let (ctx, t) = oind_body.mind_nf_lc.(k) in
           let (t_f,t_args) = Constr.decompose_app t in
           if not (Constr.isRel t_f) then
-            user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] result of constructor type is not Rel:" +++
+            user_err_hov (Pp.str "[codegen:mutind_nflc_iter:bug] result of constructor type is not Rel:" +++
                           Printer.pr_constr_env env2 sigma t);
           let i = Constr.destRel t_f - List.length ctx in
           let decl = Environ.lookup_rel i env2 in
           let id_in_env = id_of_name (Context.Rel.Declaration.get_name decl) in
           let expected_id1 = oind_body.mind_typename in
           if not (Id.equal expected_id1 id_in_env) then
-            user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] inductive type name mismatch:" +++
+            user_err_hov (Pp.str "[codegen:mutind_nflc_iter:bug] inductive type name mismatch (1):" +++
                           Pp.str "expected:" ++ Id.print expected_id1 +++ Pp.str "but" +++
-                          Pp.str "actual:" ++ Id.print id_in_env);
-          match Context.Rel.Declaration.get_value decl with
-          | None -> ()
-          | Some v ->
-              (if not (Constr.isInd v) then
-                user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] not inductive type:" +++
-                              Printer.pr_constr_env (Environ.pop_rel_context (i-1) env2) sigma v);
-              let ((mutind2, i2), univ) = Constr.destInd v in
-              let mind_body2 = Environ.lookup_mind mutind2 env in
-              let expected_id2 = mind_body2.mind_packets.(i2).mind_typename in
-              if not (Id.equal expected_id2 id_in_env) then
-                user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] inductive type name mismatch:" +++
-                              Pp.str "expected:" ++ Id.print expected_id2 +++ Pp.str "but" +++
-                              Pp.str "actual:" ++ Id.print id_in_env)))
-        (iota_ary 0 (Array.length oind_body.mind_consnames));
-      Array.iter2 (f env2 oind_body.mind_typename params)
+                          Pp.str "actual:" ++ Id.print id_in_env))
+        (iota_ary 0 (Array.length oind_body.mind_consnames)))
+    mind_body.mind_packets;
+  Array.iter
+    (fun oind_body ->
+      let ind_id = oind_body.mind_typename in
+      Array.iter2
+        (fun cons_id nf_lc ->
+          let (ctx, t) = nf_lc in
+          let t = EConstr.of_constr t in
+          (* ctx is a list of decls from innermost to outermost *)
+          let rev_ctx = array_rev (Array.of_list ctx) in
+          let env3 = ref env2 in
+          let params = ref (Array.to_list params) in
+          let h = Array.length rev_ctx in
+          for i = 0 to h - 1 do
+            let decl = rev_ctx.(i) in
+            match decl with
+            | LocalDef (x,e,ty) ->
+                env3 := Environ.push_rel decl !env3
+            | LocalAssum (x,ty) ->
+                let ty = EConstr.of_constr ty in
+                (match !params with
+                | param :: rest ->
+                    params := rest;
+                    env3 := EConstr.push_rel (Context.Rel.Declaration.LocalDef (x, param, ty)) !env3
+                | [] ->
+                    let ty = whd_all !env3 sigma ty in
+                    if not (Vars.noccur_between sigma 1 (i - List.length mind_body.mind_params_ctxt) ty) then
+                      user_err_hov (Pp.str "[codegen] dependent constructor:" +++ Id.print ind_id +++ Id.print cons_id);
+                    let ty = Vars.lift (-i) ty in
+                    f env2 ind_id cons_id ty subst_ind;
+                    env3 := Environ.push_rel decl !env3)
+          done;
+          let t = whd_all !env3 sigma t in
+          if not (Vars.noccur_between sigma 1 (h - List.length mind_body.mind_params_ctxt) t) then
+            user_err_hov (Pp.str "[codegen] dependent constructor result:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma t);
+          let t = Vars.lift (-h) t in
+          let t' = Vars.substl subst_ind t in
+          let (tf, targs) = decompose_app sigma t' in
+          if not (EConstr.isInd sigma tf) then
+            user_err_hov (Pp.str "[codegen:mutind_nflc_iter:bug] result of constructor type is not Ind:" +++
+                          Printer.pr_econstr_env env sigma t');
+          let ((mutind2, i2), univ) = EConstr.destInd sigma tf in
+          let mind_body2 = Environ.lookup_mind mutind2 env2 in
+          let expected_id2 = mind_body2.mind_packets.(i2).mind_typename in
+          if not (Id.equal expected_id2 ind_id) then
+            user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] inductive type name mismatch (2):" +++
+                          Pp.str "expected:" ++ Id.print expected_id2 +++ Pp.str "but" +++
+                          Pp.str "actual:" ++ Id.print ind_id))
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
-
-let nflc_carg_iter (env : Environ.env) (sigma : Evd.evar_map) (params : EConstr.t array) (nf_lc : Constr.rel_context * Constr.types) (f : Environ.env -> Constr.types -> unit) : unit =
-  let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
-  (*for i = 0 to Array.length params - 1 do
-    Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] params[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma params.(i))
-  done;
-  Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] context:" +++ Printer.pr_rel_context env sigma ctx +++
-                      Pp.str "type:" +++ Printer.pr_type_env (Environ.push_rel_context ctx env) sigma t);*)
-  (* ctx is a list from inside declaration to outside declaration *)
-  let env = ref env in
-  let params = ref (CArray.map_to_list (EConstr.to_constr sigma) params) in
-  List.iter
-    (fun decl ->
-      (*Feedback.msg_debug (Pp.str "[codegen:nflc_carg_iter] decl:" +++ Printer.pr_rel_decl !env sigma decl);*)
-      match decl with
-      | Context.Rel.Declaration.LocalDef (name, expr, ty) ->
-          env := Environ.push_rel decl !env
-      | Context.Rel.Declaration.LocalAssum (name, ty) ->
-          (match !params with
-          | param :: rest ->
-              params := rest;
-              env := Environ.push_rel (Context.Rel.Declaration.LocalDef (name, param, ty)) !env
-          | [] ->
-              f !env ty;
-              env := Environ.push_rel decl !env))
-    (List.rev ctx)
 
 let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
   let ret = ref (ConstrSet.singleton (EConstr.to_constr sigma ty)) in
@@ -213,41 +219,23 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
     | Prod _ -> raise FoundFunction
     | Ind (ind, univ) -> ()
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty));
-    ind_nflc_iter env sigma (fst (destInd sigma ty_f)) ty_args
-      (fun env ind_id params cstr_id nf_lc ->
-        let nbrel_until_ind = Environ.nb_rel env in
-        nflc_carg_iter env sigma params nf_lc
-          (fun env argty ->
-            let argty = EConstr.of_constr argty in
-            let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
-            match EConstr.kind sigma argty_f with
-            | Rel i ->
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
-                  let argty = whd_all env sigma argty in
-                  if has_fv env sigma argty then
-                    user_err (Pp.str "[codegen] constructor argument type has free variable:" +++
-                              Printer.pr_econstr_env env sigma argty);
-                  ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
-                  match component_types env sigma argty with
-                  | None -> raise FoundFunction
-                  | Some set -> ret := ConstrSet.union !ret set;
-                else (* recursive references to the inductive types *)
-                  ()
-            | Sort _ ->
-                user_err (Pp.str "[codegen] component_types: constructor has type argument")
-            | Prod (x, ty, b) ->
-                raise FoundFunction
-            | Ind (ind,univ) ->
-                (let argty = whd_all env sigma argty in
-                if has_fv env sigma argty then
-                  user_err (Pp.str "[codegen] constructor argument type has free variable:" +++
-                            Printer.pr_econstr_env env sigma argty);
-                ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
-                match component_types env sigma argty with
-                | None -> raise FoundFunction
-                | Some set -> ret := ConstrSet.union !ret set)
-            | _ ->
-                user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty)));
+    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ty_f))) ty_args
+      (fun env ind_id cons_id argty subst_ind ->
+        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
+        match EConstr.kind sigma argty_f with
+        | Sort _ ->
+            user_err (Pp.str "[codegen] component_types: constructor has type argument")
+        | Prod (x, ty, b) ->
+            raise FoundFunction
+        | Rel i ->
+            ()
+        | Ind _ ->
+            (ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
+            match component_types env sigma argty with
+            | None -> raise FoundFunction
+            | Some set -> ret := ConstrSet.union !ret set)
+        | _ ->
+            user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
     Some !ret
   with
     FoundFunction -> None
@@ -311,46 +299,26 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
     argsary;
   let exception FoundLinear in
   try
-    ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
-      (fun env ind_id params cstr_id nf_lc ->
-        (*msg_debug_hov (Pp.str "[codegen:is_linear_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++
-                       Pp.str "cstr=" ++ Id.print cstr_id +++
-                       Pp.str "nf_lc=" ++ Printer.pr_constr_env env sigma
-                         (let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
-                          Context.Rel.fold_inside
-                            (fun (t : Constr.t) (decl : Constr.rel_declaration) ->
-                              match decl with
-                              | Context.Rel.Declaration.LocalAssum (name, ty) -> Constr.mkProd (name, ty, t)
-                              | Context.Rel.Declaration.LocalDef (name, expr, ty) -> Constr.mkLetIn (name, expr, ty, t))
-                            ~init:t ctx));*)
-        let nbrel_until_ind = Environ.nb_rel env in
-        nflc_carg_iter env sigma params nf_lc
-          (fun env argty ->
-            let argty = EConstr.of_constr argty in
-            (*Feedback.msg_debug (Pp.str "[codegen:is_linear_ind] argty=" ++ Printer.pr_econstr_env env sigma argty +++ Pp.str "argty_type=" ++ Pp.str (constr_name sigma argty));*)
-            match EConstr.kind sigma argty with
-            | Rel i ->
-                (* Since nf_lc is a head normalized constructor types,
-                  Rel is only used for recursive references of inductive types or
-                  references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
-                  if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
-            | App (f, args) when isRel sigma f ->
-                (* Same as above Rel *)
-                let i = destRel sigma f in
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
-                  if is_linear_type env sigma (whd_all env sigma argty) then raise FoundLinear
-            | Sort _ ->
-                user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument")
-            | Prod (x, ty, b) ->
-                (* function type argument of a constructor is non-linear or non-code-generatable *)
-                ()
-            | Ind (ind, univ) ->
-                if is_linear_type env sigma argty then raise FoundLinear
-            | App (f, args) when isInd sigma f ->
-                if is_linear_type env sigma argty then raise FoundLinear
-            | _ ->
-                user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty)));
+    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
+      (fun env ind_id cons_id argty subst_ind ->
+        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
+        match EConstr.kind sigma argty_f with
+        | Sort _ ->
+            user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument")
+        | Prod (x, ty, b) ->
+            (* function type argument of a constructor is non-linear or non-code-generatable *)
+            ()
+        | Rel _ ->
+            (* Since mutind_cstrarg_iter normalizes argty,
+              Rel is only used for recursive references of inductive types.
+              We don't need to examine the recursive references.
+              Note that we force uniform parameters and prohibit indexed-types,
+              argty_args must be unchanged. *)
+            ()
+        | Ind _ ->
+            if is_linear_type env sigma argty then raise FoundLinear
+        | _ ->
+            user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
     false
   with
     FoundLinear -> true
@@ -419,37 +387,21 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
     argsary;
   let exception FoundDownward in
   try
-    ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
-      (fun env ind_id params cstr_id nf_lc ->
-        (*Feedback.msg_debug (Pp.str "[codegen:is_downward_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++ Pp.str "cstr=" ++ Id.print cstr_id);*)
-        let nbrel_until_ind = Environ.nb_rel env in
-        nflc_carg_iter env sigma params nf_lc
-          (fun env argty ->
-            let argty = EConstr.of_constr argty in
-            (*Feedback.msg_debug (Pp.str "[codegen:is_downward_ind] argty=" ++ Printer.pr_econstr_env env sigma argty +++ Pp.str "argty_type=" ++ Pp.str (constr_name sigma argty));*)
-            match EConstr.kind sigma argty with
-            | Rel i ->
-                (* Since nf_lc is a head normalized constructor types,
-                  Rel is only used for recursive references of inductive types or
-                  references to earlier declarations in nf_lc (this contains inductive type parameters).  *)
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
-                  if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
-            | App (f, args) when isRel sigma f ->
-                (* Same as above Rel *)
-                let i = destRel sigma f in
-                if i <= Environ.nb_rel env - nbrel_until_ind then (* references to earlier declarations in nf_lc *)
-                  if is_downward_type env sigma (whd_all env sigma argty) then raise FoundDownward
-            | Sort _ ->
-                user_err (Pp.str "[codegen] is_downward_ind: constructor has type argument")
-            | Prod (x, ty, b) ->
-                (* function type argument of a constructor means DownwardOnly *)
-                raise FoundDownward
-            | Ind (ind, univ) ->
-                if is_downward_type env sigma argty then raise FoundDownward
-            | App (f, args) when isInd sigma f ->
-                if is_downward_type env sigma argty then raise FoundDownward
-            | _ ->
-                user_err (Pp.str "[codegen:is_downward_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty)));
+    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
+      (fun env ind_id cons_id argty subst_ind ->
+        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
+        match EConstr.kind sigma argty_f with
+        | Sort _ ->
+            user_err (Pp.str "[codegen] is_downward_ind: constructor has type argument")
+        | Prod _ ->
+            (* function type argument of a constructor means DownwardOnly *)
+            raise FoundDownward
+        | Rel _ ->
+            ()
+        | Ind _ ->
+            if is_downward_type env sigma argty then raise FoundDownward
+        | _ ->
+            user_err (Pp.str "[codegen:is_downward_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
     false
   with
     FoundDownward -> true
