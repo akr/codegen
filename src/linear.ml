@@ -101,39 +101,81 @@ let rec hasRel (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : b
   | Float n -> false
   | Array (u,t,def,ty) -> Array.exists (hasRel env sigma) t || hasRel env sigma def || hasRel env sigma ty
 
-let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array) (f : Environ.env -> Id.t -> EConstr.t array -> Id.t -> (Constr.rel_context * Constr.types) -> unit) : unit =
+let ind_nflc_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (argsary : EConstr.t array)
+  (f : Environ.env -> (*typename*)Id.t -> EConstr.t array -> (*consname*)Id.t ->
+       (*nf_lc*)(Constr.rel_context * Constr.types) -> unit) : unit =
+  let open Declarations in
   (*Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] ind:" +++ Printer.pr_inductive env ind);
   for i = 0 to Array.length argsary - 1 do
     Feedback.msg_debug (Pp.str "[codegen:ind_nflc_iter] argsary[" ++ Pp.int i ++ Pp.str "]:" +++ Printer.pr_econstr_env env sigma argsary.(i))
   done;*)
   let (mutind, i) = ind in
   let mind_body = Environ.lookup_mind mutind env in
-  if mind_body.Declarations.mind_nparams <> mind_body.Declarations.mind_nparams_rec then
+  if mind_body.mind_nparams <> mind_body.mind_nparams_rec then
     user_err (Pp.str "[codegen] is_linear_ind: non-uniform inductive type:" +++ Printer.pr_inductive env ind);
-  if mind_body.Declarations.mind_nparams <> Array.length argsary then
-    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++ Printer.pr_inductive env ind +++
-              Pp.hv 0 (
-                Pp.str "(" ++ Pp.int mind_body.Declarations.mind_nparams +++ Pp.str "arguments expected but" +++
-                Pp.int (Array.length argsary) +++ Pp.str "given)"));
-  if not (List.for_all (valid_type_param env sigma) mind_body.Declarations.mind_params_ctxt) then
+  if (Array.exists (fun oind_body -> oind_body.mind_nrealargs <> 0) mind_body.mind_packets) then
+    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++
+              pp_sjoinmap_ary
+                (fun oind_body ->
+                  if oind_body.mind_nrealargs <> 0 then
+                    Id.print oind_body.mind_typename
+                  else
+                    Pp.mt ())
+                mind_body.mind_packets);
+  if not (List.for_all (valid_type_param env sigma) mind_body.mind_params_ctxt) then
     user_err (Pp.str "[codegen] is_linear_ind: non-type parameter:" +++ Printer.pr_inductive env ind);
   let ind_ary = Array.map (fun j -> Constr.mkInd (mutind, j))
-      (iota_ary 0 (Array.length mind_body.Declarations.mind_packets)) in
-  let params = Array.sub argsary 0 mind_body.Declarations.mind_nparams in
-  let env = Environ.push_rel_context (
-      List.map (fun ii0 ->
-        let oind_body = mind_body.Declarations.mind_packets.(Array.length mind_body.Declarations.mind_packets - ii0 - 1) in
-        Context.Rel.Declaration.LocalDef
-          (Context.annotR (Names.Name.Name oind_body.Declarations.mind_typename),
-           ind_ary.(Array.length mind_body.Declarations.mind_packets - ii0 - 1),
-           type_of_inductive_arity oind_body.Declarations.mind_arity))
-        (iota_list 0 (Array.length mind_body.Declarations.mind_packets))
-    ) env in
+      (iota_ary 0 (Array.length mind_body.mind_packets)) in
+  let params = argsary in
+  let env2 = Environ.push_rel_context
+              (Array.to_list
+                (Array.map2 (fun oind_body ind ->
+                  Context.Rel.Declaration.LocalDef
+                    (Context.annotR (Names.Name.Name oind_body.mind_typename),
+                     ind,
+                     type_of_inductive_arity oind_body.mind_arity))
+                  (array_rev mind_body.mind_packets)
+                  (array_rev ind_ary)))
+              env
+  in
   Array.iter
     (fun oind_body ->
-      Array.iter2 (f env oind_body.Declarations.mind_typename params)
-        oind_body.Declarations.mind_consnames oind_body.Declarations.mind_nf_lc)
-    mind_body.Declarations.mind_packets
+      Array.iter
+        (fun k ->
+          (*msg_debug_hov (Pp.str "[codegen:ind_nflc_iter] check env2" +++
+                         Pp.str "typename=" ++ Id.print oind_body.mind_typename +++
+                         Pp.str "consname=" ++ Id.print (oind_body.mind_consnames.(k)) +++
+                         Pp.str "constype=" ++ Printer.pr_constr_env env2 sigma (oind_body.mind_user_lc.(k)));*)
+          let (ctx, t) = oind_body.mind_nf_lc.(k) in
+          let (t_f,t_args) = Constr.decompose_app t in
+          if not (Constr.isRel t_f) then
+            user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] result of constructor type is not Rel:" +++
+                          Printer.pr_constr_env env2 sigma t);
+          let i = Constr.destRel t_f - List.length ctx in
+          let decl = Environ.lookup_rel i env2 in
+          let id_in_env = id_of_name (Context.Rel.Declaration.get_name decl) in
+          let expected_id1 = oind_body.mind_typename in
+          if not (Id.equal expected_id1 id_in_env) then
+            user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] inductive type name mismatch:" +++
+                          Pp.str "expected:" ++ Id.print expected_id1 +++ Pp.str "but" +++
+                          Pp.str "actual:" ++ Id.print id_in_env);
+          match Context.Rel.Declaration.get_value decl with
+          | None -> ()
+          | Some v ->
+              (if not (Constr.isInd v) then
+                user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] not inductive type:" +++
+                              Printer.pr_constr_env (Environ.pop_rel_context (i-1) env2) sigma v);
+              let ((mutind2, i2), univ) = Constr.destInd v in
+              let mind_body2 = Environ.lookup_mind mutind2 env in
+              let expected_id2 = mind_body2.mind_packets.(i2).mind_typename in
+              if not (Id.equal expected_id2 id_in_env) then
+                user_err_hov (Pp.str "[codegen:ind_nflc_iter:bug] inductive type name mismatch:" +++
+                              Pp.str "expected:" ++ Id.print expected_id2 +++ Pp.str "but" +++
+                              Pp.str "actual:" ++ Id.print id_in_env)))
+        (iota_ary 0 (Array.length oind_body.mind_consnames));
+      Array.iter2 (f env2 oind_body.mind_typename params)
+        oind_body.mind_consnames oind_body.mind_nf_lc)
+    mind_body.mind_packets
 
 let nflc_carg_iter (env : Environ.env) (sigma : Evd.evar_map) (params : EConstr.t array) (nf_lc : Constr.rel_context * Constr.types) (f : Environ.env -> Constr.types -> unit) : unit =
   let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
@@ -271,7 +313,16 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   try
     ind_nflc_iter env sigma (fst (destInd sigma ind_f)) argsary
       (fun env ind_id params cstr_id nf_lc ->
-        (*Feedback.msg_debug (Pp.str "[codegen:is_linear_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++ Pp.str "cstr=" ++ Id.print cstr_id);*)
+        (*msg_debug_hov (Pp.str "[codegen:is_linear_ind] ind_nflc_iter calls with ind=" ++ Id.print ind_id +++
+                       Pp.str "cstr=" ++ Id.print cstr_id +++
+                       Pp.str "nf_lc=" ++ Printer.pr_constr_env env sigma
+                         (let ((ctx : Constr.rel_context), (t : Constr.t)) = nf_lc in
+                          Context.Rel.fold_inside
+                            (fun (t : Constr.t) (decl : Constr.rel_declaration) ->
+                              match decl with
+                              | Context.Rel.Declaration.LocalAssum (name, ty) -> Constr.mkProd (name, ty, t)
+                              | Context.Rel.Declaration.LocalDef (name, expr, ty) -> Constr.mkLetIn (name, expr, ty, t))
+                            ~init:t ctx));*)
         let nbrel_until_ind = Environ.nb_rel env in
         nflc_carg_iter env sigma params nf_lc
           (fun env argty ->
