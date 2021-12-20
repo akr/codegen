@@ -151,11 +151,11 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                           Printer.pr_constr_env env2 sigma t);
           let i = Constr.destRel t_f - List.length ctx in
           let decl = Environ.lookup_rel i env2 in
+          let ind_id = oind_body.mind_typename in
           let id_in_env = id_of_name (Context.Rel.Declaration.get_name decl) in
-          let expected_id1 = oind_body.mind_typename in
-          if not (Id.equal expected_id1 id_in_env) then
+          if not (Id.equal ind_id id_in_env) then
             user_err_hov (Pp.str "[codegen:mutind_nflc_iter:bug] inductive type name mismatch (1):" +++
-                          Pp.str "expected:" ++ Id.print expected_id1 +++ Pp.str "but" +++
+                          Pp.str "expected:" ++ Id.print ind_id +++ Pp.str "but" +++
                           Pp.str "actual:" ++ Id.print id_in_env))
         (iota_ary 0 (Array.length oind_body.mind_consnames)))
     mind_body.mind_packets;
@@ -164,9 +164,9 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
       let ind_id = oind_body.mind_typename in
       Array.iter2
         (fun cons_id nf_lc ->
+          (* ctx is a list of decls from innermost to outermost *)
           let (ctx, t) = nf_lc in
           let t = EConstr.of_constr t in
-          (* ctx is a list of decls from innermost to outermost *)
           let rev_ctx = array_rev (Array.of_list ctx) in
           let env3 = ref env2 in
           let params = ref (Array.to_list params) in
@@ -181,7 +181,7 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                 (match !params with
                 | param :: rest ->
                     params := rest;
-                    env3 := EConstr.push_rel (Context.Rel.Declaration.LocalDef (x, param, ty)) !env3
+                    env3 := EConstr.push_rel (LocalDef (x, param, ty)) !env3
                 | [] ->
                     let ty = whd_all !env3 sigma ty in
                     if not (Vars.noccur_between sigma 1 (i - List.length mind_body.mind_params_ctxt) ty) then
@@ -201,11 +201,11 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                           Printer.pr_econstr_env env sigma t');
           let ((mutind2, i2), univ) = EConstr.destInd sigma tf in
           let mind_body2 = Environ.lookup_mind mutind2 env2 in
-          let expected_id2 = mind_body2.mind_packets.(i2).mind_typename in
-          if not (Id.equal expected_id2 ind_id) then
+          let id_via_substitution = mind_body2.mind_packets.(i2).mind_typename in
+          if not (Id.equal ind_id id_via_substitution) then
             user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] inductive type name mismatch (2):" +++
-                          Pp.str "expected:" ++ Id.print expected_id2 +++ Pp.str "but" +++
-                          Pp.str "actual:" ++ Id.print ind_id))
+                          Pp.str "expected:" ++ Id.print ind_id +++ Pp.str "but" +++
+                          Pp.str "actual:" ++ Id.print id_via_substitution))
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
 
