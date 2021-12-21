@@ -128,6 +128,17 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
     (iota_ary 0 mind_body.mind_ntypes) in
   (mind_body,ind_ary)
 
+let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
+  let (ty_f, ty_args) = EConstr.decompose_app sigma ty in
+  let (mutind,i) =
+    match EConstr.kind sigma ty_f with
+    | Ind (ind,univ) -> ind
+    | _ -> user_err_hov (Pp.str "[codegen:mutual_inductive_types] inductive type expected:" +++
+                         Printer.pr_econstr_env env sigma ty)
+  in
+  let (_,ind_ary) = make_ind_ary env sigma mutind in
+  Array.map (fun ind -> mkApp (ind, Array.of_list ty_args)) ind_ary
+
 let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
   (f : Environ.env -> (*typename*)Id.t -> (*consname*)Id.t ->
        (*argtype*)EConstr.types -> (*subst_ind*)Vars.substl -> unit) : unit =
@@ -218,7 +229,7 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
     mind_body.mind_packets
 
 let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
-  let ret = ref (ConstrSet.singleton (EConstr.to_constr sigma ty)) in
+  let ret = ref (ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty))) in
   let exception FoundFunction in
   try
     let (ty_f,ty_args) = EConstr.decompose_app sigma ty in
@@ -699,7 +710,6 @@ let pr_lvalues (env : Environ.env) (sigma : Evd.evar_map) (lvs : lvalues) =
     (ConstrMap.bindings lvs) ++
   Pp.str "}"
 
-  (*
 let lvalues_of_list (pairs : (Constr.t*int) list) : lvalues =
   List.fold_left
     (fun m (ty,l) ->
@@ -711,10 +721,14 @@ let lvalues_of_list (pairs : (Constr.t*int) list) : lvalues =
         m)
     ConstrMap.empty
     pairs
-    *)
+
+(*
+let lvalues_of_array (pairs : (Constr.t*int) array) : lvalues =
+  lvalues_of_list (Array.to_list pairs)
 
 let lvalues_singleton (ty : Constr.t) (l : int) : lvalues =
   ConstrMap.singleton ty (IntSet.singleton l)
+*)
 
 let lvalues_union (lvs1 : lvalues) (lvs2 : lvalues) : lvalues =
   ConstrMap.merge
@@ -984,16 +998,19 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (assert (List.length vs = 1);
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
-        (* xxx: needs all borrow types in the result of ctnt *)
         let (_,_,ty) = destProd sigma (Retyping.get_type_of env sigma term) in
-        let ty = EConstr.to_constr sigma ty in
+        let tys =
+          match component_types env sigma ty with
+          | None -> user_err_hov (Pp.str "[codegen] borrowed type contains a function:" +++ Printer.pr_econstr_env env sigma ty)
+          | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
+        in
         (*Context.Rel.Declaration.get_type (Environ.lookup_rel i env)*)
         let l =
           match List.nth original_linear_var_in_env (i-1) with
           | Some l' -> l'
           | None -> l
         in
-        let lresult = lvalues_singleton ty l in
+        let lresult = lvalues_of_list (List.map (fun ty -> (ty,l)) tys) in
         (lresult, IntSet.empty, lresult))
       else
         if CList.is_empty vs then
@@ -1190,6 +1207,26 @@ let linear_type_check_single (libref : Libnames.qualid) : unit =
       | (_, _, _) -> user_err (Pp.str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] not a constant reference:" +++ Printer.pr_global gref)
 
+
+let add_borrow_type ?(msg_new:bool=false) ?(msg_already:bool=false)
+    (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
+  let tyset = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
+  let added = ConstrSet.diff tyset !borrow_type_set in
+  let already_added = ConstrSet.inter tyset !borrow_type_set in
+  if not (ConstrSet.subset tyset !borrow_type_set) then
+    borrow_type_set := ConstrSet.union tyset !borrow_type_set;
+  if msg_new then
+    List.iter
+      (fun ty ->
+        Feedback.msg_info (Pp.str "[codegen] borrow type registered:" +++ Printer.pr_constr_env env sigma ty))
+      (ConstrSet.elements added);
+  if msg_already then
+    List.iter
+      (fun ty ->
+        Feedback.msg_info (Pp.str "[codegen] borrow type already registered:" +++ Printer.pr_constr_env env sigma ty))
+      (ConstrSet.elements already_added);
+  ()
+
 let command_borrow_type (ty : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -1197,10 +1234,8 @@ let command_borrow_type (ty : Constrexpr.constr_expr) : unit =
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (Pp.str "[codegen] BorrowType: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
-  (if ConstrSet.mem (EConstr.to_constr sigma ty4) !borrow_type_set then
-    user_err (Pp.str "[codegen] borrow type already defined:" +++ Printer.pr_econstr_env env sigma ty4));
-  borrow_type_set := ConstrSet.add (EConstr.to_constr sigma ty4) !borrow_type_set;
-  Feedback.msg_info (Pp.str "[codegen] borrow type registered:" +++ Printer.pr_econstr_env env sigma ty2)
+  add_borrow_type ~msg_new:true ~msg_already:true env sigma ty4;
+  ()
 
 let command_borrow_function (libref : Libnames.qualid) : unit =
   let set_linear env sigma ty =
@@ -1212,13 +1247,7 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
         Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_constr_env env sigma ty);
         type_linearity_map := ConstrMap.add ty LinearityIsLinear !type_linearity_map
   in
-  let set_borrow_type env sigma ty =
-    if ConstrSet.mem ty !borrow_type_set then
-      () (* already registered *)
-    else
-      (Feedback.msg_info (Pp.str "[codegen] borrow type registered:" +++ Printer.pr_constr_env env sigma ty);
-      borrow_type_set := ConstrSet.add ty !borrow_type_set)
-  in
+  let set_borrow_type env sigma ty = add_borrow_type ~msg_new:true env sigma (EConstr.of_constr ty) in
   let set_borrow_function ctnt =
     if Cset.mem ctnt !borrow_function_set then
       ()

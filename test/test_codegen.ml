@@ -3235,6 +3235,40 @@ let test_borrowcheck_invalid_borrow_lambda_in_match (ctx : test_ctxt) : unit =
 	b.
     |}) {| |}
 
+let test_borrowcheck_invalid_borrow_mutual (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
+    ({|
+      (* This example is taken from Coq reference manual *)
+      Inductive tree : Set :=
+      | node : forest -> tree
+      with forest : Set :=
+      | emptyf : forest
+      | consf : tree -> forest -> forest.
+      Definition dealloc_tree (t : tree) : unit := tt.
+      Inductive btree : Set :=
+      | bnode : bforest -> btree
+      with bforest : Set :=
+      | bemptyf : bforest
+      | bconsf : btree -> bforest -> bforest.
+      Fixpoint borrow_tree t :=
+        match t with
+        | node f => bnode (borrow_forest f)
+        end
+      with borrow_forest f :=
+        match f with
+        | emptyf => bemptyf
+        | consf t f => bconsf (borrow_tree t) (borrow_forest f)
+        end.
+      CodeGen BorrowFunction borrow_tree.
+      CodeGen TestBorrowCheck
+        fun (t : tree) =>
+        let bt := borrow_tree t in
+        match bt with
+        | bnode bf => let _ := dealloc_tree t in bf
+        end.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3373,6 +3407,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_borrow_proj" >:: test_borrowcheck_invalid_borrow_proj;
     "test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true;
     "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
+    "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
   ]
 
 let () =
