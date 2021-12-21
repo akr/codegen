@@ -967,7 +967,6 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
     | Some tyset ->
         ConstrMap.filter
           (fun ty set ->
-            (* xxx: check ty is a borrow type *)
             ConstrSet.mem ty tyset)
           lresult
   in
