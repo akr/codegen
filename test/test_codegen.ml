@@ -2836,17 +2836,39 @@ let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
     |}
 
 let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
-  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] cannot match linear variable without deallocator:") ctx
-    (unit_src ^ bool_src ^
-     Str.global_replace (Str.regexp "CodeGen DeallocatorType boolbox .*\n") "" boolbox_src ^
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ boolbox_src ^
     {|
-      Definition f (x : boolbox) : bool :=
-        match x with
-        | BoolBox b => b
+      CodeGen Inductive Type boolbox*boolbox => "pair_boolbox_boolbox".
+      CodeGen Inductive Match boolbox*boolbox => ""
+      | pair => "" "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
+      CodeGen Primitive pair boolbox boolbox => "make_pair_boolbox_boolbox".
+      CodeGen Snippet "
+      typedef struct {
+        boolbox fst;
+        boolbox snd;
+      } pair_boolbox_boolbox;
+      #define make_pair_boolbox_boolbox(fst, snd) ((pair_boolbox_boolbox){ (fst), (snd) })
+      #define pair_boolbox_boolbox_fst(x) ((x).fst)
+      #define pair_boolbox_boolbox_snd(x) ((x).snd)
+      ".
+      Definition f (xy : boolbox*boolbox) : bool :=
+        match xy with
+        | pair (BoolBox x) (BoolBox y) => x
         end.
       CodeGen Function f.
-    |}) {| |}
+    |})
+    {|
+      pair_boolbox_boolbox p = make_pair_boolbox_boolbox(boolbox_alloc(true), boolbox_alloc(false));
+      assert(boolbox_log_next - boolbox_log_buffer == 2);
+      assert(boolbox_log_buffer[0] == 'a');
+      assert(boolbox_log_buffer[1] == 'a');
+      assert(f(p) == true);
+      assert(boolbox_log_next - boolbox_log_buffer == 5);
+      assert(boolbox_log_buffer[2] == 'g');
+      assert(boolbox_log_buffer[3] == 'd');
+      assert(boolbox_log_buffer[4] == 'd');
+    |}
 
 let test_downward_simple (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
