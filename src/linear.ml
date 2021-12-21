@@ -1186,9 +1186,61 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       else
         user_err_hov (Pp.str "[codegen] the result of projection is a function")
 
+let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (args : EConstr.t list) : unit =
+  let open Declarations in
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _
+  | Sort _ | Prod _ | Ind _
+  | CoFix _ | Array _
+  | Cast _ | Int _ | Float _ ->
+      user_err_hov (Pp.str "[codegen:borrowcheck_constructor] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
+  | App (f, argsary) ->
+      borrowcheck_constructor env sigma f (List.append (Array.to_list argsary) args)
+  | Rel _ -> ()
+  | Const _ -> ()
+  | Construct (cstr,univ) ->
+      let (ind,j) = cstr in
+      let (mutind,i) = ind in
+      let mind_body = Environ.lookup_mind mutind env in
+      let params = CList.firstn mind_body.mind_nparams args in
+      let ty = mkApp (mkInd ind, Array.of_list params) in
+      if is_borrow_type env sigma ty then
+        user_err_hov (Pp.str "[codegen] constructor of borrow type used:" +++ Printer.pr_econstr_env env sigma term)
+
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      Array.iter (fun f -> borrowcheck_constructor env2 sigma f []) fary
+
+  | Lambda (x, ty, b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
+      let env2 = EConstr.push_rel decl env in
+      (match args with
+      | [] -> (* closure creation *)
+          borrowcheck_constructor env2 sigma b []
+      | _ :: rest_args ->
+          borrowcheck_constructor env2 sigma b rest_args)
+
+  | LetIn (x, e, ty, b) ->
+      borrowcheck_constructor env sigma e [];
+      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
+      let env2 = EConstr.push_rel decl env in
+      borrowcheck_constructor env2 sigma b args
+
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      Array.iter2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          borrowcheck_constructor env2 sigma body args)
+        bl bl0
+
+  | Proj (proj, expr) ->
+      borrowcheck_constructor env sigma expr []
+
 let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : unit =
-  ignore (borrowcheck_function env sigma [] [] term)
+  ignore (borrowcheck_function env sigma [] [] term);
+  borrowcheck_constructor env sigma term []
 
 let linear_type_check_single (libref : Libnames.qualid) : unit =
   let gref = Smartlocate.global_with_alias libref in
@@ -1318,5 +1370,6 @@ let command_test_borrowcheck (term : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, term) = Constrintern.interp_constr_evars env sigma term in
-  let lresult = borrowcheck_function env sigma [] [] term in
-  Feedback.msg_info (Pp.str "[codegen] borrowcheck_function return:" +++ pr_lvalues env sigma lresult)
+  borrowcheck env sigma term
+
+

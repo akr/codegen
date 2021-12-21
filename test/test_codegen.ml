@@ -3269,6 +3269,19 @@ let test_borrowcheck_invalid_borrow_mutual (ctx : test_ctxt) : unit =
         end.
     |}) {| |}
 
+let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] constructor of borrow type used:") ctx
+    ({|
+      Inductive L : Set := LC.
+      Inductive B : Set := BC.
+      Definition dealloc (x : L) : unit := tt.
+      Definition borrow (x : L) : B := BC.
+      CodeGen BorrowFunction borrow.
+      CodeGen TestBorrowCheck
+	fun (n : nat) => BC.
+    |}) {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3408,6 +3421,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true;
     "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
     "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
+    "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
   ]
 
 let () =
