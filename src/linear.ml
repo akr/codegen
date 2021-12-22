@@ -63,44 +63,6 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
   | Context.Rel.Declaration.LocalDef _ -> false
 
-let rec hasRel (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
-  match EConstr.kind sigma term with
-  | Rel i -> true
-  | Var name -> false
-  | Meta i -> false
-  | Evar (ekey, terms) -> List.exists (hasRel env sigma) terms
-  | Sort s -> false
-  | Cast (expr, kind, ty) -> hasRel env sigma expr || hasRel env sigma ty
-  | Prod (name, ty, body) -> hasRel env sigma ty ||
-      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-      let env2 = EConstr.push_rel decl env in
-      hasRel env2 sigma body
-  | Lambda (name, ty, body) -> hasRel env sigma ty ||
-      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-      let env2 = EConstr.push_rel decl env in
-      hasRel env2 sigma body
-  | LetIn (name, expr, ty, body) -> hasRel env sigma expr || hasRel env sigma ty ||
-      let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
-      let env2 = EConstr.push_rel decl env in
-      hasRel env2 sigma body
-  | App (f, argsary) -> hasRel env sigma f || Array.exists (hasRel env sigma) argsary
-  | Const ctntu -> false
-  | Ind iu -> false
-  | Construct cstru -> false
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, tyf, iv, expr, brs) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      hasRel env sigma tyf || hasRel env sigma expr || Array.exists (hasRel env sigma) brs
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) -> Array.exists (hasRel env sigma) tary ||
-      let env2 = push_rec_types prec env in
-      Array.exists (hasRel env2 sigma) fary
-  | CoFix (i, ((nary, tary, fary) as prec)) -> Array.exists (hasRel env sigma) tary ||
-      let env2 = push_rec_types prec env in
-      Array.exists (hasRel env2 sigma) fary
-  | Proj (proj, expr) -> hasRel env sigma expr
-  | Int n -> false
-  | Float n -> false
-  | Array (u,t,def,ty) -> Array.exists (hasRel env sigma) t || hasRel env sigma def || hasRel env sigma ty
-
 let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) : Declarations.mutual_inductive_body * EConstr.t array =
   let open Declarations in
   let mind_body = Environ.lookup_mind mutind env in
@@ -313,7 +275,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   in
   Array.iter
     (fun arg ->
-      if hasRel env sigma arg then (* hasRel is too strong.  No free variables is enough *)
+      if not (Vars.closed0 sigma arg) then
         user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
     argsary;
   let exception FoundLinear in
@@ -401,7 +363,7 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
   in
   Array.iter
     (fun arg ->
-      if hasRel env sigma arg then (* hasRel is too strong.  No free variables is enough *)
+      if not (Vars.closed0 sigma arg) then
         user_err (Pp.str "[codegen] is_downward_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
     argsary;
   let exception FoundDownward in

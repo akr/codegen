@@ -12,7 +12,6 @@ val type_of_inductive_arity :
   Declarations.declaration_arity -> Constr.t
 val valid_type_param :
   Environ.env -> Evd.evar_map -> Constr.rel_declaration -> bool
-val hasRel : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val is_linear_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val is_linear_ind1 : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val is_linear_ind : Environ.env -> Evd.evar_map -> EConstr.types -> bool
