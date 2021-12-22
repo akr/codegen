@@ -658,47 +658,77 @@ let intlist_duplicates (l : int list) : int list =
     (IntMap.bindings counts)
 
 (*
-  lresult = borrowcheck_function env sigma original_linear_var_in_env linear_vars_of_borrow_in_env term
-  (lresult, lused, lconsumed) = borrowcheck_expression env sigma original_linear_var_in_env linear_vars_of_borrow_in_env term vs
+  let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
+      (original_linear_var_in_env : int option list) (linear_vars_of_borrow_in_env : lvalues list)
+      (term : EConstr.t) : lvalues = ...
 
-  borrowcheck_function verifies term as a function.
-  It returns lresult that is a set of free borrowed variables in term.
-  It raises an error for invalid borrowing.
+  and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
+      (original_linear_var_in_env : int option list) (linear_vars_of_borrow_in_env : lvalues list)
+      (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (lvalues * IntSet.t * lvalues) = ...
 
-  borrowcheck_expression verifies term vs as an expression.
-  It returns (lresult,lused,lconsumed).
-  It raises an error for invalid borrowing.
+  bresult = borrowcheck_function env sigma original_linear_var_in_env linear_vars_of_borrow_in_env term
+  (bused, lconsumed, bresult) = borrowcheck_expression env sigma original_linear_var_in_env linear_vars_of_borrow_in_env term vs term_vs_ty
 
-  lresult is the set of free borrowed variables in the result value.
-  lused is the set of free borrowed variables in term vs.
-  (For example, lresult is b1 and lused is b1 and b2 in `let x = ... b1 ... in ... b2 ...`)
-  lconsumed is the set of free linear variables used in term vs.
+  borrowcheck_function verifies `term` as a function.
+  It returns bresult that is a set of free borrowed variables in term.
 
-  lresult, lused and lconsumed is represented as Bruijn's level (Environ.nb_rel - de_Bruijn_index) of
-  linear variables.
-  Borrowed variables are represented as corresponding linear variables.
-
-
-  original_linear_var_in_env :
-  linear_vars_of_borrow_in_env :
+  borrowcheck_expression verifies `term vs` as an expression.
+  It returns (bused,lconsumed,bresult).
 
   term : term to evaluate
   vs : the list of variables (Rel) which are given to term
 
-  lresult: linear values contained in the result value
+  They raises an error for invalid borrowing.
 
-  lused: linear values used (not consumed)
-      - linear variable x is used directly with borrow x
-      - linear variable x is used indirectly via borrowed value
+  They verify that a borrowed variable, y in following example, is only usable
+  before the original linear variable, x, is consumed.
 
-  lconsumed: linear variables consumed
+  fun (x : linear_type) =>
+  let y := borrow x in
+  let z1 := ... in      (* y is usable *)
+  let _ := dealloc x in
+  let z2 := ... in      (* y is not usable *)
+  ...
 
-  Note: "linear value" means that value bounded to a linear variable or borrowed variable.
-     "linear value" is represented as a linear variable in borrow check
+  They uses de Bruijn's level (Environ.nb_rel - de_Bruijn_index) to represent linear variables.
 
-  Note: lresult is a subset of lused - lconsumed
+  lconsumed is the set of free linear variables used.
+  bused is the set of free linear variables used with borrowing.
+  bresult is the set of free linear variables which may be contained in the result value by borrowing.
 
-  Variables (in vs, lresult, lused, lconsumed) are represented as de Bruijn's level (Environ.nb_rel - de_Bruijn_index)
+  bused and bresult are represented as lvalues = IntSet.t ConstrMap.t.
+  It is a map from a type to set of linear variables.
+
+  For example, if the type of `borrow x` is A and
+  A doesn't contain borrow types except A,
+  bresult (and bused) of `borrow x` is `{A => {x}}`.
+  It means the evaluation of `borrow x` needs `x` is live (not deallocated yet) and
+  the result of `borrow x` contains values of type A which is only usable while `x` is live.
+
+  original_linear_var_in_env : int option list
+    This represents original linear variables.
+    Basically, each linear variables are distinct but
+    there is one exception in codegen.
+    codegen treats `y1` and `y2` in `match x with ... | C => fun y2 => ... | ... end y1`
+    same variable.
+    So we maintain a map to normalize such variables (y2 to y1 in this example).
+    We represent such map using `int option list` where the length of list is same as
+    Environ.nb_rel.
+    The list is indexed by de Bruijn index. (innermost variable is first)
+    Each element is `int option`.
+    `None` means the variable is not linear.
+    `Some l` means the variable is linear and
+    the original linear variable is represented as de Bruijn level `l`.
+
+  linear_vars_of_borrow_in_env :
+    This represents borrowed values used in variables.
+    It is a list that length is same as Environ.nb_rel.
+    It is indexed by de Bruijn index. (innermost variable is first)
+    The type of each element is `lvalues`.
+    If i'th element (base-1) is `{A => {x}}`,
+    i'th variable may contains values of type `A` borrowed from `x`.
+
+  Constraint: bresult is a subset of bused - lconsumed
   *)
 
 type lvalues = IntSet.t ConstrMap.t
