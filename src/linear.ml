@@ -162,7 +162,7 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
           let params = ref (Array.to_list params) in
           let h = Array.length rev_ctx in
           for i = 0 to h - 1 do
-            msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env3 sigma);
+            (* msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env3 sigma); *)
             let decl = rev_ctx.(i) in
             match decl with
             | LocalDef (x,e,ty) ->
