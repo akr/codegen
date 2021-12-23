@@ -706,11 +706,11 @@ let intlist_duplicates (l : int list) : int list =
 
 type borrow_t = IntSet.t ConstrMap.t
 
-let pr_borrow (env : Environ.env) (sigma : Evd.evar_map) (lvs : borrow_t) =
+let pr_borrow (env : Environ.env) (sigma : Evd.evar_map) (brw : borrow_t) =
   Pp.str "{" ++
   pp_joinmap_list (Pp.str "," ++ Pp.spc ())
     (fun (ty,set) -> Printer.pr_constr_env env sigma ty +++ Pp.str "in" +++ pr_deBruijn_level_set env set)
-    (ConstrMap.bindings lvs) ++
+    (ConstrMap.bindings brw) ++
   Pp.str "}"
 
 let borrow_of_list (pairs : (Constr.t*int) list) : borrow_t =
@@ -733,7 +733,7 @@ let borrow_singleton (ty : Constr.t) (l : int) : borrow_t =
   ConstrMap.singleton ty (IntSet.singleton l)
 *)
 
-let borrow_union (lvs1 : borrow_t) (lvs2 : borrow_t) : borrow_t =
+let borrow_union (brw1 : borrow_t) (brw2 : borrow_t) : borrow_t =
   ConstrMap.merge
     (fun ty opt1 opt2 ->
       match opt1, opt2 with
@@ -741,10 +741,10 @@ let borrow_union (lvs1 : borrow_t) (lvs2 : borrow_t) : borrow_t =
       | Some set1, None -> Some set1
       | None, Some set2 -> Some set2
       | None, None -> None)
-    lvs1 lvs2
+    brw1 brw2
 
-let borrow_union_ary (lvs : borrow_t array) : borrow_t =
-  Array.fold_left borrow_union ConstrMap.empty lvs
+let borrow_union_ary (brw : borrow_t array) : borrow_t =
+  Array.fold_left borrow_union ConstrMap.empty brw
 
 let constrmap_filter_map (f : ConstrMap.key -> 'a -> 'b option) (m : 'a ConstrMap.t) : 'b ConstrMap.t =
   List.fold_left
@@ -757,7 +757,7 @@ let constrmap_filter_map (f : ConstrMap.key -> 'a -> 'b option) (m : 'a ConstrMa
         | None -> None)
       (ConstrMap.bindings m))
 
-let borrow_filter_lvar (pred : int -> bool) (lvs : borrow_t) : borrow_t =
+let borrow_filter_lvar (pred : int -> bool) (brw : borrow_t) : borrow_t =
   constrmap_filter_map
     (fun ty set ->
       let set' = IntSet.filter pred set in
@@ -765,9 +765,9 @@ let borrow_filter_lvar (pred : int -> bool) (lvs : borrow_t) : borrow_t =
         None
       else
         Some set')
-    lvs
+    brw
 
-let borrow_remove (l : int) (lvs : borrow_t) : borrow_t =
+let borrow_remove (l : int) (brw : borrow_t) : borrow_t =
   constrmap_filter_map
     (fun ty set ->
       let set' = IntSet.remove l set in
@@ -775,25 +775,25 @@ let borrow_remove (l : int) (lvs : borrow_t) : borrow_t =
         None
       else
         Some set')
-    lvs
+    brw
 
-let lvariables_of_borrow (lvs : borrow_t) : IntSet.t =
+let lvariables_of_borrow (brw : borrow_t) : IntSet.t =
   ConstrMap.fold
     (fun term set set0 -> IntSet.union set set0)
-    lvs
+    brw
     IntSet.empty
 
     (*
-let borrow_equal (lvs1 : borrow_t) (lvs2 : borrow_t) : bool =
-  ConstrMap.cardinal lvs1 = ConstrMap.cardinal lvs2 &&
+let borrow_equal (brw1 : borrow_t) (brw2 : borrow_t) : bool =
+  ConstrMap.cardinal brw1 = ConstrMap.cardinal brw2 &&
   ConstrMap.for_all
-    (fun term set1 -> match ConstrMap.find_opt term lvs2 with None -> false | Some set2 -> IntSet.equal set1 set2)
-    lvs1
+    (fun term set1 -> match ConstrMap.find_opt term brw2 with None -> false | Some set2 -> IntSet.equal set1 set2)
+    brw1
     *)
 
     (*
-let borrow_disjoint (lvs1 : borrow_t) (lvs2 : borrow_t) : bool =
-  IntSet.disjoint (lvariables_of_borrow lvs1) (lvariables_of_borrow lvs2)
+let borrow_disjoint (brw1 : borrow_t) (brw2 : borrow_t) : bool =
+  IntSet.disjoint (lvariables_of_borrow brw1) (lvariables_of_borrow brw2)
   *)
 
 let is_borrow_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
@@ -946,10 +946,10 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       let linear_consumed = IntSet.of_list linear_consumed_list in
       let linear_used =
         List.fold_left
-          (fun lvs l ->
+          (fun brw l ->
             let i = Environ.nb_rel env - l in
             borrow_union
-              lvs
+              brw
               (List.nth linear_vars_of_borrow_in_env (i-1)))
           bresult vs
       in
