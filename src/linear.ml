@@ -923,7 +923,7 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
     Pp.str ":" +++ Printer.pr_econstr_env env sigma term_vs_ty);
   let (bused, lconsumed, bresult) = borrowcheck_expression1 env sigma lvar_env borrow_env term vs term_vs_ty in
   (if not (IntSet.subset (lvariables_of_borrow bresult) (IntSet.diff (lvariables_of_borrow bused) lconsumed)) then
-    user_err_hov (Pp.str "[codegen:bug] not (subset bresult (bused - lconsumed))"));
+    user_err_hov (Pp.str "[codegen:bug] not (bresult <= (bused - lconsumed))"));
   msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] return:" +++
     Pp.str "bused=" ++ pr_borrow env sigma bused +++
     Pp.str "lconsumed=" ++ pr_deBruijn_level_set env lconsumed +++
