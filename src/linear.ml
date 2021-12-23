@@ -779,7 +779,7 @@ let borrow_remove (l : int) (brw : borrow_t) : borrow_t =
 
 let lvariables_of_borrow (brw : borrow_t) : IntSet.t =
   ConstrMap.fold
-    (fun term set set0 -> IntSet.union set set0)
+    (fun ty set set0 -> IntSet.union set set0)
     brw
     IntSet.empty
 
@@ -787,7 +787,7 @@ let lvariables_of_borrow (brw : borrow_t) : IntSet.t =
 let borrow_equal (brw1 : borrow_t) (brw2 : borrow_t) : bool =
   ConstrMap.cardinal brw1 = ConstrMap.cardinal brw2 &&
   ConstrMap.for_all
-    (fun term set1 -> match ConstrMap.find_opt term brw2 with None -> false | Some set2 -> IntSet.equal set1 set2)
+    (fun ty set1 -> match ConstrMap.find_opt ty brw2 with None -> false | Some set2 -> IntSet.equal set1 set2)
     brw1
     *)
 
