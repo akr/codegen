@@ -942,15 +942,15 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       (* cannot reached? *)
       user_err_hov (Pp.str "[codegen] function cannot refer free linear variables:" +++ pr_deBruijn_level_set env lconsumed)
     else
-      let linear_consumed_list =
+      let lvars_in_args_list =
         List.filter_map
           (fun l ->
             let i = Environ.nb_rel env - l in
             List.nth lvar_env (i-1))
           vs
       in
-      let linear_consumed = IntSet.of_list linear_consumed_list in
-      let linear_used =
+      let lvars_in_args_set = IntSet.of_list lvars_in_args_list in
+      let borrow_in_app =
         List.fold_left
           (fun brw l ->
             let i = Environ.nb_rel env - l in
@@ -959,16 +959,16 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
               (List.nth borrow_env (i-1)))
           bresult vs
       in
-      let duplicates = intlist_duplicates linear_consumed_list in
+      let duplicates = intlist_duplicates lvars_in_args_list in
       if not (CList.is_empty duplicates) then
         user_err_hov (Pp.str "[codegen] linear variables used multiply in arguments:" +++
           pp_sjoinmap_list (pr_deBruijn_level env) duplicates)
-      else if not (IntSet.disjoint linear_consumed (lvariables_of_borrow linear_used)) then
+      else if not (IntSet.disjoint lvars_in_args_set (lvariables_of_borrow borrow_in_app)) then
         (* We don't know how free variables of the function (term) and its arguments (vs) are used in term.
            So we determine its safety conservatively *)
-        user_err_hov (Pp.str "[codegen] linear variable and its borrowed value are used both in an application:" +++ pr_deBruijn_level_set env (IntSet.inter linear_consumed (lvariables_of_borrow linear_used)))
+        user_err_hov (Pp.str "[codegen] linear variable and its borrowed value are used both in an application:" +++ pr_deBruijn_level_set env (IntSet.inter lvars_in_args_set (lvariables_of_borrow borrow_in_app)))
       else
-        (linear_used, linear_consumed)
+        (borrow_in_app, lvars_in_args_set)
   in
   let filter_result bresult =
     match component_types env sigma term_vs_ty with
