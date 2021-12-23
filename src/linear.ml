@@ -872,21 +872,18 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
         (* xxx: body_ty may not be a normal form *)
         let (bused,lconsumed,bresult) = borrowcheck_expression env3 sigma lvar_env' borrow_env' body [] body_ty in
         let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length args) lvar_env')) in
-        let linear_consumed = IntSet.filter (fun l -> Environ.nb_rel env <= l) lconsumed in
-        if not (IntSet.equal linear_args linear_consumed) then
-          if IntSet.is_empty (IntSet.diff linear_consumed linear_args) then
+        let (lconsumed_in_args, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) lconsumed in
+        if not (IntSet.equal linear_args lconsumed_in_args) then
+          if IntSet.is_empty (IntSet.diff lconsumed_in_args linear_args) then
             user_err_hov (Pp.str "[codegen] linear argument not consumed:" +++
-              pr_deBruijn_level_set env3 (IntSet.diff linear_args linear_consumed))
+              pr_deBruijn_level_set env3 (IntSet.diff linear_args lconsumed_in_args))
           else
             user_err_hov (Pp.str "[codegen:bug] non-linear argument consumed as linear variable:" +++
-              pr_deBruijn_level_set env3 (IntSet.diff linear_consumed linear_args))
+              pr_deBruijn_level_set env3 (IntSet.diff lconsumed_in_args linear_args))
+        else if not (IntSet.is_empty lconsumed_in_fv) then
+          user_err_hov (Pp.str "[codegen] function cannot refer free linear variables:" +++ pr_deBruijn_level_set env lconsumed_in_fv)
         else
-          let bused' = borrow_filter_lvar (fun l -> l < Environ.nb_rel env) bused in
-          let lconsumed' = IntSet.filter (fun l -> l < Environ.nb_rel env) lconsumed in
-          if not (IntSet.is_empty lconsumed') then
-            user_err_hov (Pp.str "[codegen] function cannot refer free linear variables:" +++ pr_deBruijn_level_set env lconsumed')
-          else
-            bused'
+          borrow_filter_lvar (fun l -> l < Environ.nb_rel env) bused
 
   | _ ->
       (* global constant *)
