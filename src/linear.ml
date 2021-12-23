@@ -81,11 +81,11 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
       mind_body.mind_packets
   in
   if mind_body.mind_nparams <> mind_body.mind_nparams_rec then
-    user_err (Pp.str "[codegen] non-uniform inductive type:" +++ pp_all_ind_names ());
+    user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ pp_all_ind_names ());
   if (Array.exists (fun oind_body -> oind_body.mind_nrealargs <> 0) mind_body.mind_packets) then
-    user_err (Pp.str "[codegen] is_linear_ind: indexed types not supported:" +++ pp_indexed_ind_names ());
+    user_err (Pp.str "[codegen] indexed types not supported:" +++ pp_indexed_ind_names ());
   if not (List.for_all (valid_type_param env sigma) mind_body.mind_params_ctxt) then
-    user_err (Pp.str "[codegen] is_linear_ind: non-type parameter:" +++ pp_all_ind_names ());
+    user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
   let ind_ary = Array.map (fun j -> EConstr.mkInd (mutind, j))
     (iota_ary 0 mind_body.mind_ntypes) in
   (mind_body,ind_ary)
