@@ -107,6 +107,10 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
   let open Declarations in
   let open Context.Rel.Declaration in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind in
+  (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] mutind=[" ++
+    pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
+    Pp.str "params=[" ++
+    pp_sjoinmap_ary (fun p -> Printer.pr_econstr_env env sigma p) params ++ Pp.str "]");*)
   let subst_ind = Array.to_list (array_rev ind_ary) in
   let env2 = Environ.push_rel_context
               (Array.to_list
@@ -147,12 +151,18 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
         (fun cons_id nf_lc ->
           (* ctx is a list of decls from innermost to outermost *)
           let (ctx, t) = nf_lc in
+          (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] reduce" +++
+                         Pp.str "typename=" ++ Id.print ind_id +++
+                         Pp.str "consname=" ++ Id.print cons_id +++
+                         Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env2 sigma ctx ++ Pp.str "]" +++
+                         Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env2) sigma t);*)
           let t = EConstr.of_constr t in
           let rev_ctx = array_rev (Array.of_list ctx) in
           let env3 = ref env2 in
           let params = ref (Array.to_list params) in
           let h = Array.length rev_ctx in
           for i = 0 to h - 1 do
+            msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env3 sigma);
             let decl = rev_ctx.(i) in
             match decl with
             | LocalDef (x,e,ty) ->
@@ -164,15 +174,16 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                     params := rest;
                     env3 := EConstr.push_rel (LocalDef (x, param, ty)) !env3
                 | [] ->
-                    let ty = whd_all !env3 sigma ty in
-                    if not (Vars.noccur_between sigma 1 (i - List.length mind_body.mind_params_ctxt) ty) then
-                      user_err_hov (Pp.str "[codegen] dependent constructor:" +++ Id.print ind_id +++ Id.print cons_id);
-                    let ty = Vars.lift (-i) ty in
-                    f env2 ind_id cons_id ty subst_ind;
+                    let ty' = nf_all !env3 sigma ty in
+                    (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env3 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env3 sigma ty');*)
+                    if not (Vars.noccur_between sigma 1 i ty') then
+                      user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma ty');
+                    let ty' = Vars.lift (-i) ty' in
+                    f env2 ind_id cons_id ty' subst_ind;
                     env3 := Environ.push_rel decl !env3)
           done;
-          let t = whd_all !env3 sigma t in
-          if not (Vars.noccur_between sigma 1 (h - List.length mind_body.mind_params_ctxt) t) then
+          let t = nf_all !env3 sigma t in
+          if not (Vars.noccur_between sigma 1 h t) then
             user_err_hov (Pp.str "[codegen] dependent constructor result:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma t);
           let t = Vars.lift (-h) t in
           let t' = Vars.substl subst_ind t in
