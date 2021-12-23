@@ -935,7 +935,7 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
 and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
     (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (borrow_t * IntSet.t * borrow_t) =
-  let add_args_and_check (bresult : borrow_t) (lconsumed : IntSet.t) : borrow_t * IntSet.t =
+  let check_app (bresult : borrow_t) (lconsumed : IntSet.t) : borrow_t * IntSet.t =
     if CList.is_empty vs then
       (bresult, lconsumed)
     else if not (IntSet.is_empty lconsumed) then
@@ -999,7 +999,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       if CList.is_empty vs then
         (bresult, lconsumed, bresult)
       else (* term is a function.  So term is not linear and lconsumed should be empty. *)
-        let (bused', lconsumed') = add_args_and_check bresult lconsumed in
+        let (bused', lconsumed') = check_app bresult lconsumed in
         (bused', lconsumed', filter_result bused')
   | Const (ctnt, univ) ->
       if Cset.mem ctnt !borrow_function_set then
@@ -1024,10 +1024,10 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         if CList.is_empty vs then
           (ConstrMap.empty, IntSet.empty, ConstrMap.empty)
         else
-          let (bused', lconsumed') = add_args_and_check ConstrMap.empty IntSet.empty in
+          let (bused', lconsumed') = check_app ConstrMap.empty IntSet.empty in
           (bused', lconsumed', filter_result bused')
   | Construct _ ->
-      let (bused', lconsumed') = add_args_and_check ConstrMap.empty IntSet.empty in
+      let (bused', lconsumed') = check_app ConstrMap.empty IntSet.empty in
       (* the return value of constructor application contains all arguments including the borrowed values *)
       (bused', lconsumed', bused')
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
@@ -1047,14 +1047,14 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
            Thus we don't need to set borrow_env' with the free borrowed variables.
            The free borrowed variables are collected by borrowcheck_function to bresults.
            Note that the arguments, vs, may reference the free linear variables.
-           add_args_and_check verify (conservertively) the condition between sucn linear variables and bresults.
+           check_app verify (conservertively) the condition between sucn linear variables and bresults.
          *)
         let borrow_env' =
           CList.addn (Array.length fary) ConstrMap.empty borrow_env
         in
         let bresults = Array.map (borrowcheck_function env2 sigma lvar_env' borrow_env') fary in
         let bresult = borrow_union_ary bresults in
-        let (bused', lconsumed') = add_args_and_check bresult IntSet.empty in
+        let (bused', lconsumed') = check_app bresult IntSet.empty in
         (bused', lconsumed', filter_result bused')
 
   | Lambda (x, ty, b) ->
