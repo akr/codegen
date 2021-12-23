@@ -2936,7 +2936,7 @@ let test_borrowcheck_linear_id (ctx : test_ctxt) : unit =
 
 let test_borrowcheck_invalid_linearity_linear_arg_out_of_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument out of fix-term:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument outside of fix-term:") ctx
     ({|
       Inductive L : Set := LC.
       CodeGen Linear L.
