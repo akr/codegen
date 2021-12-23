@@ -219,7 +219,7 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
             user_err (Pp.str "[codegen] component_types: constructor has type argument")
         | Prod (x, ty, b) ->
             raise FoundFunction
-        | Rel i ->
+        | Rel _ -> (* inductive types currently traversing *)
             ()
         | Ind _ ->
             (ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
@@ -227,7 +227,7 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
             | None -> raise FoundFunction
             | Some set -> ret := ConstrSet.union !ret set)
         | _ ->
-            user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
+            user_err (Pp.str "[codegen] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
     Some !ret
   with
     FoundFunction -> None
@@ -300,7 +300,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
         | Prod (x, ty, b) ->
             (* function type argument of a constructor is non-linear or non-code-generatable *)
             ()
-        | Rel _ ->
+        | Rel _ -> (* inductive types currently traversing *)
             (* Since mutind_cstrarg_iter normalizes argty,
               Rel is only used for recursive references of inductive types.
               We don't need to examine the recursive references.
