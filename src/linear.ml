@@ -975,7 +975,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
     | None -> bresult
     | Some tyset ->
         ConstrMap.filter
-          (fun ty set ->
+          (fun ty _ ->
             ConstrSet.mem ty tyset)
           bresult
   in
@@ -1006,17 +1006,17 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (assert (List.length vs = 1);
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
-        let (_,_,ty) = destProd sigma (Retyping.get_type_of env sigma term) in
+        let (_,_,ty) = destProd sigma (Retyping.get_type_of env sigma term) in (* xxx: the type may not be a normal form *)
+        (* xxx: ty is a term under env with the prod's declaration *)
         let tys =
           match component_types env sigma ty with
           | None -> user_err_hov (Pp.str "[codegen] borrowed type contains a function:" +++ Printer.pr_econstr_env env sigma ty)
           | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
         in
-        (*Context.Rel.Declaration.get_type (Environ.lookup_rel i env)*)
         let l =
           match List.nth lvar_env (i-1) with
           | Some l' -> l'
-          | None -> l
+          | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's argument is non-linear:" +++ Printer.pr_econstr_env env sigma (mkRel i))
         in
         let bresult = borrow_of_list (List.map (fun ty -> (ty,l)) tys) in
         (bresult, IntSet.empty, bresult))
