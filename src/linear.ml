@@ -1081,21 +1081,22 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
       let ty_is_linear = is_linear_type env sigma ty in
+      let l = Environ.nb_rel env in
       let lvar_env' =
-        (if ty_is_linear then Some (Environ.nb_rel env) else None) :: lvar_env
+        (if ty_is_linear then Some l else None) :: lvar_env
       in
       let borrow_env' = bresult1 :: borrow_env in
       let (bused2, lconsumed2, bresult2) = borrowcheck_expression env2 sigma lvar_env' borrow_env' b vs term_vs_ty in
       if not (IntSet.disjoint lconsumed1 lconsumed2) then
-        user_err_hov (Pp.str "[codegen] linear variables used multiply:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 lconsumed2))
-      else if ty_is_linear && not (IntSet.mem (Environ.nb_rel env) lconsumed2) then
+        user_err_hov (Pp.str "[codegen] linear variables consumed multiply:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 lconsumed2))
+      else if ty_is_linear && not (IntSet.mem l lconsumed2) then
         user_err_hov (Pp.str "[codegen] linear variable not consumed:" +++ Pp.str (str_of_name (Context.binder_name x)))
       else if not (IntSet.disjoint lconsumed1 (lvariables_of_borrow bused2)) then
         user_err (Pp.str "[codegen] linear variable and its borrowed value are used inconsistently in let-in:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 (lvariables_of_borrow bused2)))
       else
-        let bused0 = borrow_remove (Environ.nb_rel env) (borrow_union bused1 bused2) in
-        let lconsumed0 = IntSet.remove (Environ.nb_rel env) (IntSet.union lconsumed1 lconsumed2) in
-        let bresult0 = borrow_remove (Environ.nb_rel env) bresult2 in
+        let bused0 = borrow_remove l (borrow_union bused1 bused2) in
+        let lconsumed0 = IntSet.remove l (IntSet.union lconsumed1 lconsumed2) in
+        let bresult0 = borrow_remove l bresult2 in
         (bused0, lconsumed0, bresult0)
 
   | Case (ci,u,pms,p,iv,item,bl) ->

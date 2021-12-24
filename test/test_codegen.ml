@@ -2982,7 +2982,7 @@ let test_borrowcheck_invalid_linearity_letin (ctx : test_ctxt) : unit =
 
 let test_borrowcheck_invalid_linearity_dealloc_twice (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables used multiply:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables consumed multiply:") ctx
     ({|
       Inductive L : Set := LC.
       Definition dealloc (x : L) : unit := tt.
