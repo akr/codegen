@@ -1144,14 +1144,14 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                 user_err_hov (Pp.str "[codegen:bug] non-linear member consumed as linear variable:" +++
                   pr_deBruijn_level_set env2 (IntSet.diff linear_consumed linear_args))
             else
-              (br_bresult,br_bused,br_lconsumed))
+              (br_bused,br_lconsumed,br_bresult))
           bl bl0
       in
-      let (_,_,br0_lconsumed) = branch_results.(0) in
+      let (_,br0_lconsumed,_) = branch_results.(0) in
       let br0_lconsumed = IntSet.filter (fun l -> l < Environ.nb_rel env) br0_lconsumed in
-      if Array.exists (fun (_,_,br_lconsumed) -> not (IntSet.equal br0_lconsumed (IntSet.filter (fun l -> l < Environ.nb_rel env) br_lconsumed))) branch_results then
-        let union = Array.fold_left (fun lconsumed (_,_,br_lconsumed) -> IntSet.union lconsumed br_lconsumed) IntSet.empty branch_results in
-        let inter = Array.fold_left (fun lconsumed (_,_,br_lconsumed) -> IntSet.inter lconsumed br_lconsumed) br0_lconsumed branch_results in
+      if Array.exists (fun (_,br_lconsumed,_) -> not (IntSet.equal br0_lconsumed (IntSet.filter (fun l -> l < Environ.nb_rel env) br_lconsumed))) branch_results then
+        let union = Array.fold_left (fun lconsumed (_,br_lconsumed,_) -> IntSet.union lconsumed br_lconsumed) IntSet.empty branch_results in
+        let inter = Array.fold_left (fun lconsumed (_,br_lconsumed,_) -> IntSet.inter lconsumed br_lconsumed) br0_lconsumed branch_results in
         let (mutind, i) = ci.ci_ind in
         let mind_body = Environ.lookup_mind mutind env in
         let oind_body = mind_body.Declarations.mind_packets.(i) in
@@ -1163,7 +1163,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                 List.filter_map (fun opt -> opt)
                   (Array.to_list
                     (Array.map2
-                      (fun id (_,_,br_lconsumed) -> if IntSet.mem l br_lconsumed then Some id else None)
+                      (fun id (_,br_lconsumed,_) -> if IntSet.mem l br_lconsumed then Some id else None)
                       consnames branch_results))
               in
               pr_deBruijn_level env l +++ Pp.str "is used only for" +++
@@ -1176,8 +1176,8 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         user_err_hov (Pp.str "[codegen] linear match-item is used in match-branch:" +++
           pr_deBruijn_level_set env (IntSet.inter lconsumed1 br0_lconsumed))
       else
-        let bresult2 = Array.fold_left (fun bresult (br_bresult,br_bused,br_lconsumed) -> borrow_union bresult br_bresult) ConstrMap.empty branch_results in
-        let bused2 = Array.fold_left (fun bused (br_bresult,br_bused,br_lconsumed) -> borrow_union bused br_bused) ConstrMap.empty branch_results in
+        let bresult2 = Array.fold_left (fun bresult (br_bused,br_lconsumed,br_bresult) -> borrow_union bresult br_bresult) ConstrMap.empty branch_results in
+        let bused2 = Array.fold_left (fun bused (br_bused,br_lconsumed,br_bresult) -> borrow_union bused br_bused) ConstrMap.empty branch_results in
         let lconsumed2 = br0_lconsumed in
         if not (IntSet.disjoint lconsumed1 (lvariables_of_borrow bused2)) then
           user_err_hov (Pp.str "[codegen] linear variable and its borrowed value are used inconsistently in match:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 (lvariables_of_borrow bused2)))
