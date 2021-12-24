@@ -1006,10 +1006,11 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (assert (List.length vs = 1);
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
-        let (_,_,ty) = destProd sigma (Retyping.get_type_of env sigma term) in (* xxx: the type may not be a normal form *)
-        (* xxx: ty is a term under env with the prod's declaration *)
+        let (x,argty,retty) = destProd sigma (Retyping.get_type_of env sigma term) in (* xxx: the type may not be a normal form *)
+        let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
+        let env2 = EConstr.push_rel decl env in
         let tys =
-          match component_types env sigma ty with
+          match component_types env2 sigma retty with
           | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's result contains a function:" +++ Constant.print ctnt);
           | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
         in
