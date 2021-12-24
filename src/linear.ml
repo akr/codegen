@@ -1010,7 +1010,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (* xxx: ty is a term under env with the prod's declaration *)
         let tys =
           match component_types env sigma ty with
-          | None -> user_err_hov (Pp.str "[codegen] borrowed type contains a function:" +++ Printer.pr_econstr_env env sigma ty)
+          | None -> user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Printer.pr_econstr_env env sigma ty)
           | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
         in
         let l =
@@ -1322,16 +1322,15 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
       (let fctntu = Univ.in_punivs ctnt in
       let (ty, u) = Environ.constant_type env fctntu in
       let ty = nf_all env sigma (EConstr.of_constr ty) in
-      let ty = EConstr.to_constr sigma ty in
-      (match Constr.kind ty with
+      (match EConstr.kind sigma ty with
       | Prod (x, argty, retty) ->
-          if not (Constr.isInd (fst (Constr.decompose_app argty))) then
+          if not (isInd sigma (fst (EConstr.decompose_app sigma argty))) then
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which argument type is an inductive type:" +++ Printer.pr_constant env ctnt);
-          if not (Constr.isInd (fst (Constr.decompose_app retty))) then
-            user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which return type is an inductive type:" +++ Printer.pr_constant env ctnt);
+          if not (isInd sigma (fst (EConstr.decompose_app sigma retty))) then
+            user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which result type is an inductive type:" +++ Printer.pr_constant env ctnt);
           set_borrow_function ctnt;
-          set_linear env sigma argty;
-          set_borrow_type env sigma retty
+          set_linear env sigma (EConstr.to_constr sigma argty);
+          set_borrow_type env sigma (EConstr.to_constr sigma retty)
       | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)
 
