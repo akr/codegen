@@ -1016,7 +1016,9 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         let l =
           match List.nth lvar_env (i-1) with
           | Some l' -> l'
-          | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's argument is non-linear:" +++ Printer.pr_econstr_env env sigma (mkRel i))
+          | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's argument is non-linear:" +++
+                                  Constant.print ctnt +++
+                                  Pp.str "(" ++ Printer.pr_econstr_env env sigma (mkRel i) ++ Pp.str ")")
         in
         let bresult = borrow_of_list (List.map (fun ty -> (ty,l)) tys) in
         (bresult, IntSet.empty, bresult))
