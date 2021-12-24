@@ -1119,9 +1119,9 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                         else
                           None) :: lvar_env1
                       in
-                      msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] match constructor argument:" +++
+                      (*msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] match constructor argument:" +++
                         Id.print (id_of_name (Context.binder_name x)) +++ Pp.str "is" +++
-                        (if is_borrow_type env1 sigma ty then Pp.str "borrow" else Pp.str "not-borrowed"));
+                        (if is_borrow_type env1 sigma ty then Pp.str "borrow" else Pp.str "not-borrowed"));*)
                       let borrow_env1' =
                         (if is_borrow_type env1 sigma ty then
                           List.nth borrow_env (destRel sigma item  - 1)
