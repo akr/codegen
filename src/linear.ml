@@ -1077,8 +1077,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
           borrowcheck_expression env2 sigma lvar_env' borrow_env' b rest_vs term_vs_ty)
 
   | LetIn (x, e, ty, b) ->
-      let e_ty = Retyping.get_type_of env sigma e in
-      let (bused1, lconsumed1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e [] e_ty in
+      let (bused1, lconsumed1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e [] ty in
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
       let ty_is_linear = is_linear_type env sigma ty in
