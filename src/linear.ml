@@ -1010,7 +1010,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (* xxx: ty is a term under env with the prod's declaration *)
         let tys =
           match component_types env sigma ty with
-          | None -> user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Printer.pr_econstr_env env sigma ty)
+          | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's result contains a function:" +++ Constant.print ctnt);
           | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
         in
         let l =
@@ -1328,6 +1328,10 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which argument type is an inductive type:" +++ Printer.pr_constant env ctnt);
           if not (isInd sigma (fst (EConstr.decompose_app sigma retty))) then
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which result type is an inductive type:" +++ Printer.pr_constant env ctnt);
+          let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
+          let env2 = EConstr.push_rel decl env in
+          if component_types env2 sigma retty = None then
+            user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Constant.print ctnt);
           set_borrow_function ctnt;
           set_linear env sigma (EConstr.to_constr sigma argty);
           set_borrow_type env sigma (EConstr.to_constr sigma retty)
