@@ -1188,11 +1188,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       if CList.is_empty vs then
         let expr_ty = Retyping.get_type_of env sigma expr in
         let (bused1, lconsumed1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env expr [] expr_ty in
-        let termty = Retyping.get_type_of env sigma term in
-        if is_borrow_type env sigma termty then
-          (bused1, lconsumed1, bresult1)
-        else
-          (bused1, lconsumed1, ConstrMap.empty)
+        (bused1, lconsumed1, filter_result bresult1)
       else
         user_err_hov (Pp.str "[codegen] the result of projection is a function")
 
