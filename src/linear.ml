@@ -99,7 +99,7 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
                          Printer.pr_econstr_env env sigma ty)
   in
   let (_,ind_ary) = make_ind_ary env sigma mutind in
-  Array.map (fun ind -> mkApp (ind, Array.of_list ty_args)) ind_ary
+  Array.map (fun ind -> nf_all env sigma (mkApp (ind, Array.of_list ty_args))) ind_ary
 
 let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
   (f : Environ.env -> (*typename*)Id.t -> (*consname*)Id.t ->
@@ -797,7 +797,7 @@ let borrow_disjoint (brw1 : borrow_t) (brw2 : borrow_t) : bool =
   *)
 
 let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
+  ConstrSet.mem (EConstr.to_constr sigma (nf_all env sigma ty)) !borrow_type_set
 
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
