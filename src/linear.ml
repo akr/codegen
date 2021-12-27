@@ -17,7 +17,7 @@ let prod_appvect (sigma : Evd.evar_map) (c : EConstr.t) (v : EConstr.t array) : 
 
 let rec is_concrete_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool =
   let termty = Retyping.get_type_of env sigma term in
-  (if isSort sigma termty then
+  (if isSort sigma (whd_all env sigma termty) then
     match EConstr.kind sigma term with
     | Ind _ -> true
     | App (f, argsary) ->
@@ -318,7 +318,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
   let sort = Retyping.get_type_of env sigma ty in
-  if not (isSort sigma sort) then
+  if not (isSort sigma (whd_all env sigma sort)) then
     user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);
   let ty2 = nf_all env sigma ty in
   is_linear_type env sigma ty2
@@ -401,7 +401,7 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
 let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
   let sort = Retyping.get_type_of env sigma ty in
-  if not (isSort sigma sort) then
+  if not (isSort sigma (whd_all env sigma sort)) then
     user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);
   let ty2 = nf_all env sigma ty in
   is_downward_type env sigma ty2
@@ -491,9 +491,9 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
         let count = linearcheck_exp env sigma linear_vars numvars_innermost_function f (Array.length argsary + numargs) in
         let counts = Array.map (fun arg -> linearcheck_exp env sigma linear_vars numvars_innermost_function arg 0) argsary in
         (* no partial application after argument completion? *)
-        if Array.exists (fun arg -> let ty = Retyping.get_type_of env sigma arg in
+        if Array.exists (fun arg -> let ty = nf_all env sigma (Retyping.get_type_of env sigma arg) in
                          is_linear env sigma ty) argsary &&
-           isProd sigma (Retyping.get_type_of env sigma term) then
+           isProd sigma (whd_all env sigma (Retyping.get_type_of env sigma term)) then
              user_err (Pp.str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term);
         Array.fold_left merge_count count counts
   | Const ctntu -> IntMap.empty
@@ -591,7 +591,7 @@ let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc
       check_fix_downwardness env sigma cfunc expr
 
 let check_function_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
-  let termty = Retyping.get_type_of env sigma term in
+  let termty = nf_all env sigma (Retyping.get_type_of env sigma term) in
   let (argtys, retty) = EConstr.decompose_prod sigma termty in
   if is_downward env sigma retty then
     user_err (Pp.str "[codegen] function returns downward value:" +++ Pp.str cfunc);
@@ -871,8 +871,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
         let borrow_env3 =
           CList.addn (List.length args) ConstrMap.empty borrow_env
         in
-        let body_ty = Retyping.get_type_of env3 sigma body in
-        (* xxx: body_ty may not be a normal form *)
+        let body_ty = nf_all env sigma (Retyping.get_type_of env3 sigma body) in
         let (lconsumed,bused,bresult) = borrowcheck_expression env3 sigma lvar_env3 borrow_env3 body [] body_ty in
         let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length args) lvar_env3)) in
         let (lconsumed_in_args, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) lconsumed in
@@ -890,7 +889,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
 
   | _ ->
       (* global constant *)
-      let term_ty = Retyping.get_type_of env sigma term in
+      let term_ty = nf_all env sigma (Retyping.get_type_of env sigma term) in
       let (lconsumed,bused,bresult) = borrowcheck_expression env sigma lvar_env borrow_env term [] term_ty in
       bresult
 
@@ -1039,7 +1038,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (assert (List.length vs = 1);
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
-        let (x,argty,retty) = destProd sigma (Retyping.get_type_of env sigma term) in (* xxx: the type may not be a normal form *)
+        let (x,argty,retty) = destProd sigma (nf_all env sigma (Retyping.get_type_of env sigma term)) in
         let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
         let env2 = EConstr.push_rel decl env in
         let tys =
@@ -1221,7 +1220,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
 
   | Proj (proj, expr) ->
       if CList.is_empty vs then
-        let expr_ty = Retyping.get_type_of env sigma expr in
+        let expr_ty = nf_all env sigma (Retyping.get_type_of env sigma expr) in
         let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env expr [] expr_ty in
         (lconsumed1, bused1, filter_result bresult1)
       else
