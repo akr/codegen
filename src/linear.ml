@@ -796,6 +796,9 @@ let borrow_disjoint (brw1 : borrow_t) (brw2 : borrow_t) : bool =
   IntSet.disjoint (lvariables_of_borrow brw1) (lvariables_of_borrow brw2)
   *)
 
+let borrow_max_elt (brw : borrow_t) : int =
+  IntSet.max_elt (lvariables_of_borrow brw)
+
 let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   ConstrSet.mem (EConstr.to_constr sigma (nf_all env sigma ty)) !borrow_type_set
 
@@ -924,6 +927,36 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
   let (lconsumed, bused, bresult) = borrowcheck_expression1 env sigma lvar_env borrow_env term vs term_vs_ty in
   (if not (IntSet.subset (lvariables_of_borrow bresult) (IntSet.diff (lvariables_of_borrow bused) lconsumed)) then
     user_err_hov (Pp.str "[codegen:bug] not (bresult <= (bused - lconsumed))"));
+  (if not (IntSet.is_empty lconsumed) && not (IntSet.max_elt lconsumed < Environ.nb_rel env) then
+    user_err_hov (Pp.str "[codegen:bug] lconsumed contains too big de Bruijn level:" +++
+      Pp.str "env has" +++ Pp.int (Environ.nb_rel env) +++ Pp.str "variables" +++
+      Pp.str "[" ++
+        pp_sjoinmap_ary
+          (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)))
+          (array_rev (iota_ary 1 (Environ.nb_rel env))) ++
+      Pp.str "]" +++
+      Pp.str "but lconsumed contains" +++
+      Pp.int (IntSet.max_elt lconsumed)));
+  (if not (ConstrMap.is_empty bused) && not (borrow_max_elt bused < Environ.nb_rel env) then
+    user_err_hov (Pp.str "[codegen:bug] bused contains too big de Bruijn level:" +++
+      Pp.str "env has" +++ Pp.int (Environ.nb_rel env) +++ Pp.str "variables" +++
+      Pp.str "[" ++
+        pp_sjoinmap_ary
+          (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)))
+          (array_rev (iota_ary 1 (Environ.nb_rel env))) ++
+      Pp.str "]" +++
+      Pp.str "but bused contains" +++
+      Pp.int (borrow_max_elt bused)));
+  (if not (ConstrMap.is_empty bresult) && not (borrow_max_elt bresult < Environ.nb_rel env) then
+    user_err_hov (Pp.str "[codegen:bug] bresult contains too big de Bruijn level:" +++
+      Pp.str "env has" +++ Pp.int (Environ.nb_rel env) +++ Pp.str "variables" +++
+      Pp.str "[" ++
+        pp_sjoinmap_ary
+          (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)))
+          (array_rev (iota_ary 1 (Environ.nb_rel env))) ++
+      Pp.str "]" +++
+      Pp.str "but bresult contains" +++
+      Pp.int (borrow_max_elt bresult)));
   msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] return:" +++
     Pp.str "lconsumed=" ++ pr_deBruijn_level_set env lconsumed +++
     Pp.str "bused=" ++ pr_borrow env sigma bused +++
