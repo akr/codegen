@@ -1169,21 +1169,20 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
             in
             let (br_lconsumed,br_bused,br_bresult) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 body vs term_vs_ty in
             let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length ctx) lvar_env2)) in
-            let linear_consumed = IntSet.filter (fun l -> Environ.nb_rel env <= l) br_lconsumed in
-            if not (IntSet.equal linear_args linear_consumed) then
-              if IntSet.is_empty (IntSet.diff linear_consumed linear_args) then
+            let (lconsumed_in_members, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) br_lconsumed in
+            if not (IntSet.equal linear_args lconsumed_in_members) then
+              if IntSet.is_empty (IntSet.diff lconsumed_in_members linear_args) then
                 user_err_hov (Pp.str "[codegen] linear member not consumed:" +++
-                  pr_deBruijn_level_set env2 (IntSet.diff linear_args linear_consumed))
+                  pr_deBruijn_level_set env2 (IntSet.diff linear_args lconsumed_in_members))
               else
                 user_err_hov (Pp.str "[codegen:bug] non-linear member consumed as linear variable:" +++
-                  pr_deBruijn_level_set env2 (IntSet.diff linear_consumed linear_args))
+                  pr_deBruijn_level_set env2 (IntSet.diff lconsumed_in_members linear_args))
             else
-              (br_lconsumed,br_bused,br_bresult))
+              (lconsumed_in_fv,br_bused,br_bresult))
           bl bl0
       in
       let (br0_lconsumed,_,_) = branch_results.(0) in
-      let br0_lconsumed = IntSet.filter (fun l -> l < Environ.nb_rel env) br0_lconsumed in
-      if Array.exists (fun (br_lconsumed,_,_) -> not (IntSet.equal br0_lconsumed (IntSet.filter (fun l -> l < Environ.nb_rel env) br_lconsumed))) branch_results then
+      if Array.exists (fun (br_lconsumed,_,_) -> not (IntSet.equal br0_lconsumed br_lconsumed)) branch_results then
         let union = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.union lconsumed br_lconsumed) IntSet.empty branch_results in
         let inter = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.inter lconsumed br_lconsumed) br0_lconsumed branch_results in
         let (mutind, i) = ci.ci_ind in
