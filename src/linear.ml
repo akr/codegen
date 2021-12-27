@@ -814,28 +814,28 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
   match EConstr.kind sigma term with
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let lvar_env' =
+      let lvar_env2 =
         CList.addn (Array.length fary) None lvar_env
       in
       (* The fix-bounded functions may access borrowed values via free variables.
-         So this assumption of borrow_env', fix-bounded functions contain no borrowed values, is invalid.
+         So this assumption of borrow_env2, fix-bounded functions contain no borrowed values, is invalid.
          However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
          - borrowcheck_function returns the set of borrowed values correctly
          - if a function contains some borrowed values (via free variables), its application is restricted that arguments cannot have corresponding linear variables
          - functions cannot capture linear variables
          Thus, the corresponding linear variables are not consumed and the borrowed values are usable in this fix-term.
        *)
-      let borrow_env' =
+      let borrow_env2 =
         CList.addn (Array.length fary) ConstrMap.empty borrow_env
       in
-      let bresults = Array.map (borrowcheck_function env2 sigma lvar_env' borrow_env') fary in
+      let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
       borrow_union_ary bresults
   | Lambda _ ->
       let (args, body) = EConstr.decompose_lam sigma term in
       (* args is a list of pairs of name and type from inner (last) argument to outer (first) argument *)
       if isFix sigma body then
         (* linear argument is prohibited in args (because fix-bounded functions may be called multiple times) *)
-        let (env3, lvar_env') =
+        let (env3, lvar_env3) =
           List.fold_right
             (fun (x,ty) (env,lvar_env) ->
               let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
@@ -847,14 +847,14 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
                 (env2, None :: lvar_env))
             args (env, lvar_env)
         in
-        let borrow_env' =
+        let borrow_env3 =
           CList.addn (List.length args) ConstrMap.empty borrow_env
         in
-        borrowcheck_function env3 sigma lvar_env' borrow_env' body
+        borrowcheck_function env3 sigma lvar_env3 borrow_env3 body
       else
         (* function/closure body found *)
         (* linear argument is possible in args *)
-        let (env3, lvar_env') =
+        let (env3, lvar_env3) =
           List.fold_right
             (fun (x,ty) (env,lvar_env) ->
               let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
@@ -865,13 +865,13 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
                 (env2, None :: lvar_env))
             args (env, lvar_env)
         in
-        let borrow_env' =
+        let borrow_env3 =
           CList.addn (List.length args) ConstrMap.empty borrow_env
         in
         let body_ty = Retyping.get_type_of env3 sigma body in
         (* xxx: body_ty may not be a normal form *)
-        let (lconsumed,bused,bresult) = borrowcheck_expression env3 sigma lvar_env' borrow_env' body [] body_ty in
-        let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length args) lvar_env')) in
+        let (lconsumed,bused,bresult) = borrowcheck_expression env3 sigma lvar_env3 borrow_env3 body [] body_ty in
+        let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length args) lvar_env3)) in
         let (lconsumed_in_args, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) lconsumed in
         if not (IntSet.equal linear_args lconsumed_in_args) then
           if IntSet.is_empty (IntSet.diff lconsumed_in_args linear_args) then
@@ -1040,22 +1040,22 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (IntSet.empty, bresult, bresult)
       else
         let env2 = EConstr.push_rec_types prec env in
-        let lvar_env' =
+        let lvar_env2 =
           CList.addn (Array.length fary) None lvar_env
         in
         (* The fix-bounded functions, fary, may reference free borrowed variables but
            cannot reference free linear variables.
            So the free borrowed variables can be used freely in fary
            because the free linear variables are not consumed.
-           Thus we don't need to set borrow_env' with the free borrowed variables.
+           Thus we don't need to set borrow_env2 with the free borrowed variables.
            The free borrowed variables are collected by borrowcheck_function to bresults.
            Note that the arguments, vs, may reference the free linear variables.
            check_app verify (conservertively) the condition between sucn linear variables and bresults.
          *)
-        let borrow_env' =
+        let borrow_env2 =
           CList.addn (Array.length fary) ConstrMap.empty borrow_env
         in
-        let bresults = Array.map (borrowcheck_function env2 sigma lvar_env' borrow_env') fary in
+        let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
         let bresult = borrow_union_ary bresults in
         let (bused', lconsumed') = check_app bresult IntSet.empty in
         (lconsumed', bused', filter_result bused')
@@ -1069,13 +1069,13 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
           let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
           let env2 = EConstr.push_rel decl env in
           let i = Environ.nb_rel env - l in
-          let lvar_env' =
+          let lvar_env2 =
             List.nth lvar_env (i-1) :: lvar_env
           in
-          let borrow_env' =
+          let borrow_env2 =
             List.nth borrow_env (i-1) :: borrow_env
           in
-          borrowcheck_expression env2 sigma lvar_env' borrow_env' b rest_vs term_vs_ty)
+          borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b rest_vs term_vs_ty)
 
   | LetIn (x, e, ty, b) ->
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e [] ty in
@@ -1083,11 +1083,11 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       let env2 = EConstr.push_rel decl env in
       let ty_is_linear = is_linear_type env sigma ty in
       let l = Environ.nb_rel env in
-      let lvar_env' =
+      let lvar_env2 =
         (if ty_is_linear then Some l else None) :: lvar_env
       in
-      let borrow_env' = bresult1 :: borrow_env in
-      let (lconsumed2, bused2, bresult2) = borrowcheck_expression env2 sigma lvar_env' borrow_env' b vs term_vs_ty in
+      let borrow_env2 = bresult1 :: borrow_env in
+      let (lconsumed2, bused2, bresult2) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b vs term_vs_ty in
       if not (IntSet.disjoint lconsumed1 lconsumed2) then
         user_err_hov (Pp.str "[codegen] linear variables consumed multiply:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 lconsumed2))
       else if ty_is_linear && not (IntSet.mem l lconsumed2) then
