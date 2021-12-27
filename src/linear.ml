@@ -935,7 +935,7 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
 and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
     (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
-  let check_app (bresult : borrow_t) (lconsumed : IntSet.t) : IntSet.t * borrow_t =
+  let check_app (lconsumed : IntSet.t) (bresult : borrow_t) : IntSet.t * borrow_t =
     if CList.is_empty vs then
       (lconsumed, bresult)
     else if not (IntSet.is_empty lconsumed) then
@@ -999,7 +999,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       if CList.is_empty vs then
         (lconsumed, bresult, bresult)
       else (* term is a function.  So term is not linear and lconsumed should be empty. *)
-        let (lconsumed', bused') = check_app bresult lconsumed in
+        let (lconsumed', bused') = check_app lconsumed bresult in
         (lconsumed', bused', filter_result bused')
   | Const (ctnt, univ) ->
       if Cset.mem ctnt !borrow_function_set then
@@ -1027,10 +1027,10 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         if CList.is_empty vs then
           (IntSet.empty, ConstrMap.empty, ConstrMap.empty)
         else
-          let (lconsumed', bused') = check_app ConstrMap.empty IntSet.empty in
+          let (lconsumed', bused') = check_app IntSet.empty ConstrMap.empty in
           (lconsumed', bused', filter_result bused')
   | Construct _ ->
-      let (lconsumed', bused') = check_app ConstrMap.empty IntSet.empty in
+      let (lconsumed', bused') = check_app IntSet.empty ConstrMap.empty in
       (* the return value of constructor application contains all arguments including the borrowed values *)
       (lconsumed', bused', bused')
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
@@ -1057,7 +1057,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         in
         let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
         let bresult = borrow_union_ary bresults in
-        let (lconsumed', bused') = check_app bresult IntSet.empty in
+        let (lconsumed', bused') = check_app IntSet.empty bresult in
         (lconsumed', bused', filter_result bused')
 
   | Lambda (x, ty, b) ->
