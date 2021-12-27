@@ -244,7 +244,7 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
     - a inductive type which has (possibly indirectly) have a component which type is linear.
   - function type is always unrestricted.
 *)
-let rec is_linear_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
+let rec is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Prod (name, namety, body) ->
@@ -338,7 +338,7 @@ let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConst
     - a inductive type which has (possibly indirectly) have a component which type is DownwardOnly.
   - function type is always DownwardOnly.
 *)
-let rec is_downward_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
+let rec is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_downward_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Prod (name, namety, body) ->
@@ -796,7 +796,7 @@ let borrow_disjoint (brw1 : borrow_t) (brw2 : borrow_t) : bool =
   IntSet.disjoint (lvariables_of_borrow brw1) (lvariables_of_borrow brw2)
   *)
 
-let is_borrow_type (env : Environ.env) (sigma :Evd.evar_map) (ty : EConstr.t) : bool =
+let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
 
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
