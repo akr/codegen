@@ -832,7 +832,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
       borrow_union_ary bresults
   | Lambda _ ->
       let (args, body) = EConstr.decompose_lam sigma term in
-      (* args is a list of pairs of name and type from inner (last) argument to outer (first) argument *)
+      (* args is a list of pairs of name and type from innermost (last) argument to outermost (first) argument *)
       if isFix sigma body then
         (* linear argument is prohibited in args (because fix-bounded functions may be called multiple times) *)
         let (env3, lvar_env3) =
