@@ -800,7 +800,10 @@ let borrow_max_elt (brw : borrow_t) : int =
   IntSet.max_elt (lvariables_of_borrow brw)
 
 let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  ConstrSet.mem (EConstr.to_constr sigma (nf_all env sigma ty)) !borrow_type_set
+  let ty = nf_all env sigma ty in
+  (if not (Vars.closed0 sigma ty) then
+    user_err_hov (Pp.str "[codegen] free variable in borrow type:" +++ Printer.pr_econstr_env env sigma ty));
+  ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
 
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
