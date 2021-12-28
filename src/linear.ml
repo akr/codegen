@@ -321,6 +321,8 @@ let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : 
   if not (isSort sigma (whd_all env sigma sort)) then
     user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);
   let ty2 = nf_all env sigma ty in
+  (if not (Vars.closed0 sigma ty2) then
+    user_err_hov (Pp.str "[codegen:is_linear] free variable in type:" +++ Printer.pr_econstr_env env sigma ty2));
   is_linear_type env sigma ty2
 
 let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
@@ -404,6 +406,8 @@ let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   if not (isSort sigma (whd_all env sigma sort)) then
     user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);
   let ty2 = nf_all env sigma ty in
+  (if not (Vars.closed0 sigma ty2) then
+    user_err_hov (Pp.str "[codegen:is_downward] free variable in type:" +++ Printer.pr_econstr_env env sigma ty2));
   is_downward_type env sigma ty2
 
 (*let check_type_downwardness (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
@@ -802,7 +806,7 @@ let borrow_max_elt (brw : borrow_t) : int =
 let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   let ty = nf_all env sigma ty in
   (if not (Vars.closed0 sigma ty) then
-    user_err_hov (Pp.str "[codegen] free variable in borrow type:" +++ Printer.pr_econstr_env env sigma ty));
+    user_err_hov (Pp.str "[codegen:is_borrow_type] free variable in borrow type:" +++ Printer.pr_econstr_env env sigma ty));
   ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
 
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
