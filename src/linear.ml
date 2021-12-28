@@ -1226,7 +1226,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       else
         user_err_hov (Pp.str "[codegen] the result of projection is a function")
 
-let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (args : EConstr.t list) : unit =
+let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int list) : unit =
   let open Declarations in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _
@@ -1235,15 +1235,17 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
   | Cast _ | Int _ | Float _ ->
       user_err_hov (Pp.str "[codegen:borrowcheck_constructor] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | App (f, argsary) ->
-      borrowcheck_constructor env sigma f (List.append (Array.to_list argsary) args)
+      borrowcheck_constructor env sigma f
+        (List.append (CArray.map_to_list (fun rel -> Environ.nb_rel env - destRel sigma rel) argsary) vs)
   | Rel _ -> ()
   | Const _ -> ()
   | Construct (cstr,univ) ->
       let (ind,j) = cstr in
       let (mutind,i) = ind in
       let mind_body = Environ.lookup_mind mutind env in
-      let params = CList.firstn mind_body.mind_nparams args in
-      let ty = mkApp (mkInd ind, Array.of_list params) in
+      let params = CArray.map_of_list (fun l -> mkRel (Environ.nb_rel env - l)) (CList.firstn mind_body.mind_nparams vs) in
+      let ty = mkApp (mkInd ind, params) in
+      (*msg_debug_hov (Pp.str "[codegen:borrowcheck_constructor] ty=" ++ Printer.pr_econstr_env env sigma ty);*)
       if is_borrow_type env sigma ty then
         user_err_hov (Pp.str "[codegen] constructor of borrow type used:" +++ Printer.pr_econstr_env env sigma term)
 
@@ -1254,24 +1256,24 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
   | Lambda (x, ty, b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
-      (match args with
+      (match vs with
       | [] -> (* closure creation *)
           borrowcheck_constructor env2 sigma b []
-      | _ :: rest_args ->
-          borrowcheck_constructor env2 sigma b rest_args)
+      | _ :: rest_vs ->
+          borrowcheck_constructor env2 sigma b rest_vs)
 
   | LetIn (x, e, ty, b) ->
       borrowcheck_constructor env sigma e [];
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
-      borrowcheck_constructor env2 sigma b args
+      borrowcheck_constructor env2 sigma b vs
 
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       Array.iter2
         (fun (nas,body) (ctx,_) ->
           let env2 = EConstr.push_rel_context ctx env in
-          borrowcheck_constructor env2 sigma body args)
+          borrowcheck_constructor env2 sigma body vs)
         bl bl0
 
   | Proj (proj, expr) ->
