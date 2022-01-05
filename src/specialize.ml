@@ -1211,7 +1211,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
       (* reduction: delta-app *)
       let f_args_nf = Array.map (reduce_arg env sigma) f_args in
       reduce_app env sigma f_f (Array.append f_args_nf args_nf)
-  | LetIn (x,e,t,b) ->
+  | LetIn _ ->
       (* reduction: zeta-app *)
       let (defs, body) = decompose_lets sigma f in
       let args_nf_lifted = Array.map (Vars.lift (List.length defs)) args_nf in
