@@ -12,6 +12,7 @@ val opt_debug_reduce_eta : bool ref
 val opt_debug_complete_arguments : bool ref
 val opt_debug_expand_eta : bool ref
 val opt_debug_delete_let : bool ref
+val opt_debug_borrowcheck : bool ref
 val gensym_id : int ref
 type string_or_qualid =
     StrOrQid_Str of string
