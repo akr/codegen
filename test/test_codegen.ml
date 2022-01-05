@@ -196,6 +196,8 @@ let codegen_test_template
     ?(goal : test_goal = UntilExe)
     ?(coq_exit_code : Unix.process_status option)
     ?(coq_output_regexp : Str.regexp option)
+    ?(generated_code_regexp : Str.regexp option)
+    ?(generated_code_regexp_not : Str.regexp option)
     ?(modify_generated_source : (string -> string) option)
     ?(resolve_dependencies : bool = true)
     ?(mutual_recursion_detection : bool = true)
@@ -236,6 +238,28 @@ let codegen_test_template
     ~use_stderr:true
     ?foutput:coq_foutput
     coqc (List.append coq_opts [src_fn]);
+  (match generated_code_regexp with
+  | None -> ()
+  | Some regexp ->
+      let ch = open_in gen_fn in
+      let text = really_input_string ch (in_channel_length ch) in
+      close_in ch;
+      try
+        ignore (Str.search_forward regexp text 0);
+        assert_bool "regexp matched expectedly" true
+      with Not_found ->
+        assert_bool "regexp not matched unexpectedly" false);
+  (match generated_code_regexp_not with
+  | None -> ()
+  | Some regexp ->
+      let ch = open_in gen_fn in
+      let text = really_input_string ch (in_channel_length ch) in
+      close_in ch;
+      try
+        ignore (Str.search_forward regexp text 0);
+        assert_bool "regexp matched unexpectedly" false
+      with Not_found ->
+        assert_bool "regexp not matched expectedly" true);
   (match modify_generated_source with
   | None -> ()
   | Some f ->
@@ -2386,6 +2410,26 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
       assert(value_of_optionbool(false, Some_bool(true)) == true);
     |}
 
+let test_reduceeta_makes_single_function (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    ~generated_code_regexp_not:(Str.regexp "^codegen_functions_mycat_bool")
+    (bool_src ^ list_bool_src ^
+    {|
+      Definition mycat {T : Type} :=
+        fix mycat (s1 s2 : list T) : list T :=
+          match s1 with
+          | nil => s2
+          | cons x s => cons x (mycat s s2)
+          end.
+      CodeGen Function mycat bool => "mycat_bool".
+    |}) {|
+      #define cons(h,t) list_bool_cons(h,t)
+      list_bool s1 = cons(true,(cons(false,NULL)));
+      list_bool s2 = cons(false,(cons(true,NULL)));
+      list_bool s3 = cons(true,(cons(false,cons(false,(cons(true,NULL))))));
+      assert(list_bool_eq(s3, mycat_bool(s1,s2)));
+    |}
+
 let test_indimp_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -3398,6 +3442,7 @@ let suite : OUnit2.test =
     "test_auto_const" >:: test_auto_const;
     "test_auto_construct" >:: test_auto_construct;
     "test_option_bool_struct" >:: test_option_bool_struct;
+    "test_reduceeta_makes_single_function" >:: test_reduceeta_makes_single_function;
     "test_indimp_bool" >:: test_indimp_bool;
     "test_indimp_bool_pair" >:: test_indimp_bool_pair;
     "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;

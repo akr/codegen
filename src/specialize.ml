@@ -1046,7 +1046,7 @@ let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   | _ -> false
 
 (* lams is a list from innermost lambda to outermost lambda *)
-let rec push_rel_lams (lams : (Name.t Context.binder_annot * t) list) (env : Environ.env) : Environ.env =
+let rec push_rel_lams (lams : (Name.t Context.binder_annot * EConstr.t) list) (env : Environ.env) : Environ.env =
   match lams with
   | [] -> env
   | (x, ty) :: rest ->
@@ -1841,6 +1841,105 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
           let (env', f, referred_cfuncs) = replace ~cfunc env sigma f in
           (env', mkApp (f, args), referred_cfuncs)
 
+let rec reduce_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (if !opt_debug_reduce_eta then
+    msg_debug_hov (Pp.str "[codegen] reduce_eta arg:" +++ Printer.pr_econstr_env env sigma term));
+  let result = reduce_eta1 env sigma term in
+  (if !opt_debug_reduce_eta then
+    msg_debug_hov (Pp.str "[codegen] reduce_eta ret:" +++ Printer.pr_econstr_env env sigma result));
+  check_convertible "reduce_eta" env sigma term result;
+  result
+
+and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      term
+  | Var _ | Meta _ | Evar _ | Sort _ | Prod _ | Array _ | CoFix _ ->
+      user_err (Pp.str "[codegen:reduce_eta] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
+  | Const _ | Ind _ | Construct _ | Int _ | Float _ -> term
+  | Cast (e,ck,t) -> reduce_eta env sigma e
+  | Lambda _ ->
+      let (lams, b) = decompose_lam sigma term in
+      let env2 = push_rel_lams lams env in
+      (match EConstr.kind sigma b with
+      | App (f, args) ->
+          (*msg_info_hov (Pp.str "[codegen:reduce_eta1]" +++
+            Pp.str "f=" ++ Printer.pr_econstr_env env2 sigma f +++
+            Pp.str "args=[" ++ pp_sjoinmap_ary (Printer.pr_econstr_env env2 sigma) args ++ Pp.str "]");*)
+          let min_fv =
+            match fv_range env2 sigma f with
+            | None -> List.length lams + 1 (* does not refer variables in lams *)
+            | Some (min,max) -> min
+          in
+          let nargs = Array.length args in
+          let rec instantiate_prods f_ty i acc =
+            if i < nargs then
+              let f_ty = Reductionops.whd_all env2 sigma f_ty in
+              match EConstr.kind sigma f_ty with
+              | Prod (x,ty,b) ->
+                  let ty = Reductionops.nf_all env2 sigma ty in
+                  instantiate_prods (Vars.subst1 args.(i) b) (i+1) (ty :: acc)
+              | _ -> assert false
+            else
+              acc
+          in
+          let f_ty = Retyping.get_type_of env2 sigma f in
+          (*msg_info_hov (Pp.str "[codegen:reduce_eta1]" +++
+            Pp.str "f_ty=" ++ (Printer.pr_econstr_env env2 sigma f_ty));*)
+          let prods = instantiate_prods f_ty 0 [] in
+          (*msg_info_hov (Pp.str "[codegen:reduce_eta1]" +++
+            Pp.str "f_formal_args=[" ++ pp_sjoinmap_list (Printer.pr_econstr_env env2 sigma) (List.rev prods) ++ Pp.str "]");*)
+          let rec count_eta_reducible_args lams prods n =
+            match lams, prods with
+            | (x,ty_lam) :: rest_lams, ty_prod :: rest_prods ->
+                if nargs <= n then
+                  n
+                else if min_fv-1 <= n then
+                  n
+                else if destRel sigma args.(nargs - n - 1) <> (n+1) then
+                  n
+                else
+                  if EConstr.eq_constr sigma (Vars.lift (n+1) ty_lam) ty_prod then
+                    count_eta_reducible_args rest_lams rest_prods (n+1)
+                  else
+                    n
+            | _, _ -> n
+          in
+          let n = count_eta_reducible_args lams prods 0 in
+          (*msg_info_hov (Pp.str "[codegen:reduce_eta1] num_eta_reducible_args=" ++ Pp.int n);*)
+          if 0 < n then
+            let lams3 = CList.skipn n lams in
+            let args3 = Array.map (Vars.lift (-n)) (Array.sub args 0 (nargs - n)) in
+            let f3 = Vars.lift (-n) f in
+            let env3 = push_rel_lams lams3 env in
+            compose_lam lams3 (reduce_eta env3 sigma (mkApp (f3,args3)))
+          else
+            compose_lam lams (reduce_eta env2 sigma b)
+      | _ ->
+        compose_lam lams (reduce_eta env2 sigma b))
+  | LetIn (x,e,t,b) ->
+      let e' = reduce_eta env sigma e in
+      let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLetIn (x, e', t, reduce_eta env2 sigma b)
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let bl' =
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            (nas,reduce_eta env2 sigma body))
+          bl bl0
+      in
+      mkCase (ci,u,pms,p,iv,item,bl')
+  | Proj (pr,item) ->
+      term
+  | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      mkFix ((ks, j), (nary, tary, Array.map (reduce_eta env2 sigma) fary))
+  | App (f,args) ->
+      mkApp (reduce_eta env sigma f, args)
+
 (*
   - complete_args_fun transforms "term" to begin with p lambdas.
     (fix can be mixed in the lambdas.)
@@ -2188,6 +2287,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "delete_unused_let" term;
   let (env, term, referred_cfuncs) = replace ~cfunc env sigma term in (* "replace" modifies global env *)
   debug_simplification env sigma "replace" term;
+  let term = reduce_eta env sigma term in
+  debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
   Linear.linear_type_check_term env sigma term;
