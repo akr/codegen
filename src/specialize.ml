@@ -1045,6 +1045,15 @@ let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
   | App (f, args) -> isInd sigma f
   | _ -> false
 
+(* lams is a list from innermost lambda to outermost lambda *)
+let rec push_rel_lams (lams : (Name.t Context.binder_annot * t) list) (env : Environ.env) : Environ.env =
+  match lams with
+  | [] -> env
+  | (x, ty) :: rest ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
+      let env2 = EConstr.push_rel decl env in
+      push_rel_lams rest env2
+
 (* invariant: letin-bindings in env is reduced form *)
 let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let t1 = Unix.times () in
@@ -1074,10 +1083,10 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Construct _ | Int _ | Float _ | Array _ -> term
   | Cast (e,ck,t) -> reduce_exp env sigma e
-  | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      mkLambda (x, t, reduce_exp env2 sigma e)
+  | Lambda _ ->
+      let (lams, b) = decompose_lam sigma term in
+      let env2 = push_rel_lams lams env in
+      compose_lam lams (reduce_exp env2 sigma b)
   | LetIn (x,e,t,b) ->
       let e' = reduce_exp env sigma e in (* xxx: we don't want to reduce function? *)
       if isLetIn sigma e' then
