@@ -1907,9 +1907,14 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           in
           let n = count_eta_reducible_args lams prods 0 in
           (*msg_info_hov (Pp.str "[codegen:reduce_eta1] num_eta_reducible_args=" ++ Pp.int n);*)
-          if 0 < n then
+          if n = nargs then
+            (* We apply eta reduction only if it eliminates all arguments.
+              If some arguments are retained (i.e. partial application is retained),
+              they will be reproduced by complete_args
+              with different variable names.
+              *)
             let lams3 = CList.skipn n lams in
-            let args3 = Array.map (Vars.lift (-n)) (Array.sub args 0 (nargs - n)) in
+            let args3 = [||] in
             let f3 = Vars.lift (-n) f in
             let env3 = push_rel_lams lams3 env in
             compose_lam lams3 (reduce_eta env3 sigma (mkApp (f3,args3)))
