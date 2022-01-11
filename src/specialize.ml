@@ -336,9 +336,9 @@ let codegen_define_instance
     user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));
   let sp_inst =
     let check_cfunc_name_conflict cfunc_name =
-      match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-      | None -> ()
-      | Some (sp_cfg, sp_inst) ->
+      match is_function_icommand icommand, CString.Map.find_opt cfunc_name !cfunc_instance_map with
+      | true, None -> ()
+      | true, Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
           user_err
             (Pp.str "[codegen] C function name already used:" +++
             Pp.str cfunc_name +++
@@ -346,6 +346,22 @@ let codegen_define_instance
             Printer.pr_constr_env env sigma sp_inst.sp_presimp +++
             Pp.str "but also for" +++
             Printer.pr_constr_env env sigma presimp)
+      | true, Some (CodeGenCfuncPrimitive _) ->
+          user_err
+            (Pp.str "[codegen] C function name already used:" +++
+            Pp.str cfunc_name +++
+            Pp.str "for primitives" +++
+            Pp.str "but also for" +++
+            Printer.pr_constr_env env sigma presimp)
+      | false, None -> ()
+      | false, Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
+          user_err
+            (Pp.str "[codegen] C function name already used:" +++
+            Pp.str cfunc_name +++
+            Pp.str "for" +++
+            Printer.pr_constr_env env sigma sp_inst.sp_presimp +++
+            Pp.str "but also for a primitive")
+      | false, Some (CodeGenCfuncPrimitive _) -> ()
     in
     let generated_ps_syms = ref None in
     let lazy_gensym_ps suffix =
@@ -423,7 +439,13 @@ let codegen_define_instance
     pr_codegen_instance env sigma sp_cfg sp_inst);
   gallina_instance_map := (ConstrMap.add sp_inst.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map);
   gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
-  cfunc_instance_map := (CString.Map.add cfunc_name (sp_cfg, sp_inst) !cfunc_instance_map);
+  (if is_function_icommand icommand then
+    cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst)) !cfunc_instance_map)
+  else
+    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+    | None -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]) !cfunc_instance_map);
+    | Some (CodeGenCfuncPrimitive l) -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)) !cfunc_instance_map)
+    | Some (CodeGenCfuncGenerate l) -> assert false);
   let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
   let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
@@ -2245,7 +2267,10 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     | None ->
         user_err (Pp.str "[codegen] specialization instance not defined:" +++
                   Pp.str (escape_as_coq_string cfunc))
-    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
+    | Some (CodeGenCfuncPrimitive _) ->
+        user_err (Pp.str "[codegen] not a target of simplification:" +++
+                  Pp.str (escape_as_coq_string cfunc))
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) -> (sp_cfg, sp_inst)
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -2326,7 +2351,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     let m = ConstrMap.add (Constr.mkConst declared_ctnt) (sp_cfg, sp_inst2) m in
     gallina_instance_map := m);
   (let m = !cfunc_instance_map in
-    let m = CString.Map.set sp_inst.sp_cfunc_name (sp_cfg, sp_inst2) m in
+    let m = CString.Map.set sp_inst.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2)) m in
     cfunc_instance_map := m);
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
@@ -2349,8 +2374,8 @@ let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string l
     (visited := StringSet.add cfunc !visited;
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
-    | Some (sp_cfg, sp_inst) ->
-        match sp_inst.sp_simplified_status with
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
+        (match sp_inst.sp_simplified_status with
         | SpNoSimplification -> ()
         | SpExpectedId _ ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
@@ -2359,6 +2384,7 @@ let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string l
         | SpDefined (declared_ctnt, referred_cfuncs) ->
             (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
             rev_postorder := cfunc :: !rev_postorder)
+    | Some (CodeGenCfuncPrimitive _) -> ())
 
 let command_simplify_dependencies (cfuncs : string list) : unit =
   let visited = ref StringSet.empty in

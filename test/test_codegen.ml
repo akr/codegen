@@ -2430,6 +2430,26 @@ let test_reduceeta_makes_single_function (ctx : test_ctxt) : unit =
       assert(list_bool_eq(s3, mycat_bool(s1,s2)));
     |}
 
+let test_multiple_primitives_shares_cfunc (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Fixpoint myadd (m n : nat) :=
+        match n with
+        | O => m
+        | S n' => myadd (S m) n'
+        end.
+      Definition f a b := a + b.
+      Definition g a b := myadd a b.
+      (* CodeGen Primitive Nat.add => "nat_add". *) (* nat_src contains this *)
+      CodeGen Primitive myadd => "nat_add".
+      CodeGen Function f.
+      CodeGen Function g.
+    |}) {|
+      assert(f(2,3) == 5);
+      assert(g(2,3) == 5);
+    |}
+
 let test_indimp_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -3443,6 +3463,7 @@ let suite : OUnit2.test =
     "test_auto_construct" >:: test_auto_construct;
     "test_option_bool_struct" >:: test_option_bool_struct;
     "test_reduceeta_makes_single_function" >:: test_reduceeta_makes_single_function;
+    "test_multiple_primitives_shares_cfunc" >:: test_multiple_primitives_shares_cfunc;
     "test_indimp_bool" >:: test_indimp_bool;
     "test_indimp_bool_pair" >:: test_indimp_bool_pair;
     "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;

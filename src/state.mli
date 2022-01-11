@@ -74,8 +74,12 @@ type specialization_config = {
 val specialize_config_map : specialization_config ConstrMap.t ref
 val gallina_instance_map :
   (specialization_config * specialization_instance) ConstrMap.t ref
+
+type cfunc_usage =
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunction or CodeGenStaticFunction *)
+| CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 val cfunc_instance_map :
-  (specialization_config * specialization_instance) CString.Map.t ref
+  cfunc_usage CString.Map.t ref
 type string_or_none = string option
 val current_header_filename : string option ref
 val current_source_filename : string option ref

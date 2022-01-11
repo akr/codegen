@@ -1551,7 +1551,10 @@ let make_simplified_for_cfunc (cfunc_name : string) :
     | None ->
         user_err (Pp.str "[codegen] C function name not found:" +++
                   Pp.str cfunc_name)
-    | Some (sp_cfg, sp_inst) -> (sp_cfg, sp_inst)
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) -> (sp_cfg, sp_inst)
+    | Some (CodeGenCfuncPrimitive _) ->
+        user_err (Pp.str "[codegen] C primitive function name found:" +++
+                  Pp.str cfunc_name)
   in
   let static = is_static_function_icommand sp_inst.sp_icommand in
   let (env, ctnt) =

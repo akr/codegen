@@ -172,6 +172,9 @@ type simplified_status =
 (*
 - CodeGenFunction
   Codegen-generated function.  Gallina function only.  Any dynamic argument.
+- CodeGenStaticFunction
+  Codegen-generated function.  Gallina function only.  Any dynamic argument.
+  The generated function is defined as static function.
 - CodeGenPrimitive
   User-defined function.  Function or constructor.  Any dynamic argument.
 - CodeGenConstant
@@ -211,8 +214,14 @@ let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 
+(* CodeGenFunction and CodeGenStaticFunction needs unique C function name
+  but CodeGenPrimitive and CodeGenConstant don't need. *)
+type cfunc_usage =
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunction or CodeGenStaticFunction *)
+| CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
+
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
-  (CString.Map.empty : (specialization_config * specialization_instance) CString.Map.t)
+  (CString.Map.empty : cfunc_usage CString.Map.t)
 
 type string_or_none = string option
 
