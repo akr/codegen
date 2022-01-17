@@ -2463,4 +2463,4 @@ let command_deallocator_type (t : Constrexpr.constr_expr) (cfunc : string) : uni
   let (sigma, t) = Constrintern.interp_type_evars env sigma t in
   let t = Reductionops.nf_all env sigma t in
   let t = EConstr.to_constr sigma t in
-  deallocator_cfunc_of_type := ConstrMap.add t cfunc !deallocator_cfunc_of_type
+  deallocator_cfunc_map := ConstrMap.add t cfunc !deallocator_cfunc_map

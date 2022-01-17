@@ -760,7 +760,7 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
   (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
   let c_deallocation =
     if Linear.is_linear env sigma (EConstr.of_constr item_type) then
-      match ConstrMap.find_opt item_type !deallocator_cfunc_of_type with
+      match ConstrMap.find_opt item_type !deallocator_cfunc_map with
       | None -> Pp.mt () (* some linear type, such as immediate struct containing linear type member, don't need deallocator. *)
       | Some dealloc_cfunc ->
           Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");"

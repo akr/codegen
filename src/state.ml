@@ -151,8 +151,8 @@ type type_linearity = LinearityIsLinear | LinearityIsUnrestricted | LinearityIsI
 let type_linearity_map_empty : type_linearity ConstrMap.t = ConstrMap.empty
 let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLinearTypeMap"
 
-let deallocator_cfunc_of_type = Summary.ref
-  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncOfType"
+let deallocator_cfunc_map = Summary.ref
+  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncMap"
 
 type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
 let type_downward_map = Summary.ref

@@ -42,7 +42,7 @@ val ind_config_map : ind_config ConstrMap.t ref
 type type_linearity = LinearityIsLinear | LinearityIsUnrestricted | LinearityIsInvestigating
 val type_linearity_map_empty : type_linearity ConstrMap.t
 val type_linearity_map : type_linearity ConstrMap.t ref
-val deallocator_cfunc_of_type : string ConstrMap.t ref
+val deallocator_cfunc_map : string ConstrMap.t ref
 type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
 val type_downward_map : type_downward ConstrMap.t ref
 val borrow_function_set : Names.Cset.t ref
