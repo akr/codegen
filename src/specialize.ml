@@ -2469,11 +2469,33 @@ let command_print_generation_map () =
       command_print_generation_list gen_list)
     !generation_map
 
-let command_deallocator_type (t : Constrexpr.constr_expr) (cfunc : string) : unit =
+let command_deallocator_type (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
+  let open Declarations in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
-  let t = Reductionops.nf_all env sigma t in
+  let gref = Smartlocate.global_with_alias func in
+  let (mutind,func) =
+    match gref with
+    | IndRef ind ->
+        let (mutind,_) = ind in
+        (mutind, Constr.mkInd ind)
+    | ConstructRef cstr ->
+        let ((mutind,_),_) = cstr in
+        (mutind, Constr.mkConstruct cstr)
+    | _ -> user_err (Pp.str "[codegen] inductive or constructor expected:" +++ Printer.pr_global gref)
+  in
+  let mind_body = Environ.lookup_mind mutind env in
+  (if mind_body.mind_nparams <> List.length user_args then
+    user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
+      Pp.int mind_body.mind_nparams +++ Pp.str "expected but" +++
+      Pp.int (List.length user_args) +++ Pp.str "given for" +++
+      Printer.pr_constr_env env sigma func));
+  let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
+  let func_istypearg_list = determine_type_arguments env sigma func_type in
+  let func_istypearg_list = CList.firstn (List.length user_args) func_istypearg_list in
+  let (sigma, args) = interp_args env sigma func_istypearg_list user_args in
+  let args = List.map (Reductionops.nf_all env sigma) args in
+  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
+  let t = Constr.mkApp (func, Array.of_list args) in
   (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
-  let t = EConstr.to_constr sigma t in
   deallocator_cfunc_map := ConstrMap.add t cfunc !deallocator_cfunc_map
