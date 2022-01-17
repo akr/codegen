@@ -2754,7 +2754,7 @@ let boolbox_src = {|
       CodeGen Inductive Type boolbox => "boolbox".
       CodeGen Inductive Match boolbox => ""
       | BoolBox => "" "boolbox_get".
-      CodeGen DeallocatorType boolbox => "boolbox_dealloc".
+      CodeGen Deallocator boolbox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
