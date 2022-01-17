@@ -2460,7 +2460,8 @@ let command_print_generation_map () =
 let command_deallocator_type (t : Constrexpr.constr_expr) (cfunc : string) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, t) = Constrintern.interp_type_evars env sigma t in
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
   let t = Reductionops.nf_all env sigma t in
+  (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
   let t = EConstr.to_constr sigma t in
   deallocator_cfunc_map := ConstrMap.add t cfunc !deallocator_cfunc_map

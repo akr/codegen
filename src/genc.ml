@@ -758,16 +758,31 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
   (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
-  let c_deallocation =
+  let c_deallocations =
     if Linear.is_linear env sigma (EConstr.of_constr item_type) then
-      match ConstrMap.find_opt item_type !deallocator_cfunc_map with
-      | None -> Pp.mt () (* some linear type, such as immediate struct containing linear type member, don't need deallocator. *)
-      | Some dealloc_cfunc ->
-          Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");"
+
+      let deallocator_for_type =
+        lazy (match ConstrMap.find_opt item_type !deallocator_cfunc_map with
+              | None -> Pp.mt () (* some linear type, such as immediate struct containing linear type member, don't need deallocator. *)
+              | Some dealloc_cfunc ->
+                  Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")
+      in
+      (* all arguments to an inductive type are parameters because we don't support indexed types *)
+      let params = if Constr.isApp item_type then snd (Constr.destApp item_type) else [||] in
+      Array.map
+        (fun i ->
+          let cstr = (ci.ci_ind, i+1) in
+          let cstr_exp = Constr.mkApp (Constr.mkConstruct cstr, params) in
+          (*msg_debug_hov (Pp.str "[codegen:gen_match] cstr_exp:" +++ Printer.pr_constr_env env sigma cstr_exp);*)
+          match ConstrMap.find_opt cstr_exp !deallocator_cfunc_map with
+          | None -> Lazy.force deallocator_for_type
+          | Some dealloc_cfunc ->
+              Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")
+        (iota_ary 0 (Array.length branches))
     else
-      Pp.mt ()
+      Array.make (Array.length branches) (Pp.mt ())
   in
-  let gen_branch accessors br =
+  let gen_branch accessors c_deallocation br =
     let m = Array.length accessors in
     let (env2, branch_body) = decompose_lam_n_env env sigma m br in
     let c_vars = Array.map
@@ -814,8 +829,9 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
   if h = 1 then
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
     let accessors = snd caselabel_accessors.(0) in
+    let c_deallocation = c_deallocations.(0) in
     let br = branches.(0) in
-    gen_branch accessors br)
+    gen_branch accessors c_deallocation br)
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
@@ -825,10 +841,10 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
                    Pp.str swfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")" in
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
-      (Array.map2
-        (fun (caselabel, accessors) br ->
-          (caselabel, gen_branch accessors br))
-        caselabel_accessors branches))
+      (array_map3
+        (fun (caselabel, accessors) c_deallocation br ->
+          (caselabel, gen_branch accessors c_deallocation br))
+        caselabel_accessors c_deallocations branches))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
     (pr : Projection.t) (item : EConstr.t) : Pp.t =
