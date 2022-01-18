@@ -176,4 +176,4 @@ val codegen_resolve_dependencies :
 val command_resolve_dependencies : unit -> unit
 val command_print_generation_list : State.code_generation list -> unit
 val command_print_generation_map : unit -> unit
-val command_deallocator_type : Libnames.qualid -> Constrexpr.constr_expr list -> string -> unit
+val command_deallocator : Libnames.qualid -> Constrexpr.constr_expr list -> string -> unit

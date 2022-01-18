@@ -254,7 +254,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_test_unrestricted t }
 
     | [ "CodeGen" "Deallocator" ref(ind_or_cstr) constr_list(args) "=>" string(cfunc) ] ->
-      { command_deallocator_type ind_or_cstr args cfunc }
+      { command_deallocator ind_or_cstr args cfunc }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
     | [ "CodeGen" "BorrowFunction" ref(f) ] -> { command_borrow_function f }

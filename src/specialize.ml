@@ -2469,7 +2469,7 @@ let command_print_generation_map () =
       command_print_generation_list gen_list)
     !generation_map
 
-let command_deallocator_type (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
+let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
   let open Declarations in
   let env = Global.env () in
   let sigma = Evd.from_env env in
