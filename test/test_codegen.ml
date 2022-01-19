@@ -3407,6 +3407,26 @@ let test_void_mutual (ctx : test_ctxt) : unit =
     |})
     {| |}
 
+let test_void_empty_args (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ nat_src ^ {|
+      Definition f (u : unit) : nat :=
+        let z := O in
+        let n := match u with
+                 | tt => z
+                 end
+        in
+        (fix g (n : nat) : nat :=
+          match n with
+          | O => O
+          | S m => S (g m)
+          end) n.
+      CodeGen Function f.
+    |})
+    {|
+      assert(f() == 0);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3552,6 +3572,7 @@ let suite : OUnit2.test =
     "test_void_tail" >:: test_void_tail;
     "test_void_head" >:: test_void_head;
     "test_void_mutual" >:: test_void_mutual;
+    "test_void_empty_args" >:: test_void_empty_args;
   ]
 
 let () =

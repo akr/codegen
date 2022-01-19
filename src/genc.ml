@@ -1459,31 +1459,26 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         (fun (c_arg, t) -> Pp.hov 0 (Pp.str t +++ Pp.str c_arg ++ Pp.str ";"))
         args
     in
-    Pp.hv 0 (
-    Pp.str ("struct codegen_args_" ^ primary_cfunc) +++
-    hovbrace (
-    pr_members formal_arguments +++
     (if CList.is_empty formal_arguments then
-      (* empty struct is undefined behavior *)
-      Pp.str "int" +++ Pp.str "dummy;" (* Not reached because fixfunc_formal_arguments cannot be empty. *)
+      Pp.mt ()
     else
-      Pp.mt ())) ++ Pp.str ";") +++
+      Pp.hv 0 (
+      Pp.str ("struct codegen_args_" ^ primary_cfunc) +++
+      hovbrace (pr_members formal_arguments) ++ Pp.str ";")) +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        Pp.hv 0 (
-        Pp.str ("struct codegen_args_" ^ fixfunc.fixfunc_c_name) +++
-        hovbrace (
-        pr_members fixfunc.fixfunc_outer_variables +++
-        pr_members (List.filter_map
-                     (function (c_arg, None) -> None
-                             | (c_arg, Some c_ty) -> Some (c_arg, c_ty))
-                     fixfunc.fixfunc_formal_arguments) +++
-        (if CList.is_empty fixfunc.fixfunc_outer_variables &&
-            CList.is_empty fixfunc.fixfunc_formal_arguments then
-          (* empty struct is undefined behavior *)
-          Pp.str "int" +++ Pp.str "dummy;" (* Not reached because fixfunc_formal_arguments cannot be empty. *)
+        if CList.is_empty fixfunc.fixfunc_outer_variables &&
+           CList.is_empty fixfunc.fixfunc_formal_arguments then
+          Pp.mt ()
         else
-          Pp.mt ())) ++ Pp.str ";"))
+          Pp.hv 0 (
+          Pp.str ("struct codegen_args_" ^ fixfunc.fixfunc_c_name) +++
+          hovbrace (
+          pr_members fixfunc.fixfunc_outer_variables +++
+          pr_members (List.filter_map
+                       (function (c_arg, None) -> None
+                               | (c_arg, Some c_ty) -> Some (c_arg, c_ty))
+                       fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))
       sibling_and_internal_entfuncs
   in
   let pp_forward_decl =
@@ -1494,19 +1489,24 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
   in
   let pp_entry_functions =
     let pr_entry_function static c_name func_index formal_arguments return_type =
-      let pp_vardecl_args =
-        Pp.str ("struct codegen_args_" ^ c_name) +++
-        Pp.str "codegen_args" +++
-        Pp.str "=" +++
-        hovbrace (
-          (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-            (fun (c_arg, t) -> Pp.str c_arg)
-            formal_arguments)) ++
-        Pp.str ";"
+      let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h *)
+      let (pp_vardecl_args, pp_struct_arg) =
+        if CList.is_empty formal_arguments then
+          (Pp.mt (), null)
+        else
+          ((Pp.str ("struct codegen_args_" ^ c_name) +++
+            Pp.str "codegen_args" +++
+            Pp.str "=" +++
+            hovbrace (
+              (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+                (fun (c_arg, t) -> Pp.str c_arg)
+                formal_arguments)) ++
+            Pp.str ";"),
+           "&codegen_args")
       in
       let (pp_vardecl_ret, pp_return_arg) =
         match return_type with
-        | None -> (Pp.mt (), "((void*)0)") (* We don't use NULL because it needs stddef.h *)
+        | None -> (Pp.mt (), null)
         | Some c_return_type ->
             (Pp.str c_return_type +++ Pp.str "codegen_ret;", "&codegen_ret")
       in
@@ -1514,7 +1514,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         Pp.str ("codegen_functions_" ^ primary_cfunc) ++
         Pp.str "(" ++
         Pp.str func_index ++ Pp.str "," +++
-        Pp.str "&codegen_args," +++
+        Pp.str pp_struct_arg ++ Pp.str "," +++
         Pp.str pp_return_arg ++ Pp.str ");"
       in
       let pp_return =
