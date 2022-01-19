@@ -24,9 +24,10 @@ type cstr_config = {
 }
 type ind_config = {
   coq_type : Constr.t;
-  c_type : string;
+  c_type : string option; (* None means void type *)
   c_swfunc : string option;
   cstr_configs : cstr_config array;
+  is_void_type : bool;
 }
 type ind_cstr_caselabel_accessors = Names.Id.t * string * string list
 type s_or_d = SorD_S | SorD_D

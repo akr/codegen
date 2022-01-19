@@ -35,7 +35,7 @@ let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.co
 let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   Feedback.msg_info (Pp.str "CodeGen Inductive Type" +++
     Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-    Pp.str (quote_coq_string ind_cfg.c_type) ++ Pp.str ".")
+    Pp.str (quote_coq_string (Stdlib.Option.value ind_cfg.c_type ~default:"void")) ++ Pp.str ".")
 
 let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
   let f cstr_cfg =
@@ -125,10 +125,38 @@ let check_ind_coq_type_not_registered (coq_type : Constr.t) : unit =
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_constr_env env sigma coq_type)
 
+let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Declarations.mutual_inductive_body) (ty : Constr.types) : unit =
+  let open Declarations in
+  (if Array.length mind_body.mind_packets <> 1 then
+    user_err (Pp.str "[codegen] non-mutual inductive type expected for void type:" +++ Printer.pr_constr_env env sigma ty));
+  (if mind_body.mind_nparams <> 0 then
+    (* This "no parameters" constraint is not mandatory.
+       However it makes us easy to determine constructor invocation in code generation
+       because constructor with parameters is wrapped as a constant.  *)
+    user_err (Pp.str "[codegen] void type must not have no inductive type parameters:" +++ Printer.pr_constr_env env sigma ty));
+  let oind_body = mind_body.mind_packets.(0) in
+  (if oind_body.mind_nrealargs <> 0 then
+    user_err (Pp.str "[codegen] non-indexed type expected for void type:" +++ Printer.pr_constr_env env sigma ty));
+  (if Array.length oind_body.mind_consnames <> 1 then
+    user_err (Pp.str "[codegen] single constructor inductive type expected for void type:" +++ Printer.pr_constr_env env sigma ty +++
+    Pp.str "has" +++ Pp.int (Array.length oind_body.mind_consnames) +++ Pp.str "constructors"));
+  (if oind_body.mind_consnrealargs.(0) <> 0 then
+    user_err (Pp.str "[codegen] no-argument constructor expected for void type:" +++
+      Id.print oind_body.mind_consnames.(0) +++
+      Pp.str "of" +++
+      Printer.pr_constr_env env sigma ty))
+
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : string) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
+  let c_type =
+    if String.equal c_type "void" then
+      (check_void_type env sigma mutind_body coq_type; None)
+    else
+      Some c_type
+  in
+  let is_void_type = (c_type = None) in
   let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
     Array.map (fun cstrname -> {
       coq_cstr = cstrname;
@@ -138,7 +166,9 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
     coq_type=coq_type;
     c_type=c_type;
     c_swfunc=None;
-    cstr_configs=cstr_cfgs } in
+    cstr_configs=cstr_cfgs;
+    is_void_type=is_void_type;
+  } in
   ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
   ind_cfg
 
@@ -152,8 +182,11 @@ let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.
      Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
   ind_cfg
 
+let lookup_ind_config (t : Constr.types) : ind_config option =
+  ConstrMap.find_opt t !ind_config_map
+
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  match ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map with
+  match lookup_ind_config (EConstr.to_constr sigma t) with
   | Some ind_cfg -> ind_cfg
   | None -> generate_ind_config env sigma t
 
@@ -237,9 +270,12 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
      Pp.hv 0 (pr_inductive_match env sigma ind_cfg)));
   ind_cfg
 
-let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
+let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
+  (get_ind_config env sigma t).is_void_type
+
+let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string option =
   match EConstr.kind sigma t with
-  | Prod _ -> "codegen_closure_t" (* codegen_closure_t is not used yet *)
+  | Prod _ -> Some "codegen_closure_t" (* codegen_closure_t is not used yet *)
   | _ -> (get_ind_config env sigma t).c_type
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
@@ -275,4 +311,3 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
-

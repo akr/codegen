@@ -282,14 +282,7 @@ let template_coq_success
     ctx coq_commands ""
 
 let unit_src = {|
-      CodeGen Inductive Type unit => "unit".
-      CodeGen Constant tt => "tt".
-
-      CodeGen Snippet "
-      #include <stdbool.h> /* for bool and true */
-      typedef bool unit;
-      #define tt true
-      ".
+      CodeGen Inductive Type unit => "void".
 |}
 
 let bool_src = {|
@@ -2777,10 +2770,9 @@ let boolbox_src = {|
         return *x;
       }
 
-      static inline unit boolbox_dealloc(boolbox x) {
+      static inline void boolbox_dealloc(boolbox x) {
         *boolbox_log_next++ = 'd';
         free(x);
-        return tt;
       }
       ".
 |}
@@ -2870,7 +2862,7 @@ let test_linear_dellet_match (ctx : test_ctxt) : unit =
         true.
       CodeGen Function f.
     |}) {|
-      assert(f(boolbox_alloc(true), tt) == true);
+      assert(f(boolbox_alloc(true)) == true);
       assert(boolbox_log_next - boolbox_log_buffer > 0);
       assert(boolbox_log_buffer[0] == 'a');
       assert(boolbox_log_next - boolbox_log_buffer > 1);
@@ -3368,6 +3360,53 @@ let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
 	fun (n : nat) => BC.
     |}) {| |}
 
+let test_void_tail (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ {|
+      CodeGen Snippet "void f(bool);".
+      Definition f (b : bool) : unit := tt.
+      CodeGen Function f.
+    |})
+    {| |}
+
+let test_void_head (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ {|
+      CodeGen Snippet "void f(bool);".
+      Definition f (b : bool) : unit :=
+	let x := tt in
+	match b with
+	| true => x
+	| false => x
+	end.
+      CodeGen Function f.
+    |})
+    {| |}
+
+let test_void_mutual (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      CodeGen Snippet "void f(nat);".
+      CodeGen Snippet "static nat constant_zero(void) { return 0; }".
+      CodeGen Snippet "static void ignore_nat(nat v1_x) { return; }".
+      Definition ignore_nat (x : nat) : unit := tt.
+      Definition constant_zero (x : unit) : nat := 0.
+      Fixpoint f (n : nat) : unit :=
+        match n with
+        | O => tt
+        | S m => let x := g m in ignore_nat x
+        end
+      with g (n : nat) : nat :=
+        match n with
+        | O => 0
+        | S m => let x := f m in constant_zero x
+        end.
+      CodeGen Primitive ignore_nat.
+      CodeGen Primitive constant_zero.
+      CodeGen Function f.
+    |})
+    {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3510,6 +3549,9 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
     "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
     "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
+    "test_void_tail" >:: test_void_tail;
+    "test_void_head" >:: test_void_head;
+    "test_void_mutual" >:: test_void_mutual;
   ]
 
 let () =

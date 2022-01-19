@@ -22,6 +22,7 @@ val register_ind_type :
   Environ.env -> Evd.evar_map -> Constr.t -> string -> State.ind_config
 val generate_ind_config :
   Environ.env -> Evd.evar_map -> EConstr.types -> State.ind_config
+val lookup_ind_config : Constr.types -> State.ind_config option
 val get_ind_config :
   Environ.env -> Evd.evar_map -> EConstr.types -> State.ind_config
 val command_ind_type : Constrexpr.constr_expr -> string -> unit
@@ -32,7 +33,8 @@ val register_ind_match :
   string -> State.ind_cstr_caselabel_accessors list -> State.ind_config
 val generate_ind_match :
   Environ.env -> Evd.evar_map -> EConstr.types -> State.ind_config
-val c_typename : Environ.env -> Evd.evar_map -> EConstr.types -> string
+val ind_is_void_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
+val c_typename : Environ.env -> Evd.evar_map -> EConstr.types -> string option
 val case_swfunc : Environ.env -> Evd.evar_map -> EConstr.types -> string
 val case_cstrlabel :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> string

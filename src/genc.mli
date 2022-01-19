@@ -13,8 +13,8 @@ type fixfunc_t = {
   fixfunc_inlinable : bool;
   fixfunc_used_as_call : bool;
   fixfunc_used_as_goto : bool;
-  fixfunc_formal_arguments : (string * string) list;
-  fixfunc_return_type : string;
+  fixfunc_formal_arguments : (string * string option) list;
+  fixfunc_return_type : string option;
   fixfunc_top_call : string option;
   fixfunc_c_name : string;
   fixfunc_outer_variables : (string * string) list;
@@ -22,7 +22,7 @@ type fixfunc_t = {
 type fixfunc_table = (Names.Id.t, fixfunc_t) Hashtbl.t
 val show_fixfunc_table : Environ.env -> Evd.evar_map -> fixfunc_table -> unit
 val c_args_and_ret_type :
-  Environ.env -> Evd.evar_map -> EConstr.t -> (string * string) list * string
+  Environ.env -> Evd.evar_map -> EConstr.t -> (string * string option) list * string option
 val disjoint_id_map_union :
   'a Names.Id.Map.t -> 'a Names.Id.Map.t -> 'a Names.Id.Map.t
 val detect_inlinable_fixterm_rec :
@@ -114,41 +114,16 @@ val gen_switch_with_break : Pp.t -> (string * Pp.t) array -> Pp.t
 val gen_match :
   Names.Id.Set.t ->
   (Pp.t -> (string * Pp.t) array -> Pp.t) ->
-  (Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t) ->
+  (Environ.env -> Evd.evar_map -> EConstr.t -> string option list -> Pp.t) ->
   Environ.env ->
   Evd.evar_map ->
   Constr.case_info ->
-  EConstr.t -> EConstr.t -> EConstr.t array -> string list -> Pp.t
+  EConstr.t -> EConstr.t -> EConstr.t array -> string option list -> Pp.t
 val gen_proj :
   Environ.env -> Evd.evar_map -> Names.Projection.t -> EConstr.t -> Pp.t
 val gen_parallel_assignment : (string * string * string) array -> Pp.t
-type head_cont = {
-  head_cont_ret_var : string;
-  head_cont_exit_label : string option;
-}
-val gen_head_cont : head_cont -> Pp.t -> Pp.t
-val gen_head :
-  fixfunc_tbl:fixfunc_table ->
-  used_vars:Names.Id.Set.t ->
-  cont:head_cont ->
-  Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t
-val gen_head1 :
-  fixfunc_tbl:fixfunc_table ->
-  used_vars:Names.Id.Set.t ->
-  cont:head_cont ->
-  Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t
-val gen_tail :
-  fixfunc_tbl:fixfunc_table ->
-  used_vars:Names.Id.Set.t ->
-  gen_ret:(Pp.t -> Pp.t) ->
-  Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t
-val gen_tail1 :
-  fixfunc_tbl:fixfunc_table ->
-  used_vars:Names.Id.Set.t ->
-  gen_ret:(Pp.t -> Pp.t) ->
-  Environ.env -> Evd.evar_map -> EConstr.t -> string list -> Pp.t
 val gen_function_header :
-  bool -> string -> string -> (string * string) list -> Pp.t
+  bool -> string option -> string -> (string * string) list -> Pp.t
 val fixfuncs_for_internal_entfuncs : fixfunc_table -> fixfunc_t list
 val detect_fixterms_for_bodies :
   fixterms:fixterm_t list ->
@@ -163,7 +138,7 @@ val gen_func_single :
   static:bool ->
   primary_cfunc:string ->
   Environ.env ->
-  Evd.evar_map -> EConstr.t -> string -> Names.Id.Set.t -> Pp.t
+  Evd.evar_map -> EConstr.t -> string option -> Names.Id.Set.t -> Pp.t
 val gen_func_multi :
   fixterms:fixterm_t list ->
   fixfunc_tbl:fixfunc_table ->
@@ -173,7 +148,7 @@ val gen_func_multi :
   Evd.evar_map ->
   EConstr.t ->
   (string * string) list ->
-  string ->
+  string option ->
   Names.Id.Set.t ->
   fixfunc_t list -> (bool * string * int * Names.Id.t) list -> Pp.t
 val used_variables :

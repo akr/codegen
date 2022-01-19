@@ -174,6 +174,22 @@ let rec list_find_index pred l =
       else
         1 + (list_find_index pred rest)
 
+let list_filter_map2 (f : 'a -> 'b -> 'c option) (xs : 'a list) (ys : 'b list) : 'c list =
+  List.fold_right2
+    (fun x y s ->
+      match f x y with
+      | None -> s
+      | Some z -> z :: s)
+    xs ys []
+
+let list_filter_none (s : 'a option list) : 'a list =
+  List.fold_right
+    (fun opt s ->
+      match opt with
+      | None -> s
+      | Some x -> x :: s)
+    s []
+
 let seq_map2 (f : 'a -> 'b -> 'c) (xs : 'a Seq.t) (ys : 'b Seq.t) () : 'c Seq.node =
   let rec r xs ys () =
     match xs (), ys () with

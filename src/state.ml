@@ -122,9 +122,10 @@ type cstr_config = {
 
 type ind_config = {
   coq_type : Constr.t;
-  c_type : string;
+  c_type : string option;
   c_swfunc : string option;
-  cstr_configs : cstr_config array
+  cstr_configs : cstr_config array;
+  is_void_type : bool;
 }
 
 type ind_cstr_caselabel_accessors = Id.t * string * string list

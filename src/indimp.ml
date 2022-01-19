@@ -161,18 +161,20 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
               let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
               let members_and_accessors =
-                List.mapi
+                CList.map_filter_i
                   (fun k (arg_name, arg_type) ->
-                    let member_type = c_typename env sigma arg_type in
-                    let k_suffix =
-                      string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
-                      match Context.binder_name arg_name with
-                      | Name.Anonymous -> ""
-                      | Name.Name id -> "_" ^ c_id (Id.to_string id)
-                    in
-                    let member_name = global_prefix ^ "_member" ^ k_suffix in
-                    let accessor = global_prefix ^ "_get" ^ k_suffix in
-                    (member_type, member_name, accessor))
+                    match c_typename env sigma arg_type with
+                    | None -> None
+                    | Some member_type ->
+                        let k_suffix =
+                          string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
+                          match Context.binder_name arg_name with
+                          | Name.Anonymous -> ""
+                          | Name.Name id -> "_" ^ c_id (Id.to_string id)
+                        in
+                        let member_name = global_prefix ^ "_member" ^ k_suffix in
+                        let accessor = global_prefix ^ "_get" ^ k_suffix in
+                        Some (member_type, member_name, accessor))
                   (List.rev args)
               in
               (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors))
