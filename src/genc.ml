@@ -1494,28 +1494,29 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         if CList.is_empty formal_arguments then
           (Pp.mt (), null)
         else
-          ((Pp.str ("struct codegen_args_" ^ c_name) +++
-            Pp.str "codegen_args" +++
-            Pp.str "=" +++
-            hovbrace (
-              (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-                (fun (c_arg, t) -> Pp.str c_arg)
-                formal_arguments)) ++
-            Pp.str ";"),
+          (Pp.hov 2
+            (Pp.str ("struct codegen_args_" ^ c_name) +++
+             Pp.str "codegen_args" +++
+             Pp.str "=" +++
+             hovbrace (
+               (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+                 (fun (c_arg, t) -> Pp.str c_arg)
+                 formal_arguments)) ++
+             Pp.str ";"),
            "&codegen_args")
       in
       let (pp_vardecl_ret, pp_return_arg) =
         match return_type with
         | None -> (Pp.mt (), null)
         | Some c_return_type ->
-            (Pp.str c_return_type +++ Pp.str "codegen_ret;", "&codegen_ret")
+            (Pp.hov 2 (Pp.str c_return_type +++ Pp.str "codegen_ret;"), "&codegen_ret")
       in
       let pp_call =
-        Pp.str ("codegen_functions_" ^ primary_cfunc) ++
-        Pp.str "(" ++
-        Pp.str func_index ++ Pp.str "," +++
-        Pp.str pp_struct_arg ++ Pp.str "," +++
-        Pp.str pp_return_arg ++ Pp.str ");"
+        Pp.hov 2 (Pp.str ("codegen_functions_" ^ primary_cfunc) ++
+                  Pp.str "(" ++
+                  Pp.str func_index ++ Pp.str "," +++
+                  Pp.str pp_struct_arg ++ Pp.str "," +++
+                  Pp.str pp_return_arg ++ Pp.str ");")
       in
       let pp_return =
         match return_type with
@@ -1525,10 +1526,10 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
       Pp.v 0 (
         gen_function_header static return_type c_name formal_arguments +++
         vbrace (
-          Pp.hov 0 (pp_vardecl_args) +++
-          Pp.hov 0 (pp_vardecl_ret) +++
-          Pp.hov 0 pp_call +++
-          Pp.hov 0 pp_return))
+          pp_vardecl_args +++
+          pp_vardecl_ret +++
+          pp_call +++
+          pp_return))
     in
     pr_entry_function static primary_cfunc (func_index_prefix ^ primary_cfunc)
       formal_arguments return_type +++
