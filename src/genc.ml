@@ -901,9 +901,9 @@ type head_cont = {
   head_cont_exit_label: string option;
 }
 
-let gen_head_cont (cont : head_cont) (rhs : Pp.t) : Pp.t =
+let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (rhs : Pp.t) : Pp.t =
   (match cont.head_cont_ret_var with
-  | None -> rhs ++ Pp.str ";"
+  | None -> if omit_void_exp then Pp.mt () else (rhs ++ Pp.str ";")
   | Some c_var -> gen_assignment (Pp.str c_var) rhs) +++
   match cont.head_cont_exit_label with
   | None -> Pp.mt ()
@@ -925,12 +925,8 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
       user_err (Pp.str "[codegen:gen_head] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
-        match cont.head_cont_ret_var with
-        | None ->
-            Pp.mt ()
-        | Some _ ->
-            let str = carg_of_garg env i in
-            gen_head_cont cont (Pp.str str)
+        let str = carg_of_garg env i in
+        gen_head_cont ~omit_void_exp:true cont (Pp.str str)
       else
         let decl = Environ.lookup_rel i env in
         let name = Context.Rel.Declaration.get_name decl in
@@ -966,9 +962,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
   | Const (ctnt,_) ->
       gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)))
   | Construct (cstr,_) ->
-      (match cont.head_cont_ret_var with
-      | None -> Pp.mt ()
-      | Some _ -> gen_head_cont cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs))))
+      gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
   | App (f,args) ->
       let cargs2 =
         List.append
@@ -1092,13 +1086,18 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
 
 type tail_cont = { tail_cont_return_type: string option; tail_cont_multifunc: bool }
 
-let gen_tail_cont (cont : tail_cont) (rhs : Pp.t) : Pp.t =
-  if cont.tail_cont_multifunc then
-    match cont.tail_cont_return_type with
-    | None -> rhs ++ Pp.str ";" +++ Pp.str "return;"
-    | Some c_ret_type -> gen_void_return ("(*(" ^ c_ret_type ^ " *)codegen_ret)") rhs
-  else
-    gen_return rhs
+let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (rhs : Pp.t) : Pp.t =
+  match cont.tail_cont_return_type with
+  | None ->
+      if omit_void_exp then
+        Pp.str "return;"
+      else
+        rhs ++ Pp.str ";" +++ Pp.str "return;"
+  | Some c_ret_type ->
+      if cont.tail_cont_multifunc then
+        gen_void_return ("(*(" ^ c_ret_type ^ " *)codegen_ret)") rhs
+      else
+        gen_return rhs
 
 let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++
@@ -1113,7 +1112,6 @@ let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont :
     pp);*)
   pp
 and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
-  let is_void_context = (cont.tail_cont_return_type = None) in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
   | Evar _ | Prod _
@@ -1122,11 +1120,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
       user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
-        if is_void_context then
-          Pp.str "return;"
-        else
-          let str = carg_of_garg env i in
-          gen_tail_cont cont (Pp.str str)
+        let str = carg_of_garg env i in
+        gen_tail_cont ~omit_void_exp:true cont (Pp.str str)
       else
         let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
         let fixfunc_opt = Hashtbl.find_opt fixfunc_tbl (id_of_name key) in
@@ -1155,10 +1150,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
       let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)) in
       gen_tail_cont cont pp
   | Construct (cstr,univ) ->
-      if is_void_context then
-        Pp.str "return;"
-      else
-        gen_tail_cont cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
+      gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
   | App (f,args) ->
       let cargs2 =
         List.append

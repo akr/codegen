@@ -3427,6 +3427,36 @@ let test_void_empty_args (ctx : test_ctxt) : unit =
       assert(f() == 0);
     |}
 
+let test_void_head_tt_var (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      CodeGen Snippet "nat f(bool);".
+      Definition constant_zero (x : unit) : nat := 0.
+      Definition f (b : bool) (u0 : unit) : nat :=
+        let u :=
+          match b with
+          | true => tt (* We don't define tt in C but tt is usable because codegen omit void constructor *)
+          | false => u0 (* void variable reference is also omitted *)
+          end
+        in
+        constant_zero u.
+      CodeGen Function f.
+    |})
+    {| |}
+
+let test_void_tail_tt_var (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      CodeGen Snippet "void f(bool);".
+      Definition f (b : bool) (u0 : unit) : unit :=
+        match b with
+        | true => tt (* We don't define tt in C but tt is usable because codegen omit void constructor *)
+        | false => u0 (* void variable reference is also omitted *)
+        end.
+      CodeGen Function f.
+    |})
+    {| |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3573,6 +3603,8 @@ let suite : OUnit2.test =
     "test_void_head" >:: test_void_head;
     "test_void_mutual" >:: test_void_mutual;
     "test_void_empty_args" >:: test_void_empty_args;
+    "test_void_head_tt_var" >:: test_void_head_tt_var;
+    "test_void_tail_tt_var" >:: test_void_tail_tt_var;
   ]
 
 let () =
