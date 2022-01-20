@@ -895,10 +895,10 @@ type head_cont = {
   head_cont_exit_label: string option;
 }
 
-let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (rhs : Pp.t) : Pp.t =
+let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (exp : Pp.t) : Pp.t =
   (match cont.head_cont_ret_var with
-  | None -> if omit_void_exp then Pp.mt () else Pp.hov 0 (rhs ++ Pp.str ";")
-  | Some c_var -> gen_assignment (Pp.str c_var) rhs) +++
+  | None -> if omit_void_exp then Pp.mt () else Pp.hov 0 (exp ++ Pp.str ";")
+  | Some c_var -> gen_assignment (Pp.str c_var) exp) +++
   match cont.head_cont_exit_label with
   | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
@@ -1080,19 +1080,19 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
 
 type tail_cont = { tail_cont_return_type: string option; tail_cont_multifunc: bool }
 
-let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (rhs : Pp.t) : Pp.t =
+let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (exp : Pp.t) : Pp.t =
   match cont.tail_cont_return_type with
   | None ->
       if omit_void_exp then
         Pp.str "return;"
       else
-        Pp.hov 0 (rhs ++ Pp.str ";") +++ Pp.str "return;"
+        Pp.hov 0 (exp ++ Pp.str ";") +++ Pp.str "return;"
   | Some c_ret_type ->
       if cont.tail_cont_multifunc then
         let retvar = "(*(" ^ c_ret_type ^ " *)codegen_ret)" in
-        gen_assignment (Pp.str retvar) rhs +++ Pp.str "return;"
+        gen_assignment (Pp.str retvar) exp +++ Pp.str "return;"
       else
-        Pp.hov 0 (Pp.str "return" +++ rhs ++ Pp.str ";")
+        Pp.hov 0 (Pp.str "return" +++ exp ++ Pp.str ";")
 
 let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++
