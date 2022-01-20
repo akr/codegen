@@ -703,12 +703,6 @@ let carg_of_garg (env : Environ.env) (i : int) : string =
 let gen_assignment (lhs : Pp.t) (rhs : Pp.t) : Pp.t =
   Pp.hov 0 (lhs +++ Pp.str "=" +++ rhs ++ Pp.str ";")
 
-let gen_return (arg : Pp.t) : Pp.t =
-  Pp.hov 0 (Pp.str "return" +++ arg ++ Pp.str ";")
-
-let gen_void_return (retvar : string) (arg : Pp.t) : Pp.t =
-  gen_assignment (Pp.str retvar) arg +++ Pp.str "return;"
-
 let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
   Pp.str c_fname ++ Pp.str "(" ++
   pp_join_ary (Pp.str "," ++ Pp.spc ()) (Array.map Pp.str argvars) ++
@@ -903,7 +897,7 @@ type head_cont = {
 
 let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (rhs : Pp.t) : Pp.t =
   (match cont.head_cont_ret_var with
-  | None -> if omit_void_exp then Pp.mt () else (rhs ++ Pp.str ";")
+  | None -> if omit_void_exp then Pp.mt () else Pp.hov 0 (rhs ++ Pp.str ";")
   | Some c_var -> gen_assignment (Pp.str c_var) rhs) +++
   match cont.head_cont_exit_label with
   | None -> Pp.mt ()
@@ -1092,12 +1086,13 @@ let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (rhs : Pp.t
       if omit_void_exp then
         Pp.str "return;"
       else
-        rhs ++ Pp.str ";" +++ Pp.str "return;"
+        Pp.hov 0 (rhs ++ Pp.str ";") +++ Pp.str "return;"
   | Some c_ret_type ->
       if cont.tail_cont_multifunc then
-        gen_void_return ("(*(" ^ c_ret_type ^ " *)codegen_ret)") rhs
+        let retvar = "(*(" ^ c_ret_type ^ " *)codegen_ret)" in
+        gen_assignment (Pp.str retvar) rhs +++ Pp.str "return;"
       else
-        gen_return rhs
+        Pp.hov 0 (Pp.str "return" +++ rhs ++ Pp.str ";")
 
 let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++

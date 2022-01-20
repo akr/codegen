@@ -104,8 +104,6 @@ val local_vars_with : (unit -> 'a) -> (string * string) list * 'a
 val add_local_var : string -> string -> unit
 val carg_of_garg : Environ.env -> int -> string
 val gen_assignment : Pp.t -> Pp.t -> Pp.t
-val gen_return : Pp.t -> Pp.t
-val gen_void_return : string -> Pp.t -> Pp.t
 val gen_funcall : string -> string array -> Pp.t
 val gen_app_const_construct :
   Environ.env -> Evd.evar_map -> EConstr.t -> string array -> Pp.t
