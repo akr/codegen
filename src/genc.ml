@@ -1100,20 +1100,20 @@ let gen_tail_cont (cont : tail_cont) (rhs : Pp.t) : Pp.t =
   else
     gen_return rhs
 
-let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
+let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
     pp_sjoinmap_list Pp.str cargs ++
     Pp.str ")");*)
-  let pp = gen_tail1 ~fixfunc_tbl ~used_vars ~gen_ret env sigma term cargs in
+  let pp = gen_tail1 ~fixfunc_tbl ~used_vars ~cont env sigma term cargs in
   (*msg_debug_hov (Pp.str "[codegen] gen_tail return:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
   pp
-and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
-  let is_void_context = (gen_ret.tail_cont_return_type = None) in
+and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
+  let is_void_context = (cont.tail_cont_return_type = None) in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Sort _ | Ind _
   | Evar _ | Prod _
@@ -1126,7 +1126,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
           Pp.str "return;"
         else
           let str = carg_of_garg env i in
-          gen_tail_cont gen_ret (Pp.str str)
+          gen_tail_cont cont (Pp.str str)
       else
         let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
         let fixfunc_opt = Hashtbl.find_opt fixfunc_tbl (id_of_name key) in
@@ -1153,12 +1153,12 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
             pp_assignments +++ pp_goto_entry)
   | Const (ctnt,_) ->
       let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)) in
-      gen_tail_cont gen_ret pp
+      gen_tail_cont cont pp
   | Construct (cstr,univ) ->
       if is_void_context then
         Pp.str "return;"
       else
-        gen_tail_cont gen_ret (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
+        gen_tail_cont cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
   | App (f,args) ->
       let cargs2 =
         List.append
@@ -1173,7 +1173,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
               args))
           cargs
       in
-      gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env sigma f cargs2
+      gen_tail ~fixfunc_tbl ~used_vars ~cont env sigma f cargs2
   | Lambda (x,t,b) ->
       (match cargs with
       | [] -> user_err (Pp.str "[codegen] gen_tail: lambda term without argument (higher-order term not supported yet):" +++
@@ -1186,15 +1186,15 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
           | None -> ());
           let decl = Context.Rel.Declaration.LocalAssum (x, t) in
           let env2 = EConstr.push_rel decl env in
-          gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma b rest)
+          gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b rest)
   | Case (ci,u,pms,p,iv,c,bl) ->
       let (ci,predicate,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~gen_ret) env sigma ci predicate item branches cargs
+      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~cont) env sigma ci predicate item branches cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       let pp = gen_proj env sigma pr item in
-      gen_tail_cont gen_ret pp)
+      gen_tail_cont cont pp)
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
@@ -1210,7 +1210,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
               head_cont_exit_label = None; })
       in
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e [] +++
-      gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma b cargs
+      gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b cargs
 
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
@@ -1250,7 +1250,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(gen_ret :
               else
                 Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
             in
-            pp_label +++ gen_tail ~fixfunc_tbl ~used_vars ~gen_ret env2 sigma fi ni_formal_argvars)
+            pp_label +++ gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma fi ni_formal_argvars)
           nary fary in
       let reordered_pp_bodies = Array.copy pp_bodies in
       Array.blit pp_bodies 0 reordered_pp_bodies 1 j;
@@ -1406,7 +1406,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
             (List.rev args);
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
           pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-          gen_tail ~fixfunc_tbl ~used_vars ~gen_ret:cont env2 sigma body [])
+          gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma body [])
         bodies)
   in
   let c_fargs =
@@ -1556,7 +1556,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           let cont = { tail_cont_return_type = ret_type; tail_cont_multifunc = true } in
           Pp.v 0 (
             pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-            gen_tail ~fixfunc_tbl ~used_vars ~gen_ret:cont env2 sigma body []))
+            gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma body []))
         bodies)
   in
   let pp_local_variables_decls =
