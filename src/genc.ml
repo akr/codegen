@@ -752,6 +752,7 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
     (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
+  let h = Array.length branches in
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
@@ -778,9 +779,20 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
           | None -> Lazy.force deallocator_for_type
           | Some dealloc_cfunc ->
               Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")
-        (iota_ary 0 (Array.length branches))
+        (iota_ary 0 h)
     else
-      Array.make (Array.length branches) (Pp.mt ())
+      Array.make h (Pp.mt ())
+  in
+  (*msg_debug_hov (Pp.str "[codegen] gen_match:3");*)
+  let caselabel_accessors =
+    Array.map
+      (fun j ->
+        (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
+        (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
+         Array.map
+           (case_cstrmember env sigma (EConstr.of_constr item_type) j)
+           (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
+      (iota_ary 1 h)
   in
   let gen_branch accessors c_deallocation br =
     let m = Array.length accessors in
@@ -795,37 +807,27 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
         (if Id.Set.mem c_id used_vars then
           let env4 = Environ.pop_rel_context 1 env3 in
           let t = EConstr.of_constr t in
-          match c_typename env4 sigma t with
+          (match c_typename env4 sigma t with
           | None -> ()
           | Some c_ty -> add_local_var c_ty c_var);
-        c_var)
+          Some c_var
+        else
+          None))
       (array_rev (iota_ary 1 m))
     in
     let c_member_access =
       pp_sjoin_ary
         (Array.map2
-          (fun c_var access ->
-            if Id.Set.mem (Id.of_string c_var) used_vars then
-              gen_assignment (Pp.str c_var)
-                (Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")")
-            else
-              Pp.mt ())
+          (fun c_var_opt access ->
+            match c_var_opt with
+            | Some c_var ->
+                gen_assignment (Pp.str c_var)
+                  (Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")")
+            | None -> Pp.mt ())
           c_vars accessors)
     in
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
     c_member_access +++ c_deallocation +++ c_branch_body
-  in
-  (*msg_debug_hov (Pp.str "[codegen] gen_match:3");*)
-  let h = Array.length branches in
-  let caselabel_accessors =
-    Array.map
-      (fun j ->
-        (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
-        (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
-         Array.map
-           (case_cstrmember env sigma (EConstr.of_constr item_type) j)
-           (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
-      (iota_ary 1 h)
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_match:4");*)
   if h = 1 then
@@ -854,7 +856,8 @@ let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   let item_cvar = carg_of_garg env item_relindex in
   let accessor = case_cstrmember env sigma (EConstr.of_constr item_type) 1 (Projection.arg pr) in
-  Pp.str accessor ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")"
+  let c_member_access = Pp.str accessor ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")" in
+  c_member_access
 
 let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
   let assign = Array.to_list assignments in
