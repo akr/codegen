@@ -5,6 +5,7 @@ val array_rev : 'a array -> 'a array
 val array_map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val array_map3 :
   ('a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
+val array_map4 : ('a -> 'b -> 'c -> 'd -> 'e) -> 'a array -> 'b array -> 'c array -> 'd array -> 'e array
 val array_iter2 : ('a -> 'b -> unit) -> 'a array -> 'b array -> unit
 val array_iter3 :
   ('a -> 'b -> 'c -> unit) -> 'a array -> 'b array -> 'c array -> unit

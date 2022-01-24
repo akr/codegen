@@ -749,10 +749,11 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
 let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
     (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> string option list -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (ci : case_info) (predicate : EConstr.t) (item : EConstr.t) (branches : EConstr.t array)
+    (ci : case_info) (item : EConstr.t)
+    (branches : EConstr.t Constr.pcase_branch array * (EConstr.rel_context * EConstr.t) array)
     (cargs : string option list) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
-  let h = Array.length branches in
+  let h = Array.length ci.ci_cstr_nargs in
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
@@ -795,8 +796,9 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
       (iota_ary 1 h)
   in
   let gen_branch accessors c_deallocation br =
+    let ((nas, branch_body), (ctx, _)) = br in
     let m = Array.length accessors in
-    let (env2, branch_body) = decompose_lam_n_env env sigma m br in
+    let env2 = EConstr.push_rel_context ctx env in
     let c_vars = Array.map
       (fun i ->
         let env3 = Environ.pop_rel_context (i-1) env2 in
@@ -830,12 +832,13 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     c_member_access +++ c_deallocation +++ c_branch_body
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_match:4");*)
+  let (bl, bl0) = branches in
   if h = 1 then
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
     let accessors = snd caselabel_accessors.(0) in
     let c_deallocation = c_deallocations.(0) in
-    let br = branches.(0) in
-    gen_branch accessors c_deallocation br)
+    let branch = (bl.(0), bl0.(0)) in
+    gen_branch accessors c_deallocation branch)
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
@@ -845,10 +848,10 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
                    Pp.str swfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")" in
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
-      (array_map3
-        (fun (caselabel, accessors) c_deallocation br ->
-          (caselabel, gen_branch accessors c_deallocation br))
-        caselabel_accessors c_deallocations branches))
+      (array_map4
+        (fun (caselabel, accessors) c_deallocation b b0 ->
+          (caselabel, gen_branch accessors c_deallocation (b, b0)))
+        caselabel_accessors c_deallocations bl bl0))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
     (pr : Projection.t) (item : EConstr.t) : Pp.t =
@@ -977,14 +980,14 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
           cargs
       in
       gen_head ~fixfunc_tbl ~used_vars ~cont env sigma f cargs2
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci,predicate, iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let gen_switch =
         match cont.head_cont_exit_label with
         | None -> gen_switch_with_break
         | Some _ -> gen_switch_without_break
       in
-      gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~used_vars ~cont) env sigma ci predicate item branches cargs
+      gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~used_vars ~cont) env sigma ci item (bl,bl0) cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
@@ -1179,9 +1182,9 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
           let decl = Context.Rel.Declaration.LocalAssum (x, t) in
           let env2 = EConstr.push_rel decl env in
           gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b rest)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci,predicate,iv,item,branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~cont) env sigma ci predicate item branches cargs
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~cont) env sigma ci item (bl,bl0) cargs
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));

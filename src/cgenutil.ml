@@ -44,6 +44,13 @@ let array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : 'c 
   if Array.length c <> n then raise (Invalid_argument "array_map3");
   Array.init n (fun i -> f a.(i) b.(i) c.(i))
 
+let array_map4 (f : 'a -> 'b -> 'c -> 'd -> 'e) (a : 'a array) (b : 'b array) (c : 'c array) (d : 'd array) : 'e array =
+  let n = Array.length a in
+  if Array.length b <> n then raise (Invalid_argument "array_map4");
+  if Array.length c <> n then raise (Invalid_argument "array_map4");
+  if Array.length d <> n then raise (Invalid_argument "array_map4");
+  Array.init n (fun i -> f a.(i) b.(i) c.(i) d.(i))
+
 let array_iter2 f a1 a2 =
   if Array.length a1 <> Array.length a2 then
     invalid_arg "Array.iter2: arrays must have the same length";
