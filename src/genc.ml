@@ -38,7 +38,6 @@ type fixfunc_t = {
   fixfunc_func_id: Id.t;
   fixfunc_term_id: Id.t;
   fixfunc_term_env: Environ.env;
-  fixfunc_func: EConstr.t;
   fixfunc_inlinable: bool;
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
@@ -74,6 +73,8 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.mt ()
       ))
     fixfunc_tbl
+
+let _ = ignore show_fixfunc_table
 
 let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * string option) list) * string option =
   match EConstr.kind sigma term with
@@ -394,7 +395,6 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                 fixfunc_func_id = id_of_annotated_name nary.(i);
                 fixfunc_term_id = id_of_annotated_name nary.(j);
                 fixfunc_term_env = env;
-                fixfunc_func = fary.(i);
                 fixfunc_inlinable = inlinable;
                 fixfunc_used_as_call = !(List.nth used_as_call2 (h - i - 1));
                 fixfunc_used_as_goto = !(List.nth used_as_goto2 (h - i - 1));
@@ -548,6 +548,8 @@ let pr_outer_variable (outer : (string * string) list) : Pp.t =
 let check_eq_outer_variables outer1 outer2 =
   if outer1 <> outer2 then
     user_err (Pp.str "[codegen:bug] outer length differ:" +++ pr_outer_variable outer1 +++ Pp.str "<>" +++ pr_outer_variable outer2)
+
+let _ = ignore check_eq_outer_variables
 
 (*
   compute_naive_outer_variables computes outer variables in "naive" way:
