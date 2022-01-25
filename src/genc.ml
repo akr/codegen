@@ -746,12 +746,8 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
         (caselabel, pp_branch +++ Pp.str "break;"))
       branches)
 
-let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
-    (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> string option list -> Pp.t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (ci : case_info) (item : EConstr.t)
-    (branches : EConstr.t Constr.pcase_branch array * (EConstr.rel_context * EConstr.t) array)
-    (cargs : string option list) : Pp.t =
+let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (ci : case_info) (item : EConstr.t) 
+     =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
   let h = Array.length ci.ci_cstr_nargs in
   let item_relindex = destRel sigma item in
@@ -798,6 +794,15 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
            (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
       (iota_ary 1 h)
   in
+  (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls)
+
+let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
+    (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> string option list -> Pp.t)
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (ci : case_info) (item : EConstr.t)
+    (branches : EConstr.t Constr.pcase_branch array * (EConstr.rel_context * EConstr.t) array)
+    (cargs : string option list) : Pp.t =
+  let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma ci item in
   let gen_assign_member accessor_calls ctx =
     let m = Array.length accessor_calls in
     let env2 = EConstr.push_rel_context ctx env in
