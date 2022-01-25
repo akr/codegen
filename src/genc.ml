@@ -746,14 +746,18 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
         (caselabel, pp_branch +++ Pp.str "break;"))
       branches)
 
-let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (ci : case_info) (item : EConstr.t) 
+let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConstr.t)
      =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
-  let h = Array.length ci.ci_cstr_nargs in
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
   let item_cvar = carg_of_garg env item_relindex in
+  let ind = fst (Constr.destInd (if Constr.isApp item_type then fst (Constr.destApp item_type) else item_type)) in
+  let (mutind, ind_index) = ind in
+  let mind_body = Environ.lookup_mind mutind env in
+  let oind_body = mind_body.Declarations.mind_packets.(ind_index) in
+  let h = Array.length oind_body.Declarations.mind_consnames in
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
   (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
@@ -769,7 +773,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (ci : case_inf
       let params = if Constr.isApp item_type then snd (Constr.destApp item_type) else [||] in
       Array.map
         (fun i ->
-          let cstr = (ci.ci_ind, i+1) in
+          let cstr = (ind, i+1) in
           let cstr_exp = Constr.mkApp (Constr.mkConstruct cstr, params) in
           (*msg_debug_hov (Pp.str "[codegen:gen_match] cstr_exp:" +++ Printer.pr_constr_env env sigma cstr_exp);*)
           match ConstrMap.find_opt cstr_exp !deallocator_cfunc_map with
@@ -791,7 +795,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (ci : case_inf
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
            (fun i -> gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
-           (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
+           (iota_ary 0 oind_body.Declarations.mind_consnrealargs.(j-1))))
       (iota_ary 1 h)
   in
   (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls)
@@ -802,7 +806,7 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     (ci : case_info) (item : EConstr.t)
     (branches : EConstr.t Constr.pcase_branch array * (EConstr.rel_context * EConstr.t) array)
     (cargs : string option list) : Pp.t =
-  let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma ci item in
+  let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma item in
   let gen_assign_member accessor_calls ctx =
     let m = Array.length accessor_calls in
     let env2 = EConstr.push_rel_context ctx env in
