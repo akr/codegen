@@ -785,19 +785,21 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
       Array.make h (Pp.mt ())
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_match:3");*)
-  let caselabel_accessors =
+  let gen_accessor_call access =
+    Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")"
+  in
+  let caselabel_accessorcalls =
     Array.map
       (fun j ->
         (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
-           (case_cstrmember env sigma (EConstr.of_constr item_type) j)
+           (fun i -> gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
            (iota_ary 0 ci.ci_cstr_nargs.(j-1))))
       (iota_ary 1 h)
   in
-  let gen_branch accessors c_deallocation br =
-    let ((nas, branch_body), (ctx, _)) = br in
-    let m = Array.length accessors in
+  let gen_assign_member accessor_calls ctx =
+    let m = Array.length accessor_calls in
     let env2 = EConstr.push_rel_context ctx env in
     let c_vars = Array.map
       (fun i ->
@@ -820,14 +822,19 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     let c_member_access =
       pp_sjoin_ary
         (Array.map2
-          (fun c_var_opt access ->
+          (fun c_var_opt accessor_call ->
             match c_var_opt with
             | Some c_var ->
-                gen_assignment (Pp.str c_var)
-                  (Pp.str access ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")")
+                gen_assignment (Pp.str c_var) accessor_call
             | None -> Pp.mt ())
-          c_vars accessors)
+          c_vars accessor_calls)
     in
+    c_member_access
+  in
+  let gen_branch accessor_calls c_deallocation br =
+    let ((nas, branch_body), (ctx, _)) = br in
+    let env2 = EConstr.push_rel_context ctx env in
+    let c_member_access = gen_assign_member accessor_calls ctx in
     let c_branch_body = gen_branch_body env2 sigma branch_body cargs in
     c_member_access +++ c_deallocation +++ c_branch_body
   in
@@ -835,10 +842,10 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
   let (bl, bl0) = branches in
   if h = 1 then
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
-    let accessors = snd caselabel_accessors.(0) in
+    let accessorcalls = snd caselabel_accessorcalls.(0) in
     let c_deallocation = c_deallocations.(0) in
     let branch = (bl.(0), bl0.(0)) in
-    gen_branch accessors c_deallocation branch)
+    gen_branch accessorcalls c_deallocation branch)
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
@@ -849,9 +856,9 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
       (array_map4
-        (fun (caselabel, accessors) c_deallocation b b0 ->
-          (caselabel, gen_branch accessors c_deallocation (b, b0)))
-        caselabel_accessors c_deallocations bl bl0))
+        (fun (caselabel, accessorcalls) c_deallocation b b0 ->
+          (caselabel, gen_branch accessorcalls c_deallocation (b, b0)))
+        caselabel_accessorcalls c_deallocations bl bl0))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
     (pr : Projection.t) (item : EConstr.t) : Pp.t =
