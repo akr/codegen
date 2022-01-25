@@ -746,8 +746,11 @@ let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : P
         (caselabel, pp_branch +++ Pp.str "break;"))
       branches)
 
-let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConstr.t)
-     =
+let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConstr.t) :
+    ((*h*)int *
+     (*item_type*)Constr.types *
+     (*item_cvar*)string * (*c_deallocations*)Pp.t array *
+     (*caselabel_accessorcalls*)(string * Pp.t array) array) =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
@@ -870,13 +873,13 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
         caselabel_accessorcalls c_deallocations bl bl0))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
-    (pr : Projection.t) (item : EConstr.t) : Pp.t =
-  let item_relindex = destRel sigma item in
-  let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
-  let item_cvar = carg_of_garg env item_relindex in
-  let accessor = case_cstrmember env sigma (EConstr.of_constr item_type) 1 (Projection.arg pr) in
-  let c_member_access = Pp.str accessor ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ")" in
-  c_member_access
+    (pr : Projection.t) (item : EConstr.t)
+    (gen_cont : Pp.t -> Pp.t) : Pp.t =
+  let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma item in
+  assert (h = 1);
+  let accessorcall = (snd caselabel_accessorcalls.(0)).(Projection.arg pr) in
+  let c_deallocation = c_deallocations.(0) in
+  c_deallocation +++ gen_cont accessorcall
 
 let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)string) array) : Pp.t =
   let assign = Array.to_list assignments in
@@ -1007,7 +1010,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
-      gen_head_cont cont (gen_proj env sigma pr item))
+      gen_proj env sigma pr item (gen_head_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
@@ -1204,8 +1207,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
-      let pp = gen_proj env sigma pr item in
-      gen_tail_cont cont pp)
+      gen_proj env sigma pr item (gen_tail_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
       let c_var = str_of_annotated_name x in
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in

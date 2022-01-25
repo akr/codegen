@@ -3457,6 +3457,57 @@ let test_void_tail_tt_var (ctx : test_ctxt) : unit =
     |})
     {| |}
 
+let test_void_head_proj (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      Set Primitive Projections.
+      Record TestRecord : Set := mk { umem : unit; nmem : nat }.
+      Definition constant_zero (x : unit) : nat := 0.
+      Definition f (x : TestRecord) : nat :=
+        let x := umem x in
+        constant_zero x.
+      CodeGen Inductive Type TestRecord => "TestRecord".
+      CodeGen Inductive Match TestRecord => ""
+      | mk => "" "TestRecord_umem" "TestRecord_nmem".
+      CodeGen Linear TestRecord.
+      CodeGen Deallocator TestRecord => "dealloc_TestRecord".
+      CodeGen Snippet "typedef int TestRecord;".
+      CodeGen Snippet "int dealloc_called = 0;".
+      CodeGen Snippet "#define TestRecord_umem(x) (abort(x))".
+      CodeGen Snippet "#define TestRecord_nmem(x) (x)".
+      CodeGen Snippet "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
+      CodeGen Snippet "static nat constant_zero(void) { return 0; }".
+      CodeGen Primitive constant_zero.
+      CodeGen Function f.
+    |})
+    {|
+      f(0);
+      assert(dealloc_called == 1);
+    |}
+
+let test_void_tail_proj (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      Set Primitive Projections.
+      Record TestRecord : Set := mk { umem : unit; nmem : nat }.
+      Definition f (x : TestRecord) : unit := umem x.
+      CodeGen Inductive Type TestRecord => "TestRecord".
+      CodeGen Inductive Match TestRecord => ""
+      | mk => "" "TestRecord_umem" "TestRecord_nmem".
+      CodeGen Linear TestRecord.
+      CodeGen Deallocator TestRecord => "dealloc_TestRecord".
+      CodeGen Snippet "typedef int TestRecord;".
+      CodeGen Snippet "int dealloc_called = 0;".
+      CodeGen Snippet "#define TestRecord_umem(x) (abort(x))".
+      CodeGen Snippet "#define TestRecord_nmem(x) (x)".
+      CodeGen Snippet "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
+      CodeGen Function f.
+    |})
+    {|
+      f(0);
+      assert(dealloc_called == 1);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3605,6 +3656,8 @@ let suite : OUnit2.test =
     "test_void_empty_args" >:: test_void_empty_args;
     "test_void_head_tt_var" >:: test_void_head_tt_var;
     "test_void_tail_tt_var" >:: test_void_tail_tt_var;
+    "test_void_head_proj" >:: test_void_head_proj;
+    "test_void_tail_proj" >:: test_void_tail_proj;
   ]
 
 let () =
