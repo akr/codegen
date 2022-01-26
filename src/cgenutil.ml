@@ -338,6 +338,11 @@ let merge_range (r1 : (int*int) option) (r2 : (int*int) option) : (int*int) opti
 let merge_range3 (r1 : (int*int) option) (r2 : (int*int) option) (r3 : (int*int) option) : (int*int) option =
   merge_range (merge_range r1 r2) r3
 
+let merge_range_ary (ranges : (int*int) option array) : (int*int) option =
+  Array.fold_left
+    (fun acc r -> merge_range acc r)
+    None ranges
+
 let intset_union_ary (sets : IntSet.t array) : IntSet.t =
   let result = ref IntSet.empty in
   for i = 0 to Array.length sets - 1 do

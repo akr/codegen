@@ -959,12 +959,23 @@ let rec fv_range_rec (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int)
         (fv_range_rec env sigma numlocal e)
         (fv_range_rec env sigma numlocal t)
         (fv_range_rec env2 sigma (numlocal+1) b)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let mpred =
+        let (ctx, body) = p0 in
+        it_mkLambda_or_LetIn body ctx
+      in
+      let fv_branches =
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            fv_range_rec env2 sigma (numlocal + Array.length nas) body)
+          bl bl0
+      in
       merge_range3
-        (fv_range_rec env sigma numlocal p)
+        (fv_range_rec env sigma numlocal mpred)
         (fv_range_rec env sigma numlocal item)
-        (fv_range_array env sigma numlocal branches)
+        (merge_range_ary fv_branches)
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in

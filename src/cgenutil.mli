@@ -60,6 +60,7 @@ val merge_range :
 val merge_range3 :
   (int * int) option ->
   (int * int) option -> (int * int) option -> (int * int) option
+val merge_range_ary : (int * int) option array -> (int * int) option
 val intset_union_ary : IntSet.t array -> IntSet.t
 val ( ++ ) : Pp.t -> Pp.t -> Pp.t
 val ( +++ ) : Pp.t -> Pp.t -> Pp.t
