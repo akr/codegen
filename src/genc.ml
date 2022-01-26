@@ -509,8 +509,8 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       let fv_e = fixterm_free_variables_rec env sigma e ~result in
       let fv_b = fixterm_free_variables_rec env2 sigma b ~result in
       Id.Set.union fv_e (Id.Set.remove id fv_b)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let item_id =
         let i = destRel sigma item in
         let decl = Environ.lookup_rel i env in
@@ -518,7 +518,16 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
         id_of_name name
       in
       let fv_branches =
-        Array.map (fixterm_free_variables_rec env sigma ~result) branches
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            let fv_body = fixterm_free_variables_rec env2 sigma body ~result in
+            let ids = Array.fold_left
+              (fun ids annotated_name -> Id.Set.add (id_of_annotated_name annotated_name) ids)
+              Id.Set.empty nas
+            in
+            Id.Set.diff fv_body ids)
+          bl bl0
       in
       Array.fold_right Id.Set.union fv_branches (Id.Set.singleton item_id)
   | Lambda (x,t,b) ->
