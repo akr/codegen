@@ -336,14 +336,18 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let (fixterms1, fixfuncs1) = collect_fix_usage_rec ~inlinable_fixterms env sigma false e 0 ~used_as_call ~used_as_goto in
       let (fixterms2, fixfuncs2) = collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 in
       (Seq.append fixterms1 fixterms2, Seq.append fixfuncs1 fixfuncs2)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      (* item must be a Rel which type is inductive (non-function) type *)
-      let results =
-        Array.map2
-          (fun cstr_nargs br -> collect_fix_usage_rec ~inlinable_fixterms env sigma
-            tail_position br (cstr_nargs + numargs) ~used_as_call ~used_as_goto)
-          ci.Constr.ci_cstr_nargs branches
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
+      let results = Array.map2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          let n = Array.length nas in
+          let used_as_call2 = List.append (List.init n (fun _ -> ref false)) used_as_call in
+          let used_as_goto2 = List.append (List.init n (fun _ -> ref false)) used_as_goto in
+          collect_fix_usage_rec ~inlinable_fixterms env2 sigma
+            tail_position body numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2)
+        bl bl0
       in
       (concat_array_seq (Array.map fst results),
        concat_array_seq (Array.map snd results))
