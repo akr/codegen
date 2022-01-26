@@ -168,13 +168,18 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       in
       let inlinable = disjoint_id_map_union inlinable_e inlinable_b in
       (inlinable, nontailset, tailset_b)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      (* item must be a Rel which type is inductive (non-function) type *)
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
       let branches_result = Array.map2
-        (fun cstr_nargs br -> detect_inlinable_fixterm_rec env sigma br
-          (cstr_nargs + numargs))
-        ci.Constr.ci_cstr_nargs branches
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          let n = Array.length nas in
+          let (inlinable_br, nontailset_br, tailset_br) = detect_inlinable_fixterm_rec env2 sigma body numargs in
+          let tailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) tailset_br) in
+          let nontailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) nontailset_br) in
+          (inlinable_br, nontailset_br, tailset_br))
+        bl bl0
       in
       let tailset =
         Array.fold_left
