@@ -69,6 +69,34 @@ let array_exists f a =
   try Array.iter (fun x -> if f x then raise Exit) a; false
   with Exit -> true
 
+let array_find_map (f : 'a -> 'b option) (s : 'a array) : 'b option =
+  let n = Array.length s in
+  let rec aux i =
+    if i < n then
+      let v = f s.(i) in
+      match v with
+      | None -> aux (i+1)
+      | Some _ -> v
+    else
+      None
+  in
+  aux 0
+
+let array_find_map2 (f : 'a -> 'b -> 'c option) (s1 : 'a array) (s2 : 'b array) : 'c option =
+  let n = Array.length s1 in
+  if n <> Array.length s2 then
+    raise (Invalid_argument "array_find_map2: arrays must have the same length");
+  let rec aux i =
+    if i < n then
+      let v = f s1.(i) s2.(i) in
+      match v with
+      | None -> aux (i+1)
+      | Some _ -> v
+    else
+      None
+  in
+  aux 0
+
 (* map from right to left *)
 let array_map_right f a =
   let n = Array.length a in
@@ -752,11 +780,21 @@ let rec first_fv_rec (env : Environ.env) (sigma : Evd.evar_map) (numrels : int) 
       shortcut_option_or (first_fv_rec env sigma numrels e)
         (fun () -> shortcut_option_or (first_fv_rec env sigma numrels t)
           (fun () -> Option.map int_pred (first_fv_rec env2 sigma (numrels+1) b)))
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      shortcut_option_or (first_fv_rec env sigma numrels p)
-        (fun () -> shortcut_option_or (first_fv_rec env sigma numrels item)
-          (fun () -> array_option_exists (first_fv_rec env sigma numrels) branches))
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let mpred =
+        let (ctx, body) = p0 in
+        it_mkLambda_or_LetIn body ctx
+      in
+      shortcut_option_or
+        (first_fv_rec env sigma numrels mpred)
+        (fun () ->
+          shortcut_option_or (first_fv_rec env sigma numrels item)
+          (fun () ->
+            array_find_map2
+              (fun (nas,body) (ctx,_) ->
+                first_fv_rec env sigma numrels (it_mkLambda_or_LetIn body ctx))
+              bl bl0))
   | Prod (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in

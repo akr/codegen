@@ -11,6 +11,8 @@ val array_iter3 :
   ('a -> 'b -> 'c -> unit) -> 'a array -> 'b array -> 'c array -> unit
 val array_for_all : ('a -> bool) -> 'a array -> bool
 val array_exists : ('a -> bool) -> 'a array -> bool
+val array_find_map : ('a -> 'b option) -> 'a array -> 'b option
+val array_find_map2 : ('a -> 'b -> 'c option) -> 'a array -> 'b array -> 'c option
 val array_map_right : ('a -> 'b) -> 'a array -> 'b array
 val array_fold_right_map :
   ('a -> 'b -> 'c * 'b) -> 'a array -> 'b -> 'c array * 'b
