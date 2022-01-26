@@ -428,6 +428,26 @@ let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
     else
       IntMap.remove (Environ.nb_rel env) count)
 
+(* with_local_revctx is only for with_local_ctx.
+   revctx is ctx reversed in with_local_revctx *)
+let rec with_local_revctx (env : Environ.env) (sigma : Evd.evar_map)
+    (revctx : EConstr.rel_context) (linear_vars : bool list)
+    (numvars_innermost_function : int)
+    (f : Environ.env -> bool list -> int -> int IntMap.t) : int IntMap.t =
+  match revctx with
+  | [] ->
+      f env linear_vars numvars_innermost_function
+  | decl :: revctx' ->
+      with_local_var env sigma decl linear_vars numvars_innermost_function
+        (fun env' linear_vars' numvars_innermost_function' ->
+          with_local_revctx env' sigma revctx' linear_vars' numvars_innermost_function' f)
+
+let with_local_ctx (env : Environ.env) (sigma : Evd.evar_map)
+    (ctx : EConstr.rel_context) (linear_vars : bool list)
+    (numvars_innermost_function : int)
+    (f : Environ.env -> bool list -> int -> int IntMap.t) : int IntMap.t =
+  with_local_revctx env sigma (List.rev ctx) linear_vars numvars_innermost_function f
+
 let merge_count (c1 : int IntMap.t) (c2 : int IntMap.t) : int IntMap.t =
   IntMap.merge
     (fun j n1 n2 -> Some (Stdlib.Option.value n1 ~default:0 + Stdlib.Option.value n2 ~default:0))
@@ -499,13 +519,16 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
         Array.fold_left merge_count count counts
   | Const ctntu -> IntMap.empty
   | Construct cstru -> IntMap.empty
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, tyf, iv, expr, brs) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
-      ((* tyf is not checked because it is not a target of code generation.
-          check tyf is (fun _ -> termty) ? *)
-      let count0 = linearcheck_exp env sigma linear_vars numvars_innermost_function expr 0 in
-      let chk_br cstr_nargs br = linearcheck_exp env sigma linear_vars numvars_innermost_function br (cstr_nargs + numargs) in
-      let counts = Array.map2 chk_br ci.ci_cstr_nargs brs in
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      (let count0 = linearcheck_exp env sigma linear_vars numvars_innermost_function item 0 in
+      let counts = Array.map2
+        (fun (nas,body) (ctx,_) ->
+          with_local_ctx env sigma ctx linear_vars numvars_innermost_function
+            (fun env' linear_vars' numvars_innermost_function' ->
+              linearcheck_exp env' sigma linear_vars' numvars_innermost_function' body numargs))
+        bl bl0
+      in
       Array.iter
         (fun c ->
           if not (IntMap.equal Int.equal c counts.(0)) then
