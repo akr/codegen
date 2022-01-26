@@ -1707,14 +1707,16 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       Id.Set.union
         (used_variables env sigma e)
         (used_variables env2 sigma b)
-  | Case (ci,u,pms,p,iv,c,bl) ->
-      let (ci, p, iv, item, branches) = EConstr.expand_case env sigma (ci,u,pms,p,iv,c,bl) in
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       Id.Set.union
         (used_variables env sigma item)
-        (Array.fold_left
-          (fun set br -> Id.Set.union set (used_variables env sigma br))
+        (CArray.fold_left2
+          (fun set (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            Id.Set.union set (used_variables env2 sigma body))
           Id.Set.empty
-          branches)
+          bl bl0)
   | App (f,args) ->
       Id.Set.union
         (used_variables env sigma f)
