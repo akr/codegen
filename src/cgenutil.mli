@@ -105,8 +105,6 @@ val escape_as_coq_string : string -> string
 val compose_prod :
   (Names.Name.t Context.binder_annot * EConstr.t) list ->
   EConstr.t -> EConstr.t
-val free_variables_rec :
-  Environ.env -> Evd.evar_map -> int -> bool array -> EConstr.t -> unit
 val free_variables_without :
   Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
 val free_variables_index_set : Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
