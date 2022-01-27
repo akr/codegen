@@ -1782,18 +1782,22 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
   let nf_static_args = CArray.filter_with static_flags args in (* static arguments are already normalized by normalize_static_arguments *)
   (Array.iteri (fun i nf_arg ->
-    let fv_opt = first_fv env sigma nf_arg in
-    match fv_opt with
-    | None -> ()
-    | Some k ->
-        user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
-          Printer.pr_constr_env env sigma func ++
-          Pp.str "'s" +++
-          Pp.str (CString.ordinal (i+1)) +++
-          Pp.str "static argument" +++
-          Printer.pr_econstr_env env sigma nf_arg +++
-          Pp.str "refer" +++
-          Printer.pr_econstr_env env sigma (mkRel k)))
+    let fvs = free_variables_index_set env sigma nf_arg in
+    if not (IntSet.is_empty fvs) then
+      user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
+        Printer.pr_constr_env env sigma func ++
+        Pp.str "'s" +++
+        Pp.str (CString.ordinal (i+1)) +++
+        Pp.str "static argument" +++
+        Printer.pr_econstr_env env sigma nf_arg +++
+        Pp.str "refer" +++
+        pp_joinmap_list (Pp.str ",")
+          (fun k ->
+            let decl = Environ.lookup_rel k env in
+            let name = Context.Rel.Declaration.get_name decl in
+            Pp.str (str_of_name_permissive name))
+          (IntSet.elements fvs)
+        ))
     nf_static_args);
   let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
   let efunc = EConstr.of_constr func in
