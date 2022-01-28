@@ -684,12 +684,12 @@ let free_variables_without (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : 
   free_variables_rec sigma nb_local fv term;
   fv
 
-let free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool array =
+let free_variables_bool_ary (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool array =
   free_variables_without env sigma (Environ.nb_rel env) 0 term
 
 (* set of de Bruijn indexes of free variables *)
 let free_variables_index_set (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : IntSet.t =
-  let fv = free_variables env sigma term in
+  let fv = free_variables_bool_ary env sigma term in
   let r = ref IntSet.empty in
   for i = 0 to Array.length fv - 1 do
     if fv.(i) then
