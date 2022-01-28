@@ -668,71 +668,20 @@ let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : E
   | [] -> b
   | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
 
-let rec free_variables_rec (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
+let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
-  | Const _ | Construct _ -> ()
   | Rel i ->
       if numlocal < i then
         fv.(i-numlocal-1) <- true
-  | Evar (ev, es) ->
-      List.iter (free_variables_rec env sigma numlocal fv) es
-  | Proj (proj, e) ->
-      free_variables_rec env sigma numlocal fv e
-  | Cast (e,ck,t) ->
-      free_variables_rec env sigma numlocal fv e;
-      free_variables_rec env sigma numlocal fv t
-  | App (f, args) ->
-      free_variables_rec env sigma numlocal fv f;
-      Array.iter (free_variables_rec env sigma numlocal fv) args
-  | LetIn (x,e,t,b) ->
-      free_variables_rec env sigma numlocal fv e;
-      free_variables_rec env sigma numlocal fv t;
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      free_variables_rec env2 sigma (numlocal+1) fv b
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      let mpred =
-        let (ctx, body) = p0 in
-        it_mkLambda_or_LetIn body ctx
-      in
-      free_variables_rec env sigma numlocal fv mpred;
-      free_variables_rec env sigma numlocal fv item;
-      Array.iter2
-        (fun (nas,body) (ctx,_) ->
-          free_variables_ctx env sigma numlocal fv ctx;
-          let env2 = EConstr.push_rel_context ctx env in
-          free_variables_rec env2 sigma (numlocal + Array.length nas) fv body)
-        bl bl0
-  | Prod (x,t,b) | Lambda (x,t,b) ->
-      free_variables_rec env sigma numlocal fv t;
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      free_variables_rec env2 sigma (numlocal+1) fv b
-  | Fix (_, ((nary, tary, fary) as prec)) | CoFix (_, ((nary, tary, fary) as prec)) ->
-      Array.iter (free_variables_rec env sigma numlocal fv) tary;
-      let env2 = push_rec_types prec env in
-      let numlocal2 = numlocal + Array.length fary in
-      Array.iter (free_variables_rec env2 sigma numlocal2 fv) fary
-and free_variables_ctx (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (fv : bool array) (ctx : EConstr.rel_context) : unit =
-  ignore (Context.Rel.fold_outside
-           (fun decl (env2,numlocal2) ->
-             let env3 = EConstr.push_rel decl env2 in
-             match decl with
-             | Context.Rel.Declaration.LocalDef (x,e,t) ->
-                 free_variables_rec env2 sigma numlocal2 fv e;
-                 free_variables_rec env2 sigma numlocal2 fv t;
-                 (env3,numlocal+1)
-             | Context.Rel.Declaration.LocalAssum (x,t) ->
-                 free_variables_rec env2 sigma numlocal2 fv t;
-                 (env3,numlocal+1))
-           ctx ~init:(env,numlocal))
+  | _ ->
+      Termops.fold_constr_with_binders sigma Stdlib.Int.succ
+        (fun numlocal u e -> free_variables_rec sigma numlocal fv e)
+        numlocal () term
 
 (* nb_rel + nb_local should be Environ.nb_rel env *)
 let free_variables_without (env : Environ.env) (sigma : Evd.evar_map) (nb_rel : int) (nb_local : int) (term : EConstr.t) : bool array =
   let fv = Array.make nb_rel false in
-  free_variables_rec env sigma nb_local fv term;
+  free_variables_rec sigma nb_local fv term;
   fv
 
 let free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool array =
