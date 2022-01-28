@@ -931,81 +931,6 @@ let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     msg_debug_hov (Pp.str ("[codegen] reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
-let rec fv_range_rec (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (term : EConstr.t) : (int*int) option =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ | Array _
-  | Const _ | Construct _ -> None
-  | Rel i ->
-      if numlocal < i then
-        Some (i-numlocal,i-numlocal)
-      else
-        None
-  | Evar (ev, es) ->
-      fv_range_array env sigma numlocal (Array.of_list es)
-  | Proj (proj, e) ->
-      fv_range_rec env sigma numlocal e
-  | Cast (e,ck,t) ->
-      merge_range
-        (fv_range_rec env sigma numlocal e)
-        (fv_range_rec env sigma numlocal t)
-  | App (f, args) ->
-      merge_range
-        (fv_range_rec env sigma numlocal f)
-        (fv_range_array env sigma numlocal args)
-  | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
-      merge_range3
-        (fv_range_rec env sigma numlocal e)
-        (fv_range_rec env sigma numlocal t)
-        (fv_range_rec env2 sigma (numlocal+1) b)
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      let mpred =
-        let (ctx, body) = p0 in
-        it_mkLambda_or_LetIn body ctx
-      in
-      let fv_branches =
-        Array.map2
-          (fun (nas,body) (ctx,_) ->
-            let env2 = EConstr.push_rel_context ctx env in
-            fv_range_rec env2 sigma (numlocal + Array.length nas) body)
-          bl bl0
-      in
-      merge_range3
-        (fv_range_rec env sigma numlocal mpred)
-        (fv_range_rec env sigma numlocal item)
-        (merge_range_ary fv_branches)
-  | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      merge_range
-        (fv_range_rec env sigma numlocal t)
-        (fv_range_rec env2 sigma (numlocal+1) b)
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      merge_range
-        (fv_range_rec env sigma numlocal t)
-        (fv_range_rec env2 sigma (numlocal+1) b)
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      merge_range
-        (fv_range_array env sigma numlocal tary)
-        (fv_range_array env2 sigma (numlocal + Array.length fary) fary)
-  | CoFix (i, ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      merge_range
-        (fv_range_array env sigma numlocal tary)
-        (fv_range_array env2 sigma (numlocal + Array.length fary) fary)
-and fv_range_array (env : Environ.env) (sigma : Evd.evar_map) (numlocal : int) (terms : EConstr.t array) : (int*int) option =
-  Array.fold_left
-    (fun acc term -> merge_range acc (fv_range_rec env sigma numlocal term))
-    None terms
-
-let fv_range (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (int*int) option =
-  fv_range_rec env sigma 0 term
-
 let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     (lift : int -> EConstr.t -> EConstr.t) (ks : int array)
     (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) =
@@ -1054,7 +979,7 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ks : int array)
   let (nary, tary, fary) = prec in
   let h = Array.length fary in
   let nb_rel = Environ.nb_rel env in
-  match fv_range env sigma (mkFix ((ks,0),prec)) with
+  match free_variables_index_range env sigma (mkFix ((ks,0),prec)) with
   | None ->
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix: fv_range=None");*)
       let lift _ term = term in
@@ -1916,7 +1841,7 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             Pp.str "f=" ++ Printer.pr_econstr_env env2 sigma f +++
             Pp.str "args=[" ++ pp_sjoinmap_ary (Printer.pr_econstr_env env2 sigma) args ++ Pp.str "]");*)
           let min_fv =
-            match fv_range env2 sigma f with
+            match free_variables_index_range env2 sigma f with
             | None -> List.length lams + 1 (* does not refer variables in lams *)
             | Some (min,max) -> min
           in

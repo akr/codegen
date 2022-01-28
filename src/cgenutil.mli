@@ -108,6 +108,7 @@ val compose_prod :
 val free_variables_without :
   Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
 val free_variables_index_set : Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
+val free_variables_index_range : Environ.env -> Evd.evar_map -> EConstr.t -> (int * int) option
 val free_variables_level_set : ?without:int -> Environ.env -> Evd.evar_map -> EConstr.t -> IntSet.t
 val constr_name : Evd.evar_map -> EConstr.t -> string
 val constr_expr_cstr_name : Constrexpr.constr_expr -> string

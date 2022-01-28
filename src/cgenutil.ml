@@ -697,6 +697,16 @@ let free_variables_index_set (env : Environ.env) (sigma : Evd.evar_map) (term : 
   done;
   !r
 
+(* range of de Bruijn indexes of free variables *)
+let free_variables_index_range (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (int * int) option =
+  let fv = free_variables_bool_ary env sigma term in
+  let r = ref None in
+  for i = 0 to Array.length fv - 1 do
+    if fv.(i) then
+      r := merge_range !r (Some (i+1,i+1))
+  done;
+  !r
+
 (* set of de Bruijn levels of free variables *)
 let free_variables_level_set ?(without : int = 0) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : IntSet.t =
   let nb_rel = Environ.nb_rel env in
