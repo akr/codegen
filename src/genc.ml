@@ -473,6 +473,13 @@ let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
       Some { fixfunc with fixfunc_c_name = c_name })
     fixfunc_tbl
 
+(*
+  fixterm_free_variables computes variables which may be references at run time,
+  for each fixterm.
+  So it doesn't consider types of LetIn, Lambda and Fix,
+  parameters, match predicates invert of Case.
+*)
+
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) ~(result : (Id.t, Id.Set.t) Hashtbl.t) : Id.Set.t =
   match EConstr.kind sigma term with
