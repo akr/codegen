@@ -126,11 +126,13 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                          Pp.str "typename=" ++ Id.print oind_body.mind_typename +++
                          Pp.str "consname=" ++ Id.print (oind_body.mind_consnames.(k)) +++
                          Pp.str "constype=" ++ Printer.pr_constr_env env2 sigma (oind_body.mind_user_lc.(k)));*)
-          let (ctx, t) = oind_body.mind_nf_lc.(k) in
+          let (ctx, t) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
+            mind_body.mind_ntypes mutind oind_body.mind_nf_lc.(k) in
           let (t_f,t_args) = Constr.decompose_app t in
           if not (Constr.isRel t_f) then
             user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] result of constructor type is not Rel:" +++
-                          Printer.pr_constr_env env2 sigma t);
+                          Printer.pr_constr_env env2 sigma t +++
+                          Pp.str "(" ++ Pp.str (constr_name sigma (EConstr.of_constr t)) ++ Pp.str ")");
           let i = Constr.destRel t_f - List.length ctx in
           let decl = Environ.lookup_rel i env2 in
           let ind_id = oind_body.mind_typename in
@@ -147,7 +149,8 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
       Array.iter2
         (fun cons_id nf_lc ->
           (* ctx is a list of decls from innermost to outermost *)
-          let (ctx, t) = nf_lc in
+          let (ctx, t) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
+            mind_body.mind_ntypes mutind nf_lc in
           (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] reduce" +++
                          Pp.str "typename=" ++ Id.print ind_id +++
                          Pp.str "consname=" ++ Id.print cons_id +++

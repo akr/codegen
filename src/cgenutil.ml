@@ -549,6 +549,12 @@ let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
 
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
+let inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc (ntypes : int) (mutind : MutInd.t) (nf_lc : Constr.rel_context * Constr.types) : Constr.rel_context * Constr.types =
+  let (ctx, t) = nf_lc in
+  let t = Term.it_mkProd_or_LetIn t ctx in
+  let t = Inductive.abstract_constructor_type_relatively_to_inductive_types_context ntypes mutind t in
+  Term.decompose_prod_assum t
+
 let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer.t) (ty : EConstr.t) : unit =
   (*Feedback.msg_debug (Pp.str "mangle_term_buf:" +++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
@@ -751,6 +757,7 @@ let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   | Constrexpr.CLetIn _ -> "CLetIn"
   | Constrexpr.CAppExpl _ -> "CAppExpl"
   | Constrexpr.CApp _ -> "CApp"
+  | Constrexpr.CProj _ -> "CProj"
   | Constrexpr.CRecord _ -> "CRecord"
   | Constrexpr.CCases _ -> "CCases"
   | Constrexpr.CLetTuple _ -> "CLetTuple"

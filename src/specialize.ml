@@ -579,8 +579,10 @@ let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : 
     TransparentState.tr_var = Id.Pred.empty;
     TransparentState.tr_cst = pred
   } in
-  let reds = CClosure.RedFlags.red_add_transparent CClosure.RedFlags.no_red trans in
+  let reds = CClosure.RedFlags.red_add_transparent (CClosure.RedFlags.red_add CClosure.RedFlags.no_red CClosure.RedFlags.fDELTA) trans in
+  (*msg_debug_hov (Pp.str "[codegen:inline1] before-inline:" +++ Printer.pr_econstr_env env sigma term);*)
   let term = Reductionops.clos_norm_flags reds env sigma term in
+  (*msg_debug_hov (Pp.str "[codegen:inline1] after-inline:" +++ Printer.pr_econstr_env env sigma term);*)
   term
 
 let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =

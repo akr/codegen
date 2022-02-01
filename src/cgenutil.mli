@@ -93,6 +93,7 @@ val decompose_lam_n_env :
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
 val out_punivs : 'a EConstr.puniverses -> 'a
+val inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc : int -> Names.MutInd.t -> (Constr.rel_context * Constr.types) -> (Constr.rel_context * Constr.types)
 val mangle_term_buf :
   Environ.env -> Evd.evar_map -> Buffer.t -> EConstr.t -> unit
 val mangle_term : Environ.env -> Evd.evar_map -> EConstr.t -> string

@@ -45,7 +45,8 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
                            Pp.str "(" ++ Id.print oneind_body.mind_typename ++ Pp.str ")" +++
                            Pp.str "j0=" ++ Pp.int j0 ++
                            Pp.str "(" ++ Id.print oneind_body.mind_consnames.(j0) ++ Pp.str ")");*)
-        let (ctxt, rettype) = oneind_body.mind_nf_lc.(j0) in
+        let (ctxt, rettype) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
+          mutind_body.mind_ntypes mutind oneind_body.mind_nf_lc.(j0) in
         ignore
           (Context.Rel.fold_outside
             (fun decl k ->
