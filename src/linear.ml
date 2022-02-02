@@ -100,7 +100,7 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
 
 let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
   (f : Environ.env -> (*typename*)Id.t -> (*consname*)Id.t ->
-       (*argtype*)EConstr.types -> (*subst_ind*)Vars.substl -> unit) : unit =
+       (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let open Context.Rel.Declaration in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind in
@@ -179,7 +179,7 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
                     if not (Vars.noccur_between sigma 1 i ty') then
                       user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma ty');
                     let ty' = Vars.lift (-i) ty' in
-                    f env2 ind_id cons_id ty' subst_ind;
+                    f env2 ind_id cons_id ty';
                     env3 := Environ.push_rel decl !env3)
           done;
           let t = nf_all !env3 sigma t in
@@ -212,7 +212,7 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
     | Ind (ind, univ) -> ()
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty));
     mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ty_f))) ty_args
-      (fun env ind_id cons_id argty subst_ind ->
+      (fun env ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
@@ -292,7 +292,7 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
   let exception FoundLinear in
   try
     mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
-      (fun env ind_id cons_id argty subst_ind ->
+      (fun env ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
@@ -382,7 +382,7 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
   let exception FoundDownward in
   try
     mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
-      (fun env ind_id cons_id argty subst_ind ->
+      (fun env ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
