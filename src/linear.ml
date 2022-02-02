@@ -50,11 +50,6 @@ let command_downward (ty : Constrexpr.constr_expr) : unit =
   type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty4) DownwardOnly !type_downward_map;
   Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
-let type_of_inductive_arity (mind_arity : (Declarations.regular_inductive_arity, Declarations.template_arity) Declarations.declaration_arity) : Constr.t =
-  match mind_arity with
-  | Declarations.RegularArity regind_arity -> regind_arity.Declarations.mind_user_arity
-  | Declarations.TemplateArity temp_arity -> Constr.mkType (temp_arity : Declarations.template_arity).Declarations.template_level
-
 let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.rel_declaration) : bool =
   match decl with
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
@@ -99,8 +94,7 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
   Array.map (fun ind -> nf_all env sigma (mkApp (ind, Array.of_list ty_args))) ind_ary
 
 let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
-  (f : Environ.env -> (*typename*)Id.t -> (*consname*)Id.t ->
-       (*argtype*)EConstr.types -> unit) : unit =
+  (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let open Context.Rel.Declaration in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind in
@@ -108,96 +102,43 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
     pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
     Pp.str "params=[" ++
     pp_sjoinmap_ary (fun p -> Printer.pr_econstr_env env sigma p) params ++ Pp.str "]");*)
-  let subst_ind = Array.to_list (array_rev ind_ary) in
-  let env2 = Environ.push_rel_context
-              (Array.to_list
-                (Array.map (fun oind_body ->
-                  LocalAssum
-                    (Context.annotR (Names.Name.Name oind_body.mind_typename),
-                     type_of_inductive_arity oind_body.mind_arity))
-                  (array_rev mind_body.mind_packets)))
-              env
-  in
-  Array.iter
-    (fun oind_body ->
-      Array.iter
-        (fun k ->
-          (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] check env2" +++
-                         Pp.str "typename=" ++ Id.print oind_body.mind_typename +++
-                         Pp.str "consname=" ++ Id.print (oind_body.mind_consnames.(k)) +++
-                         Pp.str "constype=" ++ Printer.pr_constr_env env2 sigma (oind_body.mind_user_lc.(k)));*)
-          let (ctx, t) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
-            mind_body.mind_ntypes mutind oind_body.mind_nf_lc.(k) in
-          let (t_f,t_args) = Constr.decompose_app t in
-          if not (Constr.isRel t_f) then
-            user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] result of constructor type is not Rel:" +++
-                          Printer.pr_constr_env env2 sigma t +++
-                          Pp.str "(" ++ Pp.str (constr_name sigma (EConstr.of_constr t)) ++ Pp.str ")");
-          let i = Constr.destRel t_f - List.length ctx in
-          let decl = Environ.lookup_rel i env2 in
-          let ind_id = oind_body.mind_typename in
-          let id_in_env = id_of_name (get_name decl) in
-          if not (Id.equal ind_id id_in_env) then
-            user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] inductive type name mismatch (1):" +++
-                          Pp.str "expected:" ++ Id.print ind_id +++ Pp.str "but" +++
-                          Pp.str "actual:" ++ Id.print id_in_env))
-        (iota_ary 0 (Array.length oind_body.mind_consnames)))
-    mind_body.mind_packets;
   Array.iter
     (fun oind_body ->
       let ind_id = oind_body.mind_typename in
       Array.iter2
         (fun cons_id nf_lc ->
           (* ctx is a list of decls from innermost to outermost *)
-          let (ctx, t) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
-            mind_body.mind_ntypes mutind nf_lc in
+          let (ctx, t) = nf_lc in
           (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] reduce" +++
                          Pp.str "typename=" ++ Id.print ind_id +++
                          Pp.str "consname=" ++ Id.print cons_id +++
-                         Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env2 sigma ctx ++ Pp.str "]" +++
-                         Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env2) sigma t);*)
-          let t = EConstr.of_constr t in
+                         Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env sigma ctx ++ Pp.str "]" +++
+                         Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma t);*)
           let rev_ctx = array_rev (Array.of_list ctx) in
-          let env3 = ref env2 in
+          let env2 = ref env in
           let params = ref (Array.to_list params) in
           let h = Array.length rev_ctx in
           for i = 0 to h - 1 do
-            (* msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env3 sigma); *)
+            (* msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env2 sigma); *)
             let decl = rev_ctx.(i) in
             match decl with
             | LocalDef (x,e,ty) ->
-                env3 := Environ.push_rel decl !env3
+                env2 := Environ.push_rel decl !env2
             | LocalAssum (x,ty) ->
                 let ty = EConstr.of_constr ty in
                 (match !params with
                 | param :: rest ->
                     params := rest;
-                    env3 := EConstr.push_rel (LocalDef (x, param, ty)) !env3
+                    env2 := EConstr.push_rel (LocalDef (x, param, ty)) !env2
                 | [] ->
-                    let ty' = nf_all !env3 sigma ty in
-                    (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env3 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env3 sigma ty');*)
+                    let ty' = nf_all !env2 sigma ty in
+                    (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
                     if not (Vars.noccur_between sigma 1 i ty') then
-                      user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma ty');
+                      user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env2 sigma ty');
                     let ty' = Vars.lift (-i) ty' in
-                    f env2 ind_id cons_id ty';
-                    env3 := Environ.push_rel decl !env3)
-          done;
-          let t = nf_all !env3 sigma t in
-          if not (Vars.noccur_between sigma 1 h t) then
-            user_err_hov (Pp.str "[codegen] dependent constructor result:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env3 sigma t);
-          let t = Vars.lift (-h) t in
-          let t' = Vars.substl subst_ind t in
-          let (tf, targs) = decompose_app sigma t' in
-          if not (EConstr.isInd sigma tf) then
-            user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] result of constructor type is not Ind:" +++
-                          Printer.pr_econstr_env env sigma t');
-          let ((mutind2, i2), univ) = EConstr.destInd sigma tf in
-          let mind_body2 = Environ.lookup_mind mutind2 env2 in
-          let id_via_substitution = mind_body2.mind_packets.(i2).mind_typename in
-          if not (Id.equal ind_id id_via_substitution) then
-            user_err_hov (Pp.str "[codegen:mutind_cstrarg_iter:bug] inductive type name mismatch (2):" +++
-                          Pp.str "expected:" ++ Id.print ind_id +++ Pp.str "but" +++
-                          Pp.str "actual:" ++ Id.print id_via_substitution))
+                    f ind_id cons_id ty';
+                    env2 := Environ.push_rel decl !env2)
+          done)
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
 
@@ -211,16 +152,17 @@ let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr
     | Prod _ -> raise FoundFunction
     | Ind (ind, univ) -> ()
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty));
-    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ty_f))) ty_args
-      (fun env ind_id cons_id argty ->
+    let mutind = fst (fst (destInd sigma ty_f)) in
+    mutind_cstrarg_iter env sigma mutind ty_args
+      (fun ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
             user_err (Pp.str "[codegen] component_types: constructor has type argument")
         | Prod (x, ty, b) ->
             raise FoundFunction
-        | Rel _ -> (* inductive types currently traversing *)
-            ()
+        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
+            () (* inductive types currently traversing *)
         | Ind _ ->
             (ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
             match component_types env sigma argty with
@@ -289,10 +231,11 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
       if not (Vars.closed0 sigma arg) then
         user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
     argsary;
+  let mutind = fst (fst (destInd sigma ind_f)) in
   let exception FoundLinear in
   try
-    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
-      (fun env ind_id cons_id argty ->
+    mutind_cstrarg_iter env sigma mutind argsary
+      (fun ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
@@ -300,13 +243,8 @@ and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types
         | Prod (x, ty, b) ->
             (* function type argument of a constructor is non-linear or non-code-generatable *)
             ()
-        | Rel _ -> (* inductive types currently traversing *)
-            (* Since mutind_cstrarg_iter normalizes argty,
-              Rel is only used for recursive references of inductive types.
-              We don't need to examine the recursive references.
-              Note that we force uniform parameters and prohibit indexed-types,
-              argty_args must be unchanged. *)
-            ()
+        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
+            () (* inductive types currently traversing *)
         | Ind _ ->
             if is_linear_type env sigma argty then raise FoundLinear
         | _ ->
@@ -379,10 +317,11 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
       if not (Vars.closed0 sigma arg) then
         user_err (Pp.str "[codegen] is_downward_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
     argsary;
+  let mutind = fst (fst (destInd sigma ind_f)) in
   let exception FoundDownward in
   try
-    mutind_cstrarg_iter env sigma (fst (fst (destInd sigma ind_f))) argsary
-      (fun env ind_id cons_id argty ->
+    mutind_cstrarg_iter env sigma mutind argsary
+      (fun ind_id cons_id argty ->
         let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
         match EConstr.kind sigma argty_f with
         | Sort _ ->
@@ -390,7 +329,7 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
         | Prod _ ->
             (* function type argument of a constructor means DownwardOnly *)
             raise FoundDownward
-        | Rel _ ->
+        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
             ()
         | Ind _ ->
             if is_downward_type env sigma argty then raise FoundDownward
