@@ -53,6 +53,7 @@ clean :
 	  src/*.cmx \
 	  src/*.cma \
 	  src/*.cmt \
+	  src/*.cmti \
 	  src/*.cmxa \
 	  src/*.cmxs \
 	  src/*.a \
