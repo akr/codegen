@@ -575,15 +575,22 @@ let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
   specialize_local_inline := Cmap.add ctnt pred' local_inline
 
 let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
-  let trans = {
-    TransparentState.tr_var = Id.Pred.empty;
-    TransparentState.tr_cst = pred
-  } in
-  let reds = CClosure.RedFlags.red_add_transparent (CClosure.RedFlags.red_add CClosure.RedFlags.no_red CClosure.RedFlags.fDELTA) trans in
-  (*msg_debug_hov (Pp.str "[codegen:inline1] before-inline:" +++ Printer.pr_econstr_env env sigma term);*)
-  let term = Reductionops.clos_norm_flags reds env sigma term in
-  (*msg_debug_hov (Pp.str "[codegen:inline1] after-inline:" +++ Printer.pr_econstr_env env sigma term);*)
-  term
+  let rec aux term =
+    match EConstr.kind sigma term with
+    | Const (ctnt, univ) ->
+        if Cpred.mem ctnt pred then
+          let cbody = Environ.lookup_constant ctnt env in
+          let body = match Global.body_of_constant_body Library.indirect_accessor cbody with
+                     | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++ Printer.pr_constant env ctnt)
+                     | Some (body,_, _) -> body
+          in
+          aux (EConstr.of_constr body)
+        else
+          term
+    | _ ->
+        EConstr.map sigma aux term
+  in
+  aux term
 
 let inline (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
   let result = inline1 env sigma pred term in
