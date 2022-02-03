@@ -142,37 +142,28 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
 
-let rec component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
-  let ret = ref (ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty))) in
-  let exception FoundFunction in
-  try
-    let (ty_f,ty_args) = EConstr.decompose_app sigma ty in
-    let ty_args = Array.of_list ty_args in
-    (match EConstr.kind sigma ty_f with
-    | Prod _ -> raise FoundFunction
-    | Ind (ind, univ) -> ()
-    | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty));
-    let mutind = fst (fst (destInd sigma ty_f)) in
-    mutind_cstrarg_iter env sigma mutind ty_args
-      (fun ind_id cons_id argty ->
-        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
-        match EConstr.kind sigma argty_f with
-        | Sort _ ->
-            user_err (Pp.str "[codegen] component_types: constructor has type argument")
-        | Prod (x, ty, b) ->
-            raise FoundFunction
-        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
-            () (* inductive types currently traversing *)
-        | Ind _ ->
-            (ret := ConstrSet.add (EConstr.to_constr sigma argty) !ret;
-            match component_types env sigma argty with
-            | None -> raise FoundFunction
-            | Some set -> ret := ConstrSet.union !ret set)
-        | _ ->
-            user_err (Pp.str "[codegen] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
-    Some !ret
-  with
-    FoundFunction -> None
+let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (acc_ref : ConstrSet.t option ref) : unit =
+  match !acc_ref with
+  | None -> () (* function already found.  all types may be contained. *)
+  | Some set ->
+      if ConstrSet.mem (EConstr.to_constr sigma ty) set then
+        ()
+      else
+        (let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
+        acc_ref := Some (ConstrSet.union set mutinds_set);
+        let (ty_f,ty_args) = decompose_appvect sigma ty in
+        match EConstr.kind sigma ty_f with
+        | Prod _ -> acc_ref := None
+        | Ind ((mutind, _), univ) ->
+            mutind_cstrarg_iter env sigma mutind ty_args
+              (fun ind_id cons_id argty ->
+                component_types_acc env sigma argty acc_ref)
+        | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
+
+let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
+  let r = ref (Some ConstrSet.empty) in
+  component_types_acc env sigma ty r;
+  !r
 
 (*
   is_linear_type env sigma ty returns true if

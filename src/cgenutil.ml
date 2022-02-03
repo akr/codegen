@@ -522,6 +522,11 @@ let new_env_with_rels (env : Environ.env) : Environ.env =
   done;
   !r
 
+let decompose_appvect (sigma : Evd.evar_map) (term : EConstr.t) : (EConstr.t * EConstr.t array) =
+  match EConstr.kind sigma term with
+  | App (f,args) -> (f,args)
+  | _ -> (term, [||])
+
 let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Environ.env * EConstr.t) =
   if n = 0 then
     (env, term)
