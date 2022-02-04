@@ -157,14 +157,18 @@ let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : ECo
             component_types_acc env sigma argty ty_set_ref has_func_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
 
-let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
+let component_types_and_funcs (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : (ConstrSet.t * bool) =
   let ty_set_ref = ref (ConstrSet.empty) in
   let has_func_ref = ref false in
   component_types_acc env sigma ty ty_set_ref has_func_ref;
-  if !has_func_ref then
+  (!ty_set_ref, !has_func_ref)
+
+let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
+  let (ty_set, has_func) = component_types_and_funcs env sigma ty in
+  if has_func then
     None
   else
-    Some (!ty_set_ref)
+    Some (ty_set)
 
 (*
   is_linear_type env sigma ty returns true if
