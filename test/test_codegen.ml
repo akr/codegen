@@ -98,6 +98,23 @@ let coq_opts : string list =
   | None -> []) @
   ["-bt"]
 
+let expand_tab (str : string) : string =
+  let add_spaces buf n =
+    for i = 1 to n do
+      Buffer.add_char buf ' '
+    done
+  in
+  let buf = Buffer.create (String.length str) in
+  let col = ref 0 in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> Buffer.add_char buf ch; col := 0
+      | '\t' -> let n = (8 - (!col mod 8)) in add_spaces buf n; col := !col + n
+      | _ -> Buffer.add_char buf ch; col := !col + 1)
+    str;
+    Buffer.contents buf
+
 let min_indent (str : string) : int =
   let min = ref (String.length str + 1) in
   let indent = ref (Some 0) in
@@ -216,7 +233,7 @@ let codegen_test_template
     "From codegen Require codegen.\n" ^
     "CodeGen Source File \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
-    delete_indent coq_commands ^ "\n" ^
+    delete_indent (expand_tab coq_commands) ^ "\n" ^
     "CodeGen GenerateFile" ^
     (if resolve_dependencies then "" else " DisableDependencyResolver") ^
     (if mutual_recursion_detection then "" else " DisableMutualRecursionDetection") ^
@@ -227,7 +244,7 @@ let codegen_test_template
     "#include <assert.h>\n" ^
     "#include \"gen.c\"\n" ^
     "int main(int argc, char *argv[]) {\n" ^
-    add_n_indent 2 (delete_indent c_body) ^ "\n" ^
+    add_n_indent 2 (delete_indent (expand_tab c_body)) ^ "\n" ^
     "  return EXIT_SUCCESS;\n" ^
     "}\n");
   let coq_foutput = Option.map make_foutput coq_output_regexp in
