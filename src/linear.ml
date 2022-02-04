@@ -285,7 +285,7 @@ and is_downward_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.ty
   match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_downward_map with
   | Some DownwardOnly -> true
   | Some DownwardUnrestricted -> false
-  | Some DownwardInvestigating -> user_err (Pp.str "[codegen:bug] type downwardness checker is calld with a type currently checking:" +++ Printer.pr_econstr_env env sigma ty)
+  | Some DownwardInvestigating -> false
   | None ->
       (type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardInvestigating !type_downward_map;
       if is_downward_ind env sigma ty then
@@ -331,7 +331,7 @@ and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
     FoundDownward -> true
 
 let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
+  (*Feedback.msg_debug (Pp.str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
   let sort = Retyping.get_type_of env sigma ty in
   if not (isSort sigma (whd_all env sigma sort)) then
     user_err (Pp.str "[codegen] not a type:" +++ Printer.pr_econstr_env env sigma ty +++ Pp.str ":" +++ Printer.pr_econstr_env env sigma sort);

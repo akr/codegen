@@ -2969,6 +2969,38 @@ let test_downward_fixfunc (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
+let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive T := C1 : T | C2 : (T*T) -> T.
+      Definition f (x : T)  := x.
+      CodeGen Snippet "
+        typedef struct T_struct *T;
+        typedef struct prod_T_T_struct {
+          T member1;
+          T member2;
+        } prod_T_T;
+        struct T_struct { prod_T_T member; };
+        #define C1() NULL
+        static inline T C2(prod_T_T arg) {
+          T ret;
+          if ((ret = malloc(sizeof(*ret))) == NULL) abort();
+          ret->member = arg;
+          return ret;
+        }
+        static inline prod_T_T pair_T_T(T arg1, T arg2) {
+          return (struct prod_T_T_struct){ arg1, arg2 };
+        }
+      ".
+      CodeGen Inductive Type T => "T".
+      CodeGen Function f.
+    |}) {|
+      T x1 = C1();
+      T x2 = C2(pair_T_T(C1(),C1()));
+      assert(f(x1) == x1);
+      assert(f(x2) == x2);
+    |}
+
 let test_borrowcheck_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
     ({|
@@ -3671,6 +3703,7 @@ let suite : OUnit2.test =
     "test_downward_simple" >:: test_downward_simple;
     "test_downward_in_pair" >:: test_downward_in_pair;
     "test_downward_fixfunc" >:: test_downward_fixfunc;
+    "test_downward_indirect_cycle" >:: test_downward_indirect_cycle;
     "test_borrowcheck_constructor" >:: test_borrowcheck_constructor;
     "test_borrowcheck_constant" >:: test_borrowcheck_constant;
     "test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id;
