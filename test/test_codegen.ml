@@ -3106,6 +3106,52 @@ let test_borrowcheck_invalid_linearity_match_member (ctx : test_ctxt) : unit =
 	end.
     |}) {| |}
 
+let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ {|
+      Inductive L := LC1 : L | LC2 : (L*L) -> L.
+      Inductive B := BC1 : B | BC2 : (B*B) -> B.
+      Fixpoint borrow (l : L) : B :=
+        match l with
+        | LC1 => BC1
+        | LC2 (x,y) => BC2 (borrow x, borrow y)
+        end.
+      Definition f (b : B) : bool :=
+        match b with
+        | BC1 => true
+        | BC2 _ => false
+        end.
+      CodeGen BorrowFunction borrow.
+      CodeGen Snippet "
+        typedef struct L_struct *L;
+        typedef struct prod_L_L_struct {
+          L member1;
+          L member2;
+        } prod_L_L;
+        struct L_struct { prod_L_L member; };
+        #define LC1() NULL
+        static inline L LC2(prod_L_L arg) {
+          L ret;
+          if ((ret = malloc(sizeof(*ret))) == NULL) abort();
+          ret->member = arg;
+          return ret;
+        }
+        static inline prod_L_L pair_L_L(L arg1, L arg2) {
+          return (struct prod_L_L_struct){ arg1, arg2 };
+        }
+        #define sw_L(l) ((l) == NULL)
+        #define LC2_tag 0
+      ".
+      CodeGen Inductive Type L => "L".
+      CodeGen Inductive Match L => "sw_L" | LC1 => "default" | LC2 => "case 0" "L_member".
+      CodeGen Inductive Type B => "L".
+      CodeGen Inductive Match B => "sw_L" | BC1 => "default" | BC2 => "case 0" "L_member".
+      CodeGen Function f.
+    |}) {|
+      assert(f(LC1()) == true);
+      assert(f(LC2(pair_L_L(LC1(),LC1()))) == false);
+    |}
+
 let test_borrowcheck_simple_borrow (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
     ({|
@@ -3637,6 +3683,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_linearity_match_item" >:: test_borrowcheck_invalid_linearity_match_item;
     "test_borrowcheck_invalid_linearity_match_branches" >:: test_borrowcheck_invalid_linearity_match_branches;
     "test_borrowcheck_invalid_linearity_match_member" >:: test_borrowcheck_invalid_linearity_match_member;
+    "test_borrowcheck_indirect_cycle" >:: test_borrowcheck_indirect_cycle;
     "test_borrowcheck_simple_borrow" >:: test_borrowcheck_simple_borrow;
     "test_borrowcheck_proj" >:: test_borrowcheck_proj;
     "test_borrowcheck_lambda_out_of_fix" >:: test_borrowcheck_lambda_out_of_fix;
