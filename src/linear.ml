@@ -142,28 +142,29 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
 
-let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (acc_ref : ConstrSet.t option ref) : unit =
-  match !acc_ref with
-  | None -> () (* function already found.  all types may be contained. *)
-  | Some set ->
-      if ConstrSet.mem (EConstr.to_constr sigma ty) set then
-        ()
-      else
-        (let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
-        acc_ref := Some (ConstrSet.union set mutinds_set);
-        let (ty_f,ty_args) = decompose_appvect sigma ty in
-        match EConstr.kind sigma ty_f with
-        | Prod _ -> acc_ref := None
-        | Ind ((mutind, _), univ) ->
-            mutind_cstrarg_iter env sigma mutind ty_args
-              (fun ind_id cons_id argty ->
-                component_types_acc env sigma argty acc_ref)
-        | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
+let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) : unit =
+  if ConstrSet.mem (EConstr.to_constr sigma ty) !ty_set_ref then
+    ()
+  else
+    (let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
+    ty_set_ref := (ConstrSet.union !ty_set_ref mutinds_set);
+    let (ty_f,ty_args) = decompose_appvect sigma ty in
+    match EConstr.kind sigma ty_f with
+    | Prod _ -> has_func_ref := true
+    | Ind ((mutind, _), univ) ->
+        mutind_cstrarg_iter env sigma mutind ty_args
+          (fun ind_id cons_id argty ->
+            component_types_acc env sigma argty ty_set_ref has_func_ref)
+    | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
 
 let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
-  let r = ref (Some ConstrSet.empty) in
-  component_types_acc env sigma ty r;
-  !r
+  let ty_set_ref = ref (ConstrSet.empty) in
+  let has_func_ref = ref false in
+  component_types_acc env sigma ty ty_set_ref has_func_ref;
+  if !has_func_ref then
+    None
+  else
+    Some (!ty_set_ref)
 
 (*
   is_linear_type env sigma ty returns true if
