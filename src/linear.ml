@@ -24,18 +24,24 @@ let rec is_concrete_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (t
   else
     false) (* "list" is not "concrete" inductive type because it has concrete parameter *)
 
+let add_linear_type ?(msg_new:bool=false) ?(msg_already:bool=false)
+    (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
+  let ty = nf_all env sigma ty in
+  (if not (is_concrete_inductive_type env sigma ty) then
+    user_err (Pp.str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty));
+  if ConstrSet.mem (EConstr.to_constr sigma ty) !linearity_type_set then
+    (if msg_already then
+      Feedback.msg_info (Pp.str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty))
+  else
+    (linearity_type_set := ConstrSet.add (EConstr.to_constr sigma ty) !linearity_type_set;
+    if msg_new then
+      Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty))
+
 let command_linear (ty : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, ty2) = Constrintern.interp_constr_evars env sigma ty in
-  let ty4 = nf_all env sigma ty2 in
-  (if not (is_concrete_inductive_type env sigma ty4) then
-    user_err (Pp.str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
-  (match ConstrMap.find_opt (EConstr.to_constr sigma ty4) !type_linearity_map with
-  | Some _ -> user_err (Pp.str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty4)
-  | None -> ());
-  type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty4) LinearityIsLinear !type_linearity_map;
-  Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty2)
+  add_linear_type ~msg_new:true ~msg_already:true env sigma ty2
 
 let command_downward (ty : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
@@ -187,15 +193,8 @@ let is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.type
   let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
   if has_sort then
     false (* not code-generatable *)
-  else if ConstrSet.exists
-       (fun ty ->
-         match ConstrMap.find_opt ty !type_linearity_map with
-         | Some LinearityIsLinear -> true
-         | _ -> false)
-       ty_set then
-    true
   else
-    false
+    not (ConstrSet.disjoint ty_set !linearity_type_set)
 
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
@@ -405,7 +404,7 @@ and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bo
   | Float n -> IntMap.empty)
 
 let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
-  if not (ConstrMap.is_empty !type_linearity_map) then
+  if not (ConstrSet.is_empty !linearity_type_set) then
     linearcheck_function env sigma [] term
 
 let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
@@ -1198,13 +1197,7 @@ let command_borrow_type (ty : Constrexpr.constr_expr) : unit =
 
 let command_borrow_function (libref : Libnames.qualid) : unit =
   let set_linear env sigma ty =
-    match ConstrMap.find_opt ty !type_linearity_map with
-    | Some LinearityIsLinear -> ()
-    | Some LinearityIsUnrestricted -> user_err (Pp.str "[codegen] the linearity of the argument of borrow function is non-linear:" +++ Printer.pr_constr_env env sigma ty)
-    | Some LinearityIsInvestigating -> user_err (Pp.str "[codegen:bug] LinearityIsInvestigating found")
-    | None ->
-        Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_constr_env env sigma ty);
-        type_linearity_map := ConstrMap.add ty LinearityIsLinear !type_linearity_map
+    add_linear_type ~msg_new:true env sigma ty
   in
   let set_borrow_type env sigma ty = add_borrow_type ~msg_new:true env sigma (EConstr.of_constr ty) in
   let set_borrow_function ctnt =
@@ -1232,7 +1225,7 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
           if component_types env2 sigma retty = None then
             user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Constant.print ctnt);
           set_borrow_function ctnt;
-          set_linear env sigma (EConstr.to_constr sigma argty);
+          set_linear env sigma argty;
           set_borrow_type env sigma (EConstr.to_constr sigma retty)
       | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)

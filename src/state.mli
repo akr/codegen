@@ -40,9 +40,7 @@ type sp_instance_names = {
 }
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
 val ind_config_map : ind_config ConstrMap.t ref
-type type_linearity = LinearityIsLinear | LinearityIsUnrestricted | LinearityIsInvestigating
-val type_linearity_map_empty : type_linearity ConstrMap.t
-val type_linearity_map : type_linearity ConstrMap.t ref
+val linearity_type_set : ConstrSet.t ref
 val deallocator_cfunc_map : string ConstrMap.t ref
 val downward_type_set : ConstrSet.t ref
 val borrow_function_set : Names.Cset.t ref
