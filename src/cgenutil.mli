@@ -44,6 +44,8 @@ val concat_list_seq : 'a Seq.t list -> 'a Seq.t
 val concat_array_seq : 'a Seq.t array -> 'a Seq.t
 val unique_string_list : string list -> string list
 val quote_coq_string : string -> string
+val expand_tab : string -> string
+val delete_indent : string -> string
 val id_of_name : Names.Name.t -> Names.Id.t
 val id_of_annotated_name : Names.Name.t Context.binder_annot -> Names.Id.t
 val str_of_name : Names.Name.t -> string

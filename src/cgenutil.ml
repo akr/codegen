@@ -307,6 +307,70 @@ let quote_coq_string (s : string) : string =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
+let expand_tab (str : string) : string =
+  let add_spaces buf n =
+    for i = 1 to n do
+      ignore i;
+      Buffer.add_char buf ' '
+    done
+  in
+  let buf = Buffer.create (String.length str) in
+  let col = ref 0 in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> Buffer.add_char buf ch; col := 0
+      | '\t' -> let n = (8 - (!col mod 8)) in add_spaces buf n; col := !col + n
+      | _ -> Buffer.add_char buf ch; col := !col + 1)
+    str;
+    Buffer.contents buf
+
+let min_indent (str : string) : int =
+  let min = ref (String.length str + 1) in
+  let indent = ref (Some 0) in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> indent := Some 0
+      | ' ' ->
+          (match !indent with
+          | None -> ()
+          | Some n -> indent := Some (n+1))
+      | _ ->
+          (match !indent with
+          | None -> ()
+          | Some n ->
+              (indent := None;
+              if n < !min then min := n)))
+    str;
+  if String.length str < !min then
+    0
+  else
+    !min
+
+let delete_n_indent (n : int) (str : string) : string =
+  let buf = Buffer.create (String.length str) in
+  let indent = ref (Some 0) in
+  String.iter
+    (fun ch ->
+      match ch with
+      | '\n' -> Buffer.add_char buf ch; indent := Some 0
+      | ' ' ->
+          (match !indent with
+          | Some i ->
+              if i < n then
+                indent := Some (i + 1)
+              else
+                (Buffer.add_char buf ch; indent := None)
+          | None -> Buffer.add_char buf ch)
+      | _ ->
+          (Buffer.add_char buf ch; indent := None))
+    str;
+  Buffer.contents buf
+
+let delete_indent (str : string) : string =
+  delete_n_indent (min_indent str) str
+
 let id_of_name (name : Name.t) : Id.t =
   match name with
   | Name.Anonymous -> user_err (Pp.str "[codegen:bug] id_of_name require non-anonymous Name")

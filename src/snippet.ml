@@ -17,6 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open State
+open Cgenutil
 
 let fix_snippet (str : string) : string =
   let len = String.length str in
@@ -34,8 +35,14 @@ let add_header_snippet (str : string) : unit =
   codegen_add_header_generation (GenSnippet str')
 
 let command_snippet (str : string) : unit =
+  add_snippet (delete_indent (expand_tab str))
+
+let command_rawsnippet (str : string) : unit =
   add_snippet str
 
 let command_header_snippet (str : string) : unit =
+  add_header_snippet (delete_indent (expand_tab str))
+
+let command_header_rawsnippet (str : string) : unit =
   add_header_snippet str
 

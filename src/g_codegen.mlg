@@ -84,7 +84,11 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PRESIMP_NAME.
 
-  CodeGen Snippet "...".
+  CodeGen Snippet "...".                (* append the string into the source file *)
+  CodeGen RawSnippet "...".             (* same as CodeGen Snippet but it does not strip indent *)
+  CodeGen Header Snippet "...".         (* append the string into the header file *)
+  CodeGen Header RawSnippet "...".      (* same as CodeGen Header Snippet but it does not strip indent *)
+
   CodeGen IndImp COQ_TYPE.
 
   CodeGen GenerateFile "FILENAME".
@@ -217,6 +221,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Snippet" string(str) ] -> { command_snippet str }
     | [ "CodeGen" "Header" "Snippet" string(str) ] -> { command_header_snippet str }
+    | [ "CodeGen" "RawSnippet" string(str) ] -> { command_rawsnippet str }
+    | [ "CodeGen" "Header" "RawSnippet" string(str) ] -> { command_header_rawsnippet str }
 
     | [ "CodeGen" "IndImp" constr(coq_type) ] ->
       { command_indimp coq_type }
