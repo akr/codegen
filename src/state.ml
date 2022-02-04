@@ -158,9 +158,8 @@ let type_linearity_map = Summary.ref type_linearity_map_empty ~name:"CodeGenLine
 let deallocator_cfunc_map = Summary.ref
   (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncMap"
 
-type type_downward = DownwardOnly | DownwardUnrestricted | DownwardInvestigating
-let type_downward_map = Summary.ref
-  (ConstrMap.empty : type_downward ConstrMap.t) ~name:"CodeGenDownwardTypeMap"
+let downward_type_set = Summary.ref
+  (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"
 
 let borrow_function_set = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFunctionSet"

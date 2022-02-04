@@ -44,10 +44,9 @@ let command_downward (ty : Constrexpr.constr_expr) : unit =
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (Pp.str "[codegen] downward: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
-  (match ConstrMap.find_opt (EConstr.to_constr sigma ty4) !type_downward_map with
-  | Some _ -> user_err (Pp.str "[codegen] downwardness already defined:" +++ Printer.pr_econstr_env env sigma ty4)
-  | None -> ());
-  type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty4) DownwardOnly !type_downward_map;
+  (if ConstrSet.mem (EConstr.to_constr sigma ty4) !downward_type_set then
+    user_err (Pp.str "[codegen] downwardness already defined:" +++ Printer.pr_econstr_env env sigma ty4));
+  downward_type_set := ConstrSet.add (EConstr.to_constr sigma ty4) !downward_type_set;
   Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
 let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.rel_declaration) : bool =
@@ -229,15 +228,8 @@ let is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.ty
     false (* not code-generatable *)
   else if has_func then
     true
-  else if ConstrSet.exists
-            (fun ty ->
-              match ConstrMap.find_opt ty !type_downward_map with
-              | Some DownwardOnly -> true
-              | _ -> false)
-            ty_set then
-    true
   else
-    false
+    not (ConstrSet.disjoint ty_set !downward_type_set)
 
 let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
