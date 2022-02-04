@@ -142,30 +142,32 @@ let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : Mut
         oind_body.mind_consnames oind_body.mind_nf_lc)
     mind_body.mind_packets
 
-let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) : unit =
+let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
   if ConstrSet.mem (EConstr.to_constr sigma ty) !ty_set_ref then
     ()
   else
-    (let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
-    ty_set_ref := (ConstrSet.union !ty_set_ref mutinds_set);
-    let (ty_f,ty_args) = decompose_appvect sigma ty in
+    (let (ty_f,ty_args) = decompose_appvect sigma ty in
     match EConstr.kind sigma ty_f with
+    | Sort _ -> has_sort_ref := true
     | Prod _ -> has_func_ref := true
     | Ind ((mutind, _), univ) ->
+        let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
+        ty_set_ref := (ConstrSet.union !ty_set_ref mutinds_set);
         mutind_cstrarg_iter env sigma mutind ty_args
           (fun ind_id cons_id argty ->
-            component_types_acc env sigma argty ty_set_ref has_func_ref)
+            component_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
 
-let component_types_and_funcs (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : (ConstrSet.t * bool) =
+let component_types_funcs_sorts (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : (ConstrSet.t * bool * bool) =
   let ty_set_ref = ref (ConstrSet.empty) in
   let has_func_ref = ref false in
-  component_types_acc env sigma ty ty_set_ref has_func_ref;
-  (!ty_set_ref, !has_func_ref)
+  let has_sort_ref = ref false in
+  component_types_acc env sigma ty ty_set_ref has_func_ref has_sort_ref;
+  (!ty_set_ref, !has_func_ref, !has_sort_ref)
 
 let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
-  let (ty_set, has_func) = component_types_and_funcs env sigma ty in
-  if has_func then
+  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  if has_func || has_sort then
     None
   else
     Some (ty_set)
@@ -182,72 +184,19 @@ let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
     - a inductive type which has (possibly indirectly) have a component which type is linear.
   - function type is always unrestricted.
 *)
-let rec is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_linear_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  match EConstr.kind sigma ty with
-  | Prod (name, namety, body) ->
-      (* function type can be code-generatable or not.
-        - forall (x:nat), nat is code-generatable when we'll support closures but
-        - forall (x:nat), Set is not code-generatable.
-        When it is code-generable,
-        function type cannot be linear.
-        So false is returned anyway.  *)
-      false (* function (closure) must not reference outside linear variables *)
-  | Ind iu -> is_linear_ind1 env sigma ty
-  | App (f, argsary) when isInd sigma f -> is_linear_ind1 env sigma ty
-  | _ ->
-      (* not code-generatable. *)
-      false
-
-and is_linear_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_linearity_map with
-  | Some LinearityIsLinear -> true
-  | Some LinearityIsUnrestricted -> false
-  | Some LinearityIsInvestigating -> false
-  | None ->
-      (type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsInvestigating !type_linearity_map;
-      if is_linear_ind env sigma ty then
-        (Feedback.msg_info (Pp.str "[codegen] Linear type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsLinear !type_linearity_map;
-        true)
-      else
-        (Feedback.msg_info (Pp.str "[codegen] Non-linear (unrestricted) type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_linearity_map := ConstrMap.add (EConstr.to_constr sigma ty) LinearityIsUnrestricted !type_linearity_map;
-        false))
-and is_linear_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_linear_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  let (ind_f, argsary) =
-    match EConstr.kind sigma ty with
-    | App (f, argsary) -> (f, argsary)
-    | _ -> (ty, [| |])
-  in
-  Array.iter
-    (fun arg ->
-      if not (Vars.closed0 sigma arg) then
-        user_err (Pp.str "[codegen] is_linear_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
-    argsary;
-  let mutind = fst (fst (destInd sigma ind_f)) in
-  let exception FoundLinear in
-  try
-    mutind_cstrarg_iter env sigma mutind argsary
-      (fun ind_id cons_id argty ->
-        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
-        match EConstr.kind sigma argty_f with
-        | Sort _ ->
-            user_err (Pp.str "[codegen] is_linear_ind: constructor has type argument")
-        | Prod (x, ty, b) ->
-            (* function type argument of a constructor is non-linear or non-code-generatable *)
-            ()
-        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
-            () (* inductive types currently traversing *)
-        | Ind _ ->
-            if is_linear_type env sigma argty then raise FoundLinear
-        | _ ->
-            user_err (Pp.str "[codegen:is_linear_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
+let is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  if has_sort then
+    false (* not code-generatable *)
+  else if ConstrSet.exists
+       (fun ty ->
+         match ConstrMap.find_opt ty !type_linearity_map with
+         | Some LinearityIsLinear -> true
+         | _ -> false)
+       ty_set then
+    true
+  else
     false
-  with
-    FoundLinear -> true
 
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
@@ -274,66 +223,21 @@ let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConst
     - a inductive type which has (possibly indirectly) have a component which type is DownwardOnly.
   - function type is always DownwardOnly.
 *)
-let rec is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_type:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  match EConstr.kind sigma ty with
-  | Prod (name, namety, body) ->
-      true (* function (closure) must be DownwardOnly *)
-  | Ind iu -> is_downward_ind1 env sigma ty
-  | App (f, argsary) when isInd sigma f -> is_downward_ind1 env sigma ty
-  | _ ->
-      (* not code-generatable. *)
-      false
-
-and is_downward_ind1 (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_ind1:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  match ConstrMap.find_opt (EConstr.to_constr sigma ty) !type_downward_map with
-  | Some DownwardOnly -> true
-  | Some DownwardUnrestricted -> false
-  | Some DownwardInvestigating -> false
-  | None ->
-      (type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardInvestigating !type_downward_map;
-      if is_downward_ind env sigma ty then
-        (Feedback.msg_info (Pp.str "[codegen] Downward type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardOnly !type_downward_map;
-        true)
-      else
-        (Feedback.msg_info (Pp.str "[codegen] Non-downward (unrestricted) type registered:" +++ Printer.pr_econstr_env env sigma ty);
-        type_downward_map := ConstrMap.add (EConstr.to_constr sigma ty) DownwardUnrestricted !type_downward_map;
-        false))
-and is_downward_ind (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  (*Feedback.msg_debug (Pp.str "[codegen] is_downward_ind:ty=" ++ Printer.pr_econstr_env env sigma ty);*)
-  let (ind_f, argsary) =
-    match EConstr.kind sigma ty with
-    | App (f, argsary) -> (f, argsary)
-    | _ -> (ty, [| |])
-  in
-  Array.iter
-    (fun arg ->
-      if not (Vars.closed0 sigma arg) then
-        user_err (Pp.str "[codegen] is_downward_ind: constructor type has has local reference:" +++ Printer.pr_econstr_env env sigma arg))
-    argsary;
-  let mutind = fst (fst (destInd sigma ind_f)) in
-  let exception FoundDownward in
-  try
-    mutind_cstrarg_iter env sigma mutind argsary
-      (fun ind_id cons_id argty ->
-        let (argty_f,argty_args) = EConstr.decompose_app sigma argty in
-        match EConstr.kind sigma argty_f with
-        | Sort _ ->
-            user_err (Pp.str "[codegen] is_downward_ind: constructor has type argument")
-        | Prod _ ->
-            (* function type argument of a constructor means DownwardOnly *)
-            raise FoundDownward
-        | Ind ((mutind',i),_) when MutInd.CanOrd.equal mutind mutind' ->
-            ()
-        | Ind _ ->
-            if is_downward_type env sigma argty then raise FoundDownward
-        | _ ->
-            user_err (Pp.str "[codegen:is_downward_ind] unexpected constructor argument:" +++ Printer.pr_econstr_env env sigma argty));
+let is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  if has_sort then
+    false (* not code-generatable *)
+  else if has_func then
+    true
+  else if ConstrSet.exists
+            (fun ty ->
+              match ConstrMap.find_opt ty !type_downward_map with
+              | Some DownwardOnly -> true
+              | _ -> false)
+            ty_set then
+    true
+  else
     false
-  with
-    FoundDownward -> true
 
 let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
