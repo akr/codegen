@@ -98,54 +98,53 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
   let (_,ind_ary) = make_ind_ary env sigma mutind in
   Array.map (fun ind -> nf_all env sigma (mkApp (ind, Array.of_list ty_args))) ind_ary
 
-let mutind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (params : EConstr.t array)
+let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let open Context.Rel.Declaration in
+  let (mutind, i) = ind in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind in
-  (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] mutind=[" ++
+  (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
     pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
     Pp.str "params=[" ++
     pp_sjoinmap_ary (fun p -> Printer.pr_econstr_env env sigma p) params ++ Pp.str "]");*)
-  Array.iter
-    (fun oind_body ->
-      let ind_id = oind_body.mind_typename in
-      Array.iter2
-        (fun cons_id nf_lc ->
-          (* ctx is a list of decls from innermost to outermost *)
-          let (ctx, t) = nf_lc in
-          (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] reduce" +++
-                         Pp.str "typename=" ++ Id.print ind_id +++
-                         Pp.str "consname=" ++ Id.print cons_id +++
-                         Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env sigma ctx ++ Pp.str "]" +++
-                         Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma t);*)
-          let rev_ctx = array_rev (Array.of_list ctx) in
-          let env2 = ref env in
-          let params = ref (Array.to_list params) in
-          let h = Array.length rev_ctx in
-          for i = 0 to h - 1 do
-            (* msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] i=" ++ Pp.int i +++ Printer.pr_rel_context_of !env2 sigma); *)
-            let decl = rev_ctx.(i) in
-            match decl with
-            | LocalDef (x,e,ty) ->
-                env2 := Environ.push_rel decl !env2
-            | LocalAssum (x,ty) ->
-                let ty = EConstr.of_constr ty in
-                (match !params with
-                | param :: rest ->
-                    params := rest;
-                    env2 := EConstr.push_rel (LocalDef (x, param, ty)) !env2
-                | [] ->
-                    let ty' = nf_all !env2 sigma ty in
-                    (*msg_debug_hov (Pp.str "[codegen:mutind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
-                    if not (Vars.noccur_between sigma 1 i ty') then
-                      user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env2 sigma ty');
-                    let ty' = Vars.lift (-i) ty' in
-                    f ind_id cons_id ty';
-                    env2 := Environ.push_rel decl !env2)
-          done)
-        oind_body.mind_consnames oind_body.mind_nf_lc)
-    mind_body.mind_packets
+  let oind_body = mind_body.mind_packets.(i) in
+  let ind_id = oind_body.mind_typename in
+  Array.iter2
+    (fun cons_id nf_lc ->
+      (* ctx is a list of decls from innermost to outermost *)
+      let (ctx, t) = nf_lc in
+      (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] reduce" +++
+                     Pp.str "typename=" ++ Id.print ind_id +++
+                     Pp.str "consname=" ++ Id.print cons_id +++
+                     Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env sigma ctx ++ Pp.str "]" +++
+                     Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma t);*)
+      let rev_ctx = array_rev (Array.of_list ctx) in
+      let env2 = ref env in
+      let params = ref (Array.to_list params) in
+      let h = Array.length rev_ctx in
+      for j = 0 to h - 1 do
+        (* msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] j=" ++ Pp.int j +++ Printer.pr_rel_context_of !env2 sigma); *)
+        let decl = rev_ctx.(j) in
+        match decl with
+        | LocalDef (x,e,ty) ->
+            env2 := Environ.push_rel decl !env2
+        | LocalAssum (x,ty) ->
+            let ty = EConstr.of_constr ty in
+            (match !params with
+            | param :: rest ->
+                params := rest;
+                env2 := EConstr.push_rel (LocalDef (x, param, ty)) !env2
+            | [] ->
+                let ty' = nf_all !env2 sigma ty in
+                (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
+                if not (Vars.noccur_between sigma 1 j ty') then
+                  user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env2 sigma ty');
+                let ty' = Vars.lift (-j) ty' in
+                f ind_id cons_id ty';
+                env2 := Environ.push_rel decl !env2)
+      done)
+    oind_body.mind_consnames oind_body.mind_nf_lc
 
 let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
   if ConstrSet.mem (EConstr.to_constr sigma ty) !ty_set_ref then
@@ -155,10 +154,9 @@ let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : ECo
     match EConstr.kind sigma ty_f with
     | Sort _ -> has_sort_ref := true
     | Prod _ -> has_func_ref := true
-    | Ind ((mutind, _), univ) ->
-        let mutinds_set = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
-        ty_set_ref := (ConstrSet.union !ty_set_ref mutinds_set);
-        mutind_cstrarg_iter env sigma mutind ty_args
+    | Ind (ind, univ) ->
+        ty_set_ref := (ConstrSet.add (EConstr.to_constr sigma ty) !ty_set_ref);
+        ind_cstrarg_iter env sigma ind ty_args
           (fun ind_id cons_id argty ->
             component_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
