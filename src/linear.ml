@@ -146,7 +146,7 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive
       done)
     oind_body.mind_consnames oind_body.mind_nf_lc
 
-let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
+let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
   if ConstrSet.mem (EConstr.to_constr sigma ty) !ty_set_ref then
     ()
   else
@@ -158,18 +158,18 @@ let rec component_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : ECo
         ty_set_ref := (ConstrSet.add (EConstr.to_constr sigma ty) !ty_set_ref);
         ind_cstrarg_iter env sigma ind ty_args
           (fun ind_id cons_id argty ->
-            component_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
+            traverse_constructor_argument_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
 
-let component_types_funcs_sorts (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : (ConstrSet.t * bool * bool) =
+let traverse_constructor_argument_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : (ConstrSet.t * bool * bool) =
   let ty_set_ref = ref (ConstrSet.empty) in
   let has_func_ref = ref false in
   let has_sort_ref = ref false in
-  component_types_acc env sigma ty ty_set_ref has_func_ref has_sort_ref;
+  traverse_constructor_argument_types_acc env sigma ty ty_set_ref has_func_ref has_sort_ref;
   (!ty_set_ref, !has_func_ref, !has_sort_ref)
 
 let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : ConstrSet.t option =
-  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  let (ty_set, has_func, has_sort) = traverse_constructor_argument_types env sigma ty in
   if has_func || has_sort then
     None
   else
@@ -188,7 +188,7 @@ let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
   - function type is always unrestricted.
 *)
 let is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  let (ty_set, has_func, has_sort) = traverse_constructor_argument_types env sigma ty in
   if has_sort then
     false (* not code-generatable *)
   else
@@ -220,7 +220,7 @@ let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConst
   - function type is always DownwardOnly.
 *)
 let is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  let (ty_set, has_func, has_sort) = component_types_funcs_sorts env sigma ty in
+  let (ty_set, has_func, has_sort) = traverse_constructor_argument_types env sigma ty in
   if has_sort then
     false (* not code-generatable *)
   else if has_func then
