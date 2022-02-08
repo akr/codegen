@@ -748,9 +748,10 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
 
   | _ ->
       (* global constant *)
+      assert (Environ.nb_rel env = 0);
       let term_ty = nf_all env sigma (Retyping.get_type_of env sigma term) in
-      let (lconsumed,bused,bresult) = borrowcheck_expression env sigma lvar_env borrow_env term [] term_ty in
-      bresult
+      ignore (borrowcheck_expression env sigma lvar_env borrow_env term [] term_ty);
+      ConstrMap.empty
 
 and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
