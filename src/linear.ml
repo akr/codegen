@@ -677,19 +677,22 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
   match EConstr.kind sigma term with
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
+      let h = Array.length fary in
       let lvar_env2 =
-        CList.addn (Array.length fary) None lvar_env
+        CList.addn h None lvar_env
       in
       (* The fix-bounded functions may access borrowed values via free variables.
          So this assumption of borrow_env2, fix-bounded functions contain no borrowed values, is invalid.
          However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
-         - borrowcheck_function returns the set of borrowed values correctly
-         - if a function contains some borrowed values (via free variables), its application is restricted that arguments cannot have corresponding linear variables
-         - functions cannot capture linear variables
-         Thus, the corresponding linear variables are not consumed and the borrowed values are usable in this fix-term.
+         Consider an application: (fix ...) args
+         - (fix ...) cannot capture linear variables because it is a function
+         - borrowcheck_function returns correct bused for (fix ...).
+         - borrowcheck_function apply an constraint that
+           args must not contain linear variables corresponds to bused of (fix ...).
+         Thus, the corresponding linear variables of bused are not consumed and the borrowed values are usable in this fix-term.
        *)
       let borrow_env2 =
-        CList.addn (Array.length fary) ConstrMap.empty borrow_env
+        CList.addn h ConstrMap.empty borrow_env
       in
       let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
       borrow_union_ary bresults
@@ -934,8 +937,9 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (IntSet.empty, bresult, bresult)
       else
         let env2 = EConstr.push_rec_types prec env in
+        let h = Array.length fary in
         let lvar_env2 =
-          CList.addn (Array.length fary) None lvar_env
+          CList.addn h None lvar_env
         in
         (* The fix-bounded functions, fary, may reference free borrowed variables but
            cannot reference free linear variables.
@@ -947,7 +951,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
            check_app verify (conservertively) the condition between sucn linear variables and bresults.
          *)
         let borrow_env2 =
-          CList.addn (Array.length fary) ConstrMap.empty borrow_env
+          CList.addn h ConstrMap.empty borrow_env
         in
         let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
         let bresult = borrow_union_ary bresults in
