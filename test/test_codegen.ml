@@ -2814,7 +2814,7 @@ let test_linear_types (ctx : test_ctxt) : unit =
 
 let test_linear_novar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable not lineary used:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument not consumed:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := tt.
@@ -2823,7 +2823,7 @@ let test_linear_novar (ctx : test_ctxt) : unit =
 
 let test_linear_twovar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable not lineary used:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables used multiply in arguments:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := (x,x).
@@ -2832,7 +2832,7 @@ let test_linear_twovar (ctx : test_ctxt) : unit =
 
 let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] inconsistent linear variable use in match branches") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] match-branches uses linear variables inconsistently:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) (b : bool) :=
@@ -2845,7 +2845,7 @@ let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
 
 let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable is referened by an inner function:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument outside of fix-term:") ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) :=

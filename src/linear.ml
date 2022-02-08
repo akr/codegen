@@ -204,9 +204,6 @@ let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : 
     user_err_hov (Pp.str "[codegen:is_linear] free variable in type:" +++ Printer.pr_econstr_env env sigma ty2));
   is_linear_type env sigma ty2
 
-let check_type_linearity (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
-  ignore (is_linear env sigma ty)
-
 (*
   is_downward_type env sigma ty returns true if
   ty is code generatable and it is DownwardOnly.
@@ -240,170 +237,6 @@ let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
 
 (*let check_type_downwardness (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   ignore (is_downward env sigma ty)*)
-
-let with_local_var (env : Environ.env) (sigma : Evd.evar_map)
-    (decl : EConstr.rel_declaration) (linear_vars : bool list)
-    (numvars_innermost_function : int)
-    (f : Environ.env -> bool list -> int -> int IntMap.t) : int IntMap.t =
-  let env2 = EConstr.push_rel decl env in
-  let name = Context.Rel.Declaration.get_name decl in
-  let ty = Context.Rel.Declaration.get_type decl in
-  let numvars_innermost_function2 = numvars_innermost_function+1 in
-  if not (is_linear env sigma ty) then
-    f env2 (false :: linear_vars) numvars_innermost_function2
-  else
-    (let count = f env2 (true :: linear_vars) numvars_innermost_function2 in
-    let opt_n = IntMap.find_opt (Environ.nb_rel env) count in
-    if opt_n <> Some 1 then
-      user_err (Pp.str "[codegen] linear variable not lineary used:" +++ Names.Name.print name +++ Pp.str "(" ++ Pp.int (Stdlib.Option.value opt_n ~default:0) +++ Pp.str "times used)")
-    else
-      IntMap.remove (Environ.nb_rel env) count)
-
-(* with_local_revctx is only for with_local_ctx.
-   revctx is ctx reversed in with_local_revctx *)
-let rec with_local_revctx (env : Environ.env) (sigma : Evd.evar_map)
-    (revctx : EConstr.rel_context) (linear_vars : bool list)
-    (numvars_innermost_function : int)
-    (f : Environ.env -> bool list -> int -> int IntMap.t) : int IntMap.t =
-  match revctx with
-  | [] ->
-      f env linear_vars numvars_innermost_function
-  | decl :: revctx' ->
-      with_local_var env sigma decl linear_vars numvars_innermost_function
-        (fun env' linear_vars' numvars_innermost_function' ->
-          with_local_revctx env' sigma revctx' linear_vars' numvars_innermost_function' f)
-
-let with_local_ctx (env : Environ.env) (sigma : Evd.evar_map)
-    (ctx : EConstr.rel_context) (linear_vars : bool list)
-    (numvars_innermost_function : int)
-    (f : Environ.env -> bool list -> int -> int IntMap.t) : int IntMap.t =
-  with_local_revctx env sigma (List.rev ctx) linear_vars numvars_innermost_function f
-
-let merge_count (c1 : int IntMap.t) (c2 : int IntMap.t) : int IntMap.t =
-  IntMap.merge
-    (fun j n1 n2 -> Some (Stdlib.Option.value n1 ~default:0 + Stdlib.Option.value n2 ~default:0))
-    c1 c2
-
-let rec linearcheck_function (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bool list) (term : EConstr.t) : unit =
-  let count = linearcheck_function_rec env sigma linear_vars 0 term in
-  if IntMap.is_empty count then
-    ()
-  else
-    user_err (Pp.str "[codegen] linear variable is referened by an inner function:" +++
-      pp_sjoinmap_list
-        (fun (j, _) -> Names.Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - j) env)))
-        (IntMap.bindings count))
-and linearcheck_function_rec (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bool list) (numvars_innermost_function : int) (term : EConstr.t) : int IntMap.t =
-  ((*Feedback.msg_debug (str "[codegen] linearcheck_function:" +++ Printer.pr_econstr_env env sigma term);*)
-  match EConstr.kind sigma term with
-  | Lambda (name, ty, body) ->
-      (check_type_linearity env sigma ty;
-      let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-      with_local_var env sigma decl linear_vars numvars_innermost_function
-        (fun env2 linear_vars2 numvars_innermost_function2 -> linearcheck_function_rec env2 sigma linear_vars2 numvars_innermost_function2 body))
-  | _ -> linearcheck_exp env sigma linear_vars numvars_innermost_function term 0)
-and linearcheck_exp (env : Environ.env) (sigma : Evd.evar_map) (linear_vars : bool list) (numvars_innermost_function : int) (term : EConstr.t) (numargs : int) : int IntMap.t =
-  ((*Feedback.msg_debug (str "[codegen] linearcheck_exp:" +++ Printer.pr_econstr_env env sigma term);*)
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _
-  | Sort _ | Prod _ | Ind _
-  | CoFix _ | Array _ ->
-      user_err (Pp.str "[codegen:linearcheck_exp] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
-  | Rel i ->
-      if List.nth linear_vars (i-1) then
-        IntMap.singleton (Environ.nb_rel env - i) 1
-      else
-        IntMap.empty
-  | Cast (expr, kind, ty) ->
-      (check_type_linearity env sigma ty;
-      linearcheck_exp env sigma linear_vars numvars_innermost_function expr numargs)
-  | Lambda (name, ty, body) ->
-      if numargs <= 0 then
-        (* closure creation found *)
-        (linearcheck_function env sigma linear_vars term;
-        IntMap.empty)
-      else
-	let decl = Context.Rel.Declaration.LocalAssum (name, ty) in
-	with_local_var env sigma decl linear_vars numvars_innermost_function
-          (fun env2 linear_vars2 numvars_innermost_function2 -> linearcheck_exp env2 sigma linear_vars2 numvars_innermost_function2 body (numargs-1))
-  | LetIn (name, expr, ty, body) ->
-      (check_type_linearity env sigma ty;
-      let count1 = linearcheck_exp env sigma linear_vars numvars_innermost_function expr 0 in
-      let decl = Context.Rel.Declaration.LocalDef (name, expr, ty) in
-      let count2 = with_local_var env sigma decl linear_vars numvars_innermost_function
-        (fun env2 linear_vars2 numvars_innermost_function2 -> linearcheck_exp env2 sigma linear_vars2 numvars_innermost_function2 body numargs) in
-      merge_count count1 count2)
-  | App (f, argsary) ->
-      if isConst sigma f && Cset.mem (fst (destConst sigma f)) !borrow_function_set then
-        (* borrow function application found.
-           We don't count the linear variable reference of the argument of a borrow function application.
-           The defer validity checking of borrow function to borrow checker. *)
-        IntMap.empty
-      else
-        let count = linearcheck_exp env sigma linear_vars numvars_innermost_function f (Array.length argsary + numargs) in
-        let counts = Array.map (fun arg -> linearcheck_exp env sigma linear_vars numvars_innermost_function arg 0) argsary in
-        (* no partial application after argument completion? *)
-        if Array.exists (fun arg -> let ty = nf_all env sigma (Retyping.get_type_of env sigma arg) in
-                         is_linear env sigma ty) argsary &&
-           isProd sigma (whd_all env sigma (Retyping.get_type_of env sigma term)) then
-             user_err (Pp.str "[codegen] application with linear argument cannot return function value:" +++ Printer.pr_econstr_env env sigma term);
-        Array.fold_left merge_count count counts
-  | Const ctntu -> IntMap.empty
-  | Construct cstru -> IntMap.empty
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      (let count0 = linearcheck_exp env sigma linear_vars numvars_innermost_function item 0 in
-      let counts = Array.map2
-        (fun (nas,body) (ctx,_) ->
-          with_local_ctx env sigma ctx linear_vars numvars_innermost_function
-            (fun env' linear_vars' numvars_innermost_function' ->
-              linearcheck_exp env' sigma linear_vars' numvars_innermost_function' body numargs))
-        bl bl0
-      in
-      Array.iter
-        (fun c ->
-          if not (IntMap.equal Int.equal c counts.(0)) then
-            let pp_vars =
-              List.filter_map
-                (fun (j, b) ->
-                  if b then
-                    Some (Names.Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - j) env)))
-                  else
-                    None)
-                (IntMap.bindings
-                  (Array.fold_left
-                    (fun bmap1 bmap2 ->
-                      IntMap.merge
-                        (fun j opt_b0 opt_b1 -> Some (Stdlib.Option.value opt_b0 ~default:false || Stdlib.Option.value opt_b1 ~default:false))
-                        bmap1 bmap2)
-                    IntMap.empty
-                    (Array.map
-                      (fun c ->
-                        IntMap.merge
-                          (fun j opt_n0 opt_n1 -> Some (Stdlib.Option.value opt_n0 ~default:0 <> Stdlib.Option.value opt_n1 ~default:0))
-                          counts.(0) c)
-                      counts)))
-            in
-            user_err (Pp.str "[codegen] inconsistent linear variable use in match branches:" +++ pp_sjoin_list pp_vars))
-        counts;
-      merge_count count0 counts.(0))
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      (let h = Array.length fary in
-      let env2 = push_rec_types prec env in
-      let linear_vars2 = CList.addn h false linear_vars in
-      Array.iter (check_type_linearity env sigma) tary;
-      (* Since fix-bounded funcitons can be evaluated 0 or more times,
-        they cannot reference linear variables declared outside of the fix-expression. *)
-      Array.iter (fun f -> linearcheck_function env2 sigma linear_vars2 f) fary;
-      IntMap.empty)
-  | Proj (proj, expr) ->
-      linearcheck_exp env sigma linear_vars numvars_innermost_function expr 0
-  | Int n -> IntMap.empty
-  | Float n -> IntMap.empty)
-
-let linear_type_check_term (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
-  if not (ConstrSet.is_empty !linearity_type_set) then
-    linearcheck_function env sigma [] term
 
 let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
@@ -1142,24 +975,6 @@ let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
   ignore (borrowcheck_function env sigma [] [] term);
   borrowcheck_constructor env sigma term []
 
-let linear_type_check_single (libref : Libnames.qualid) : unit =
-  let gref = Smartlocate.global_with_alias libref in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  match gref with
-  | ConstRef ctnt ->
-      (let fctntu = Univ.in_punivs ctnt in
-      let value_and_type = Environ.constant_value_and_type env fctntu in
-      (match value_and_type with
-      | (Some term, termty, uconstraints) ->
-        let eterm = EConstr.of_constr term in
-        linearcheck_function env sigma [] eterm;
-        Feedback.msg_info (Pp.str "[codegen] linearity check passed:" +++ Printer.pr_constant env ctnt);
-        ()
-      | (_, _, _) -> user_err (Pp.str "[codegen] constant value couldn't obtained:" ++ Printer.pr_constant env ctnt)))
-  | _ -> user_err (Pp.str "[codegen] not a constant reference:" +++ Printer.pr_global gref)
-
-
 let add_borrow_type ?(msg_new:bool=false) ?(msg_already:bool=false)
     (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   let tyset = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
@@ -1224,9 +1039,6 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
       | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)
 
-let command_linear_check (libref_list : Libnames.qualid list) : unit =
-  List.iter linear_type_check_single libref_list
-
 let command_test_linear (t : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -1244,24 +1056,6 @@ let command_test_unrestricted (t : Constrexpr.constr_expr) : unit =
     user_err (Pp.str "[codegen] linear type:" +++ Printer.pr_econstr_env env sigma t)
   else
     Feedback.msg_info (Pp.str "unrestricted type:" +++ Printer.pr_econstr_env env sigma t)
-
-(* xxx test *)
-
-let command_linear_test t1 t2 =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, t1a) = Constrintern.interp_constr_evars env sigma t1 in
-  let (sigma, t2a) = Constrintern.interp_constr_evars env sigma t2 in
-  Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test t1:" +++ Printer.pr_econstr_env env sigma t1a);
-  Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test t2:" +++ Printer.pr_econstr_env env sigma t2a);
-  Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test is_conv:" +++ Pp.bool (Reductionops.is_conv env sigma t1a t2a));
-  Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test is_conv_leq:" +++ Pp.bool (Reductionops.is_conv_leq env sigma t1a t2a));
-  (match Reductionops.infer_conv env sigma t1a t2a with
-  | Some _ -> Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test infer_conv succeed")
-  | None -> Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test infer_conv failed"));
-  (match Reductionops.infer_conv ~pb:Reduction.CONV env sigma t1a t2a with
-  | Some _ -> Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test infer_conv(CONV) succeed")
-  | None -> Feedback.msg_debug (Pp.str "[codegen] linear_type_check_test infer_conv(CONV) failed"))
 
 let command_test_borrowcheck (term : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
