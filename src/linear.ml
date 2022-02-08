@@ -660,6 +660,15 @@ let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) :
     user_err_hov (Pp.str "[codegen:is_borrow_type] free variable in type:" +++ Printer.pr_econstr_env env sigma ty));
   ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
 
+let filter_borrow env sigma term_vs_ty bresult =
+  match component_types env sigma term_vs_ty with
+  | None -> bresult
+  | Some tyset ->
+      ConstrMap.filter
+        (fun ty _ ->
+          ConstrSet.mem ty tyset)
+        bresult
+
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
     (term : EConstr.t) : borrow_t =
@@ -865,15 +874,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       else
         (lvars_in_args_set, borrow_in_app)
   in
-  let filter_result bresult =
-    match component_types env sigma term_vs_ty with
-    | None -> bresult
-    | Some tyset ->
-        ConstrMap.filter
-          (fun ty _ ->
-            ConstrSet.mem ty tyset)
-          bresult
-  in
+  let filter_result bresult = filter_borrow env sigma term_vs_ty bresult in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _
   | Sort _ | Prod _ | Ind _
@@ -1016,10 +1017,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                         Id.print (id_of_name (Context.binder_name x)) +++ Pp.str "is" +++
                         (if is_borrow_type env1 sigma ty then Pp.str "borrow" else Pp.str "not-borrowed"));*)
                       let borrow_env1' =
-                        (if is_borrow_type env1 sigma ty then
-                          List.nth borrow_env (destRel sigma item  - 1)
-                        else
-                          ConstrMap.empty) :: borrow_env1
+                        filter_borrow env1 sigma ty (List.nth borrow_env (destRel sigma item  - 1)) :: borrow_env1
                       in
                       (env1',lvar_env1',borrow_env1')
                   | Context.Rel.Declaration.LocalDef (x, e, ty) ->
@@ -1076,7 +1074,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         else
           (IntSet.union lconsumed1 lconsumed2,
            borrow_union bused1 bused2,
-           borrow_union bresult1 bresult2)
+           bresult2)
 
   | Proj (proj, expr) ->
       if CList.is_empty vs then

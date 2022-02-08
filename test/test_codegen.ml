@@ -3455,6 +3455,34 @@ let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
 	fun (n : nat) => BC.
     |}) {| |}
 
+let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
+    ({|
+      Inductive L := LC.
+      Inductive B := BC.
+      Definition dealloc (l : L) : unit := match l with LC => tt end.
+      Definition borrow (l : L) : B := BC.
+      Inductive Box1 := box1 : B -> Box1.
+      Inductive Box2 := box2 : Box1 -> Box2.
+      Definition id_box2 (x : Box2) := x.
+      Definition f (l : L) :=
+        let b := borrow l in
+        let b1 := box1 b in
+        let b2 := box2 b1 in
+        let b3 := id_box2 b2 in
+        let b' := match b3 with
+                  | box2 b4 =>
+                      match b4 with
+                      | box1 b5 => b5
+                      end
+                  end in
+        let _ := dealloc l in
+        b'.
+      CodeGen BorrowFunction borrow.
+      CodeGen Function f.
+    |}) {| |}
+
 let test_void_tail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ {|
@@ -3747,6 +3775,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
     "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
     "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
+    "test_borrowcheck_borrow_nested_match" >:: test_borrowcheck_borrow_nested_match;
     "test_void_tail" >:: test_void_tail;
     "test_void_head" >:: test_void_head;
     "test_void_mutual" >:: test_void_mutual;
