@@ -748,7 +748,8 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
 
   | _ ->
       (* global constant *)
-      assert (Environ.nb_rel env = 0);
+      (if not (Environ.nb_rel env = 0) then
+        user_err_hov (Pp.str "[codegen:bug] borrowcheck_function1 takes non-lambda/fix only when env is empty"));
       let term_ty = nf_all env sigma (Retyping.get_type_of env sigma term) in
       ignore (borrowcheck_expression env sigma lvar_env borrow_env term [] term_ty);
       ConstrMap.empty
