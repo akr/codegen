@@ -2,6 +2,7 @@ module IntSet : Set.S with type elt = Int.t
 val abort : 'a -> 'a
 exception CodeGenError of string
 val array_rev : 'a array -> 'a array
+val array_skipn : int -> 'a array -> 'a array
 val array_map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val array_map3 :
   ('a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array

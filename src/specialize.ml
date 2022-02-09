@@ -340,7 +340,7 @@ let codegen_define_instance
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
   (if (icommand = CodeGenConstant) &&
-      not (isInd sigma (fst (decompose_app sigma presimp_type))) then
+      not (isInd sigma (fst (decompose_appvect sigma presimp_type))) then
     user_err (Pp.str "[codegen] CodeGen Constant needs a constant:" +++
       Printer.pr_constr_env env sigma presimp +++ Pp.str ":" +++
       Printer.pr_econstr_env env sigma presimp_type));
@@ -1104,11 +1104,11 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           (* msg_info_hov (Pp.str "[codegen] reduce_exp(Proj): lookup = " ++ Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma e);
           msg_info_hov (Pp.str "[codegen] reduce_exp(Proj): Projection.npars = " ++ int (Projection.npars pr));
           msg_info_hov (Pp.str "[codegen] reduce_exp(Proj): Projection.arg = " ++ int (Projection.arg pr)); *)
-          let (f, args) = decompose_app sigma e in
+          let (f, args) = decompose_appvect sigma e in
           (match EConstr.kind sigma f with
           | Construct _ ->
               (* reduction: iota-proj *)
-              let term2 = List.nth args (Projection.npars pr + Projection.arg pr) in
+              let term2 = args.(Projection.npars pr + Projection.arg pr) in
               let term2 = Vars.lift i term2 in
               debug_reduction "iota-proj" (fun () ->
                 let term1 = default () in
@@ -1160,13 +1160,13 @@ and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
            Note that Proj cannot have such let-in expression.
            So we will support it (after we support downward funargs,
            restricted closures).  *)
-        let (f_f, f_args) = decompose_app sigma e in
+        let (f_f, f_args) = decompose_appvect sigma e in
         match EConstr.kind sigma f_f with
         | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
             (* reduction: delta-fun *)
             reduce_app env sigma
               (Vars.lift m f_f)
-              (Array.append (CArray.map_of_list (Vars.lift m) f_args) args_nf)
+              (Array.append (Array.map (Vars.lift m) f_args) args_nf)
         | _ ->
             reduce_app2 env sigma f args_nf
   else
@@ -1221,7 +1221,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         (match decarg_decl with
         | Context.Rel.Declaration.LocalAssum _ -> default ()
         | Context.Rel.Declaration.LocalDef (_,decarg_val,_) ->
-            let (decarg_f, decarg_args) = decompose_app sigma decarg_val in
+            let (decarg_f, decarg_args) = decompose_appvect sigma decarg_val in
             if isConstruct sigma decarg_f then
               let h = Array.length fary in
               let fj = fary.(j) in
@@ -1291,11 +1291,11 @@ and try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
   (match EConstr.lookup_rel i env with
   | Context.Rel.Declaration.LocalAssum _ -> failure2 ()
   | Context.Rel.Declaration.LocalDef (x,item_content,t) ->
-      let (f, args) = decompose_app sigma item_content in
+      let (f, args) = decompose_appvect sigma item_content in
       (match EConstr.kind sigma f with
       | Construct ((ind, j), _) ->
           (* reduction: iota-match *)
-          let args = (Array.of_list (CList.skipn ci.ci_npar args)) in
+          let args = (array_skipn ci.ci_npar args) in
           let args = Array.map (Vars.lift i) args in
           let (nas, branch) = bl.(j-1) in
           if Array.length nas <> Array.length args then

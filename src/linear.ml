@@ -88,7 +88,7 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
   (mind_body,ind_ary)
 
 let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
-  let (ty_f, ty_args) = EConstr.decompose_app sigma ty in
+  let (ty_f, ty_args) = decompose_appvect sigma ty in
   let (mutind,i) =
     match EConstr.kind sigma ty_f with
     | Ind (ind,univ) -> ind
@@ -96,7 +96,7 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
                          Printer.pr_econstr_env env sigma ty)
   in
   let (_,ind_ary) = make_ind_ary env sigma mutind in
-  Array.map (fun ind -> nf_all env sigma (mkApp (ind, Array.of_list ty_args))) ind_ary
+  Array.map (fun ind -> nf_all env sigma (mkApp (ind, ty_args))) ind_ary
 
 let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
@@ -1025,9 +1025,9 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
       let ty = nf_all env sigma (EConstr.of_constr ty) in
       (match EConstr.kind sigma ty with
       | Prod (x, argty, retty) ->
-          if not (isInd sigma (fst (EConstr.decompose_app sigma argty))) then
+          if not (isInd sigma (fst (decompose_appvect sigma argty))) then
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which argument type is an inductive type:" +++ Printer.pr_constant env ctnt);
-          if not (isInd sigma (fst (EConstr.decompose_app sigma retty))) then
+          if not (isInd sigma (fst (decompose_appvect sigma retty))) then
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which result type is an inductive type:" +++ Printer.pr_constant env ctnt);
           let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
           let env2 = EConstr.push_rel decl env in

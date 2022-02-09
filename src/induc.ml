@@ -82,10 +82,10 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
           Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr list =
+let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr array =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (f, args) = Constr.decompose_app coq_type in
+  let (f, args) = Constr.decompose_appvect coq_type in
   (if not (Constr.isInd f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
     Printer.pr_constr_env env sigma coq_type));
@@ -251,7 +251,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         let j = j0 + 1 in
         let consname = oneind_body.Declarations.mind_consnames.(j0) in
         let cstr = mkConstruct ((mutind, i), j) in
-        let args = CArray.map_of_list EConstr.of_constr args in
+        let args = Array.map EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term env sigma consterm in
         let caselabel =

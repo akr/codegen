@@ -29,7 +29,7 @@ open Snippet
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
-  let (f, params) = decompose_app sigma coq_type in
+  let (f, params) = decompose_appvect sigma coq_type in
   let (ind, _) = destInd sigma f in
   let (mutind, _) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
@@ -76,7 +76,7 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
 let ind_mutual_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_mutual_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
-  let (f, params) = decompose_app sigma coq_type in
+  let (f, params) = decompose_appvect sigma coq_type in
   let (ind, _) = destInd sigma f in
   let (mutind, _) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
@@ -117,8 +117,8 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         (*member name*)string *
         (*accessor name*)string) list) list) list) =
   let global_prefix = global_gensym () in
-  let (f, args) = decompose_app sigma coq_type in
-  let params = CArray.rev_of_list args in (* xxx: args should be parameters of inductive type *)
+  let (f, args) = decompose_appvect sigma coq_type in
+  let params = array_rev args in (* xxx: args should be parameters of inductive type *)
   let (ind, _) = destInd sigma f in
   let (mutind, _) = ind in
   let mutind_body = Environ.lookup_mind mutind env in

@@ -33,6 +33,9 @@ let array_rev a =
   let n = Array.length a in
   Array.init n (fun i -> a.(n - i - 1))
 
+let array_skipn (n : int) (ary : 'a array) : 'a array =
+  Array.sub ary n (Array.length ary - n)
+
 let array_map2 f a1 a2 =
   if Array.length a1 <> Array.length a2 then
     invalid_arg "Array.map2: arrays must have the same length";
