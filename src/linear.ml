@@ -326,19 +326,18 @@ let intlist_duplicates (l : int list) : int list =
 
   and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
       (lvar_env : int option list) (borrow_env : borrow_t list)
-      (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) = ...
+      (term : EConstr.t) (term_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) = ...
 
   bresult = borrowcheck_function env sigma lvar_env borrow_env term
-  (lconsumed, bused, bresult) = borrowcheck_expression env sigma lvar_env borrow_env term vs term_vs_ty
+  (lconsumed, bused, bresult) = borrowcheck_expression env sigma lvar_env borrow_env term term_ty
 
   borrowcheck_function verifies `term` as a function.
   It returns bresult that is a set of free borrowed variables in term.
 
-  borrowcheck_expression verifies `term vs` as an expression.
+  borrowcheck_expression verifies `term` as an expression.
   It returns (lconsumed,bused,bresult).
 
   term : term to evaluate
-  vs : the list of variables (Rel) which are given to term
 
   They raises an error for invalid borrowing.
 
@@ -494,8 +493,8 @@ let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) :
     user_err_hov (Pp.str "[codegen:is_borrow_type] free variable in type:" +++ Printer.pr_econstr_env env sigma ty));
   ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_type_set
 
-let filter_borrow env sigma term_vs_ty bresult =
-  match component_types env sigma term_vs_ty with
+let filter_borrow env sigma term_ty bresult =
+  match component_types env sigma term_ty with
   | None -> bresult
   | Some tyset ->
       ConstrMap.filter
@@ -574,7 +573,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
           CList.addn (List.length args) ConstrMap.empty borrow_env
         in
         let body_ty = nf_all env sigma (Retyping.get_type_of env3 sigma body) in
-        let (lconsumed,bused,bresult) = borrowcheck_expression env3 sigma lvar_env3 borrow_env3 body [] body_ty in
+        let (lconsumed,bused,bresult) = borrowcheck_expression env3 sigma lvar_env3 borrow_env3 body body_ty in
         let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length args) lvar_env3)) in
         let (lconsumed_in_args, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) lconsumed in
         if not (IntSet.equal linear_args lconsumed_in_args) then
@@ -594,12 +593,12 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
       (if not (Environ.nb_rel env = 0) then
         user_err_hov (Pp.str "[codegen:bug] borrowcheck_function1 takes non-lambda/fix only when env is empty"));
       let term_ty = nf_all env sigma (Retyping.get_type_of env sigma term) in
-      ignore (borrowcheck_expression env sigma lvar_env borrow_env term [] term_ty);
+      ignore (borrowcheck_expression env sigma lvar_env borrow_env term term_ty);
       ConstrMap.empty
 
 and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
-    (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
+    (term : EConstr.t) (term_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
   if !opt_debug_borrowcheck then
     msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] start:" +++
       Pp.str "lvar_env=[" ++
@@ -626,9 +625,8 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
         (array_rev (iota_ary 1 (Environ.nb_rel env))) ++
       Pp.str "]" +++
       Printer.pr_econstr_env env sigma term +++
-      Pp.str "/" +++ pp_sjoinmap_list (fun l -> Printer.pr_econstr_env env sigma (mkRel (Environ.nb_rel env - l))) vs +++
-      Pp.str ":" +++ Printer.pr_econstr_env env sigma term_vs_ty);
-  let (lconsumed, bused, bresult) = borrowcheck_expression1 env sigma lvar_env borrow_env term vs term_vs_ty in
+      Pp.str ":" +++ Printer.pr_econstr_env env sigma term_ty);
+  let (lconsumed, bused, bresult) = borrowcheck_expression1 env sigma lvar_env borrow_env term term_ty in
   (if not (IntSet.subset (lvariables_of_borrow bresult) (IntSet.diff (lvariables_of_borrow bused) lconsumed)) then
     user_err_hov (Pp.str "[codegen:bug] not (bresult <= (bused - lconsumed))"));
   (if not (IntSet.is_empty lconsumed) && not (IntSet.max_elt lconsumed < Environ.nb_rel env) then
@@ -667,12 +665,13 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
       Pp.str "bused=" ++ pr_borrow env sigma bused +++
       Pp.str "bresult=" ++ pr_borrow env sigma bresult +++
       Printer.pr_econstr_env env sigma term +++
-      Pp.str "/" +++ pp_sjoinmap_list (fun l -> Printer.pr_econstr_env env sigma (mkRel (Environ.nb_rel env - l))) vs +++
-      Pp.str ":" +++ Printer.pr_econstr_env env sigma term_vs_ty);
+      Pp.str ":" +++ Printer.pr_econstr_env env sigma term_ty);
   (lconsumed, bused, bresult)
 and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
-    (term : EConstr.t) (vs : int list) (term_vs_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
+    (term : EConstr.t) (term_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
+  let (term, argsary) = decompose_appvect sigma term in
+  let vs = CArray.map_to_list (fun rel -> Environ.nb_rel env - destRel sigma rel) argsary in
   let check_app (lconsumed : IntSet.t) (bresult : borrow_t) : IntSet.t * borrow_t =
     if CList.is_empty vs then
       (lconsumed, bresult)
@@ -708,18 +707,14 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       else
         (lvars_in_args_set, borrow_in_app)
   in
-  let filter_result bresult = filter_borrow env sigma term_vs_ty bresult in
+  let filter_result bresult = filter_borrow env sigma term_ty bresult in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _
   | Sort _ | Prod _ | Ind _
   | CoFix _ | Array _
-  | Cast _ | Int _ | Float _ ->
+  | Cast _ | Int _ | Float _
+  | App _ ->
       user_err_hov (Pp.str "[codegen:borrowcheck_expression] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
-  | App (f, argsary) ->
-      assert (vs = []);
-      borrowcheck_expression env sigma lvar_env borrow_env
-        f (List.append (CArray.map_to_list (fun rel -> Environ.nb_rel env - destRel sigma rel) argsary) vs)
-        term_vs_ty
   | Rel i ->
       let bresult = List.nth borrow_env (i-1) in
       let lconsumed =
@@ -789,26 +784,13 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (lconsumed', bused', filter_result bused')
 
   | Lambda (x, ty, b) ->
-      assert (vs = []);
-      (match vs with
-      | [] -> (* closure creation *)
-          let bresult = borrowcheck_function env sigma lvar_env borrow_env term in
-          (IntSet.empty, bresult, bresult)
-      | l :: rest_vs ->
-          let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-          let env2 = EConstr.push_rel decl env in
-          let i = Environ.nb_rel env - l in
-          let lvar_env2 =
-            List.nth lvar_env (i-1) :: lvar_env
-          in
-          let borrow_env2 =
-            List.nth borrow_env (i-1) :: borrow_env
-          in
-          borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b rest_vs term_vs_ty)
+      (* closure creation *)
+      let bresult = borrowcheck_function env sigma lvar_env borrow_env term in
+      (IntSet.empty, bresult, bresult)
 
   | LetIn (x, e, ty, b) ->
       assert (vs = []);
-      let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e [] ty in
+      let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e ty in
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
       let ty_is_linear = is_linear_type env sigma ty in
@@ -817,7 +799,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (if ty_is_linear then Some l else None) :: lvar_env
       in
       let borrow_env2 = bresult1 :: borrow_env in
-      let (lconsumed2, bused2, bresult2) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b vs term_vs_ty in
+      let (lconsumed2, bused2, bresult2) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b term_ty in
       if not (IntSet.disjoint lconsumed1 lconsumed2) then
         user_err_hov (Pp.str "[codegen] linear variables consumed multiply:" +++ pr_deBruijn_level_set env (IntSet.inter lconsumed1 lconsumed2))
       else if ty_is_linear && not (IntSet.mem l lconsumed2) then
@@ -834,7 +816,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       assert (vs = []);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let item_ty = Retyping.get_type_of env sigma item in
-      let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env item [] item_ty in
+      let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env item item_ty in
       let branch_results =
         Array.map2
           (fun (nas,body) (ctx,_) -> (* ctx is a list from inside declaration to outside declaration *)
@@ -862,7 +844,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                       user_err_hov (Pp.str "[codegen] let-in in constructor type is not supported yet"))
                 ctx ~init:(env,lvar_env,borrow_env)
             in
-            let (br_lconsumed,br_bused,br_bresult) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 body vs term_vs_ty in
+            let (br_lconsumed,br_bused,br_bresult) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 body term_ty in
             let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length ctx) lvar_env2)) in
             let (lconsumed_in_members, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) br_lconsumed in
             if not (IntSet.equal linear_args lconsumed_in_members) then
@@ -917,7 +899,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
   | Proj (proj, expr) ->
       if CList.is_empty vs then
         let expr_ty = nf_all env sigma (Retyping.get_type_of env sigma expr) in
-        let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env expr [] expr_ty in
+        let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env expr expr_ty in
         (lconsumed1, bused1, filter_result bresult1)
       else
         user_err_hov (Pp.str "[codegen] the result of projection is a function")
