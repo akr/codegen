@@ -279,6 +279,7 @@ let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc
       check_fix_downwardness env sigma cfunc expr
 
 let check_function_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
+  let term = Matchapp.simplify_matchapp env sigma term in
   let termty = nf_all env sigma (Retyping.get_type_of env sigma term) in
   let (argtys, retty) = EConstr.decompose_prod sigma termty in
   if is_downward env sigma retty then
@@ -715,6 +716,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
   | Cast _ | Int _ | Float _ ->
       user_err_hov (Pp.str "[codegen:borrowcheck_expression] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | App (f, argsary) ->
+      assert (vs = []);
       borrowcheck_expression env sigma lvar_env borrow_env
         f (List.append (CArray.map_to_list (fun rel -> Environ.nb_rel env - destRel sigma rel) argsary) vs)
         term_vs_ty
@@ -787,6 +789,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (lconsumed', bused', filter_result bused')
 
   | Lambda (x, ty, b) ->
+      assert (vs = []);
       (match vs with
       | [] -> (* closure creation *)
           let bresult = borrowcheck_function env sigma lvar_env borrow_env term in
@@ -804,6 +807,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
           borrowcheck_expression env2 sigma lvar_env2 borrow_env2 b rest_vs term_vs_ty)
 
   | LetIn (x, e, ty, b) ->
+      assert (vs = []);
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e [] ty in
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
@@ -827,6 +831,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (lconsumed0, bused0, bresult0)
 
   | Case (ci,u,pms,p,iv,item,bl) ->
+      assert (vs = []);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let item_ty = Retyping.get_type_of env sigma item in
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env item [] item_ty in
@@ -972,6 +977,7 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
 
 let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : unit =
+  let term = Matchapp.simplify_matchapp env sigma term in
   ignore (borrowcheck_function env sigma [] [] term);
   borrowcheck_constructor env sigma term []
 

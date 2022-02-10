@@ -11,6 +11,8 @@ src/cgenutil.mli
 src/cgenutil.ml
 src/induc.mli
 src/induc.ml
+src/matchapp.mli
+src/matchapp.ml
 src/specialize.mli
 src/specialize.ml
 src/linear.mli

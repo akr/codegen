@@ -3018,6 +3018,27 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
       assert(f(x2) == x2);
     |}
 
+let test_matchapp_twoarg (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Definition use_bn (b : bool) (n : nat) : unit := tt.
+      CodeGen TestBorrowCheck
+        fun (u : unit) (b : bool) (n : nat) =>
+        match u with
+        | tt => fun (b2 : bool) (n2 : nat) => use_bn b2 n2
+        end b n.
+      CodeGen TestBorrowCheck
+        fun (u : unit) (b : bool) (n : nat) =>
+        match u return bool -> nat -> unit with
+        | tt => fun (b2 : bool) (n2 : nat) => use_bn b2 n2
+        end b.
+      CodeGen TestBorrowCheck
+        fun (u : unit) (b : bool) (n : nat) =>
+        match u return bool -> nat -> unit with
+        | tt => fun (b2 : bool) => match u with tt => fun n2 => use_bn b2 n2 end
+        end b n.
+    |}) {| |}
+
 let test_borrowcheck_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
     ({|
@@ -3047,7 +3068,7 @@ let test_borrowcheck_invalid_linearity_linear_arg_out_of_fix (ctx : test_ctxt) :
       CodeGen Linear L.
       CodeGen TestBorrowCheck
 	fun (x : L) =>
-        fix f (n : nat) := match n with O => O | S m => S (f m) end.
+        fix f (n : nat) := match n with O => O | S m => let x := f m in S x end.
     |}) {| |}
 
 let test_borrowcheck_invalid_linearity_lambda (ctx : test_ctxt) : unit =
@@ -3749,6 +3770,7 @@ let suite : OUnit2.test =
     "test_downward_in_pair" >:: test_downward_in_pair;
     "test_downward_fixfunc" >:: test_downward_fixfunc;
     "test_downward_indirect_cycle" >:: test_downward_indirect_cycle;
+    "test_matchapp_twoarg" >:: test_matchapp_twoarg;
     "test_borrowcheck_constructor" >:: test_borrowcheck_constructor;
     "test_borrowcheck_constant" >:: test_borrowcheck_constant;
     "test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id;

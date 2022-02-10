@@ -1010,6 +1010,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
   | Construct (cstr,_) ->
       gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
   | App (f,args) ->
+      assert (cargs = []);
       let cargs2 =
         List.append
           (Array.to_list
@@ -1025,6 +1026,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
       in
       gen_head ~fixfunc_tbl ~used_vars ~cont env sigma f cargs2
   | Case (ci,u,pms,p,iv,item,bl) ->
+      assert (cargs = []);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let gen_switch =
         match cont.head_cont_exit_label with
@@ -1037,6 +1039,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_head_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
+      assert (cargs = []);
       let c_var = str_of_annotated_name x in
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1199,6 +1202,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
   | Construct (cstr,univ) ->
       gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
   | App (f,args) ->
+      assert (cargs = []);
       let cargs2 =
         List.append
           (Array.to_list
@@ -1227,6 +1231,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
           let env2 = EConstr.push_rel decl env in
           gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b rest)
   | Case (ci,u,pms,p,iv,item,bl) ->
+      assert (cargs = []);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~cont) env sigma ci item (bl,bl0) cargs
   | Proj (pr, item) ->
@@ -1234,6 +1239,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_tail_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
+      assert (cargs = []);
       let c_var = str_of_annotated_name x in
       let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
       let env2 = EConstr.push_rel decl env in
@@ -1774,6 +1780,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_term = EConstr.of_constr whole_term in
+  let whole_term = Matchapp.simplify_matchapp env sigma whole_term in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)

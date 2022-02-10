@@ -92,6 +92,7 @@ val pr_deep : Pp.t -> Pp.t
 val is_monomorphic_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val new_env_with_rels : Environ.env -> Environ.env
 val decompose_appvect : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
+val decompose_lam_upto_n : Environ.env -> Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t Context.binder_annot * EConstr.t) list * EConstr.t)
 val decompose_lam_n_env :
   Environ.env -> Evd.evar_map -> int -> EConstr.t -> Environ.env * EConstr.t
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int

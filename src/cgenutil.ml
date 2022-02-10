@@ -594,6 +594,19 @@ let decompose_appvect (sigma : Evd.evar_map) (term : EConstr.t) : (EConstr.t * E
   | App (f,args) -> (f,args)
   | _ -> (term, [||])
 
+let decompose_lam_upto_n (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t) list * EConstr.t =
+  let rec aux n fargs term =
+    if n <= 0 then
+      (fargs, term)
+    else
+      match EConstr.kind sigma term with
+      | Lambda (x,t,e) ->
+          aux (n-1) ((x,t)::fargs) e
+      | _ ->
+          (fargs, term)
+  in
+  aux n [] term
+
 let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Environ.env * EConstr.t) =
   if n = 0 then
     (env, term)
