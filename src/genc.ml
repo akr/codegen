@@ -941,6 +941,9 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
   loop assign;
   !rpp
 
+let ctx_of_fargs (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) : EConstr.rel_context =
+  List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) fargs
+
 type head_cont = {
   head_cont_ret_var: string option; (* None for void type context *)
   head_cont_exit_label: string option;
@@ -1110,7 +1113,7 @@ and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                                                        | (c_arg, Some c_ty) -> Some c_arg)
                                                ni_formal_arguments in
               let (fi_fargs, fi_body) = decompose_lam sigma fi in
-              let env3 = EConstr.push_rel_context (List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) fi_fargs) env2 in
+              let env3 = EConstr.push_rel_context (ctx_of_fargs fi_fargs) env2 in
               let ni_formal_argvars = CList.skipn (List.length fi_fargs) ni_formal_argvars in
               let ni_funcname = fixfunc_i.fixfunc_c_name in
               let pp_label =
@@ -1273,7 +1276,7 @@ and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
                       | (c_arg, Some c_ty) -> add_local_var c_ty c_arg)
               ni_formal_arguments;
             let (fi_fargs, fi_body) = decompose_lam sigma fi in
-            let env3 = EConstr.push_rel_context (List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) fi_fargs) env2 in
+            let env3 = EConstr.push_rel_context (ctx_of_fargs fi_fargs) env2 in
             let ni_funcname = fixfunc_i.fixfunc_c_name in
             let pp_label =
               if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
