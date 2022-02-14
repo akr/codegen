@@ -1240,13 +1240,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
       gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e +++
       gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b
 
-  | Fix _ ->
-      gen_tail2 ~fixfunc_tbl ~used_vars ~cont env sigma term cargs
-
-and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
-  match EConstr.kind sigma term with
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
+  | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
       if List.length cargs < List.length nj_formal_arguments then
@@ -1263,6 +1257,12 @@ and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
           cargs
       in
       let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
+      pp_assignments +++ pp_sjoin_list (gen_tail2 ~fixfunc_tbl ~used_vars ~cont env sigma term)
+
+and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t list =
+  match EConstr.kind sigma term with
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
       let pp_bodies =
         Array.map2
           (fun ni fi ->
@@ -1272,13 +1272,8 @@ and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
               (function (c_arg, None) -> ()
                       | (c_arg, Some c_ty) -> add_local_var c_ty c_arg)
               ni_formal_arguments;
-            let ni_formal_argvars = List.map (function (c_arg, None) -> None
-                                                     | (c_arg, Some c_ty) -> Some c_arg)
-                                             ni_formal_arguments
-            in
             let (fi_fargs, fi_body) = decompose_lam sigma fi in
             let env3 = EConstr.push_rel_context (List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) fi_fargs) env2 in
-            let ni_formal_argvars = CList.skipn (List.length fi_fargs) ni_formal_argvars in
             let ni_funcname = fixfunc_i.fixfunc_c_name in
             let pp_label =
               if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
@@ -1286,15 +1281,16 @@ and gen_tail2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
               else
                 Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
             in
-            pp_label +++ gen_tail2 ~fixfunc_tbl ~used_vars ~cont env3 sigma fi_body ni_formal_argvars)
+            let pp_bodies = gen_tail2 ~fixfunc_tbl ~used_vars ~cont env3 sigma fi_body in
+            (pp_label +++ List.hd pp_bodies) :: (List.tl pp_bodies))
           nary fary in
-      let reordered_pp_bodies = Array.copy pp_bodies in
-      Array.blit pp_bodies 0 reordered_pp_bodies 1 j;
-      reordered_pp_bodies.(0) <- pp_bodies.(j);
-      pp_assignments +++ pp_sjoin_ary reordered_pp_bodies
+      (List.hd pp_bodies.(j)) ::
+        List.concat
+          [List.tl pp_bodies.(j);
+           List.concat (Array.to_list (Array.sub pp_bodies 0 j));
+           List.concat (Array.to_list (Array.sub pp_bodies (j+1) (Array.length nary - (j+1))))]
   | _ ->
-      assert (cargs = []);
-      gen_tail ~fixfunc_tbl ~used_vars ~cont env sigma term
+      [gen_tail ~fixfunc_tbl ~used_vars ~cont env sigma term]
 
 let gen_function_header (static : bool) (return_type : string option) (c_name : string)
     (formal_arguments : (string * string) list) : Pp.t =
