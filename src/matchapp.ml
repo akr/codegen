@@ -37,14 +37,14 @@ let rels_of_levels (env : Environ.env) (args : int list) =
   args : arguments represented as list of de de Bruijn levels
 *)
 let rec simplify_matchapp_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (args : int list) : EConstr.t =
-  Feedback.msg_debug (Pp.hv 2 (Pp.str "[codegen:simplify_matchapp_rec] start" +++
+  (*Feedback.msg_debug (Pp.hv 2 (Pp.str "[codegen:simplify_matchapp_rec] start" +++
     Pp.hv 2 (Pp.str "term=" ++ Printer.pr_econstr_env env sigma term) +++
-    Pp.hv 2 (Pp.str "args=[" ++ pp_sjoinmap_list (fun l -> Pp.str (str_of_name_permissive (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - l) env)))) args ++ Pp.str "]")));
+    Pp.hv 2 (Pp.str "args=[" ++ pp_sjoinmap_list (fun l -> Pp.str (str_of_name_permissive (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - l) env)))) args ++ Pp.str "]")));*)
   let ret = simplify_matchapp_rec1 env sigma term args in
-  Feedback.msg_debug (Pp.hv 2 (Pp.str "[codegen:simplify_matchapp_rec] return" +++
+  (*Feedback.msg_debug (Pp.hv 2 (Pp.str "[codegen:simplify_matchapp_rec] return" +++
     Pp.hv 2 (Pp.str "term=" ++ Printer.pr_econstr_env env sigma term) +++
     Pp.hv 2 (Pp.str "args=[" ++ pp_sjoinmap_list (fun l -> Pp.str (str_of_name_permissive (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - l) env)))) args ++ Pp.str "]") +++
-    Pp.hv 2 (Pp.str "result=" ++ Printer.pr_econstr_env env sigma ret)));
+    Pp.hv 2 (Pp.str "result=" ++ Printer.pr_econstr_env env sigma ret)));*)
   ret
 and simplify_matchapp_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (args : int list) : EConstr.t =
   match EConstr.kind sigma term with
