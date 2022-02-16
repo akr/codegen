@@ -182,7 +182,7 @@ Definition ldrop {T : Type} :=
   fix ldrop (n : nat) (s : lseq T) : lseq T :=
     match n, s with
     | O, _ => s
-    | _, lnil => lnil 
+    | _, lnil => lnil
     | S n', lcons x s' => ldrop n' s'
     end.
 
@@ -190,7 +190,7 @@ Definition bdrop {T : Type} :=
   fix bdrop (n : nat) (s : bseq T) : bseq T :=
     match n, s with
     | O, _ => s
-    | _, bnil => s 
+    | _, bnil => s
     | S n', bcons x s' => bdrop n' s'
     end.
 
