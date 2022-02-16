@@ -91,7 +91,6 @@ CodeGen Deallocator lcons bool => "free".
 CodeGen Header Snippet "
 #include <stdlib.h> /* for NULL, malloc(), abort() */
 
-struct lseq_bool_struct;
 typedef struct lseq_bool_struct *lseq_bool;
 struct lseq_bool_struct {
   bool head;
