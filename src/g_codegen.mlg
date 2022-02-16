@@ -96,7 +96,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Gen FUNCTION_OR_C_FUNCNAME+.
 
   CodeGen Global Inline QUALID...
-  CodeGen Local Inline QUALID QUALID...
+  CodeGen Local Inline QUALID : QUALID...
 
   CodeGen Simplify Function C_FUNCNAME*.
   CodeGen Simplify Dependencies C_FUNCNAME*.
@@ -237,7 +237,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
       { command_global_inline funcs }
-    | [ "CodeGen" "Local" "Inline" ref(func) ref_list(funcs) ] ->
+    | [ "CodeGen" "Local" "Inline" ref(func) ":" ref_list(funcs) ] ->
       { command_local_inline func funcs }
 
     | [ "CodeGen" "Simplify" "Function" string_list(cfuncs) ] ->
