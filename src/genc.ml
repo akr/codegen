@@ -1029,7 +1029,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
               | None -> fixfunc.fixfunc_c_name
             in
             if fixfunc.fixfunc_inlinable then
-              let assginments =
+              let assignments =
                 list_filter_map2
                   (fun (lhs, ty_opt) rhs_opt ->
                     match ty_opt, rhs_opt with
@@ -1039,7 +1039,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                   fixfunc.fixfunc_formal_arguments
                   cargs
               in
-              let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
+              let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
               let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ fixfunc.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
@@ -1109,7 +1109,7 @@ and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
               (Array.of_list (list_filter_none cargs))))
       else
         let env2 = EConstr.push_rec_types prec env in
-        let assginments =
+        let assignments =
           list_filter_map2
             (fun (lhs, ty_opt) rhs_opt ->
               match ty_opt, rhs_opt with
@@ -1119,7 +1119,7 @@ and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
             nj_formal_arguments
             cargs
         in
-        let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
+        let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
         let exit_label = "exit_" ^ nj_funcname in
         let cont2 = match cont.head_cont_exit_label with
                     | None -> { cont with head_cont_exit_label = Some exit_label }
@@ -1225,7 +1225,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
             if List.length cargs < List.length formal_arguments then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
-            let assginments =
+            let assignments =
               list_filter_map2
                 (fun (lhs, ty_opt) rhs_opt ->
                   match ty_opt, rhs_opt with
@@ -1235,7 +1235,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
                 formal_arguments
                 cargs
             in
-            let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
+            let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
             let funcname = fixfunc.fixfunc_c_name in
             let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
@@ -1279,7 +1279,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
       if List.length cargs < List.length nj_formal_arguments then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
-      let assginments =
+      let assignments =
         list_filter_map2
           (fun (lhs, ty_opt) rhs_opt ->
             match ty_opt, rhs_opt with
@@ -1289,7 +1289,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
           nj_formal_arguments
           cargs
       in
-      let pp_assignments = gen_parallel_assignment (Array.of_list assginments) in
+      let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
       let fix_bodies = fix_body_list env sigma term in
       List.iter
         (fun (context, env_body) ->
