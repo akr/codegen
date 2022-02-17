@@ -1132,11 +1132,13 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
         in
         let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
         let (cont2, pp_exit) =
-          let exit_label = "exit_" ^ nj_funcname in
           match cont.head_cont_exit_label with
-          | None -> ({ cont with head_cont_exit_label = Some exit_label },
-                     Pp.hov 0 (Pp.str exit_label ++ Pp.str ":"))
-          | Some _ -> (cont, Pp.mt ())
+          | None ->
+              let exit_label = "exit_" ^ nj_funcname in
+              ({ cont with head_cont_exit_label = Some exit_label },
+               Pp.hov 0 (Pp.str exit_label ++ Pp.str ":"))
+          | Some _ ->
+              (cont, Pp.mt ())
         in
         let fix_bodies = fix_body_list env sigma term in
         add_local_vars_in_fix_body_list sigma fix_bodies;
