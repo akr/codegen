@@ -972,7 +972,6 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
         (Array.to_list ntfary)
   | _ ->
       [([], (env, term))]
-let _ = ignore fix_body_list
 
 let add_local_vars_in_fix_body_list (sigma : Evd.evar_map) fix_bodies =
   List.iter
