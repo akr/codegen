@@ -974,6 +974,23 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       [([], (env, term))]
 let _ = ignore fix_body_list
 
+let add_local_vars_in_fix_body_list (sigma : Evd.evar_map) fix_bodies =
+  List.iter
+    (fun (context, env_body) ->
+      List.iter
+        (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
+          let env = ref fixfunc_env2 in
+          List.iter
+            (fun (x,t) ->
+              (match c_typename !env sigma t with
+              | None -> ()
+              | Some c_type ->
+                  add_local_var c_type (str_of_annotated_name x));
+              env := EConstr.push_rel (decl_of_farg x t) !env)
+            (List.rev fixfunc_fargs))
+        context)
+    fix_bodies
+
 type head_cont = {
   head_cont_ret_var: string option; (* None for void type context *)
   head_cont_exit_label: string option;
@@ -1089,12 +1106,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
       user_err (Pp.str "[codegen] gen_head: lambda term without argument (higher-order term not supported yet):" +++
         Printer.pr_econstr_env env sigma term)
 
-  | Fix _ ->
-      gen_head2 ~fixfunc_tbl ~used_vars ~cont env sigma term cargs
-
-and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (cargs : string option list) : Pp.t =
-  match EConstr.kind sigma term with
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+  | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
       if List.length cargs < List.length nj_formal_arguments then
@@ -1108,7 +1120,6 @@ and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
               (Array.of_list (List.map fst fixfunc_j.fixfunc_outer_variables))
               (Array.of_list (list_filter_none cargs))))
       else
-        let env2 = EConstr.push_rec_types prec env in
         let assignments =
           list_filter_map2
             (fun (lhs, ty_opt) rhs_opt ->
@@ -1120,48 +1131,60 @@ and gen_head2 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
             cargs
         in
         let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-        let exit_label = "exit_" ^ nj_funcname in
-        let cont2 = match cont.head_cont_exit_label with
-                    | None -> { cont with head_cont_exit_label = Some exit_label }
-                    | Some _ -> cont
-        in
-        let pp_exit =
+        let (cont2, pp_exit) =
+          let exit_label = "exit_" ^ nj_funcname in
           match cont.head_cont_exit_label with
-          | None -> Pp.hov 0 (Pp.str exit_label ++ Pp.str ":")
-          | Some _ -> Pp.mt ()
+          | None -> ({ cont with head_cont_exit_label = Some exit_label },
+                     Pp.hov 0 (Pp.str exit_label ++ Pp.str ":"))
+          | Some _ -> (cont, Pp.mt ())
         in
-        let pp_bodies =
-          Array.map2
-            (fun ni fi ->
-              let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name ni) in
-              let ni_formal_arguments = fixfunc_i.fixfunc_formal_arguments in
-              List.iter
-                (function (c_arg, None) -> ()
-                        | (c_arg, Some c_ty) -> add_local_var c_ty c_arg)
-                ni_formal_arguments;
-              let ni_formal_argvars = List.map (function (c_arg, None) -> None
-                                                       | (c_arg, Some c_ty) -> Some c_arg)
-                                               ni_formal_arguments in
-              let (fi_fargs, fi_body) = decompose_lam sigma fi in
-              let env3 = EConstr.push_rel_context (ctx_of_fargs fi_fargs) env2 in
-              let ni_formal_argvars = CList.skipn (List.length fi_fargs) ni_formal_argvars in
-              let ni_funcname = fixfunc_i.fixfunc_c_name in
-              let pp_label =
-                if fixfunc_i.fixfunc_used_as_goto ||
-                   (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
-                  Pp.str ("entry_" ^ ni_funcname)  ++ Pp.str ":"
-                else
-                  Pp.mt ()
+        let fix_bodies = fix_body_list env sigma term in
+        add_local_vars_in_fix_body_list sigma fix_bodies;
+        let pp_fixfuncs =
+          List.map
+            (fun (context, (body_env, body)) ->
+              let context_ary = Array.of_list context in
+              let noninlinable_pred i (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) =
+                let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
+                not fixfunc_i.fixfunc_inlinable
               in
-              pp_label +++ gen_head2 ~fixfunc_tbl ~used_vars ~cont:cont2 env3 sigma fi_body ni_formal_argvars)
-            nary fary in
-        let reordered_pp_bodies = Array.copy pp_bodies in
-        Array.blit pp_bodies 0 reordered_pp_bodies 1 j;
-        reordered_pp_bodies.(0) <- pp_bodies.(j);
-        pp_assignments +++ pp_sjoin_ary reordered_pp_bodies +++ pp_exit
-  | _ ->
-      assert (cargs = []);
-      gen_head ~fixfunc_tbl ~used_vars ~cont env sigma term
+              let noninlinable_index = CArray.findi noninlinable_pred context_ary in
+              let context_before_noninlinable =
+                match noninlinable_index with
+                | None -> context_ary
+                | Some i -> Array.sub context_ary 0 i
+              in
+              let pp_labels =
+                pp_sjoinmap_ary
+                  (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
+                    let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
+                    let ni_funcname = fixfunc_i.fixfunc_c_name in
+                    if fixfunc_i.fixfunc_used_as_goto ||
+                       (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
+                      Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ":"
+                    else
+                      Pp.mt ())
+                  context_before_noninlinable
+              in
+              match noninlinable_index with
+              | None -> pp_labels +++ gen_head ~fixfunc_tbl ~used_vars ~cont:cont2 body_env sigma body
+              | Some i ->
+                  let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = context_ary.(i) in
+                  let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
+                  let ni_funcname = fixfunc_i.fixfunc_c_name in
+                  let cargs = List.map (function (c_arg, None) -> None
+                                               | (c_arg, Some c_ty) -> Some c_arg)
+                                       fixfunc_i.fixfunc_formal_arguments
+                  in
+                  pp_labels +++
+                    gen_head_cont cont2
+                      (gen_funcall ni_funcname
+                        (Array.append
+                          (Array.of_list (List.map fst fixfunc_i.fixfunc_outer_variables))
+                          (Array.of_list (list_filter_none cargs)))))
+            fix_bodies
+        in
+        pp_assignments +++ pp_sjoin_list pp_fixfuncs +++ pp_exit
 
 type tail_cont = { tail_cont_return_type: string option; tail_cont_multifunc: bool }
 
@@ -1291,21 +1314,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
       in
       let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
       let fix_bodies = fix_body_list env sigma term in
-      List.iter
-        (fun (context, env_body) ->
-          List.iter
-            (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
-              let env = ref fixfunc_env2 in
-              List.iter
-                (fun (x,t) ->
-                  (match c_typename !env sigma t with
-                  | None -> ()
-                  | Some c_type ->
-                      add_local_var c_type (str_of_annotated_name x));
-                  env := EConstr.push_rel (decl_of_farg x t) !env)
-                (List.rev fixfunc_fargs))
-            context)
-        fix_bodies;
+      add_local_vars_in_fix_body_list sigma fix_bodies;
       let pp_fixfuncs =
         List.map
           (fun (context, (body_env, body)) ->
