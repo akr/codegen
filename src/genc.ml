@@ -1436,7 +1436,7 @@ let rec obtain_function_bodies_rec
           if j = i then
             obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fi
           else
-            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: []) fi)
+            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma [] (fixfunc_name :: []) fi)
         nary
       in
       let reordered_bodies = Array.copy bodies in
