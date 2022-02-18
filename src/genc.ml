@@ -1408,47 +1408,42 @@ let labels_for_stacked_fixfuncs
           None)
       stacked_fixfuncs)
 
-let rec obtain_function_bodies_rec
+let obtain_function_bodies1
     ~(fixfunc_tbl : fixfunc_table)
     ~(primary_cfunc : string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (fargs : ((*varname*)string * (*vartype*)string) list) (stacked_fixfuncs : string list) (term : EConstr.t) :
-    ((*return_type*)string option * ((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) Seq.t =
-  match EConstr.kind sigma term with
-  | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      let fargs' =
-        match c_typename env sigma t with
-        | None ->
-            fargs
-        | Some c_ty ->
-            let c_var = (str_of_annotated_name x, c_ty) in
-            c_var :: fargs
-      in
-      obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs' stacked_fixfuncs b
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let bodies = Array.mapi
-        (fun i ni ->
-          let fixfunc_name = str_of_annotated_name ni in
-          let fi = fary.(i) in
-          if j = i then
-            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma fargs (fixfunc_name :: stacked_fixfuncs) fi
-          else
-            obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env2 sigma [] (fixfunc_name :: []) fi)
-        nary
-      in
-      let reordered_bodies = Array.copy bodies in
-      Array.blit bodies 0 reordered_bodies 1 j;
-      reordered_bodies.(0) <- bodies.(j);
-      concat_array_seq reordered_bodies
-  | _ ->
+    ((*return_type*)string option * ((*varname*)string * (*vartype*)string) list * (*stacked_fixfuncs*)string list * Environ.env * EConstr.t) list =
+  let fix_bodies = fix_body_list env sigma term in
+  List.map
+    (fun (context, (body_env, body)) ->
       let return_type =
-        let ty = Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term) in
+        let ty = Reductionops.nf_all body_env sigma (Retyping.get_type_of body_env sigma body) in
         c_typename env sigma ty
       in
-      Seq.return (return_type, fargs, labels_for_stacked_fixfuncs ~fixfunc_tbl ~primary_cfunc stacked_fixfuncs, env, term)
+      let fargs =
+        List.concat
+          (List.append
+            (List.rev_map
+              (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
+                List.filter_map
+                  (fun (x,t) ->
+                    match c_typename env sigma t with
+                    | None -> None
+                    | Some c_ty -> Some (str_of_annotated_name x, c_ty))
+                  fixfunc_fargs)
+              context)
+            [fargs])
+      in
+      let stacked_fixfuncs =
+        list_rev_map_append
+          (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
+            str_of_annotated_name fixfunc_name)
+          context
+          stacked_fixfuncs
+      in
+      (return_type, fargs, labels_for_stacked_fixfuncs ~fixfunc_tbl ~primary_cfunc stacked_fixfuncs, body_env, body))
+    fix_bodies
 
 let obtain_function_bodies
     ~(fixterms : fixterm_t list)
@@ -1464,11 +1459,21 @@ let obtain_function_bodies
   let results =
     List.map
       (fun (outer_variables, env1, term1) ->
-        obtain_function_bodies_rec ~fixfunc_tbl ~primary_cfunc env1 sigma outer_variables [] term1)
+        let (term1_fargs, term1_body) = EConstr.decompose_lam sigma term1 in
+        let env2 = EConstr.push_rel_context (ctx_of_fargs term1_fargs) env1 in
+        let fargs =
+          List.filter_map
+            (fun (x,t) ->
+              match c_typename env sigma t with
+              | None -> None
+              | Some c_ty -> Some (str_of_annotated_name x, c_ty))
+            term1_fargs
+        in
+        obtain_function_bodies1 ~fixfunc_tbl ~primary_cfunc env2 sigma (List.append fargs outer_variables) [] term1_body)
       (([], env, term) ::
        detect_fixterms_for_bodies ~fixterms ~fixfunc_tbl)
   in
-  List.of_seq (concat_list_seq results)
+  List.concat results
 
 let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
