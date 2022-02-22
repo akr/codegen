@@ -876,8 +876,9 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                       (fun id (br_lconsumed,_,_) -> if IntSet.mem l br_lconsumed then Some id else None)
                       consnames branch_results))
               in
-              pr_deBruijn_level env l +++ Pp.str "is used only for" +++
-                pp_sjoinmap_list Id.print ids)
+              pr_deBruijn_level env l +++ Pp.str "is used only for constructor" +++
+                pp_sjoinmap_list Id.print ids +++ Pp.str "of" +++
+                Id.print oind_body.Declarations.mind_typename)
             (IntSet.elements (IntSet.diff union inter))
         in
         user_err_hov (Pp.str "[codegen] match-branches uses linear variables inconsistently:" +++
