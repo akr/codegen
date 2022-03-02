@@ -124,13 +124,15 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\letinB}[2]{\kwlet\:#1:=#2\:\kwin}
 
 \newcommand{\match}[4]{\kwmatch\:#1\:\kwwith\:(#2 \Rightarrow #3)_{#4}\:\kwend}
+\newcommand{\matchasinret}[7]{\kwmatch\:#1\:\kwas\:#2\:\kwin\:#3\:\kwreturn\:#4\:\kwwith\:(#5 \Rightarrow #6)_{#7}\:\kwend}
 
 \newcommand{\fix}[4]{\kwfix\:(#1 := #2)_{#3}\:\kwfor\:#4}
 \newcommand{\fixT}[5]{\kwfix\:(#1:\!#2 := #3)_{#4}\:\kwfor\:#5}
 
-\DeclareMathOperator{\NA}{NA}
-\DeclareMathOperator{\NP}{NP}
-\DeclareMathOperator{\NM}{NM}
+\DeclareMathOperator{\NA}{NA} % number of arguments
+\DeclareMathOperator{\NP}{NP} % number of parameters for the inductive type
+\DeclareMathOperator{\NI}{NI} % number of indexes for the inductive type
+\DeclareMathOperator{\NM}{NM} % number of members for the constructor
 
 \DeclareMathOperator{\FV}{FV}
 
@@ -351,6 +353,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item Unused let-in Deletion
   \item Call Site Replacement
   \item Argument Completion
+  \item Move Match Argument
   \item Linearity Check
   \item C Variable Allocation
   \end{itemize}
@@ -583,6 +586,42 @@ Argument completion removes partial applications by applying eta expansions.
   \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
   \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
     $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
+\end{itemize}}
+
+\subsection{Move Match Argument}\label{sec:move-match-argument}
+
+\begin{gather*}
+  \text{match-app:}~
+    \dfrac
+    {
+      E[\Gamma] \vdash z : T
+    }{
+      \begin{aligned}
+        E[\Gamma] \vdash\; &
+          \kwmatch\:x\:
+          \kwas\:x'\:
+          \kwin\:I\:y_1\ldots y_{\NI_I}\:
+          \kwreturn\:{T \rightarrow P\:y_1\ldots y_{\NI_I}\:x'}\\
+          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i})_{i=1\ldots h}\:
+          \kwend\:z \\
+        \reltri\; &
+          \kwmatch\:x\:
+          \kwas\:x'\:
+          \kwin\:I\:y_1\ldots y_{\NI_I}\:
+          \kwreturn\:{P\:y_1\ldots y_{\NI_I}\:x'}\\
+          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i\:z})_{i=1\ldots h}\:
+          \kwend
+      \end{aligned}
+    }
+\end{gather*}
+
+beta-var and zeta-app is also applied.
+
+{\small Note:
+\begin{itemize}
+  \item match-app is not convertible
+  \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
+    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
 \end{itemize}}
 
 \subsection{Linearity Check}\label{sec:linearity-check}
