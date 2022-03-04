@@ -725,7 +725,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-var-app:}~
     \dfrac{
       \begin{gathered}
-        \lassum{x_0^{B}}{T'} \in \Gamma' \\
+        \lassum{x_0^{B}}{T'} \in \Gamma' \quad
         \APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
@@ -734,7 +734,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-constant-app:}~
     \dfrac{
       \begin{gathered}
-        \text{$c$ is not a borrow function} \\
+        \text{$c$ is not a borrow function} \quad
         \APP(\Gamma', \varnothing, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
@@ -749,7 +749,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-fix-app:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma'] \vdash \fix{f_i}{t_i}{i=1\ldots h}{f_j} ~|~ B \\
+        E[\Gamma'] \vdash \fix{f_i}{t_i}{i=1\ldots h}{f_j} ~|~ B \quad
         \APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
@@ -791,7 +791,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
         \text{$t$ is not a fixpoint} \\
         E[\Gamma'::\lassum{x_1^\varnothing}{T_1}::\cdots::\lassum{x_n^\varnothing}{T_n}] \vdash t : T ~|~ (L,B^\text{used},B^\text{result}) \\
         \{ x_i | 1 \leq i \leq n \wedge \text{$x_i$ is linear} \} = L \\
-        B' = (B - \{x_1,\ldots x_n\}) ~\text{filtered with the type of $T$} \\
+        B' = (B^\text{used} - \{x_1,\ldots x_n\}) ~\text{filtered with the type of $T$} \\
       \end{gathered}
     }{
       E[\Gamma'] \vdash \lamTB{x_1}{T_1}\ldots\lamTB{x_n}{T_n}t ~|~ B'
@@ -809,9 +809,8 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-fix-fun:}~
     \dfrac{
       \begin{gathered}
-        \text{$t$ is a fixpoint} \\
-        E[\Gamma'::\lassum{f_1^\varnothing}{T_1}::\cdots::\lassum{f_n^\varnothing}{T_n}] \vdash t_i ~|~ B_i \\
-        B = B_1\cup \cdots \cup B_n
+        E[\Gamma'::\lassum{f_1^\varnothing}{T_1}::\cdots::\lassum{f_h^\varnothing}{T_h}] \vdash t_i ~|~ B_i \\
+        B = B_1\cup \cdots \cup B_h
       \end{gathered}
     }{
       E[\Gamma'] \vdash \fixT{f_i}{T_i}{t_i}{i=1\ldots h}{f_j} ~|~ B
@@ -821,11 +820,11 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
 \begin{align*}
   &\APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result}) \\
   &= 1 \leq n \\
-  &~\wedge (1 \leq i \leq n \wedge 1 \leq j \leq n \wedge i \neq j) \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear}) \\
+  &~\wedge \forall 1 \leq i \leq n, \forall 1 \leq j \leq n, (i \neq j \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear})) \\
   &~\wedge L = \{ x_i | 1 \leq i \leq n \wedge \text{$x_i$ is linear} \} \\
-  &~\wedge B \cap L = \varnothing \\
   &~\wedge B^\text{used} = B \cup \{ B' | 1 \leq i \leq n \wedge \lassum{x_i^{B'}}{T'} \in \Gamma' \} \\
   &~\wedge B^\text{result} = B^\text{used} ~\text{filtered with the type $T$} \\
+  &~\wedge B^\text{used} \cap L = \varnothing \\
 \end{align*}
 
 We mix borrow information and set of variables in set-operations.
