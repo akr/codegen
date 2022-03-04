@@ -357,7 +357,6 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item Argument Completion
   \item Move Match Argument
   \item Borrow Check
-  \item Linearity Check
   \item C Variable Allocation
   \end{itemize}
 \item C Code Generation
@@ -843,106 +842,6 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
     This is not correct because $f_1\ldots f_n$ may refer borrowed values via free variables in
     $\fixT{f_i}{T_i}{t_i}{i=1\ldots h}{f_j}$.
     However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
-\end{itemize}}
-
-\subsection{Linearity Check}\label{sec:linearity-check}
-
-We define a judgement $E[\Gamma] \vdash t~[q]~\Delta$ for linearity check.
-$\Delta$ is a map from variables to non-negative integers: $\{x_1 \mapsto n_1, \dotsc, x_m \mapsto n_m\}$.
-It means that a free linear variable $x_i$ in $t$ is referenced $n_i$ times when $t$ is evaluated with $q$ arguments.
-
-We require $E[] \vdash t'~[\NA_t]~\varnothing$ when $t$ which defined as \kwDefinition~$c := t$ is transformed to $t'$ by the convertible transformations until argument completion.
-
-\begin{gather*}
-  \text{l-var:}~
-    \dfrac{
-      \text{$x$ is linear}
-    }{
-      E[\Gamma] \vdash x ~[q]~\{x\mapsto1\}
-    } \\
-  \text{u-var:}~
-    \dfrac{
-      \text{$x$ is unrestricted}
-    }{
-      E[\Gamma] \vdash x ~[q]~\varnothing
-    } \\
-  \text{c-constant:}~
-    E[\Gamma] \vdash c ~[q]~\varnothing \\
-  \text{c-constructor:}~
-    E[\Gamma] \vdash C ~[q]~\varnothing \\
-  \text{l-closure:}~
-    \dfrac{
-      E[\Gamma::\lassum{x}{T}] \vdash t ~[\NA_t]~\{ x\mapsto1 \} \quad
-      \text{$x$ is linear} \quad
-    }{
-      E[\Gamma] \vdash \lamT{x}{T}{t} ~[0]~\varnothing
-    } \\
-  \text{u-closure:}~
-    \dfrac{
-      E[\Gamma::\lassum{x}{T}] \vdash t ~[\NA_t]~\varnothing \quad
-      \text{$x$ is unrestricted}
-    }{
-      E[\Gamma] \vdash \lamT{x}{T}{t} ~[0]~\varnothing
-    } \\
-  \text{l-app-lambda:}~
-    \dfrac{
-      E[\Gamma::\lassum{x}{T}] \vdash t ~[q]~\Delta \quad
-      0 < q \quad
-      \text{$x$ is linear} \quad
-      \Delta(x) = 1
-    }{
-      E[\Gamma] \vdash \lamT{x}{T}{t} ~[0]~ \Delta \backslash \{x\mapsto1\}
-    } \\
-  \text{u-app-lambda:}~
-    \dfrac{
-      E[\Gamma::\lassum{x}{T}] \vdash t ~[q]~\Delta \quad
-      0 < q \quad
-      \text{$x$ is unrestricted}
-    }{
-      E[\Gamma] \vdash \lamT{x}{T}{t} ~[0]~\Delta
-    } \\
-  \text{c-app:}~
-    \dfrac{
-      E[\Gamma] \vdash t ~[q+1]~\Delta_1 \quad
-      E[\Gamma] \vdash u ~[0]~\Delta_2
-    }{
-      E[\Gamma] \vdash t\:u ~[q]~ \Delta_1 \oplus \Delta_2
-    } \\
-  \text{l-letin:}~
-    \dfrac{
-      E[\Gamma] \vdash t ~[0]~\Delta_1 \quad
-      E[\Gamma::\ldef{x}{t}{T}] \vdash u ~[q]~\Delta_2 \quad
-      \text{$x$ is linear} \quad
-      \Delta_2(x) = 1
-    }{
-      E[\Gamma] \vdash \letin{x}{t:T}{u} ~[q]~ \Delta_1 \oplus \Delta_2 \backslash \{x\mapsto1\}
-    } \\
-  \text{u-letin:}~
-    \dfrac{
-      E[\Gamma] \vdash t ~[0]~\Delta_1 \quad
-      E[\Gamma::\ldef{x}{t}{T}] \vdash u ~[q]~\Delta_2 \quad
-      \text{$x$ is unrestricted}
-    }{
-      E[\Gamma] \vdash \letin{x}{t:T}{u} ~[q]~ \Delta_1 \oplus \Delta_2
-    } \\
-  \text{c-match:}~
-    \dfrac{
-      E[\Gamma] \vdash t_0 ~[0]~\Delta_0 \quad
-      \forall i\in\{1\ldots h\}, E[\Gamma] \vdash t_i ~[\NM_{C_i}+q]~\Delta_i \quad
-      \Delta_1 = \cdots = \Delta_h
-    }{
-      E[\Gamma] \vdash \match{t_0}{C_i}{t_i}{i=1\ldots h} ~[q]~ \Delta_0 \oplus \Delta_1
-    } \\
-  \text{c-fix:}~
-    \dfrac{
-      \forall i\in\{1\ldots h\}, E[\Gamma::\lassum{f_1}{T_1}::\dotsb::\lassum{f_h}{T_h}] \vdash t_i ~[\NA_{t_i}]~\varnothing
-    }{
-      E[\Gamma] \vdash \fixT{f_i/k_i}{T_i}{t_i}{i=1\ldots h}{f_j} ~[q]~ \varnothing
-    }
-\end{gather*}
-{\small Note:
-\begin{itemize}
-  \item $\forall x, (\Delta_1 \oplus \Delta_2)(x) = \Delta_1(x) + \Delta_2(x)$ \text{where $\Delta(x) = 0$ if $\Delta$ doesn't contain a map from $x$}
 \end{itemize}}
 
 \subsection{C Variable Allocation}\label{sec:cvaralloc}
