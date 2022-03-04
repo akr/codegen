@@ -832,7 +832,9 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
             in
             let (br_lconsumed,br_bused,br_bresult) = borrowcheck_expression env2 sigma lvar_env2 borrow_env2 body term_ty in
             let linear_args = IntSet.of_list (List.filter_map (fun opt -> opt) (CList.firstn (List.length ctx) lvar_env2)) in
-            let (lconsumed_in_members, lconsumed_in_fv) = IntSet.partition (fun l -> Environ.nb_rel env <= l) br_lconsumed in
+            let (lconsumed_in_fv, lconsumed_in_members) = IntSet.partition (fun l -> Environ.nb_rel env > l) br_lconsumed in
+            let bused_in_fv = borrow_filter_lvar (fun l -> Environ.nb_rel env > l) br_bused in
+            let bresult_in_fv = borrow_filter_lvar (fun l -> Environ.nb_rel env > l) br_bresult in
             if not (IntSet.equal linear_args lconsumed_in_members) then
               if IntSet.is_empty (IntSet.diff lconsumed_in_members linear_args) then
                 user_err_hov (Pp.str "[codegen] linear member not consumed:" +++
@@ -841,7 +843,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
                 user_err_hov (Pp.str "[codegen:bug] non-linear member consumed as linear variable:" +++
                   pr_deBruijn_level_set env2 (IntSet.diff lconsumed_in_members linear_args))
             else
-              (lconsumed_in_fv,br_bused,br_bresult))
+              (lconsumed_in_fv,bused_in_fv,bresult_in_fv))
           bl bl0
       in
       let (br0_lconsumed,_,_) = branch_results.(0) in
