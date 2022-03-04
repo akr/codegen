@@ -759,27 +759,13 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       let (lconsumed', bused') = check_app IntSet.empty ConstrMap.empty in
       (* the return value of constructor application contains all arguments including the borrowed values *)
       (lconsumed', bused', bused')
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+  | Fix _ ->
       if CList.is_empty vs then
         (* closure creation *)
         let bresult = borrowcheck_function env sigma lvar_env borrow_env term in
         (IntSet.empty, bresult, bresult)
       else
-        let env2 = EConstr.push_rec_types prec env in
-        let h = Array.length fary in
-        let lvar_env2 = CList.addn h None lvar_env in
-        (* The fix-bounded functions, fary, may reference free borrowed variables but
-           cannot reference free linear variables.
-           So the free borrowed variables can be used freely in fary
-           because the free linear variables are not consumed.
-           Thus we don't need to set borrow_env2 with the free borrowed variables.
-           The free borrowed variables are collected by borrowcheck_function to bresults.
-           Note that the arguments, vs, may reference the free linear variables.
-           check_app verify (conservertively) the condition between sucn linear variables and bresults.
-         *)
-        let borrow_env2 = CList.addn h ConstrMap.empty borrow_env in
-        let bresults = Array.map (borrowcheck_function env2 sigma lvar_env2 borrow_env2) fary in
-        let bresult = borrow_union_ary bresults in
+        let bresult = borrowcheck_function env sigma lvar_env borrow_env term in
         let (lconsumed', bused') = check_app IntSet.empty bresult in
         (lconsumed', bused', filter_result bused')
 
