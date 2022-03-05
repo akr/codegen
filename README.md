@@ -46,6 +46,11 @@ sprintf function:
     gcc -g -Wall sample/sprintf.c -o sample/sprintf
     sample/sprintf
 
+## Links
+
+- Project Page https://github.com/akr/codegen
+- Formatted development memo https://akr.github.io/codegen-doc/
+
 ## Authors
 
 - Tanaka Akira
