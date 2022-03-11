@@ -1016,11 +1016,21 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
             user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function which result type is an inductive type:" +++ Printer.pr_constant env ctnt);
           let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
           let env2 = EConstr.push_rel decl env in
-          if component_types env2 sigma retty = None then
-            user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Constant.print ctnt);
-          set_borrow_function ctnt;
-          set_linear env sigma argty;
-          set_borrow_type env sigma (EConstr.to_constr sigma retty)
+          let ret_comptypes = component_types env2 sigma retty in
+          let arg_comptypes = component_types env2 sigma argty in
+          (match ret_comptypes, arg_comptypes with
+          | None, _ ->
+              user_err_hov (Pp.str "[codegen] borrow function's result contains a function:" +++ Constant.print ctnt);
+          | _, None ->
+              user_err_hov (Pp.str "[codegen] borrow function's argument contains a function:" +++ Constant.print ctnt);
+          | Some ret_comptypes, Some arg_comptypes ->
+              (ConstrSet.iter
+                (fun ty -> set_borrow_type env sigma ty)
+                (ConstrSet.diff ret_comptypes arg_comptypes);
+              ConstrSet.iter
+                (fun ty -> set_linear env sigma (EConstr.of_constr ty))
+                (ConstrSet.diff arg_comptypes ret_comptypes);
+              set_borrow_function ctnt))
       | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)
 

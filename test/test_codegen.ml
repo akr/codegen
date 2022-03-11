@@ -3504,7 +3504,7 @@ let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
       CodeGen Function f.
     |}) {| |}
 
-let test_borrowcheck_and_linear (ctx : test_ctxt) : unit =
+let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] borrow function's return type contains linear type:") ctx
     ({|
@@ -3514,6 +3514,8 @@ let test_borrowcheck_and_linear (ctx : test_ctxt) : unit =
         | O => tt
         | S m => consume m
         end.
+      CodeGen Linear nat.
+      CodeGen BorrowType nat.
       CodeGen BorrowFunction borrow.
       Definition f (n : nat) :=
         let m := borrow n in
@@ -3816,7 +3818,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
     "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
     "test_borrowcheck_borrow_nested_match" >:: test_borrowcheck_borrow_nested_match;
-    "test_borrowcheck_borrow_and_linear" >:: test_borrowcheck_and_linear;
+    "test_borrowcheck_borrow_and_linear" >:: test_borrowcheck_borrow_and_linear;
     "test_void_tail" >:: test_void_tail;
     "test_void_head" >:: test_void_head;
     "test_void_mutual" >:: test_void_mutual;
