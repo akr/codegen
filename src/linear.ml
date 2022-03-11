@@ -738,7 +738,15 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         let tys =
           match component_types env2 sigma retty with
           | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's result contains a function:" +++ Constant.print ctnt);
-          | Some set -> List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set)
+          | Some set ->
+              (ConstrSet.iter
+                (fun ty ->
+                  if is_linear_type env sigma (EConstr.of_constr ty) then
+                    user_err_hov (Pp.str "[codegen] borrow function's return type contains linear type:" +++
+                                  Pp.str "the return type (" ++ Printer.pr_econstr_env env sigma retty ++ Pp.str ")" +++
+                                  Pp.str "contains a linear type (" ++ Printer.pr_constr_env env sigma ty ++ Pp.str ")"))
+                set;
+              List.filter (fun ty -> is_borrow_type env sigma (EConstr.of_constr ty)) (ConstrSet.elements set))
         in
         let l =
           match List.nth lvar_env (i-1) with
