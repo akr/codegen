@@ -1024,12 +1024,20 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
           | _, None ->
               user_err_hov (Pp.str "[codegen] borrow function's argument contains a function:" +++ Constant.print ctnt);
           | Some ret_comptypes, Some arg_comptypes ->
-              (ConstrSet.iter
+              (let borrow_types = ConstrSet.diff ret_comptypes arg_comptypes in
+              let linear_types = ConstrSet.diff arg_comptypes ret_comptypes in
+              if ConstrSet.is_empty borrow_types then
+                user_err_hov (Pp.str "[codegen] couldn't find borrow types from borrow function:" +++
+                              Printer.pr_constant env ctnt);
+              if ConstrSet.is_empty linear_types then
+                user_err_hov (Pp.str "[codegen] couldn't find linear types from borrow function:" +++
+                              Printer.pr_constant env ctnt);
+              ConstrSet.iter
                 (fun ty -> set_borrow_type env sigma ty)
-                (ConstrSet.diff ret_comptypes arg_comptypes);
+                borrow_types;
               ConstrSet.iter
                 (fun ty -> set_linear env sigma (EConstr.of_constr ty))
-                (ConstrSet.diff arg_comptypes ret_comptypes);
+                linear_types;
               set_borrow_function ctnt))
       | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a function:" +++ Printer.pr_constant env ctnt)))
   | _ -> user_err (Pp.str "[codegen] CodeGen BorrowFunction needs a constant reference:" +++ Printer.pr_global gref)

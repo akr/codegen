@@ -3506,7 +3506,7 @@ let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
 
 let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] borrow function's return type contains linear type:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] couldn't find borrow types from borrow function:") ctx
     ({|
       Definition borrow (n : nat) : nat := n.
       Fixpoint consume (n: nat) : unit :=
