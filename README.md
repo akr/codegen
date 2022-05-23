@@ -111,7 +111,7 @@ It is possible to configure code generation of inductive types.
     }
     *)
 
-We can use more readable definition of nat type in C.
+We can use more simpler definition of nat type in C.
 
     #define pred(n) ((n) - 1)
     #define succ(n) ((n) + 1)
