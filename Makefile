@@ -83,4 +83,8 @@ clean :
 distclean : clean
 	rm -f \
 	  Makefile.coq \
-	  Makefile.coq.conf
+	  Makefile.coq.conf \
+	  theories/codegen_plugin.cmi \
+	  theories/codegen_plugin.cmx \
+	  theories/codegen_plugin.cmxa \
+	  theories/codegen_plugin.cmxs
