@@ -199,9 +199,12 @@ let my_temp_dir (ctx : test_ctxt) : string =
 
 type test_goal = UntilCoq | UntilCC | UntilExe
 
-let make_foutput regexp stream =
+let make_foutput regexp seq =
   let buf = Buffer.create 0 in
-  Stream.iter (Buffer.add_char buf) stream;
+  (try
+    Seq.iter (Buffer.add_char buf) seq
+  with End_of_file ->
+    ());
   let text = Buffer.contents buf in
   try
     ignore (Str.search_forward regexp text 0);
