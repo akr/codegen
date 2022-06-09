@@ -110,6 +110,14 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_borrowcheck);
           optwrite = (:=) opt_debug_borrowcheck }
 
+(* Set/Unset Debug CodeGen MatchApp. *)
+let opt_debug_matchapp = ref false
+let () = let open Goptions in declare_bool_option
+        { optdepr  = false;
+          optkey   = ["Debug";"CodeGen";"MatchApp"];
+          optread  = (fun () -> !opt_debug_matchapp);
+          optwrite = (:=) opt_debug_matchapp }
+
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
