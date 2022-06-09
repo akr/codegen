@@ -424,7 +424,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     \dfrac{
       0 < n \quad
       E[\Gamma] \vdash (\lam{x}{t})\:y_1\ldots y_n : T \quad
-      \text{$T$ is an inductive type}
+      \text{($t$ is abstraction, $t$ is fixpoint, or $T$ is an inductive type)}
     }{
       E[\Gamma] \vdash (\lam{x}{t})\:y_1\ldots y_n \reltri \subst{t}{x}{y_1}\:y_2\ldots y_n
     } \\
