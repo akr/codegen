@@ -29,9 +29,48 @@ let abort (x : 'a) : 'a = assert false
 
 exception CodeGenError of string
 
+let int_find_opt (p : int -> bool) ?(start : int = 0) (n : int) : int option =
+  let rec aux i =
+    if i < n then
+      if p (start + i) then
+        Some (start + i)
+      else
+        aux (i + 1)
+    else
+      None
+  in
+  aux 0
+
+let int_find_map (f : int -> 'a option) ?(start : int = 0) (n : int) : 'a option =
+  let rec aux i =
+    if i < n then
+      let opt = f (start + i) in
+      match opt with
+      | None -> aux (i + 1)
+      | Some _ -> opt
+    else
+      None
+  in
+  aux 0
+
+let int_find_i_map (f : int -> 'a option) ?(start : int = 0) (n : int) : (int * 'a) option =
+  let rec aux i =
+    if i < n then
+      let opt = f (start + i) in
+      match opt with
+      | None -> aux (i + 1)
+      | Some v -> Some (start + i, v)
+    else
+      None
+  in
+  aux 0
+
 let array_rev a =
   let n = Array.length a in
   Array.init n (fun i -> a.(n - i - 1))
+
+let array_firstn (n : int) (ary : 'a array) : 'a array =
+  Array.sub ary 0 n
 
 let array_skipn (n : int) (ary : 'a array) : 'a array =
   Array.sub ary n (Array.length ary - n)
@@ -97,6 +136,18 @@ let array_find_map2 (f : 'a -> 'b -> 'c option) (s1 : 'a array) (s2 : 'b array) 
       | Some _ -> v
     else
       None
+  in
+  aux 0
+
+let array_find_map_i (p : int -> 'a -> 'b option) (ary : 'a array) : (int * 'b) option =
+  let len = Array.length ary in
+  let rec aux i =
+    if len <= i then
+      None
+    else
+      match p i ary.(i) with
+      | None -> aux (i + 1)
+      | Some v -> Some (i, v)
   in
   aux 0
 

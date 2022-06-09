@@ -1,7 +1,11 @@
 module IntSet : Set.S with type elt = Int.t
 val abort : 'a -> 'a
 exception CodeGenError of string
+val int_find_opt : (int -> bool) -> ?start:int -> int -> int option
+val int_find_map : (int -> 'a option) -> ?start:int -> int -> 'a option
+val int_find_i_map : (int -> 'a option) -> ?start:int -> int -> (int * 'a) option
 val array_rev : 'a array -> 'a array
+val array_firstn : int -> 'a array -> 'a array
 val array_skipn : int -> 'a array -> 'a array
 val array_map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val array_map3 :
@@ -14,6 +18,7 @@ val array_for_all : ('a -> bool) -> 'a array -> bool
 val array_exists : ('a -> bool) -> 'a array -> bool
 val array_find_map : ('a -> 'b option) -> 'a array -> 'b option
 val array_find_map2 : ('a -> 'b -> 'c option) -> 'a array -> 'b array -> 'c option
+val array_find_map_i : (int -> 'a -> 'b option) -> 'a array -> (int * 'b) option
 val array_map_right : ('a -> 'b) -> 'a array -> 'b array
 val array_fold_right_map :
   ('a -> 'b -> 'c * 'b) -> 'a array -> 'b -> 'c array * 'b
