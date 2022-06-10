@@ -352,6 +352,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \begin{itemize}
   \item Inlining
   \item Strip Cast
+  \item Eta Expansion for Functions
   \item V-Normalization
   \item S-Normalization
   \item Type Normalization
@@ -373,9 +374,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \subsection{Inlining}\label{sec:inlining}
 \subsection{Strip Cast}\label{sec:strip-cast}
-\subsection{Eta Expansion for Function Bodies}\label{sec:eta-expand-bodies}
-We apply eta-expansion to function bodies of top-level functions and fix-bounded functions.
-This makes beta-var applicable to the bodies.
+\subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
+We apply eta-expansion to functions of top-level functions, fix-bounded functions, and closure generating lambdas.
+We consider explicit lambdas are closure generation.
+(Lambdas for match-branches are implicit and we don't consider them as closure generation.)
+This makes beta-var applicable for partial applications without worrying to expose computation.
 
 \subsection{V-Normalization}\label{sec:v-normalization}
 \subsubsection{V-Reductions}\label{sec:v-reductions}
@@ -421,13 +424,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \subsection{S-Normalization}\label{sec:s-normalization}
 \begin{gather*}
   \text{beta-var:}~
-    \dfrac{
-      0 < n \quad
-      E[\Gamma] \vdash (\lam{x}{t})\:y_1\ldots y_n : T \quad
-      \text{($t$ is abstraction, $t$ is fixpoint, or $T$ is an inductive type)}
-    }{
-      E[\Gamma] \vdash (\lam{x}{t})\:y_1\ldots y_n \reltri \subst{t}{x}{y_1}\:y_2\ldots y_n
-    } \\
+    E[\Gamma] \vdash (\lam{x}{t})\:y \reltri \subst{t}{x}{y} \\
   \text{delta-var:}~
     \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \\
   \text{delta-fun:}~

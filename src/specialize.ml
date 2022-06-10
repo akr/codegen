@@ -756,7 +756,7 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x, t, b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      let b' = search_fix_to_expand_eta env2 sigma b in
+      let b' = expand_eta_top env2 sigma b in
       mkLambda (x, t, b')
   | LetIn (x, e, t, b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
@@ -1016,14 +1016,6 @@ let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ks : int array)
       in
       loop 1
 
-(* assumption: ty is a type (not a function that returns a type) *)
-let is_ind_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
-  let ty = Reductionops.whd_all env sigma ty in
-  match EConstr.kind sigma ty with
-  | Ind _ -> true
-  | App (f, args) -> isInd sigma f
-  | _ -> false
-
 (* lams is a list from innermost lambda to outermost lambda *)
 let rec push_rel_lams (lams : (Name.t Context.binder_annot * EConstr.t) list) (env : Environ.env) : Environ.env =
   match lams with
@@ -1177,24 +1169,15 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
   let term1 = mkApp (f, args_nf) in
   match EConstr.kind sigma f with
   | Lambda (x,t,b) ->
-      if isLambda sigma b || isFix sigma b ||
-         let app_ty = Retyping.get_type_of env sigma (mkApp (f, args_nf)) in
-         is_ind_type env sigma app_ty then
-        (* reduction: beta-var *)
-        (* We apply beta reduction only for the first argument.
-           We don't Reductionops.beta_applist sigma (f, (Array.to_list args_nf))
-           because it apply beta reduction multiply when f is nested lambda. *)
-        (let first_arg = args_nf.(0) in
-         let rest_args = Array.sub args_nf 1 (Array.length args_nf - 1) in
-         let term2 = mkApp (Vars.subst1 first_arg b, rest_args) in
-        debug_reduction "beta-var" (fun () ->
-          Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
-          Pp.str "->" ++ Pp.fnl () ++
-          Printer.pr_econstr_env env sigma term2);
-        check_convertible "reduction(beta-var)" env sigma term1 term2;
-        reduce_exp env sigma term2)
-      else
-        default ()
+      (* reduction: beta-var *)
+      (* We apply beta reduction as much as possible using Reductionops.beta_applist. *)
+      (let term2 = Reductionops.beta_applist sigma (f, (Array.to_list args_nf)) in
+      debug_reduction "beta-var" (fun () ->
+        Printer.pr_econstr_env env sigma term1 ++ Pp.fnl () ++
+        Pp.str "->" ++ Pp.fnl () ++
+        Printer.pr_econstr_env env sigma term2);
+      check_convertible "reduction(beta-var)" env sigma term1 term2;
+      reduce_exp env sigma term2)
   | App (f_f, f_args) ->
       (* reduction: delta-app *)
       let f_args_nf = Array.map (reduce_arg env sigma) f_args in
