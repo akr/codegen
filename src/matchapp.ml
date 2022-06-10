@@ -39,6 +39,7 @@ let rec mkapp_simplify (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Fix _ | Case _ ->
       mkApp (term, args)
   | Lambda _ ->
+      (* beta-var *)
       let na = Array.length args in
       let (fargs, body) = decompose_lam_upto_n env sigma na term in
       let nf = List.length fargs in
@@ -50,6 +51,7 @@ let rec mkapp_simplify (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       else (* nf = na *)
         Vars.substl (CArray.rev_to_list args) body
   | LetIn (x,e,t,b) ->
+      (* zeta-app *)
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
       let args' = Array.map (Vars.lift 1) args in
