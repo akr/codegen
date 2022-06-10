@@ -161,17 +161,17 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
           let ma_args = Array.map (Vars.lift n) ma_args in
           Vars.substl (CArray.rev_to_list ma_args) mpred_body
         in
-          let bl' =
-            Array.map2
-              (fun (nas,body) (ctx,_) ->
-                let env2 = EConstr.push_rel_context ctx env in
-                let nctx = List.length ctx in
-                let args = Array.map (Vars.lift nctx) ma_args in
-                let body = mkapp_simplify env2 sigma body args in
-                (nas, body))
-              bl bl0
-          in
-          Some (q (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl')))
+        let bl' =
+          Array.map2
+            (fun (nas,body) (ctx,_) ->
+              let env2 = EConstr.push_rel_context ctx env in
+              let nctx = List.length ctx in
+              let args = Array.map (Vars.lift nctx) ma_args in
+              let body = mkapp_simplify env2 sigma body args in
+              (nas, body))
+            bl bl0
+        in
+        Some (q (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl')))
 
 let rec simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_matchapp then
