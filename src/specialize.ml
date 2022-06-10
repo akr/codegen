@@ -741,9 +741,9 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
         args
       in
       let n = List.length args in
-      let term' = Vars.lift n (search_fix_to_expand_eta env sigma term) in
+      let term' = Vars.lift n (search_fixclo_to_expand_eta env sigma term) in
       compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
-and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
+and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel _ | Const _ | Construct _ | Meta _ | Sort _ | Ind _ | Int _ | Float _ -> term
@@ -752,8 +752,9 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
   | Prod _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Prod:" +++ Printer.pr_econstr_env env sigma term)
   | CoFix _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected CoFix:" +++ Printer.pr_econstr_env env sigma term)
   | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
-  | Cast (e,ck,t) -> search_fix_to_expand_eta env sigma e (* strip cast *)
+  | Cast (e,ck,t) -> search_fixclo_to_expand_eta env sigma e (* strip cast *)
   | Lambda (x, t, b) ->
+      (* closure generating lambda found.  Apply eta expansion. *)
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
       let b' = expand_eta_top env2 sigma b in
@@ -761,8 +762,8 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
   | LetIn (x, e, t, b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let e' = search_fix_to_expand_eta env sigma e in
-      let b' = search_fix_to_expand_eta env2 sigma b in
+      let e' = search_fixclo_to_expand_eta env sigma e in
+      let b' = search_fixclo_to_expand_eta env2 sigma b in
       mkLetIn (x, e', t, b')
   | Case (ci, u, pms, p, iv, c, bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, c, bl) in
@@ -770,18 +771,19 @@ and search_fix_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
         Array.map2
           (fun (nas, body) (ctx, _) ->
             let env2 = EConstr.push_rel_context ctx env in
-            (nas, search_fix_to_expand_eta env2 sigma body))
+            (nas, search_fixclo_to_expand_eta env2 sigma body))
           bl bl0
       in
       mkCase (ci, u, pms, p, iv, c, bl')
   | Proj (proj, e) ->
-      let e' = search_fix_to_expand_eta env sigma e in
+      let e' = search_fixclo_to_expand_eta env sigma e in
       mkProj (proj, e')
   | App (f, args) ->
-      let f' = search_fix_to_expand_eta env sigma f in
-      let args' = Array.map (search_fix_to_expand_eta env sigma) args in
+      let f' = search_fixclo_to_expand_eta env sigma f in
+      let args' = Array.map (search_fixclo_to_expand_eta env sigma) args in
       mkApp (f', args')
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      (* fixpoint found.  Apply eta expansion. *)
       let env2 = push_rec_types prec env in
       let fary' = Array.map (expand_eta_top env2 sigma) fary in
       mkFix ((ks, j), (nary, tary, fary'))
