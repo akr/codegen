@@ -2024,30 +2024,25 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | Const _ -> mkAppOrClosure ()
   | Construct _ -> mkAppOrClosure ()
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
       (* p = 0, q = 0, r = 0 is not possible because Lambda is a function *)
       let lazy r = r in
-      if r > 0 then
-        (* r > 0 means partial application i.e. closure creation found.
-           p = 0, q = 0, r > 0
-           p = 0, q > 0, r > 0
+      if p > 0 then
+        (* apply beta-var reduction.
+           p > 0, q = 0, r = 0
+           p > 0, q > 0, r = 0
            p > 0, q = 0, r > 0
            p > 0, q > 0, r > 0 *)
-        complete_args_fun env sigma (mkOriginalApp ()) (p+q+r)
-      else if p > 0 then
-        (* p > 0, q = 0, r = 0
-           p > 0, q > 0, r = 0
-           apply beta-var reduction.
-           r = 0 because beta-var needs that the result type is inductive type. *)
         let term' = Vars.subst1 (mkRel vs.(0)) e in (* reduction/expansion: beta *)
         let vs' = Array.sub vs 1 (p-1) in
         complete_args_exp env sigma term' vs' q
-      else
-        (* p = 0, q > 0, r = 0 *)
-        mkApp (
-          mkLambda (x, t, complete_args_exp env2 sigma e [||] (p+q-1)),
-          Array.map (fun j -> mkRel j) vs)
+      else (* p = 0 *)
+        (* Conceptually, the lambda (term) generates a closure.
+           It will be invoked immediately (r = 0), or
+           it will actually generate a closure (r > 0).
+           p = 0, q = 0, r > 0
+           p = 0, q > 0, r > 0
+           p = 0, q > 0, r = 0 *)
+        complete_args_fun env sigma term (q+r)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
