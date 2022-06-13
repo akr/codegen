@@ -2231,6 +2231,21 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
 
+let test_matchapp_twoarg (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^ nat_src ^ {|
+      Definition n_of_bn (b : bool) (n : nat) : nat := n.
+      Definition f (c : bool) (b : bool) (n : nat) :=
+        match c with
+        | true => fun (n2 : nat) (b2 : bool) => S (n_of_bn b2 n2)
+        | false => fun (n2 : nat) (b2 : bool) => S (S (n_of_bn b2 n2))
+        end n b.
+      CodeGen Function f.
+    |}) {|
+    assert(f(true, true, 10) == 11);
+    assert(f(false, false, 20) == 22);
+    |}
+
 let test_auto_ind_type (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -3021,27 +3036,6 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
       assert(f(x2) == x2);
     |}
 
-let test_matchapp_twoarg (ctx : test_ctxt) : unit =
-  codegen_test_template ~goal:UntilCoq ctx
-    ({|
-      Definition use_bn (b : bool) (n : nat) : unit := tt.
-      CodeGen TestBorrowCheck
-        fun (u : unit) (b : bool) (n : nat) =>
-        match u with
-        | tt => fun (b2 : bool) (n2 : nat) => use_bn b2 n2
-        end b n.
-      CodeGen TestBorrowCheck
-        fun (u : unit) (b : bool) (n : nat) =>
-        match u return bool -> nat -> unit with
-        | tt => fun (b2 : bool) (n2 : nat) => use_bn b2 n2
-        end b.
-      CodeGen TestBorrowCheck
-        fun (u : unit) (b : bool) (n : nat) =>
-        match u return bool -> nat -> unit with
-        | tt => fun (b2 : bool) => match u with tt => fun n2 => use_bn b2 n2 end
-        end b n.
-    |}) {| |}
-
 let test_borrowcheck_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
     ({|
@@ -3416,7 +3410,7 @@ let test_borrowcheck_list_bool_has_true (ctx : test_ctxt) : unit =
 	has_true.
     |}) {| |}
 
-let test_borrowcheck_invalid_borrow_lambda_in_match (ctx : test_ctxt) : unit =
+let test_borrowcheck_invalid_borrow_in_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] linear variable and its borrowed value are used inconsistently in let-in:") ctx
     ({|
@@ -3427,7 +3421,7 @@ let test_borrowcheck_invalid_borrow_lambda_in_match (ctx : test_ctxt) : unit =
       CodeGen BorrowFunction borrow.
       CodeGen TestBorrowCheck
 	fun (u : unit) (x : L) =>
-	let b := match u with tt => fun y => borrow y end x in
+	let b := match u with tt => borrow x end in
 	let _ := dealloc x in
 	b.
     |}) {| |}
@@ -3760,6 +3754,7 @@ let suite : OUnit2.test =
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
+    "test_matchapp_twoarg" >:: test_matchapp_twoarg;
     "test_auto_ind_type" >:: test_auto_ind_type;
     "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
     "test_auto_ind_match_cstrmember" >:: test_auto_ind_match_cstrmember;
@@ -3793,7 +3788,6 @@ let suite : OUnit2.test =
     "test_downward_in_pair" >:: test_downward_in_pair;
     "test_downward_fixfunc" >:: test_downward_fixfunc;
     "test_downward_indirect_cycle" >:: test_downward_indirect_cycle;
-    "test_matchapp_twoarg" >:: test_matchapp_twoarg;
     "test_borrowcheck_constructor" >:: test_borrowcheck_constructor;
     "test_borrowcheck_constant" >:: test_borrowcheck_constant;
     "test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id;
@@ -3817,7 +3811,7 @@ let suite : OUnit2.test =
     "test_borrowcheck_invalid_borrow_match" >:: test_borrowcheck_invalid_borrow_match;
     "test_borrowcheck_invalid_borrow_proj" >:: test_borrowcheck_invalid_borrow_proj;
     "test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true;
-    "test_borrowcheck_invalid_borrow_lambda_in_match" >:: test_borrowcheck_invalid_borrow_lambda_in_match;
+    "test_borrowcheck_invalid_borrow_in_match" >:: test_borrowcheck_invalid_borrow_in_match;
     "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
     "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
     "test_borrowcheck_borrow_nested_match" >:: test_borrowcheck_borrow_nested_match;

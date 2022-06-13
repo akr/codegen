@@ -279,7 +279,6 @@ let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc
       check_fix_downwardness env sigma cfunc expr
 
 let downwardcheck (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
-  let term = Matchapp.simplify_matchapp env sigma term in
   let termty = nf_all env sigma (Retyping.get_type_of env sigma term) in
   let (argtys, retty) = EConstr.decompose_prod sigma termty in
   if is_downward env sigma retty then
@@ -956,7 +955,6 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
 
 let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : unit =
-  let term = Matchapp.simplify_matchapp env sigma term in
   ignore (borrowcheck_function env sigma [] [] term);
   borrowcheck_constructor env sigma term []
 

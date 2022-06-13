@@ -1819,7 +1819,6 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_term = EConstr.of_constr whole_term in
-  let whole_term = Matchapp.simplify_matchapp env sigma whole_term in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
