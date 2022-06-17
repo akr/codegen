@@ -916,3 +916,157 @@ let global_gensym ?(prefix : string = "g") () : string =
 
 let global_gensym_with_id (id : Id.t) : string =
   global_gensym () ^ "_" ^ (c_id (Id.to_string id))
+
+let str_cast_kind (k : cast_kind) : string =
+  match k with
+  | VMcast -> "<:"
+  | NATIVEcast -> "<<:"
+  | DEFAULTcast -> ":"
+
+let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
+  let open Declarations in
+  let env0 = Global.env () in
+  let rec aux relnames term =
+    match EConstr.kind sigma term with
+    | Rel i ->
+        (match List.nth_opt relnames (i-1) with
+        | Some name -> Name.print name
+        | None -> Pp.str "Rel") ++
+        Pp.str "[" ++ Pp.int i ++ Pp.str "]"
+    | Var id -> Pp.str "Var[" ++ Id.print id ++ Pp.str "]"
+    | Meta _ -> Pp.str "Meta"
+    | Evar _ -> Pp.str "Evar"
+    | Sort s -> Printer.pr_sort sigma (ESorts.kind sigma s)
+    | Cast (e,k,t) ->
+        Pp.hov 2 (
+          Pp.str "(" ++
+          aux relnames e +++
+          Pp.str (str_cast_kind k) +++
+          aux relnames t)
+    | Prod (x, t, b) ->
+        let n = Context.binder_name x in
+        Pp.hov 2 (
+          Pp.str "(forall" +++
+          Pp.str "(" ++
+          Name.print n +++
+          Pp.str ":" +++
+          aux relnames t ++
+          Pp.str ")," +++
+          aux (n::relnames) b ++
+          Pp.str ")")
+    | Lambda (x, t, b) ->
+        let n = Context.binder_name x in
+        Pp.hov 2 (
+          Pp.str "(fun" +++
+          Pp.str "(" ++
+          Name.print n +++
+          Pp.str ":" +++
+          aux relnames t ++
+          Pp.str ")," +++
+          aux (n::relnames) b ++
+          Pp.str ")")
+    | LetIn (x, e, t, b) ->
+        let n = Context.binder_name x in
+        Pp.hov 2 (
+          Pp.str "(let" +++
+          Name.print n +++
+          Pp.str ":" +++
+          aux relnames t +++
+          Pp.str ":=" +++
+          aux relnames e +++
+          Pp.str "in" +++
+          aux (n::relnames) b ++
+          Pp.str ")")
+    | App (f, args) ->
+        Pp.hov 2 (
+          Pp.str "(" ++
+          aux relnames f +++
+          pp_sjoinmap_ary (aux relnames) args ++
+          Pp.str ")")
+    | Const (cnst, univ) -> Constant.print cnst
+    | Ind ((mutind, ind_index), univ) ->
+        let mind_body = Environ.lookup_mind mutind env0 in
+        let oind_body = mind_body.mind_packets.(ind_index) in
+        Id.print oind_body.mind_typename
+    | Construct (((mutind, ind_index), cons_index), univ) ->
+        let mind_body = Environ.lookup_mind mutind env0 in
+        let oind_body = mind_body.mind_packets.(ind_index) in
+        Id.print oind_body.mind_consnames.(cons_index-1)
+    | Case (ci, u, pms, mpred, iv, item, bl) ->
+        let (mutind, ind_index) = ci.ci_ind in
+        let mind_body = Environ.lookup_mind mutind env0 in
+        let oind_body = mind_body.mind_packets.(ind_index) in
+        Pp.hov 2 (
+          Pp.str "(match" +++
+          aux relnames item +++
+          Pp.str "with" +++
+          pp_sjoinmap_ary
+            (fun i ->
+              let consname = oind_body.mind_consnames.(i) in
+              let (nas, b) = bl.(i) in
+              let nas = Array.map Context.binder_name nas in
+              Pp.hov 2 (
+                Pp.str "|" +++
+                Id.print consname +++
+                pp_sjoinmap_ary Name.print nas +++
+                Pp.str "=>" +++
+                aux (List.append (CArray.rev_to_list nas) relnames) b))
+            (iota_ary 0 (Array.length oind_body.mind_consnames)) ++
+          Pp.str ")")
+    | Fix ((ks, j), (nary, tary, fary)) ->
+        let nary = Array.map Context.binder_name nary in
+        let relnames2 = List.append (CArray.rev_to_list nary) relnames in (* xxx: check reverse or not *)
+        Pp.hov 2 (
+          Pp.str "(fix" +++
+          pp_sjoinmap_ary
+            (fun i ->
+              let n = nary.(i) in
+              let t = tary.(i) in
+              let f = fary.(i) in
+              let k = ks.(i) in
+              Pp.str "(" ++
+              Name.print n ++
+              Pp.str "/" ++
+              Pp.int k +++
+              Pp.str ":" +++
+              aux relnames t +++
+              Pp.str ":=" +++
+              aux relnames2 f ++
+              Pp.str ")")
+            (iota_ary 0 (Array.length nary)) +++
+          Pp.str "for" +++
+          Name.print nary.(j) ++
+          Pp.str ")")
+    | CoFix (j, (nary, tary, fary)) ->
+        let nary = Array.map Context.binder_name nary in
+        let relnames2 = List.append (CArray.rev_to_list nary) relnames in (* xxx: check reverse or not *)
+        Pp.hov 2 (
+          Pp.str "(cofix" +++
+          pp_sjoinmap_ary
+            (fun i ->
+              let n = nary.(i) in
+              let t = tary.(i) in
+              let f = fary.(i) in
+              Pp.str "(" ++
+              Name.print n +++
+              Pp.str ":" +++
+              aux relnames t +++
+              Pp.str ":=" +++
+              aux relnames2 f ++
+              Pp.str ")")
+            (iota_ary 0 (Array.length nary)) +++
+          Pp.str "for" +++
+          Name.print nary.(j) ++
+          Pp.str ")")
+    | Proj (proj, e) ->
+        Pp.hov 2 (
+          Pp.str "(Proj" ++
+          Projection.print proj +++
+          aux relnames e ++
+          Pp.str ")")
+    | Int _ -> Pp.str "Int"
+    | Float _ -> Pp.str "Float"
+    | Array _ -> Pp.str "Array"
+  in
+  aux [] term
+
