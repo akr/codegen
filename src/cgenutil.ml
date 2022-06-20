@@ -1070,3 +1070,13 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   in
   aux [] term
 
+let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : unit =
+  if Reductionops.is_conv env sigma t1 t2 then
+    ()
+  else
+    user_err (Pp.v 2 (Pp.hov 0 (Pp.str "[codegen] translation inconvertible:" +++ Pp.str phase) ++
+      Pp.fnl () ++
+      Printer.pr_econstr_env env sigma t1 ++ Pp.fnl () ++
+      Pp.str "=/=>" ++ Pp.fnl () ++
+      Printer.pr_econstr_env env sigma t2))
+
