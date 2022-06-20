@@ -25,6 +25,8 @@ open EConstr
 open Cgenutil
 open State
 
+open Proofview.Notations
+
 let whd_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
 let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = Reductionops.nf_all env sigma term
 
@@ -129,6 +131,189 @@ let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           in
           Some (q', ma_env, ma_match, ma_args))
 
+(*
+let rec nf_delta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      (match EConstr.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum (x, t) ->
+          term
+      | Context.Rel.Declaration.LocalDef (x, e, t) ->
+          nf_delta env sigma (Vars.lift i e))
+  | _ ->
+      Termops.map_constr_with_full_binders env sigma push_rel
+        (fun env2 term2 -> nf_delta env2 sigma term2)
+        env term
+*)
+
+let expand_local_definitions (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:expand_local_definitions] env rel=[" ++
+    pp_sjoinmap_ary
+      (fun i -> Pp.str "(" ++ Printer.pr_rel_decl (Environ.pop_rel_context i env) sigma (Environ.lookup_rel i env) ++ Pp.str ")")
+      (iota_ary 1 (Environ.nb_rel env)) ++
+    Pp.str "]"));*)
+  let rec aux n t =
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:expand_local_definitions]" +++
+      Pp.str "n=" ++ Pp.int n +++
+      Pp.str "term=" ++ pr_raw_econstr sigma t));*)
+    let res =
+    match EConstr.kind sigma t with
+    | Rel i ->
+        if i <= n then
+          t
+        else
+          (match EConstr.lookup_rel (i-n) env with
+          | Context.Rel.Declaration.LocalAssum (x, ty) ->
+              t
+          | Context.Rel.Declaration.LocalDef (x, e, ty) ->
+              aux n (Vars.lift (n+i) e))
+    | _ ->
+        Termops.map_constr_with_full_binders env sigma
+          (fun _ -> succ) aux n t
+    in
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:expand_local_definitions]" +++
+      Pp.str "result=" ++ pr_raw_econstr sigma res));*)
+    res
+  in
+  let result = aux 0 term in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:expand_local_definitions]" +++ Pp.str "result=" ++ pr_raw_econstr sigma result));*)
+  result
+
+(*
+  iary : An array of de Bruijn's indexes for free variables of the term
+         This array must be sorted in descending order.
+*)
+let abstract_free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (iary : int array) : EConstr.t =
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables] env rel=[" ++
+    pp_sjoinmap_ary
+      (fun i -> Pp.hov 2 (Pp.int i ++ Pp.str ":(" ++ Printer.pr_rel_decl (Environ.pop_rel_context i env) sigma (Environ.lookup_rel i env) ++ Pp.str ")"))
+      (array_rev (iota_ary 1 (Environ.nb_rel env))) ++
+    Pp.str "]"));
+  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "term=" ++ pr_raw_econstr sigma term));
+  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "iary=[" ++ pp_sjoinmap_ary Pp.int iary ++ Pp.str "]"));*)
+  if CArray.is_empty iary then
+    term
+  else
+    let nvars = Array.length iary in
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "nvars=" ++ Pp.int nvars));*)
+    let imax = iary.(0) in (* iary.(0) is the maximum of iary because it is sorted in descending order. *)
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "imax=" ++ Pp.int imax));*)
+    let sub = Array.make imax (nvars+1) in (* nvars+1 is a dummy value which can be distinguished with 1..nvars. *)
+    Array.iteri
+      (fun j i ->
+        (*
+          - j=0 and i=imax means the outermost variable in iary.
+            It should be translated to (Rel nvars).
+          - j=nvars-1 and i=imin means the innermost variable in iary.
+            It should be translated to (Rel 1).
+            (imin is the minimum value of iary)
+        *)
+        sub.(i-1) <- nvars-j)
+      iary;
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "sub=[" ++ pp_sjoinmap_ary Pp.int sub ++ Pp.str "]"));*)
+    let sub = CArray.map_to_list mkRel sub in
+    let body = Vars.substl sub term in
+    (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:abstract_free_variables]" +++ Pp.str "body=" ++ pr_raw_econstr sigma body));*)
+    Array.fold_right
+      (fun i body2 ->
+        match EConstr.lookup_rel i env with
+        | Context.Rel.Declaration.LocalAssum (x, t) ->
+            if Vars.closed0 sigma t then
+              mkLambda (x, t, body2)
+            else
+              user_err (Pp.str "[codegen] dependent type not supported:" +++
+                        Printer.pr_econstr_env env sigma (mkRel i) +++
+                        Pp.str ":" +++
+                        Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma t)
+        | Context.Rel.Declaration.LocalDef (x, e, t) ->
+            user_err (Pp.str "[codegen] local definition found:" +++
+                      Printer.pr_econstr_env env sigma (mkRel i) +++
+                      Pp.str ":" +++
+                      Printer.pr_econstr_env (Environ.pop_rel_context i env) sigma t))
+      iary body
+
+(*
+  env: environment for item, lhs_appmatch, and rhs_matchapp. (not for (q _))
+
+  q : context around lhs_appmatch and rhs_matchapp.
+  lhs_appmatch : match item with ... end args
+  rhs_matchapp : match item with ... | C vars => (...) args | ... end
+
+  This function verifies
+  (q lhs_appmatch) = (q rhs_matchapp).
+*)
+let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConstr.t -> EConstr.t) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : unit =
+  let c_eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
+  let c_functional_extensionality = mkConst (Globnames.destConstRef (Coqlib.lib_ref "codegen.functional_extensionality")) in
+  let lhs_term = q lhs_appmatch in
+  let rhs_term = q rhs_matchapp in
+  let eq_ty = Retyping.get_type_of env sigma lhs_term in
+  let eq0 = mkApp (c_eq, [| eq_ty; lhs_term; rhs_term |]) in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] lhs_appmatch:" +++ Printer.pr_econstr_env env sigma lhs_appmatch));*)
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] rhs_matchapp:" +++ Printer.pr_econstr_env env sigma rhs_matchapp));*)
+  let lhs_appmatch' = expand_local_definitions env sigma lhs_appmatch in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] lhs_appmatch':" +++ Printer.pr_econstr_env env sigma lhs_appmatch'));*)
+  let rhs_matchapp' = expand_local_definitions env sigma rhs_matchapp in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] rhs_matchapp':" +++ Printer.pr_econstr_env env sigma rhs_matchapp'));*)
+  let lhs_fv = free_variables_index_set env sigma lhs_appmatch' in
+  let rhs_fv = free_variables_index_set env sigma rhs_matchapp' in
+  let fv = IntSet.union lhs_fv rhs_fv in
+  let fv_ary = CArray.rev_of_list (IntSet.elements fv) in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform]" +++ Pp.str "fv=[" ++ pp_sjoinmap_ary Pp.int fv_ary ++ Pp.str "]"));*)
+  let lhs_fun = abstract_free_variables env sigma lhs_appmatch' fv_ary in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] lhs_fun:" +++ Printer.pr_econstr_env env sigma lhs_fun));*)
+  if not (Vars.closed0 sigma lhs_fun) then user_err (Pp.hov 2 (Pp.str "[codegen:bug] lhs_fun couldn't closed:" +++
+     Pp.str "lhs_appmatch2=" ++ pr_raw_econstr sigma lhs_appmatch' +++
+     Pp.str "lhs_fun=" ++ pr_raw_econstr sigma lhs_fun));
+  let rhs_fun = abstract_free_variables env sigma rhs_matchapp' fv_ary in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] rhs_fun:" +++ Printer.pr_econstr_env env sigma rhs_fun));*)
+  if not (Vars.closed0 sigma rhs_fun) then user_err (Pp.str "[codegen:bug] rhs_fun couldn't closed");
+  let fv_args = Array.map mkRel fv_ary in
+  let lhs_app = mkApp (lhs_fun, fv_args) in
+  let rhs_app = mkApp (rhs_fun, fv_args) in
+  check_convertible "case_transform_lhs" env sigma lhs_appmatch lhs_app;
+  check_convertible "case_transform_rhs" env sigma rhs_matchapp rhs_app;
+  let lhs_term' = q lhs_app in
+  let rhs_term' = q rhs_app in
+  let eq1 = mkApp (c_eq, [| eq_ty; lhs_term'; rhs_term' |]) in
+  let genv = Global.env () in
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2:" +++ Printer.pr_econstr_env genv sigma eq_term1_term2));
+  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (Retyping.get_type_of genv sigma eq_term1_term2)));
+  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (snd (Typing.type_of genv sigma eq_term1_term2))));*)
+  let (entry, pv) = Proofview.init sigma [(genv, eq0)] in
+  let ((), pv, unsafe, tree) =
+    Proofview.apply
+      ~name:(Names.Id.of_string "codegen")
+      ~poly:false
+      env
+      (
+        Tactics.change_concl eq1 <*>
+        Equality.replace rhs_fun lhs_fun <*>
+        Proofview.tclDISPATCH [Tactics.reflexivity; Proofview.tclUNIT ()] <*>
+        Tacticals.tclDO (Array.length fv_ary)
+          (Tactics.apply c_functional_extensionality <*>
+           Tactics.intro) <*>
+        Proofview.Goal.enter begin fun g ->
+          let sigma = Proofview.Goal.sigma g in
+          let eq_matchapp = Proofview.Goal.concl g in
+          (*Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "goal=" ++ (Printer.pr_econstr_env env sigma eq_matchapp)));*)
+          let (ci, u, pms, mpred, iv, item, bl) =
+            destCase sigma (snd (destApp sigma eq_matchapp)).(2)
+          in
+          Tactics.simplest_case item <*>
+          Tactics.reflexivity
+        end
+      )
+      pv
+  in
+  (*let sigma = Proofview.return pv in
+  let proofs = Proofview.partial_proof entry pv in
+  List.iter
+    (fun c ->
+      Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "proofterm=" ++ (Printer.pr_econstr_env env sigma c))))
+    proofs;*)
+  ()
+
 let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t option =
   match find_match_app env sigma term with
   | None -> None
@@ -171,6 +356,9 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
               (nas, body))
             bl bl0
         in
+        verify_case_transform env sigma q
+          (mkApp (mkCase ma_match, ma_args))
+          (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl'));
         Some (q (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl')))
 
 let rec simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
