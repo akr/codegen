@@ -384,7 +384,7 @@ let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term0 : EConst
             env
             (
               Equality.rewriteRL proof_eq_term_term' <*>
-              Tactics.apply proof0 <*>
+              Tactics.exact_no_check proof0 <*>
               Tactics.reflexivity
             )
             pv
