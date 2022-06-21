@@ -146,7 +146,8 @@ type constr_or_underscore = Constrexpr.constr_expr option
 type sp_instance_names = {
   spi_cfunc_name : string option;
   spi_presimp_id : Id.t option;
-  spi_simplified_id : Id.t option
+  spi_simplified_id : Id.t option;
+  spi_equality_id : Names.Id.t option;
 }
 
 type ind_constructor = {
@@ -175,7 +176,7 @@ let borrow_type_set = Summary.ref
 
 type simplified_status =
 | SpNoSimplification (* constructor or primitive function *)
-| SpExpectedId of Id.t
+| SpExpectedId of (Id.t * Id.t) (* simplified_id, equality_id *)
 | SpDefined of (Constant.t * StringSet.t) (* (defined-constant, referred-cfuncs) *)
 
 (*

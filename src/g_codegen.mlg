@@ -164,16 +164,16 @@ VERNAC ARGUMENT EXTEND constr_or_underscore
 END
 
 VERNAC ARGUMENT EXTEND sp_instance_names3
-| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) id_or_underscore(simplified_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = simplified_id } }
-| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = None } }
-| [ "=>" string_opt(cfunc) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = None; spi_simplified_id = None } }
-| [ ] -> { { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None } }
+| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) id_or_underscore(simplified_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = simplified_id; spi_equality_id = None } }
+| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = None; spi_equality_id = None } }
+| [ "=>" string_opt(cfunc) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = None; spi_simplified_id = None; spi_equality_id = None } }
+| [ ] -> { { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None; spi_equality_id = None } }
 END
 
 VERNAC ARGUMENT EXTEND sp_instance_names2
-| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = None } }
-| [ "=>" string_opt(cfunc) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = None; spi_simplified_id = None } }
-| [ ] -> { { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None } }
+| [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = None; spi_equality_id = None } }
+| [ "=>" string_opt(cfunc) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = None; spi_simplified_id = None; spi_equality_id = None } }
+| [ ] -> { { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None; spi_equality_id = None } }
 END
 
 VERNAC ARGUMENT EXTEND ind_constructor

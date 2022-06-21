@@ -86,7 +86,7 @@ let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : spe
     Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
   (match sp_inst.sp_simplified_status with
   | SpNoSimplification -> Pp.mt ()
-  | SpExpectedId s_id -> Id.print s_id
+  | SpExpectedId (s_id, e_id) -> Id.print s_id
   | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt) ++
   Pp.str "." +++
   (match sp_inst.sp_simplified_status with
@@ -283,13 +283,14 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     user_err (Pp.hov 2 (Pp.str "[codegen] pre-simplified term must have monomorphic type:" +++ Printer.pr_econstr_env env sigma ty)));
   (sigma, t, ty)
 
-let gensym_ps (suffix : string) : Names.Id.t * Names.Id.t =
+let gensym_simplification (suffix : string) : Names.Id.t * Names.Id.t * Names.Id.t =
   let n = !gensym_ps_num in
   gensym_ps_num := n + 1;
   let suffix2 = if suffix = "" then suffix else "_" ^ suffix in
-  let p = "codegen_p" ^ string_of_int n ^ suffix2 in
-  let s = "codegen_s" ^ string_of_int n ^ suffix2 in
-  (Id.of_string p, Id.of_string s)
+  let p = "codegen_p" ^ string_of_int n ^ suffix2 in (* pre-simplified *)
+  let s = "codegen_s" ^ string_of_int n ^ suffix2 in (* simplified *)
+  let e = "codegen_e" ^ string_of_int n ^ suffix2 in (* equality *)
+  (Id.of_string p, Id.of_string s, Id.of_string e)
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
     (istypearg_list : bool list)
@@ -347,6 +348,7 @@ let codegen_define_instance
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));
   let sp_inst =
+    let func_name = label_name_of_constant_or_constructor func in
     let check_cfunc_name_conflict cfunc_name =
       match is_function_icommand icommand, CString.Map.find_opt cfunc_name !cfunc_instance_map with
       | true, None -> ()
@@ -375,29 +377,33 @@ let codegen_define_instance
             Pp.str "but also for a primitive")
       | false, Some (CodeGenCfuncPrimitive _) -> ()
     in
-    let generated_ps_syms = ref None in
-    let lazy_gensym_ps suffix =
-      match !generated_ps_syms with
-      | Some ps_ids -> ps_ids
+    let generated_simplification_syms = ref None in
+    let lazy_gensym_simplification () =
+      match !generated_simplification_syms with
+      | Some ids -> ids
       | None ->
-          let ps_ids = gensym_ps suffix in
-          generated_ps_syms := Some ps_ids;
-          ps_ids
+          let ids = gensym_simplification func_name in
+          generated_simplification_syms := Some ids;
+          ids
     in
-    let lazy_gensym_p suffix = fst (lazy_gensym_ps suffix) in
-    let lazy_gensym_s suffix = snd (lazy_gensym_ps suffix) in
+    let lazy_gensym_p () = let (id, _, _) = lazy_gensym_simplification () in id in
+    let lazy_gensym_s () = let (_, id, _) = lazy_gensym_simplification () in id in
+    let lazy_gensym_e () = let (_, _, id) = lazy_gensym_simplification () in id in
     let need_presimplified_ctnt =
       List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
       (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
     in
-    let func_name = label_name_of_constant_or_constructor func in
     let s_id () = match names_opt with
       | Some { spi_simplified_id = Some s_id } -> s_id
-      | _ -> lazy_gensym_s func_name
+      | _ -> lazy_gensym_s ()
     in
     let p_id () = match names_opt with
       | Some { spi_presimp_id = Some p_id } -> p_id
-      | _ -> lazy_gensym_p func_name
+      | _ -> lazy_gensym_p ()
+    in
+    let e_id () = match names_opt with
+      | Some { spi_equality_id = Some e_id } -> e_id
+      | _ -> lazy_gensym_e ()
     in
     let cfunc_name = match names_opt with
       | Some { spi_cfunc_name = Some name } ->
@@ -431,7 +437,7 @@ let codegen_define_instance
     in
     let simplified_status =
       if is_function_icommand icommand then
-        SpExpectedId (s_id ())
+        SpExpectedId (s_id (), e_id ())
       else (* CodeGenPrimitive or CodeGenConstant *)
         SpNoSimplification
     in
@@ -2205,12 +2211,11 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let name = (match sp_inst.sp_simplified_status with
+  let (s_id, e_id) = (match sp_inst.sp_simplified_status with
     | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
-    | SpExpectedId id -> id
+    | SpExpectedId (s_id, e_id) -> (s_id, e_id)
     | SpDefined _ -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
   in
-  let proof_name = Id.of_string (Id.to_string name ^ "_proof") in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
   let ctnt =
@@ -2221,7 +2226,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   msg_info_hov (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
-    Pp.str "Start simplification:" +++ Id.print name);
+    Pp.str "Start simplification:" +++ Id.print s_id);
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
     let global_pred = !specialize_global_inline in
@@ -2262,7 +2267,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let declared_ctnt =
     let globref = Declare.declare_definition
       ~info:(Declare.Info.make ())
-      ~cinfo:(Declare.CInfo.make ~name:name ~typ:None ())
+      ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())
       ~opaque:false
       ~body:term
       sigma
@@ -2276,7 +2281,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     let eq_epresimp_simplified = mkApp (eq, [| eq_type_arg; epresimp; mkConst declared_ctnt |]) in
     let globref = Declare.declare_definition
       ~info:(Declare.Info.make ())
-      ~cinfo:(Declare.CInfo.make ~name:proof_name ~typ:(Some eq_epresimp_simplified) ())
+      ~cinfo:(Declare.CInfo.make ~name:e_id ~typ:(Some eq_epresimp_simplified) ())
       ~opaque:true
       ~body:proof
       sigma
