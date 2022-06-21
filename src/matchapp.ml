@@ -242,7 +242,7 @@ let abstract_free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : E
   This function verifies
   (q lhs_appmatch) = (q rhs_matchapp).
 *)
-let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConstr.t -> EConstr.t) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : unit =
+let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConstr.t -> EConstr.t) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : Evd.evar_map * EConstr.t =
   let c_eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
   let c_functional_extensionality = mkConst (Globnames.destConstRef (Coqlib.lib_ref "codegen.functional_extensionality")) in
   let lhs_term = q lhs_appmatch in
@@ -277,8 +277,9 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConst
   let rhs_term' = q rhs_app in
   let eq1 = mkApp (c_eq, [| eq_ty; lhs_term'; rhs_term' |]) in
   let genv = Global.env () in
-  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2:" +++ Printer.pr_econstr_env genv sigma eq_term1_term2));
-  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (Retyping.get_type_of genv sigma eq_term1_term2)));
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq0:" +++ Printer.pr_econstr_env genv sigma eq0));
+  Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq1:" +++ Printer.pr_econstr_env genv sigma eq1));*)
+  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (Retyping.get_type_of genv sigma eq_term1_term2)));
   Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (snd (Typing.type_of genv sigma eq_term1_term2))));*)
   let (entry, pv) = Proofview.init sigma [(genv, eq0)] in
   let ((), pv, unsafe, tree) =
@@ -306,15 +307,16 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConst
       )
       pv
   in
-  (*let sigma = Proofview.return pv in
+  let sigma = Proofview.return pv in
   let proofs = Proofview.partial_proof entry pv in
-  List.iter
+  assert (List.length proofs = 1);
+  (*List.iter
     (fun c ->
       Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "proofterm=" ++ (Printer.pr_econstr_env env sigma c))))
     proofs;*)
-  ()
+  (sigma, List.hd proofs)
 
-let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t option =
+let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Evd.evar_map * EConstr.t * EConstr.t) option =
   match find_match_app env sigma term with
   | None -> None
   | Some (q, env, ma_match, ma_args) ->
@@ -356,19 +358,42 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
               (nas, body))
             bl bl0
         in
-        verify_case_transform env sigma q
-          (mkApp (mkCase ma_match, ma_args))
-          (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl'));
-        Some (q (mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl')))
+        let lhs_appmatch = mkApp (mkCase ma_match, ma_args) in
+        let rhs_matchapp = mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl') in
+        let (sigma, proof) = verify_case_transform env sigma q lhs_appmatch rhs_matchapp in
+        Some (sigma, q rhs_matchapp, proof)
 
-let rec simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
-  (if !opt_debug_matchapp then
-    msg_debug_hov (Pp.str "[codegen] simplify_matchapp:" +++ Printer.pr_econstr_env env sigma term));
-  match simplify_matchapp_once env sigma term with
-  | None ->
-      ((if !opt_debug_matchapp then
-        msg_debug_hov (Pp.str "[codegen] simplify_matchapp: no matchapp redex"));
-      term)
-  | Some term' ->
-      simplify_matchapp env sigma term'
+let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term0 : EConstr.t) : Evd.evar_map * EConstr.t * EConstr.t =
+  let ty_term0 = Retyping.get_type_of env sigma term0 in
+  let eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
+  let eq_refl = mkConstruct (Globnames.destConstructRef (Coqlib.lib_ref "core.eq.refl")) in
+  let rec aux sigma term proof0 =
+    (if !opt_debug_matchapp then
+      msg_debug_hov (Pp.str "[codegen] simplify_matchapp:" +++ Printer.pr_econstr_env env sigma term));
+    match simplify_matchapp_once env sigma term with
+    | None ->
+        ((if !opt_debug_matchapp then
+          msg_debug_hov (Pp.str "[codegen] simplify_matchapp: no matchapp redex"));
+        (sigma, term, proof0))
+    | Some (sigma, term', proof_eq_term_term') ->
+        let (entry, pv) = Proofview.init sigma [(env, mkApp (eq, [|ty_term0; term0; term'|]))] in
+        let ((), pv, unsafe, tree) =
+          Proofview.apply
+            ~name:(Names.Id.of_string "codegen")
+            ~poly:false
+            env
+            (
+              Equality.rewriteRL proof_eq_term_term' <*>
+              Tactics.apply proof0 <*>
+              Tactics.reflexivity
+            )
+            pv
+        in
+        let sigma = Proofview.return pv in
+        let proofs = Proofview.partial_proof entry pv in
+        assert (List.length proofs = 1);
+        aux sigma term' (List.hd proofs)
+  in
+  let proof0 = mkApp (eq_refl, [| ty_term0; term0 |]) in
+  aux sigma term0 proof0
 

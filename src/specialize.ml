@@ -2210,6 +2210,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     | SpExpectedId id -> id
     | SpDefined _ -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
   in
+  let proof_name = Id.of_string (Id.to_string name ^ "_proof") in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
   let ctnt =
@@ -2252,20 +2253,37 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
-  let term = Matchapp.simplify_matchapp env sigma term in
+  let (sigma, term, proof) = Matchapp.simplify_matchapp env sigma term in
   debug_simplification env sigma "simplify_matchapp" term;
   Linear.borrowcheck env sigma term;
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
-  let globref = Declare.declare_definition
-    ~info:(Declare.Info.make ())
-    ~cinfo:(Declare.CInfo.make ~name:name ~typ:None ())
-    ~opaque:false
-    ~body:term
-    sigma
+  let declared_ctnt =
+    let globref = Declare.declare_definition
+      ~info:(Declare.Info.make ())
+      ~cinfo:(Declare.CInfo.make ~name:name ~typ:None ())
+      ~opaque:false
+      ~body:term
+      sigma
+    in
+    Globnames.destConstRef globref
   in
-  let declared_ctnt = Globnames.destConstRef globref in
+  let env = Global.env () in
+  let declared_proof_ctnt =
+    let eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
+    let eq_type_arg = Retyping.get_type_of env sigma epresimp in
+    let eq_epresimp_simplified = mkApp (eq, [| eq_type_arg; epresimp; mkConst declared_ctnt |]) in
+    let globref = Declare.declare_definition
+      ~info:(Declare.Info.make ())
+      ~cinfo:(Declare.CInfo.make ~name:proof_name ~typ:(Some eq_epresimp_simplified) ())
+      ~opaque:true
+      ~body:proof
+      sigma
+    in
+    Globnames.destConstRef globref
+  in
+  ignore declared_proof_ctnt;
   let sp_inst2 = {
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
@@ -2289,7 +2307,6 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    let m = !specialize_config_map in
    specialize_config_map := ConstrMap.add sp_cfg.sp_func sp_cfg2 m);
-  let env = Global.env () in
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt, referred_cfuncs)
 
