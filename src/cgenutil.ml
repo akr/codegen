@@ -1080,3 +1080,11 @@ let check_convertible (phase : string) (env : Environ.env) (sigma : Evd.evar_map
       Pp.str "=/=>" ++ Pp.fnl () ++
       Printer.pr_econstr_env env sigma t2))
 
+let show_goals () : unit Proofview.tactic =
+  Proofview.Goal.enter begin fun g ->
+    let env = Proofview.Goal.env g in
+    let sigma = Proofview.Goal.sigma g in
+    let concl = Proofview.Goal.concl g in
+    Feedback.msg_debug (Pp.str "[codegen] goal:" +++ Printer.pr_econstr_env env sigma concl);
+    Proofview.tclUNIT ()
+  end
