@@ -234,6 +234,28 @@ let abstract_free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : E
 
 (*
   env: environment for item, lhs_appmatch, and rhs_matchapp. (not for (q _))
+*)
+let replace_appmatch (env : Environ.env) (sigma : Evd.evar_map) (ty0 : EConstr.types) (q : EConstr.t -> EConstr.t) (lhs_fun : EConstr.t) (rhs_fun : EConstr.t) (fv_args : EConstr.t array) : unit Proofview.tactic =
+  let eq_ind = mkConst (Globnames.destConstRef (Coqlib.lib_ref "core.eq.ind")) in
+  let eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
+  (* eq_ind : forall [A : Type] (x : A) (P : A -> Prop), P x -> forall y : A, x = y -> P y *)
+  (* eq_ind fun_ty lhs_fun (fun z => q (lhs_fun fv_args) = q (z fv_args)) _ rhs_fun _ *)
+  (* x = lhs_fun *)
+  (* y = rhs_fun *)
+  let fun_ty = Retyping.get_type_of env sigma lhs_fun in
+  let p = mkLambda (Context.anonR, fun_ty, mkApp (eq, [| ty0; q (mkApp (lhs_fun, fv_args)); q (mkApp (mkRel (Environ.nb_rel env + 1), fv_args)) |])) in
+  Proofview.Goal.enter begin fun gl ->
+    let env = Proofview.Goal.env gl in
+    Refine.refine ~typecheck:true begin fun sigma ->
+      let sigma, px = Evarutil.new_evar env sigma (mkApp (p, [| lhs_fun |])) in
+      let sigma, g = Evarutil.new_evar env sigma (mkApp (eq, [| fun_ty; lhs_fun; rhs_fun |])) in
+      let r = mkApp (eq_ind, [| fun_ty; lhs_fun; p; px; rhs_fun; g |]) in
+      (sigma, r)
+    end
+  end
+
+(*
+  env: environment for item, lhs_appmatch, and rhs_matchapp. (not for (q _))
 
   q : context around lhs_appmatch and rhs_matchapp.
   lhs_appmatch : match item with ... end args
@@ -289,7 +311,8 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConst
       env
       (
         Tactics.change_concl eq1 <*>
-        Equality.replace rhs_fun lhs_fun <*>
+        replace_appmatch env sigma eq_ty q lhs_fun rhs_fun fv_args <*>
+        (*Equality.replace rhs_fun lhs_fun <*>*)
         Proofview.tclDISPATCH [Tactics.reflexivity; Proofview.tclUNIT ()] <*>
         Tacticals.tclDO (Array.length fv_ary)
           (Tactics.apply c_functional_extensionality <*>
