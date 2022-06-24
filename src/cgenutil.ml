@@ -1088,3 +1088,10 @@ let show_goals () : unit Proofview.tactic =
     Feedback.msg_debug (Pp.str "[codegen] goal:" +++ Printer.pr_econstr_env env sigma concl);
     Proofview.tclUNIT ()
   end
+
+let lib_ref (name : string) : EConstr.t =
+  match Coqlib.lib_ref name with
+  | GlobRef.VarRef id -> mkVar id
+  | GlobRef.ConstRef cnst -> mkConst cnst
+  | GlobRef.IndRef ind -> mkInd ind
+  | GlobRef.ConstructRef cstr -> mkConstruct cstr

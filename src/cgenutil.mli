@@ -128,3 +128,4 @@ val global_gensym_with_id : Names.Id.t -> string
 val pr_raw_econstr : Evd.evar_map -> EConstr.t -> Pp.t
 val check_convertible : string -> Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t -> unit
 val show_goals : unit -> unit Proofview.tactic
+val lib_ref : string -> EConstr.t
