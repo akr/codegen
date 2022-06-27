@@ -233,26 +233,21 @@ let abstract_free_variables (env : Environ.env) (sigma : Evd.evar_map) (term : E
       iary body
 
 (*
-  p : fun x => (lhs = q (x fv_args))
+  p : fun z => ... z ...
      closed (doesn't refer variables outside of the context)
-  n: number of variables bounded in q that are used in fv_args.
-  lhs_fun : closed term
-  rhs_fun : closed term
-  fv_args : array of variables
+  x : closed term
+  y : closed term
 *)
-let replace_appmatch (p : EConstr.t) (n : int) (fun_ty : EConstr.t) (lhs_fun : EConstr.t) (rhs_fun : EConstr.t) : unit Proofview.tactic =
+let apply_eq_ind (p : EConstr.t) (xy_ty : EConstr.t) (x : EConstr.t) (y : EConstr.t) : unit Proofview.tactic =
   let eq_ind = lib_ref "core.eq.ind" in
   let eq = lib_ref "core.eq.type" in
   (* eq_ind : forall [A : Type] (x : A) (P : A -> Prop), P x -> forall y : A, x = y -> P y *)
-  (* eq_ind fun_ty lhs_fun (fun z => q (lhs_fun fv_args) = q (z fv_args)) _ rhs_fun _ *)
-  (* x = lhs_fun *)
-  (* y = rhs_fun *)
   Proofview.Goal.enter begin fun gl ->
     let env = Proofview.Goal.env gl in
     Refine.refine ~typecheck:false begin fun sigma ->
-      let sigma, px = Evarutil.new_evar env sigma (mkApp (p, [| lhs_fun |])) in
-      let sigma, g = Evarutil.new_evar env sigma (mkApp (eq, [| fun_ty; lhs_fun; rhs_fun |])) in
-      let r = mkApp (eq_ind, [| fun_ty; lhs_fun; p; px; rhs_fun; g |]) in
+      let sigma, px = Evarutil.new_evar env sigma (mkApp (p, [| x |])) in
+      let sigma, g = Evarutil.new_evar env sigma (mkApp (eq, [| xy_ty; x; y |])) in
+      let r = mkApp (eq_ind, [| xy_ty; x; p; px; y; g |]) in
       (sigma, r)
     end
   end
@@ -270,10 +265,10 @@ let replace_appmatch (p : EConstr.t) (n : int) (fun_ty : EConstr.t) (lhs_fun : E
 let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConstr.t -> EConstr.t) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : Evd.evar_map * EConstr.t =
   let eq = lib_ref "core.eq.type" in
   let functional_extensionality = lib_ref "codegen.functional_extensionality" in
-  let lhs_term = q lhs_appmatch in
-  let rhs_term = q rhs_matchapp in
-  let eq_ty = Retyping.get_type_of env sigma lhs_term in
-  let eq_orig = mkApp (eq, [| eq_ty; lhs_term; rhs_term |]) in
+  let lhs_orig = q lhs_appmatch in
+  let rhs_orig = q rhs_matchapp in
+  let eq_ty = Retyping.get_type_of env sigma lhs_orig in
+  let eq_orig = mkApp (eq, [| eq_ty; lhs_orig; rhs_orig |]) in
   (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] lhs_appmatch:" +++ Printer.pr_econstr_env env sigma lhs_appmatch));*)
   (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] rhs_matchapp:" +++ Printer.pr_econstr_env env sigma rhs_matchapp));*)
   let lhs_appmatch' = expand_local_definitions env sigma lhs_appmatch in
@@ -294,23 +289,13 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConst
   (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] rhs_fun:" +++ Printer.pr_econstr_env env sigma rhs_fun));*)
   if not (Vars.closed0 sigma rhs_fun) then user_err (Pp.str "[codegen:bug] rhs_fun couldn't closed");
   let fv_args = Array.map mkRel fv_ary in
-  let lhs_app = mkApp (lhs_fun, fv_args) in
-  let rhs_app = mkApp (rhs_fun, fv_args) in
-  check_convertible "case_transform_lhs" env sigma lhs_appmatch lhs_app;
-  check_convertible "case_transform_rhs" env sigma rhs_matchapp rhs_app;
-  (*let lhs_term' = q lhs_app in*)
-  let rhs_term' = q rhs_app in
-  let eq_conv = mkApp (eq, [| eq_ty; lhs_term; rhs_term' |]) in
+  check_convertible "case_transform_lhs" env sigma lhs_appmatch (mkApp (lhs_fun, fv_args));
+  check_convertible "case_transform_rhs" env sigma rhs_matchapp (mkApp (rhs_fun, fv_args));
   let genv = Global.env () in
   (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_orig:" +++ Printer.pr_econstr_env genv sigma eq_orig));
   Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_conv:" +++ Printer.pr_econstr_env genv sigma eq_conv));*)
   (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (Retyping.get_type_of genv sigma eq_term1_term2)));
   Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:verify_case_transform] eq_term1_term2_type:" +++ Printer.pr_econstr_env genv sigma (snd (Typing.type_of genv sigma eq_term1_term2))));*)
-  let fun_ty = Retyping.get_type_of env sigma lhs_fun in
-  let p =
-    let rhs = q (mkApp (mkRel (Environ.nb_rel env + 1), fv_args)) in
-    mkLambda (Context.anonR, fun_ty, mkApp (eq, [| eq_ty; lhs_term; rhs |]))
-  in
   let (entry, pv) = Proofview.init sigma [(genv, eq_orig)] in
   let ((), pv, unsafe, tree) =
     Proofview.apply
@@ -318,8 +303,12 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (q : EConst
       ~poly:false
       env
       (
-        Tactics.change_concl eq_conv <*>
-        replace_appmatch p (Environ.nb_rel env) fun_ty lhs_fun rhs_fun <*>
+        (let fun_ty = Retyping.get_type_of env sigma lhs_fun in
+        let p =
+          let rhs = q (mkApp (mkRel (Environ.nb_rel env + 1), fv_args)) in
+          mkLambda (Context.anonR, fun_ty, mkApp (eq, [| eq_ty; lhs_orig; rhs |]))
+        in
+        apply_eq_ind p fun_ty lhs_fun rhs_fun) <*>
         (* Equality.replace rhs_fun lhs_fun <*> *)
         Proofview.tclDISPATCH [Tactics.reflexivity; Proofview.tclUNIT ()] <*>
         Tacticals.tclDO (Array.length fv_ary)
