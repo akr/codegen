@@ -386,37 +386,26 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
         let (sigma, proof) = verify_case_transform env sigma q lhs_appmatch rhs_matchapp in
         Some (sigma, q rhs_matchapp, proof)
 
-let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term0 : EConstr.t) : Evd.evar_map * EConstr.t * EConstr.t =
-  let ty_term0 = Retyping.get_type_of env sigma term0 in
-  let eq = lib_ref "core.eq.type" in
-  let eq_refl = lib_ref "core.eq.refl" in
-  let rec aux sigma term proof0 =
+(*
+  (sigma, term', [(lhs, rhs, proof_of_lhs_eq_rhs); ...]) = simplify_matchapp env sigma term
+
+  - proofs is a list of equality proofs from term to term'
+    If term is repeatedly rewritten to term' as
+    term=term1 -> term2 -> ... -> termN=term',
+    the first element of proofs is the tuple of (term{N-1}, termN, the proof of term{N-1} = termN), and
+    the last element of proofs is the tuple of (term1, term2, the proof of term1 = term2).
+*)
+let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Evd.evar_map * EConstr.t * (EConstr.t * EConstr.t * EConstr.t) list =
+  let rec aux sigma term proofs =
     (if !opt_debug_matchapp then
       msg_debug_hov (Pp.str "[codegen] simplify_matchapp:" +++ Printer.pr_econstr_env env sigma term));
     match simplify_matchapp_once env sigma term with
     | None ->
         ((if !opt_debug_matchapp then
           msg_debug_hov (Pp.str "[codegen] simplify_matchapp: no matchapp redex"));
-        (sigma, term, proof0))
+        (sigma, term, proofs))
     | Some (sigma, term', proof_eq_term_term') ->
-        let (entry, pv) = Proofview.init sigma [(env, mkApp (eq, [|ty_term0; term0; term'|]))] in
-        let ((), pv, unsafe, tree) =
-          Proofview.apply
-            ~name:(Names.Id.of_string "codegen")
-            ~poly:false
-            env
-            (
-              Equality.rewriteRL proof_eq_term_term' <*>
-              Tactics.exact_no_check proof0 <*>
-              Tactics.reflexivity
-            )
-            pv
-        in
-        let sigma = Proofview.return pv in
-        let proofs = Proofview.partial_proof entry pv in
-        assert (List.length proofs = 1);
-        aux sigma term' (List.hd proofs)
+        aux sigma term' ((term, term', proof_eq_term_term') :: proofs)
   in
-  let proof0 = mkApp (eq_refl, [| ty_term0; term0 |]) in
-  aux sigma term0 proof0
+  aux sigma term []
 

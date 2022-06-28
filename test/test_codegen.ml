@@ -1064,6 +1064,25 @@ let test_beta_var_presimp (ctx : test_ctxt) : unit =
       assert(bool_match_count == 4);
     |}
 
+let test_matchapp_before_reduction (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_matchcount_src ^ nat_src ^
+    {|
+      (* conditional of z must be reduced at compile-time *)
+      Definition f (x:bool) :=
+        let y := true in
+        (if x then
+          fun z:bool => if z then 0 else 1
+        else
+          fun z:bool => if z then 2 else 3) y.
+      CodeGen Function f.
+    |}) {|
+      assert(f(true) == 0);
+      assert(bool_match_count == 1);
+      assert(f(false) == 2);
+      assert(bool_match_count == 2);
+    |}
+
 let test_delta_fun_constant (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -3703,6 +3722,7 @@ let suite : OUnit2.test =
     "test_let_app_match" >:: test_let_app_match;
     "test_cast" >:: test_cast;
     "test_beta_var_presimp" >:: test_beta_var_presimp;
+    "test_matchapp_before_reduction" >:: test_matchapp_before_reduction;
     "test_delta_fun_constant" >:: test_delta_fun_constant;
     "test_delta_fun_constructor" >:: test_delta_fun_constructor;
     "test_delta_fun_lambda" >:: test_delta_fun_lambda;

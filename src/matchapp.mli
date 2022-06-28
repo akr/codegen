@@ -1,2 +1,2 @@
-val simplify_matchapp : Environ.env -> Evd.evar_map -> EConstr.t -> (Evd.evar_map * EConstr.t * EConstr.t)
+val simplify_matchapp : Environ.env -> Evd.evar_map -> EConstr.t -> (Evd.evar_map * EConstr.t * (EConstr.t * EConstr.t * EConstr.t) list)
 

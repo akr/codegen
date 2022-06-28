@@ -2197,6 +2197,24 @@ let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : stri
     msg_debug_hov (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term)));
     specialization_time := now)
 
+let combine_equality_proofs (env : Environ.env) (sigma : Evd.evar_map) (term1 : EConstr.t) (term2 : EConstr.t) (proofs : (EConstr.t * EConstr.t * EConstr.t) list) : EConstr.t * EConstr.types =
+  let eq = lib_ref "core.eq.type" in
+  let eq_ind = lib_ref "core.eq.ind" in
+  let eq_refl = lib_ref "core.eq.refl" in
+  let ty = Retyping.get_type_of env sigma term1 in
+  let eq_prop = mkApp (eq, [| ty; term1; term2 |]) in
+  let p = mkLambda (Context.anonR, ty, (mkApp (eq, [| ty; term1; mkRel 1 |]))) in
+  let rec aux proofs =
+    match proofs with
+    | [] ->
+        mkApp (eq_refl, [| ty; term1 |])
+    | [(first_lhs, first_rhs, first_proof)] ->
+        first_proof
+    | (last_lhs, last_rhs, last_proof) :: rest_proofs ->
+        mkApp (eq_ind, [| ty; last_lhs; p; aux rest_proofs; last_rhs; last_proof |])
+  in
+  (aux proofs, eq_prop)
+
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
   let (sp_cfg, sp_inst) =
@@ -2244,10 +2262,18 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "expand_eta_top" term;
   let term = normalizeV env sigma term in
   debug_simplification env sigma "normalizeV" term;
-  let term = reduce_exp env sigma term in
-  debug_simplification env sigma "reduce_exp" term;
-  let (sigma, term, proof) = Matchapp.simplify_matchapp env sigma term in
-  debug_simplification env sigma "simplify_matchapp" term;
+  let rec repeat_reduction sigma term proofs =
+    let term1 = term in
+    let term = reduce_exp env sigma term in
+    debug_simplification env sigma "reduce_exp" term;
+    let (sigma, term, proofs1) = Matchapp.simplify_matchapp env sigma term in
+    debug_simplification env sigma "simplify_matchapp" term;
+    if EConstr.eq_constr sigma term1 term then
+      (term, proofs)
+    else
+      repeat_reduction sigma term (List.append proofs1 proofs)
+  in
+  let (term, proofs) = repeat_reduction sigma term [] in
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2276,14 +2302,12 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let env = Global.env () in
   let declared_proof_ctnt =
-    let eq = mkInd (Globnames.destIndRef (Coqlib.lib_ref "core.eq.type")) in
-    let eq_type_arg = Retyping.get_type_of env sigma epresimp in
-    let eq_epresimp_simplified = mkApp (eq, [| eq_type_arg; epresimp; mkConst declared_ctnt |]) in
+    let (eq_proof, eq_prop) = combine_equality_proofs env sigma epresimp (mkConst declared_ctnt) proofs in
     let globref = Declare.declare_definition
       ~info:(Declare.Info.make ())
-      ~cinfo:(Declare.CInfo.make ~name:e_id ~typ:(Some eq_epresimp_simplified) ())
+      ~cinfo:(Declare.CInfo.make ~name:e_id ~typ:(Some eq_prop) ())
       ~opaque:true
-      ~body:proof
+      ~body:eq_proof
       sigma
     in
     Globnames.destConstRef globref
