@@ -2246,6 +2246,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "normalizeV" term;
   let term = reduce_exp env sigma term in
   debug_simplification env sigma "reduce_exp" term;
+  let (sigma, term, proof) = Matchapp.simplify_matchapp env sigma term in
+  debug_simplification env sigma "simplify_matchapp" term;
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2258,8 +2260,6 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
-  let (sigma, term, proof) = Matchapp.simplify_matchapp env sigma term in
-  debug_simplification env sigma "simplify_matchapp" term;
   Linear.borrowcheck env sigma term;
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in

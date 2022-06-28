@@ -33,9 +33,10 @@ let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
 (* term is S-normalized *)
 let rec mkapp_simplify (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (args : EConstr.t array) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _| Meta _ | Evar _ | Sort _ | Cast _ | Prod _ | Ind _
+  | Var _| Meta _ | Evar _ | Cast _
   | CoFix _ | Int _ | Float _ | Array _ ->
       user_err (Pp.str "[codegen:mkapp_simplify] unsupported term:" +++ Printer.pr_econstr_env env sigma term)
+  | Sort _ | Prod _ | Ind _
   | Rel _ | Const _ | Construct _ | Proj _
   | App _ (* We cannot move args because term is S-normalized (beta-var and zeta-app cannot applied anymore.) *)
   | Fix _ | Case _ ->
@@ -65,10 +66,12 @@ let rec mkapp_simplify (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 *)
 let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((EConstr.t -> EConstr.t) * Environ.env * EConstr.case * EConstr.t array) option =
   match EConstr.kind sigma term with
-  | Var _| Meta _ | Evar _ | Sort _ | Cast _ | Prod _ | Ind _
+  | Var _| Meta _ | Evar _ | Cast _
   | CoFix _ | Int _ | Float _ | Array _ ->
       user_err (Pp.str "[codegen:find_match_app] unsupported term:" +++ Printer.pr_econstr_env env sigma term)
-  | Rel _ | Const _ | Construct _ | Proj _ -> None
+  | Sort _ | Prod _ | Ind _
+  | Rel _ | Const _ | Construct _ | Proj _ ->
+      None
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       (match int_find_i_map (fun i -> find_match_app env2 sigma fary.(i)) (Array.length fary) with
