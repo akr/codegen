@@ -196,6 +196,7 @@ let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (lhs_appmat
   if Evarutil.has_undefined_evars sigma proof then
     user_err (Pp.str "[codegen] could not prove matchapp equality (evar remains):" +++
       Printer.pr_econstr_env env sigma eq_goal);
+  let (sigma, ty) = Typing.type_of proof_env sigma proof in (* verify proof term *)
   sigma
 
 let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Evd.evar_map * EConstr.t) option =
