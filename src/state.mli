@@ -38,7 +38,6 @@ type sp_instance_names = {
   spi_cfunc_name : string option;
   spi_presimp_id : Names.Id.t option;
   spi_simplified_id : Names.Id.t option;
-  spi_equality_id : Names.Id.t option;
 }
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
 val ind_config_map : ind_config ConstrMap.t ref
@@ -50,7 +49,7 @@ val borrow_type_set : ConstrSet.t ref
 
 type simplified_status =
     SpNoSimplification
-  | SpExpectedId of (Names.Id.t * Names.Id.t) (* simplified_id, equality_id *)
+  | SpExpectedId of Names.Id.t (* simplified_id *)
   | SpDefined of (Names.Constant.t * StringSet.t)
 type instance_command =
     CodeGenFunction

@@ -2265,6 +2265,68 @@ let test_matchapp_twoarg (ctx : test_ctxt) : unit =
     assert(f(false, false, 20) == 22);
     |}
 
+(*
+"Move Match Argument" transformation must be applied multiply.
+"Move Match Argument" phase moves "x" into branches of conditional.
+S-reductions (zeta-app) moves "x" into the body of let-in.
+Since match-expression (if-expression) and let-ins are nested,
+two "Move Match Argument" are required to transform the term.
+(and additional one to check "Move Match Argument" doesn't change the term.)
+*)
+let test_matchapp_multiple_phases (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ {|
+      Definition f (b1 b2 : bool) (x y z1 z2 z3 z4 : nat) : nat :=
+        (if b1 then
+          let y := S y in
+          if b2 then
+            fun x => x + y + z1
+          else
+            fun x => x + y + z2
+        else
+          let y := S y in
+          if b2 then
+            fun x => x + y + z3
+          else
+            fun x => x + y + z4) x.
+      CodeGen Function f.
+    |}) {|
+    assert(f(true, true, 100, 19, 1, 2, 3, 4) == 121);
+    assert(f(true, false, 100, 19, 1, 2, 3, 4) == 122);
+    assert(f(false, true, 100, 19, 1, 2, 3, 4) == 123);
+    assert(f(false, false, 100, 19, 1, 2, 3, 4) == 124);
+    |}
+
+(*
+This test needs to transform
+(match m with ... | C args => br | ... end n) to
+(match m with ... | C args => br n | ... end)
+where m is a decreasing argument of the outer fixpoint.
+codegen verify
+  (match m with ... | C args => br | ... end n) =
+  (match m with ... | C args => br n | ... end).
+But it doesn't verify
+  (fun (n : nat) => fix g (m : nat) : nat :=
+    (match m with ... | C args => br | ... end n)) =
+  (fun (n : nat) => fix g (m : nat) : nat :=
+    (match m with ... | C args => br n | ... end)).
+Because the verification needs induction which is difficult to automate.
+(Above description assumes functional_extensionality.)
+*)
+let test_matchapp_and_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition f (n : nat) :=
+        fix g (m : nat) : nat :=
+        match m with
+        | O => fun n => n
+        | S m' => fun n => g m'
+        end n.
+      CodeGen Function f.
+    |}) {|
+    assert(f(10, 5) == 10);
+    |}
+
 let test_auto_ind_type (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -3775,6 +3837,8 @@ let suite : OUnit2.test =
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
     "test_matchapp_twoarg" >:: test_matchapp_twoarg;
+    "test_matchapp_multiple_phases" >:: test_matchapp_multiple_phases;
+    "test_matchapp_and_fix" >:: test_matchapp_and_fix;
     "test_auto_ind_type" >:: test_auto_ind_type;
     "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
     "test_auto_ind_match_cstrmember" >:: test_auto_ind_match_cstrmember;

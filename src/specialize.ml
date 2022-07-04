@@ -86,7 +86,7 @@ let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : spe
     Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
   (match sp_inst.sp_simplified_status with
   | SpNoSimplification -> Pp.mt ()
-  | SpExpectedId (s_id, e_id) -> Id.print s_id
+  | SpExpectedId s_id -> Id.print s_id
   | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt) ++
   Pp.str "." +++
   (match sp_inst.sp_simplified_status with
@@ -283,14 +283,13 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     user_err (Pp.hov 2 (Pp.str "[codegen] pre-simplified term must have monomorphic type:" +++ Printer.pr_econstr_env env sigma ty)));
   (sigma, t, ty)
 
-let gensym_simplification (suffix : string) : Names.Id.t * Names.Id.t * Names.Id.t =
+let gensym_simplification (suffix : string) : Names.Id.t * Names.Id.t =
   let n = !gensym_ps_num in
   gensym_ps_num := n + 1;
   let suffix2 = if suffix = "" then suffix else "_" ^ suffix in
   let p = "codegen_p" ^ string_of_int n ^ suffix2 in (* pre-simplified *)
   let s = "codegen_s" ^ string_of_int n ^ suffix2 in (* simplified *)
-  let e = "codegen_e" ^ string_of_int n ^ suffix2 in (* equality *)
-  (Id.of_string p, Id.of_string s, Id.of_string e)
+  (Id.of_string p, Id.of_string s)
 
 let interp_args (env : Environ.env) (sigma : Evd.evar_map)
     (istypearg_list : bool list)
@@ -386,9 +385,8 @@ let codegen_define_instance
           generated_simplification_syms := Some ids;
           ids
     in
-    let lazy_gensym_p () = let (id, _, _) = lazy_gensym_simplification () in id in
-    let lazy_gensym_s () = let (_, id, _) = lazy_gensym_simplification () in id in
-    let lazy_gensym_e () = let (_, _, id) = lazy_gensym_simplification () in id in
+    let lazy_gensym_p () = let (id, _) = lazy_gensym_simplification () in id in
+    let lazy_gensym_s () = let (_, id) = lazy_gensym_simplification () in id in
     let need_presimplified_ctnt =
       List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
       (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
@@ -400,10 +398,6 @@ let codegen_define_instance
     let p_id () = match names_opt with
       | Some { spi_presimp_id = Some p_id } -> p_id
       | _ -> lazy_gensym_p ()
-    in
-    let e_id () = match names_opt with
-      | Some { spi_equality_id = Some e_id } -> e_id
-      | _ -> lazy_gensym_e ()
     in
     let cfunc_name = match names_opt with
       | Some { spi_cfunc_name = Some name } ->
@@ -437,7 +431,7 @@ let codegen_define_instance
     in
     let simplified_status =
       if is_function_icommand icommand then
-        SpExpectedId (s_id (), e_id ())
+        SpExpectedId (s_id ())
       else (* CodeGenPrimitive or CodeGenConstant *)
         SpNoSimplification
     in
@@ -2190,13 +2184,22 @@ let init_debug_simplification () : unit =
   if !opt_debug_simplification then
     specialization_time := Unix.times ()
 
-let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
+let debug_simplification ?(prevterm : EConstr.t option) (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
   if !opt_debug_simplification then
     (let old = !specialization_time in
     let now = Unix.times () in
-    msg_debug_hov (Pp.str ("--" ^ step ^ "--> (") ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term)));
+    let pp_time = Pp.str "(" ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" in
+    (match prevterm with
+    | None ->
+        msg_debug_hov (Pp.str ("--" ^ step ^ "--> ") ++ pp_time ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term)))
+    | Some prev ->
+        if EConstr.eq_constr sigma prev term then
+          msg_debug_hov (Pp.str ("--" ^ step ^ "--> term not changed ") ++ pp_time)
+        else
+          msg_debug_hov (Pp.str ("--" ^ step ^ "--> ") ++ pp_time ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term))));
     specialization_time := now)
 
+    (*
 let combine_equality_proofs (env : Environ.env) (sigma : Evd.evar_map) (term1 : EConstr.t) (term2 : EConstr.t) (proofs : (EConstr.t * EConstr.t * EConstr.t) list) : EConstr.t * EConstr.types =
   let eq = lib_ref "core.eq.type" in
   let eq_ind = lib_ref "core.eq.ind" in
@@ -2214,6 +2217,7 @@ let combine_equality_proofs (env : Environ.env) (sigma : Evd.evar_map) (term1 : 
         mkApp (eq_ind, [| ty; last_lhs; p; aux rest_proofs; last_rhs; last_proof |])
   in
   (aux proofs, eq_prop)
+  *)
 
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
@@ -2229,9 +2233,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (s_id, e_id) = (match sp_inst.sp_simplified_status with
+  let s_id = (match sp_inst.sp_simplified_status with
     | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
-    | SpExpectedId (s_id, e_id) -> (s_id, e_id)
+    | SpExpectedId s_id -> s_id
     | SpDefined _ -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
   in
   let presimp = sp_inst.sp_presimp in
@@ -2262,18 +2266,18 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "expand_eta_top" term;
   let term = normalizeV env sigma term in
   debug_simplification env sigma "normalizeV" term;
-  let rec repeat_reduction sigma term proofs =
+  let rec repeat_reduction sigma term =
     let term1 = term in
-    let term = reduce_exp env sigma term in
-    debug_simplification env sigma "reduce_exp" term;
-    let (sigma, term, proofs1) = Matchapp.simplify_matchapp env sigma term in
-    debug_simplification env sigma "simplify_matchapp" term;
-    if EConstr.eq_constr sigma term1 term then
-      (term, proofs)
+    let term2 = reduce_exp env sigma term1 in
+    debug_simplification env sigma "reduce_exp" ~prevterm:term1 term2;
+    let (sigma, term3) = Matchapp.simplify_matchapp env sigma term2 in
+    debug_simplification env sigma "simplify_matchapp" ~prevterm:term2 term3;
+    if EConstr.eq_constr sigma term1 term3 then
+      term3
     else
-      repeat_reduction sigma term (List.append proofs1 proofs)
+      repeat_reduction sigma term3
   in
-  let (term, proofs) = repeat_reduction sigma term [] in
+  let term = repeat_reduction sigma term in
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2301,18 +2305,6 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     Globnames.destConstRef globref
   in
   let env = Global.env () in
-  let declared_proof_ctnt =
-    let (eq_proof, eq_prop) = combine_equality_proofs env sigma epresimp (mkConst declared_ctnt) proofs in
-    let globref = Declare.declare_definition
-      ~info:(Declare.Info.make ())
-      ~cinfo:(Declare.CInfo.make ~name:e_id ~typ:(Some eq_prop) ())
-      ~opaque:true
-      ~body:eq_proof
-      sigma
-    in
-    Globnames.destConstRef globref
-  in
-  ignore declared_proof_ctnt;
   let sp_inst2 = {
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
