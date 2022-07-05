@@ -359,7 +359,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item Static Argument Normalization
   \item Unused let-in Deletion
   \item Call Site Replacement
-  \item Eta Reduction
+  \item Eta Reduction to Expose Fixpoint
   \item Argument Completion
   \item Borrow Check
   \item C Variable Allocation
@@ -546,14 +546,14 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
 
-\subsection{Eta Reduction}\label{sec:eta-reduction}
+\subsection{Eta Reduction to Expose Fixpoint}\label{sec:eta-reduction}
 
 \begin{gather*}
   \text{eta-all:}~
     \dfrac{
       E[\Gamma] \vdash t : T_1 \rightarrow \cdots \rightarrow T_n \rightarrow T \quad
       \text{$x_1\ldots x_n$ does not occur in $t$} \quad
-      \text{$t$ is not an application}
+      \text{$t$ is a fixpoint}
     }{E[\Gamma] \vdash \lamTB{x_1}{T_1}\ldots \lamTB{x_n}{T_n} t\: x_1\ldots x_n
                        \reltri
                        t
@@ -562,7 +562,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 {\small Note:
 \begin{itemize}
   \item We require the types of first $n$ arguments of $t$ as $T_1\ldots T_n$ to prevent this transfomation changes the type.
-  \item The premise ``$t$ is not an application'' guarantees the result is not partial application.
+  \item The premise ``$t$ is a fixpoint'' guarantees the result is not partial application.
 \end{itemize}}
 
 This transformation is intended to remove eta-redexes introduced by static arguments and eta expansion (\secref{sec:eta-expand-funcs}).

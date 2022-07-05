@@ -1820,7 +1820,7 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let (lams, b) = decompose_lam sigma term in
       let env2 = push_rel_lams lams env in
       (match EConstr.kind sigma b with
-      | App (f, args) ->
+      | App (f, args) when isFix sigma f ->
           (*msg_info_hov (Pp.str "[codegen:reduce_eta1]" +++
             Pp.str "f=" ++ Printer.pr_econstr_env env2 sigma f +++
             Pp.str "args=[" ++ pp_sjoinmap_ary (Printer.pr_econstr_env env2 sigma) args ++ Pp.str "]");*)
