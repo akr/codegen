@@ -348,7 +348,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \section{CodeGen}\label{sec:codegen}
 
 \begin{itemize}
-\item Convertible Transformations
+\item \gallina-to-\gallina{} Transformations
   \begin{itemize}
   \item Inlining
   \item Strip Cast
@@ -359,8 +359,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item Static Argument Normalization
   \item Unused let-in Deletion
   \item Call Site Replacement
+  \item Eta Reduction
   \item Argument Completion
-  \item Move Match Argument
   \item Borrow Check
   \item C Variable Allocation
   \end{itemize}
@@ -370,7 +370,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \end{itemize}
 \end{itemize}
 
-\section{Convertible Transformations}\label{sec:convertible-transformations}
+\section{\gallina-to-\gallina{} Transformations}\label{sec:gallina-to-gallina-transformations}
 
 \subsection{Inlining}\label{sec:inlining}
 \subsection{Strip Cast}\label{sec:strip-cast}
@@ -495,8 +495,37 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
       (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n
       \reltri
       \subst{t_j}{f_k}{f'_k}_{k=1\ldots h} \:x_1 \ldots x_n
+    } \\
+  \text{match-app:}~
+    \dfrac
+    {
+      E[\Gamma] \vdash z : T
+    }{
+      \begin{aligned}
+        E[\Gamma] \vdash\; &
+          \kwmatch\:x\:
+          \kwas\:x'\:
+          \kwin\:I\:\_\ldots \_\;y_1\ldots y_{\NI_I}\:
+          \kwreturn\:{T \rightarrow P\:y_1\ldots y_{\NI_I}\:x'}\\
+          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i})_{i=1\ldots h}\:
+          \kwend\:z \\
+        \reltri\; &
+          \kwmatch\:x\:
+          \kwas\:x'\:
+          \kwin\:I\:\_\ldots \_\;y_1\ldots y_{\NI_I}\:
+          \kwreturn\:{P\:y_1\ldots y_{\NI_I}\:x'}\\
+          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i\:z})_{i=1\ldots h}\:
+          \kwend
+      \end{aligned}
     }
 \end{gather*}
+
+{\small Note:
+\begin{itemize}
+  \item match-app is not convertible
+  \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
+    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
+\end{itemize}}
 
 \subsection{Type Normalization}\label{sec:type-normalization}
 \subsection{Static Argument Normalization}\label{sec:static-argument-normalization}
@@ -516,6 +545,8 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \end{itemize}}
 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
+
+\subsection{Eta Reduction}\label{sec:eta-reduction}
 
 \subsection{Argument Completion}\label{sec:argcomp}
 Argument completion removes partial applications by applying eta expansions.
@@ -588,42 +619,6 @@ Argument completion removes partial applications by applying eta expansions.
   \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
   \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
     $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
-\end{itemize}}
-
-\subsection{Move Match Argument}\label{sec:move-match-argument}
-
-\begin{gather*}
-  \text{match-app:}~
-    \dfrac
-    {
-      E[\Gamma] \vdash z : T
-    }{
-      \begin{aligned}
-        E[\Gamma] \vdash\; &
-          \kwmatch\:x\:
-          \kwas\:x'\:
-          \kwin\:I\:\_\ldots \_\:y_1\ldots y_{\NI_I}\:
-          \kwreturn\:{T \rightarrow P\:y_1\ldots y_{\NI_I}\:x'}\\
-          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i})_{i=1\ldots h}\:
-          \kwend\:z \\
-        \reltri\; &
-          \kwmatch\:x\:
-          \kwas\:x'\:
-          \kwin\:I\:\_\ldots \_\:y_1\ldots y_{\NI_I}\:
-          \kwreturn\:{P\:y_1\ldots y_{\NI_I}\:x'}\\
-          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i\:z})_{i=1\ldots h}\:
-          \kwend
-      \end{aligned}
-    }
-\end{gather*}
-
-beta-var and zeta-app are also applied.
-
-{\small Note:
-\begin{itemize}
-  \item match-app is not convertible
-  \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
-    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
 \end{itemize}}
 
 \subsection{Borrow Check}\label{sec:borrow-check}
@@ -1288,6 +1283,8 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
     & \text{$c$ is defined as \kwDefinition~$c := t.$}
   \end{aligned}
 \]
+
+\section{Verification of \gallina-to-\gallina{} Transformations}\label{sec:verification-of-gallina-to-gallina-transformations}
 
 \bibliographystyle{plain}
 \bibliography{base}
