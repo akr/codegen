@@ -548,6 +548,42 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 
 \subsection{Eta Reduction}\label{sec:eta-reduction}
 
+\begin{gather*}
+  \text{eta-all:}~
+    \dfrac{
+      E[\Gamma] \vdash t : T_1 \rightarrow \cdots \rightarrow T_n \rightarrow T \quad
+      \text{$x_1\ldots x_n$ does not occur in $t$} \quad
+      \text{$t$ is not an application}
+    }{E[\Gamma] \vdash \lamTB{x_1}{T_1}\ldots \lamTB{x_n}{T_n} t\: x_1\ldots x_n
+                       \reltri
+                       t
+    }
+\end{gather*}
+{\small Note:
+\begin{itemize}
+  \item We require the types of first $n$ arguments of $t$ as $T_1\ldots T_n$ to prevent this transfomation changes the type.
+\end{itemize}}
+
+This transformation is intended to remove eta-redexes introduced by static arguments and eta expansion (\secref{sec:eta-expand-funcs}).
+For example, assume the standard list concatenation function,
+$\textrm{app}: \forall A, \textrm{list}\:A \rightarrow \textrm{list}\:A \rightarrow \textrm{list}\:A$,
+is monomorphized to $\textrm{bool}$.
+
+\begin{align*}
+  & \textrm{app}\:\textrm{bool} \\
+  \reltri_\textrm{inline}\; & (\lam{A}{(\kwfix \ldots)})\:\textrm{bool} \\
+  \reltri_\textrm{eta-expansion}\; & \lam{l}{\lam{m}{(\lam{A}{(\kwfix \ldots)})\:\textrm{bool}\:l\:m}} \\
+  \reltri_\textrm{V-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\lam{A}{(\kwfix \ldots)})\:T\:l\:m}}} \\
+  \reltri_\textrm{S-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} \\
+  \reltri_\textrm{Type-nomalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} & \textrm{(expand $T$ in the \kwfix-term)} \\
+  \reltri_\textrm{unused-let-in-deletion}\; & \lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}} \\
+  \reltri_\textrm{eta-reduction}\; & (\kwfix \ldots) \\
+\end{align*}
+
+The code generator (\secref{sec:c-code-gen}) generates multiple C functions (\secref{sec:genfunm}) from the pre-eta-reduction term, $\lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}}$.
+This eta-reduction avoid this.
+The code generator generates single C function (\secref{sec:genfuns}) from post-eta-reduction term, $(\kwfix \ldots)$.
+
 \subsection{Argument Completion}\label{sec:argcomp}
 Argument completion removes partial applications by applying eta expansions.
 \begin{itemize}
@@ -1285,6 +1321,25 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 \]
 
 \section{Verification of \gallina-to-\gallina{} Transformations}\label{sec:verification-of-gallina-to-gallina-transformations}
+
+\codegen{} verifies each step of the \gallina-to-\gallina{} transformations.
+
+Since all transformations except match-app are convertible,
+\codegen{} checks convertibility of such transformations.
+
+Assuming $L = (\match{x}{C_i\: x_{i1}\ldots x_{i\NM_{C_i}}}{t_i}{i=1\ldots h}\: z)$ and \\
+$R = (\match{x}{C_i\: x_{i1}\ldots x_{i\NM_{C_i}}}{t_i\:z}{i=1\ldots h})$,
+match-app transformation is $L \reltri R$.
+The match-app redex, $L$, is a subterm of a whole function.
+The function is $K[L]$ for some context $K$.
+Free variables in $L$ and $R$ are bounded by $K$.
+
+\codegen{} verifies match-app transformation by proving $L = R$ internally.
+The proof term is not visible from a user.
+
+\codegen{} does not verify $K[L] = K[R]$ because
+(1) this verification does not add big guarantee over above because we know same context $K$ is used in LHS and RHS,
+(2) induction is required if $x$ is a decreasing argument of fixpoint in $K$ and it is difficult to automate.
 
 \bibliographystyle{plain}
 \bibliography{base}
