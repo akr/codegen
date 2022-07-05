@@ -1095,3 +1095,54 @@ let lib_ref (name : string) : EConstr.t =
   | GlobRef.ConstRef cnst -> mkConst cnst
   | GlobRef.IndRef ind -> mkInd ind
   | GlobRef.ConstructRef cstr -> mkConstruct cstr
+
+let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : bool =
+  let name_equal x1 x2 = Context.eq_annot Names.Name.equal x1 x2 in
+  let instance_equal u1 u2 = Univ.Instance.equal (EInstance.kind sigma u1) (EInstance.kind sigma u2) in
+  let rec eq t1 t2 =
+    match EConstr.kind sigma t1, EConstr.kind sigma t2 with
+    | Rel n1, Rel n2 -> Int.equal n1 n2
+    | Meta m1, Meta m2 -> Int.equal m1 m2
+    | Var id1, Var id2 -> Id.equal id1 id2
+    | Int i1, Int i2 -> Uint63.equal i1 i2
+    | Float f1, Float f2 -> Float64.equal f1 f2
+    | Sort s1, Sort s2 -> Sorts.equal (ESorts.kind sigma s1) (ESorts.kind sigma s2)
+    | Cast (c1,kind1,t1), Cast (c2,kind2,t2) -> kind1 = kind2 && eq c1 c2 && eq t1 t2
+    | Prod (x1,t1,c1), Prod (x2,t2,c2) -> name_equal x1 x2 && eq t1 t2 && eq c1 c2
+    | Lambda (x1,t1,c1), Lambda (x2,t2,c2) -> name_equal x1 x2 && eq t1 t2 && eq c1 c2
+    | LetIn (x1,b1,t1,c1), LetIn (x2,b2,t2,c2) -> name_equal x1 x2 && eq b1 b2 && eq t1 t2 && eq c1 c2
+    | App (c1, l1), App (c2, l2) ->
+      let len = Array.length l1 in
+      Int.equal len (Array.length l2) &&
+      eq c1 c2 && CArray.equal eq l1 l2
+    | Proj (p1,c1), Proj (p2,c2) -> Projection.CanOrd.equal p1 p2 && eq c1 c2
+    | Evar (e1,l1), Evar (e2,l2) -> Evar.equal e1 e2 && List.equal eq l1 l2
+    | Const (c1,u1), Const (c2,u2) ->
+      Constant.CanOrd.equal c1 c2 && instance_equal u1 u2
+    | Ind (c1,u1), Ind (c2,u2) -> Ind.CanOrd.equal c1 c2 && instance_equal u1 u2
+    | Construct (c1,u1), Construct (c2,u2) ->
+      Construct.CanOrd.equal c1 c2 && instance_equal u1 u2
+    | Case (ci1,u1,pms1,(nas1,p1),iv1,c1,bl1), Case (ci2,u2,pms2,(nas2,p2),iv2,c2,bl2) ->
+      Ind.CanOrd.equal ci1.ci_ind ci2.ci_ind && instance_equal u1 u2 &&
+      CArray.equal eq pms1 pms2 && CArray.equal name_equal nas1 nas2 && eq p1 p2 &&
+      eq_invert eq iv1 iv2 &&
+      eq c1 c2 &&
+      CArray.equal (fun (nas1,bl1) (nas2,bl2) -> CArray.equal name_equal nas1 nas2 && eq bl1 bl2) bl1 bl2
+    | Fix ((ln1, i1),(xl1,tl1,bl1)), Fix ((ln2, i2),(xl2,tl2,bl2)) ->
+      Int.equal i1 i2 && CArray.equal Int.equal ln1 ln2 &&
+      CArray.equal name_equal xl1 xl2 &&
+      CArray.equal eq tl1 tl2 && CArray.equal eq bl1 bl2
+    | CoFix(ln1,(xl1,tl1,bl1)), CoFix(ln2,(xl2,tl2,bl2)) ->
+      Int.equal ln1 ln2 &&
+      CArray.equal name_equal xl1 xl2 &&
+      CArray.equal eq tl1 tl2 && CArray.equal eq bl1 bl2
+    | Array(u1,t1,def1,ty1), Array(u2,t2,def2,ty2) ->
+      instance_equal u1 u2 &&
+      CArray.equal eq t1 t2 &&
+      eq def1 def2 && eq ty1 ty2
+    | (Rel _ | Meta _ | Var _ | Sort _ | Cast _ | Prod _ | Lambda _ | LetIn _ | App _
+      | Proj _ | Evar _ | Const _ | Ind _ | Construct _ | Case _ | Fix _
+      | CoFix _ | Int _ | Float _| Array _), _ -> false
+  in
+  eq t1 t2
+

@@ -2178,25 +2178,29 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   in
   r env term []
 
+let prevterm : EConstr.t option ref = ref None
 let specialization_time = ref (Unix.times ())
 
 let init_debug_simplification () : unit =
-  if !opt_debug_simplification then
+  if !opt_debug_simplification then begin
+    prevterm := None;
     specialization_time := Unix.times ()
+  end
 
-let debug_simplification ?(prevterm : EConstr.t option) (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
+let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : string) (term : EConstr.t) : unit =
   if !opt_debug_simplification then
     (let old = !specialization_time in
     let now = Unix.times () in
     let pp_time = Pp.str "(" ++ Pp.real (now.Unix.tms_utime -. old.Unix.tms_utime) ++ Pp.str "[s])" in
-    (match prevterm with
+    (match !prevterm with
     | None ->
         msg_debug_hov (Pp.str ("--" ^ step ^ "--> ") ++ pp_time ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term)))
     | Some prev ->
-        if EConstr.eq_constr sigma prev term then
+        if exact_term_eq sigma prev term then
           msg_debug_hov (Pp.str ("--" ^ step ^ "--> term not changed ") ++ pp_time)
         else
           msg_debug_hov (Pp.str ("--" ^ step ^ "--> ") ++ pp_time ++ Pp.fnl () ++ (pr_deep (Printer.pr_econstr_env env sigma term))));
+    prevterm := Some term;
     specialization_time := now)
 
     (*
@@ -2268,14 +2272,14 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "normalizeV" term;
   let rec repeat_reduction sigma term =
     let term1 = term in
-    let term2 = reduce_exp env sigma term1 in
-    debug_simplification env sigma "reduce_exp" ~prevterm:term1 term2;
-    let (sigma, term3) = Matchapp.simplify_matchapp env sigma term2 in
-    debug_simplification env sigma "simplify_matchapp" ~prevterm:term2 term3;
-    if EConstr.eq_constr sigma term1 term3 then
-      term3
+    let term = reduce_exp env sigma term in
+    debug_simplification env sigma "reduce_exp" term;
+    let (sigma, term) = Matchapp.simplify_matchapp env sigma term in
+    debug_simplification env sigma "simplify_matchapp" term;
+    if EConstr.eq_constr sigma term1 term then
+      term
     else
-      repeat_reduction sigma term3
+      repeat_reduction sigma term
   in
   let term = repeat_reduction sigma term in
   let term = normalize_types env sigma term in
