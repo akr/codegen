@@ -562,6 +562,7 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 {\small Note:
 \begin{itemize}
   \item We require the types of first $n$ arguments of $t$ as $T_1\ldots T_n$ to prevent this transfomation changes the type.
+  \item The premise ``$t$ is not an application'' guarantees the result is not partial application.
 \end{itemize}}
 
 This transformation is intended to remove eta-redexes introduced by static arguments and eta expansion (\secref{sec:eta-expand-funcs}).
