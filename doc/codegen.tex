@@ -123,9 +123,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\letin}[3]{\kwlet\:#1:=#2\:\kwin\:#3}
 \newcommand{\letinB}[2]{\kwlet\:#1:=#2\:\kwin}
 
+\newcommand{\omatch}[2]{\kwmatch\:#1\:\kwwith\:{#2}\:\kwend}
 \newcommand{\match}[4]{\kwmatch\:#1\:\kwwith\:(#2 \Rightarrow #3)_{#4}\:\kwend}
 \newcommand{\matchasinret}[7]{\kwmatch\:#1\:\kwas\:#2\:\kwin\:#3\:\kwreturn\:#4\:\kwwith\:(#5 \Rightarrow #6)_{#7}\:\kwend}
 
+\newcommand{\ofix}[2]{\kwfix\:{#1}\:\kwfor\:{#2}}
 \newcommand{\fix}[4]{\kwfix\:(#1 := #2)_{#3}\:\kwfor\:#4}
 \newcommand{\fixT}[5]{\kwfix\:(#1:\!#2 := #3)_{#4}\:\kwfor\:#5}
 
@@ -238,6 +240,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\WTE}[3]{\WT{E}{#1}{#2}{#3}}
 \newcommand{\WTEG}[2]{\WTE{\Gamma}{#1}{#2}}
 \newcommand{\subst}[3]{#1\{#2/#3\}}
+\newcommand{\substm}[3]{#1\{\overline{#2/#3}\}}
 
 % taken from the Coq reference manual, doc/sphinx/refman-preamble.sty
 \newcommand{\case}{\kw{case}}
@@ -254,6 +257,59 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \maketitle
 
+\section{Notations}\label{sec:notations}
+
+\subsection{Repetition}
+
+\begin{itemize}
+  \item We use overline to represent repetition:
+    $\overline{x_i+y_i}^{1\leq i \leq n}$ means $x_1+y_1, \ldots, x_n+y_n$.
+  \item We assume appropriate separator for the context (``,'' in the above example) are inserted.
+    (The separator may inserted at beginning or end if appropriate.)
+  \item We omit indexes when the range of index are known:
+    $\overline{x+y}$ means $\overline{x_i+y_i}^{1\leq i \leq n}$ if $x$ and $y$ are $n$-element sequences.
+    The index is added to the all meta-variables under the overline
+  \item We use nested overline to represent two- or more-dimensional indexes.
+    $\omatch{t}{\overline{C\:\overline{x}\Rightarrow u}}$ means
+    $\omatch{t}{ C_1\: x_{11}\ldots x_{1m_1} \Rightarrow u_1
+                \:|\: C_2\: x_{21}\ldots x_{2m_2} \Rightarrow u_2
+                \:|\: \ldots
+                \:|\: C_n\: x_{n1}\ldots x_{nm_n} \Rightarrow u_n}$.
+  \item We use underline to suppress adding indexes.
+    $\overline{\letinB{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}}$ means \\
+    $\letinB{f'_1}{\ofix{\overline{(f/k:=t)}}{f_1}} ~\ldots~
+     \letinB{f'_h}{\ofix{\overline{(f/k:=t)}}{f_h}}$.
+  \item This notation is taken from \cite{steele2017s}.
+\end{itemize}
+
+\subsection{Number of Elements}
+
+We use $|x|$ to represent the number of elements: $|x|=n$ if $x$ is an $n$-element sequence, $x_1, \ldots, x_n$.
+
+\subsection{Number of Arguments}
+
+\begin{itemize}
+  \item $\NA_t$ is the number of arguments of $t$: \quad $\NA_t=m$ if $t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0$ and $T_0$ is an inductive type.
+  \item $\NP_I$ is the number of the parameters of the inductive type $I$: \\
+    $\NP_I=p$ if $I$ is defined in an inductive definitions $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$.
+  \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
+    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
+  \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
+    $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
+\end{itemize}
+
+\subsection{Substitution}
+$\subst{t}{x}{u}$ means a term in which $x$ in term $t$ is replaced by $u$.
+This notation is taken from the Coq reference manual~\cite{coqrefman8.12.0}.
+
+We use $\substm{t}{x}{u}$ for parallel substituion.
+
+\subsection{Others}
+
+\begin{itemize}
+  \item $\FV(t)$ means the free variables of $t$.
+\end{itemize}
+
 \section{\gallina{}}\label{sec:gallina}
 \subsection{\gallina{} Syntax}\label{sec:gallina-syntax}
 
@@ -265,18 +321,18 @@ keywordstyle=[3]\color{myred}\ttfamily,
     |&\ \lamT{x}{T}{t}        & \text{abstraction} \\
     |&\ t\:u                  & \text{application} \\
     |&\ \letin{x}{t:T}{u}     & \text{let-in} \\
-    |&\ \match{t_0}{C_i}{t_i}{i=1\ldots h} & \text{conditional} \\
-    |&\ \fixT{f_i/k_i}{T_i}{t_i}{i=1\ldots h}{f_j} & \text{fixpoint}
+    |&\ \omatch{t}{\overline{C\:\overline{x}\Rightarrow u}} & \text{conditional} \\
+    |&\ \ofix{\overline{f/k{:}T:=t}}{f_j} & \text{fixpoint}
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item $u$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
+  \item $u, a, b, c$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
   \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
-  \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression).  It is not used in reductions.
-  \item \kwmatch-branches $t_i$ are functions that take the constructor members (constructor arguments without inductive type parameters).
-    This formalism is taken from CIC~\cite{coqrefman8.12.0}.
+  \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) in the syntax.
+  \item We omitted the dummy parameters (underscores between $C$ and $\overline{x}$) in conditionals.
+  \item We consider inductive types and constructor types has no let-in in binders.
   \item We omitted the detail of the types.  Actual \gallina{} permits any \gallina{} term which evaluates to a type.
 \end{itemize}}
 
@@ -303,24 +359,20 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \text{iota-match:}~
     \dfrac
     {
-      E[\Gamma] \vdash C_j\:u_1\ldots u_{p+m} : T \quad
-      \text{$p$ is the number of parameters of the inductive type $T$}
+      E[\Gamma] \vdash C_j\:\overline{a}\:\overline{b} : T \quad
+      \text{$|a| = \NP_T$}
     }{
       E[\Gamma] \vdash
-      \match{(C_j\:u_1\ldots u_{p+m})}{C_i}{t_i}{i=1\ldots h}
+      \omatch{(C_j\:\overline{a}\:\overline{b})}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
-      t_j\:u_{p+1}\ldots u_{p+m}
+      (\lam{\overline{x}}{t_j})\:\overline{b}
     } \\
   \text{iota-fix:}~
     \dfrac{
-      u_{k_j} = C\:u'_1\ldots u'_m
+      u_{k_j} = C\:\overline{a} \quad
+      |u| = k_j
     }{
-      \begin{aligned}
-        E[\Gamma] \vdash\; &
-          (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:u_1 \ldots u_{k_j} \\
-        \reltri\; &
-          \subst{t_j}{f_k}{\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_k}}_{k=1\ldots h} \:u_1 \ldots u_{k_j}
-      \end{aligned}
+      E[\Gamma] \vdash\; (\ofix{\overline{f/k:=t}}{f_j})\:\overline{u} \reltri\; \substm{t_j}{f}{\ofix{\underline{(\overline{f/k:=t})}}{f}} \: \overline{u}
     } \\
   \text{eta expansion:}~
     \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t\:x)}}
@@ -328,8 +380,6 @@ keywordstyle=[3]\color{myred}\ttfamily,
 {\small Note:
 \begin{itemize}
   \item The rules shown here are reductions, except the eta expansion.
-  \item $\subst{t}{x}{u}$ means a term in which $x$ in term $t$ is replaced by $u$.
-    This notation is taken from the Coq reference manual~\cite{coqrefman8.12.0}.
   \item Variables cannot conflict because \coq{} uses de Bruijn's indexes to represent variables.
   \item $E$ is a global environment which is a list of
     global assumptions $\gassum{c}{T}$,
@@ -338,11 +388,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
   \item $\Gamma$ is a local context which is a list of
     local assumptions $\lassum{x}{T}$ and
     local definitions $\ldef{x}{t}{T}$.
-    The local assumptions represent variables bounded by outer abstractions and fixpoints.
+    The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
     The local definitions represent variables bounded by outer let-in.
   \item If it is unambiguous, we omit type annotations in these definitions for the sake of simplicity.
-  \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:(\mathtt{cons} \Rightarrow t_2)\:\kwend$ to $t_2\:1\:\mathtt{nil}$
-    because \lstinline!list! has one parameter $(p=1)$ and \lstinline!cons! has two members $(m=2)$.
+  \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:|\:(\mathtt{cons}\:\mathtt{h}\:\mathtt{t} \Rightarrow t_2)\:\kwend$ to $(\lam{\mathtt{h}}{\lam{\mathtt{t}}{t_2}})\:1\:\mathtt{nil}$
+    because \lstinline!list! has one parameter $(\NP_\mathtt{nat}=1)$ and \lstinline!cons! has two members $(\NM_\mathtt{cons}=2)$.
 \end{itemize}}
 
 \section{CodeGen}\label{sec:codegen}
@@ -377,8 +427,9 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
 We apply eta-expansion to functions of top-level functions, fix-bounded functions, and closure generating lambdas.
 We consider explicit lambdas are closure generation.
-(Lambdas for match-branches are implicit and we don't consider them as closure generation.)
 This makes beta-var applicable for partial applications without worrying to expose computation.
+(CIC~\cite{coqrefman8.12.0} uses lambdas for match-branches but our syntax uses no lambdas for them.
+Thus match-branches doesn't trigger the eta expansion.)
 
 \subsection{V-Normalization}\label{sec:v-normalization}
 \subsubsection{V-Reductions}\label{sec:v-reductions}
@@ -386,29 +437,27 @@ This makes beta-var applicable for partial applications without worrying to expo
   \text{zeta-arg:}~
     \dfrac
     {
-      E[\Gamma] \vdash t_i : T_i \quad
-      \text{$t_0$ is not an application} \quad
-      \text{$t_i$ is not a variable} \quad
-      \text{$x_i$ is a fresh variable}
+      E[\Gamma] \vdash t : T \quad
+      \text{$a$ is not an application} \quad
+      \text{$t$ is not a variable} \quad
+      \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-      t_0\:x_1 \ldots x_{i-1}\:t_i\:t_{i+1} \ldots t_n
+      a\:\overline{x}\:t\:\overline{u}
       \reltri
-      \letin{x_i}{t_i:T_i}{t_0\:x_1 \ldots x_{i-1}\:x_i\:t_{i+1} \ldots t_n}
+      \letin{y}{t:T}{a\:\overline{x}\:y\:\overline{u}}
     } \\
   \text{zeta-item:}~
     \dfrac
     {
-      E[\Gamma] \vdash t_0 : T_0 \quad
-      \text{$t_0$ is not a variable} \quad
-      \text{$x_0$ is a fresh variable}
+      E[\Gamma] \vdash t : T \quad
+      \text{$t$ is not a variable} \quad
+      \text{$y$ is a fresh variable}
     }{
-      \begin{aligned}
-      E[\Gamma] \vdash\; &
-        \match{t_0}{C_i}{t_i}{i=1\ldots h} \\
-      \reltri\; &
-        \letin{x_0}{t_0:T_0}{\match{x_0}{C_i}{t_i}{i=1\ldots h}}
-      \end{aligned}
+      E[\Gamma] \vdash
+        \omatch{t}{\overline{C\:\overline{x} \Rightarrow u}}
+        \reltri
+        \letin{y}{t:T}{\omatch{y}{\overline{C\:\overline{x} \Rightarrow u}}}
     }
 \end{gather*}
 
@@ -416,9 +465,9 @@ This makes beta-var applicable for partial applications without worrying to expo
 V-normal form restricts \gallina{} terms that (1) application arguments and (2) match items to variables.
 \begin{align*}
   t =&\ x~|~c~|~C~|~T~|~\lamT{x}{T}{t}~|~ \letin{x}{t:T}{u} \\
-    |&\ \fixT{f_i/k_i}{T_i}{t_i}{i=1\ldots h}{f_j} \\
+    |&\ \ofix{\overline{f/k{:}T:=t}}{f_j} \\
     |&\ t\:x                               & \leftarrow (1) \\
-    |&\ \match{x}{C_i}{t_i}{i=1\ldots h} & \leftarrow (2)
+    |&\ \omatch{x}{\overline{C\:\overline{x} \Rightarrow t}} & \leftarrow (2)
 \end{align*}
 
 \subsection{S-Normalization}\label{sec:s-normalization}
@@ -430,14 +479,14 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
   \text{delta-fun:}~
      \dfrac
      {
-       0 \leq p \quad
-       0 < q \quad
-       (f := t\:x_1\ldots x_p) \in \Gamma \quad
-       \text{$t$ is one of $x, c, C, \lam{x}{u}, \fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j}$}
+       0 \leq |x| \quad
+       0 < |y| \quad
+       (f := t\:\overline{x}) \in \Gamma \quad
+       \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\overline{f/k:=t}}{f_j})$}
      }{
-       E[\Gamma] \vdash f\:y_1\ldots y_q
+       E[\Gamma] \vdash f\:\overline{y}
                         \reltri
-                        t\:x_1\ldots x_p\:y_1\ldots y_q
+                        t\:\overline{x}\:\overline{y}
      } \\
   \text{zeta-flat:}~
     E[\Gamma] \vdash \letin{y}{(\letin{x}{t_1}{t_2})}{t_0}
@@ -445,56 +494,49 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
                        \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \\
   \text{zeta-app:}~
     E[\Gamma] \vdash
-     (\letin{x_0}{t}{u})\:x_1\ldots x_n
+     (\letin{y}{t}{u})\:\overline{x}
      \reltri
-     \letin{x_0}{t}{(u\:x_1\ldots x_n)} \\
+     \letin{y}{t}{(u\:\overline{x})} \\
   \text{iota-match-var:}~
     \dfrac
     {
-      (x:=C_j\:y_1\ldots y_{p+m}:T) \in \Gamma \quad
-      \text{$p$ is the number of parameters of the inductive type $T$}
+      (x:=C_j\:\overline{y}\:\overline{z}:T) \in \Gamma \quad
+      |y|=\NP_T
     }{
       E[\Gamma] \vdash
-      \match{x}{C_i}{t_i}{i=1\ldots h}
+      \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
-      t_j\:y_{p+1}\ldots y_{p+m}
+      (\lam{\overline{x}}{t_j})\:\overline{z}
     } \\
   \text{iota-fix-var:}~
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C\:y_1\ldots y_m) \in \Gamma \quad
-        \text{$f'_1\ldots f'_h$ are fresh variables} \\
-        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n : T \quad
+        (x_{k_j} := C\:\overline{y}) \in \Gamma \quad
+        \text{$\overline{f'}$ are fresh variables} \\
+        E[\Gamma] \vdash (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
-      \begin{aligned}
-        E[\Gamma] \vdash\; &
-          (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n \\
-        \reltri\; &
-          \begin{aligned}[t]
-          & \letinB{f'_1}{\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_1}} ~\ldots \\
-          & \letinB{f'_h}{\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_h}} \\
-          & \subst{t_j}{f_k}{f'_k}_{k=1\ldots h} \:x_1 \ldots x_n
-          \end{aligned}
-      \end{aligned}
+        E[\Gamma] \vdash\;
+          (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
+          \reltri
+          \overline{\letinB{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}} \: \substm{t_j}{f}{f'} \: \overline{x}
     } \\
   \text{iota-fix-var':}~
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C\:y_1\ldots y_m) \in \Gamma \\
-        (f'_1 := \fix{f_i/k_i}{t_i}{i=1\ldots h}{f_1}) \in \Gamma ~\ldots~
-        (f'_h := \fix{f_i/k_i}{t_i}{i=1\ldots h}{f_h}) \in \Gamma \\
-        E[\Gamma] \vdash (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n : T \quad
+        (x_{k_j} := C\:\overline{y}) \in \Gamma \quad
+        \overline{(f' := \ofix{\underline{(\overline{f/k:=t})}}{f}) \in \underline{\Gamma}} \\
+        E[\Gamma] \vdash (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
       E[\Gamma] \vdash
-      (\fix{f_i/k_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n
+      (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
       \reltri
-      \subst{t_j}{f_k}{f'_k}_{k=1\ldots h} \:x_1 \ldots x_n
+      \substm{t_j}{f}{f'} \:\overline{x}
     } \\
   \text{match-app:}~
     \dfrac
@@ -505,16 +547,16 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
         E[\Gamma] \vdash\; &
           \kwmatch\:x\:
           \kwas\:x'\:
-          \kwin\:I\:\_\ldots \_\;y_1\ldots y_{\NI_I}\:
-          \kwreturn\:{T \rightarrow P\:y_1\ldots y_{\NI_I}\:x'}\\
-          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i})_{i=1\ldots h}\:
+          \kwin\:I\:\overline{y}\:
+          \kwreturn\:{T \rightarrow P\:\overline{y}\:x'}
+          \kwwith\:(\overline{{C\: \overline{x}} \Rightarrow {t}})\:
           \kwend\:z \\
         \reltri\; &
           \kwmatch\:x\:
           \kwas\:x'\:
-          \kwin\:I\:\_\ldots \_\;y_1\ldots y_{\NI_I}\:
-          \kwreturn\:{P\:y_1\ldots y_{\NI_I}\:x'}\\
-          & \kwwith\:({C_i\: x_{i1}\ldots x_{i\NM_{C_i}}} \Rightarrow {t_i\:z})_{i=1\ldots h}\:
+          \kwin\:I\:\overline{y}\:
+          \kwreturn\:{P\:\overline{y}\:x'}
+          \kwwith\:(\overline{{C\: \overline{x}} \Rightarrow {t\:\underline{z}}})\:
           \kwend
       \end{aligned}
     }
@@ -523,8 +565,6 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 {\small Note:
 \begin{itemize}
   \item match-app is not convertible
-  \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
-    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
 \end{itemize}}
 
 \subsection{Type Normalization}\label{sec:type-normalization}
@@ -539,10 +579,6 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
                        u
     }
 \end{gather*}
-{\small Note:
-\begin{itemize}
-  \item $\FV(t)$ means the free variables of $t$.
-\end{itemize}}
 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
 
@@ -551,17 +587,17 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \begin{gather*}
   \text{eta-fix:}~
     \dfrac{
-      E[\Gamma] \vdash t : T_1 \rightarrow \cdots \rightarrow T_n \rightarrow T \quad
-      \text{$x_1\ldots x_n$ does not occur in $t$} \quad
+      E[\Gamma] \vdash t : \forall \overline{x{:}T}.\: U \quad
+      \text{$\overline{x}$ does not occur in $t$} \quad
       \text{$t$ is a fixpoint}
-    }{E[\Gamma] \vdash \lamTB{x_1}{T_1}\ldots \lamTB{x_n}{T_n} t\: x_1\ldots x_n
+    }{E[\Gamma] \vdash \lam{\overline{x{:}T}}{t\: \overline{x}}
                        \reltri
                        t
     }
 \end{gather*}
 {\small Note:
 \begin{itemize}
-  \item We require the types of first $n$ arguments of $t$ as $T_1\ldots T_n$ to prevent this transfomation changes the type.
+  \item We require the types of arguments of $t$ as $\overline{T}$ to prevent this transfomation changes the type.
   \item The premise ``$t$ is a fixpoint'' guarantees the result is not partial application.
 \end{itemize}}
 
@@ -577,7 +613,7 @@ is monomorphized to $\textrm{bool}$.
   \reltri_\textrm{V-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\lam{A}{(\kwfix \ldots)})\:T\:l\:m}}} \\
   \reltri_\textrm{S-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} \\
   \reltri_\textrm{Type-nomalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} & \textrm{(expand $T$ in the \kwfix-term)} \\
-  \reltri_\textrm{unused-let-in-deletion}\; & \lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}} \\
+  \reltri_\textrm{unused-letin-deletion}\; & \lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}} \\
   \reltri_\textrm{eta-reduction}\; & (\kwfix \ldots) \\
 \end{align*}
 
@@ -654,24 +690,22 @@ Argument completion removes partial applications by applying eta expansions.
 {\small Note:
 \begin{itemize}
   \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
-  \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
-    $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
 \end{itemize}}
 
 \subsection{Borrow Check}\label{sec:borrow-check}
 
 We define two judgements $E[\Gamma'] \vdash t:T~|~B$ and $E[\Gamma'] \vdash t:T~|~(L, B^\text{used}, B^\text{result})$ for borrow check.
 $\Gamma'$ is an annotated local context.
-It is a list of $\lassum{x^B}{T}$ or $\ldef{x^B}{t}{T}$.
+It is a list of $\lassum{x^B}{T}$ and $\ldef{x^B}{t}{T}$.
 The variable $x$ is annotated with a borrow information $B$.
-$B$ is a set of pair of borrow type and linear variable, such as $\{(T_1,x_1),\ldots\}$.
+$B$ is a set of pair of borrow type and linear variable, such as $\{\overline{(T,x)}\}$.
 $B^\text{used}$ and $B^\text{result}$ are also borrow information.
 $L$ is a set of linear variables.
 $T$ is the type of $t$.
 
 We omit $:T$ in a rule which does not use $T$.
 
-The borrow information $B=\{(T_1,x_1),\ldots\}$ represents a linear variable $x_i$ is used via borrow type $T_i$.
+The borrow information $B=\{\overline{(T,x)}\}$ represents a linear variable $x_i$ is used via borrow type $T_i$.
 $\lassum{x^{\{(T',y)\}}}{T}\in \Gamma'$ represents $x$ may contain a value of type $T'$ which is a (part of) content of the linear variable $y$.
 
 $E[\Gamma'] \vdash t~|~B$ means a function $t$ may use linear variables via borrow $B$.
@@ -736,56 +770,58 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-match:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma'] \vdash t_0 ~|~(L_0, B^\text{used}_0, B^\text{result}_0) \\
-        B_{ij} = B^\text{result}_0 ~\text{filtered with the type of $x_{ij}$} \\
-        \Gamma'_i = \lassum{x_{i1}^{B_{i1}}}{T_{i1}}; \ldots ; \lassum{x_{i\NM_{C_i}}^{B_{i\NM_{C_i}}}}{T_{i\NM_{C_i}}} \\
-        E[\Gamma' ; \Gamma'_i] \vdash t_i ~|~(L_i, B^\text{used}_i, B^\text{result}_i) \\
-        L^\text{M}_i = L_i \cap \{x_{i1},\ldots, x_{i\NM_{C_i}}\} \quad
-        L^\text{F}_i = L_i - \{x_{i1},\ldots, x_{i\NM_{C_i}}\} \\
-        L^\text{M}_i = \{ x_{ij} | 1 \leq j \leq \NM_{C_i} ~\wedge~ \text{$x_{ij}$ is linear} \} \quad
-        L^\text{F}_1 = \cdots = L^\text{F}_h \quad
-        L_0 \cap L^{F}_1 = \varnothing \\
-        {B'}^\text{used}_i = B^\text{used}_1 - \{x_{i1},\ldots, x_{i\NM_{C_i}}\} \quad
-        {B'}^\text{result}_i = B^\text{result}_1 - \{x_{i1},\ldots, x_{i\NM_{C_i}}\} \\
-        B^\text{used} = {B'}^\text{used}_1 \cup \cdots \cup {B'}^\text{used}_h \quad
-        B^\text{result} = {B'}^\text{result}_1 \cup \cdots \cup {B'}^\text{result}_h \quad
-        L_0 \cap B^\text{used} = \varnothing \\
+        E[\Gamma'] \vdash y ~|~(L_\text{item}, B^\text{used}_\text{item}, B^\text{result}_\text{item}) \\
+        B_{ij} = B^\text{result}_\text{item} ~\text{filtered with the type of $x_{ij}$} \\
+        \overline{\Gamma' = \overline{\lassum{x^{B}}{T}}} \\
+        \overline{\underline{E}[\underline{\Gamma'} ; \Gamma'] \vdash t ~|~(L, B^\text{used}, B^\text{result})} \\
+        % M stands for member (of constructor).
+        % F stands for free variable.
+        \overline{L^\text{M} = L \cap \{\overline{x}\}} \quad
+        \overline{L^\text{F} = L - \{\overline{x}\}} \\
+        \overline{L^\text{M} = \{ z ~|~ z \in \{\overline{x}\} ~\wedge~ \text{$z$ is linear} \}} \\
+        \bigwedge_i L^\text{F}_1 = L^\text{F}_i \quad
+        L_\text{item} \cap L^{F}_1 = \varnothing \\
+        \overline{{B'}^\text{used} = B^\text{used} - \{\overline{x}\}} \quad
+        \overline{{B'}^\text{result} = B^\text{result} - \{\overline{x}\}} \\
+        B^\text{used} = \bigcup_i {B'}^\text{used}_i \quad
+        B^\text{result} = \bigcup_i {B'}^\text{result}_i \quad
+        L_\text{item} \cap B^\text{used} = \varnothing \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \match{t_0}{C_i\: x_{i1}\ldots x_{i\NM_{C_i}}}{t_i}{i=1\ldots h} ~|~ (L_0 \cup L^\text{F}_1, B^\text{used}_0 \cup B^\text{used}, B^\text{result})
+      E[\Gamma'] \vdash \omatch{y}{\overline{C\: \overline{x} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}, B^\text{result})
     } \\
   \text{borrow-var-app:}~
     \dfrac{
       \begin{gathered}
-        \lassum{x_0^{B}}{T'} \in \Gamma' \quad
-        \APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
+        \lassum{f^{B}}{T'} \in \Gamma' \quad
+        \APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash x_0\:x_1\ldots x_n : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma'] \vdash f\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \\
   \text{borrow-constant-app:}~
     \dfrac{
       \begin{gathered}
         \text{$c$ is not a borrow function} \quad
-        \APP(\Gamma', \varnothing, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
+        \APP(\Gamma', \varnothing, \overline{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash c\:x_1\ldots x_n : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma'] \vdash c\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \\
   \text{borrow-constructor-app:}~
     \dfrac{
-      \APP(\Gamma', \varnothing, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
+      \APP(\Gamma', \varnothing, \overline{x}, T, L, B^\text{used}, B^\text{result})
     }{
-      E[\Gamma'] \vdash C\:x_1\ldots x_n : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma'] \vdash C\: \overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \\
   \text{borrow-fix-app:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma'] \vdash \fix{f_i}{t_i}{i=1\ldots h}{f_j} ~|~ B \quad
-        \APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result})
+        E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ B \quad
+        \APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash (\fix{f_i}{t_i}{i=1\ldots h}{f_j})\:x_1\ldots x_n : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma'] \vdash (\ofix{\overline{f:=t}}{f_j})\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \\
   \text{borrow-borrow:}~
     \dfrac{
@@ -795,17 +831,17 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
         \text{$T^\text{arg}$ is a linear type} \quad
         \text{$T^\text{result}$ is a borrow type} \\
         \text{$T^\text{result}$ does not contain function} \\
-        \text{$\{T_1, \ldots, T_n\}$ is a set of borrow types contained in $T^\text{result}$} \\
-        B = \{(T_1,x),\ldots,(T_n,x)\}
+        \text{$\{\overline{T}\}$ is a set of borrow types contained in $T^\text{result}$} \\
+        B = \{\overline{(T,\underline{x})}\}
       \end{gathered}
     }{
       E[\Gamma'] \vdash c\:x ~|~ (\varnothing, B, B)
     } \\
   \text{borrow-fix-clo:}~
     \dfrac{
-      E[\Gamma'] \vdash \fix{f_i}{t_i}{i=1\ldots h}{f_j} ~|~ B
+      E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ B
     }{
-      E[\Gamma'] \vdash \fix{f_i}{t_i}{i=1\ldots h}{f_j} ~|~ (\varnothing, B, B)
+      E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ (\varnothing, B, B)
     } \\
   \text{borrow-abs-clo:}~
     \dfrac{
@@ -821,42 +857,43 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \begin{gathered}
         \text{$t$ is not an abstraction} \\
         \text{$t$ is not a fixpoint} \\
-        E[\Gamma';\lassum{x_1^\varnothing}{T_1};\ldots;\lassum{x_n^\varnothing}{T_n}] \vdash t : T ~|~ (L,B^\text{used},B^\text{result}) \\
-        \{ x_i | 1 \leq i \leq n \wedge \text{$x_i$ is linear} \} = L \\
-        B' = (B^\text{used} - \{x_1,\ldots x_n\}) ~\text{filtered with the type of $T$} \\
+        E[\Gamma';\overline{\lassum{x^\varnothing}{T}}] \vdash t : T ~|~ (L,B^\text{used},B^\text{result}) \\
+        \{ z | z \in \{\overline{x}\} \wedge \text{$z$ is linear} \} = L \\
+        B' = (B^\text{used} - \{\overline{x}\}) ~\text{filtered with the type of $T$} \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \lamTB{x_1}{T_1}\ldots\lamTB{x_n}{T_n}t ~|~ B'
+      E[\Gamma'] \vdash \lam{\overline{x{:}T}}{t} ~|~ B'
     } \\
   \text{borrow-abs-fix:}~
     \dfrac{
       \begin{gathered}
         \text{$t$ is a fixpoint} \\
-        E[\Gamma';\lassum{x_1^\varnothing}{T_1};\ldots;\lassum{x_n^\varnothing}{T_n}] \vdash t ~|~ B \\
-        \forall 1 \leq i \leq n, \text{$x_i$ is not linear} \\
+        E[\Gamma';\overline{\lassum{x^\varnothing}{T}}] \vdash t ~|~ B \\
+        \forall z \in \{\overline{x}\}~ \text{$z$ is not linear} \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \lamTB{x_1}{T_1}\ldots\lamTB{x_n}{T_n}t ~|~ B
+      E[\Gamma'] \vdash \lam{\overline{x{:}T}}{t} ~|~ B
     } \\
   \text{borrow-fix-fun:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma';\lassum{f_1^\varnothing}{T_1};\ldots;\lassum{f_h^\varnothing}{T_h}] \vdash t_i ~|~ B_i \\
-        B = B_1\cup \cdots \cup B_h
+        E[\Gamma';\overline{\lassum{f^\varnothing}{T}}] \vdash t_i ~|~ B_i \\
+        B = \bigcup_i B_i
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \fixT{f_i}{T_i}{t_i}{i=1\ldots h}{f_j} ~|~ B
-    } \\
+      E[\Gamma'] \vdash \ofix{\overline{f{:}T:=t}}{f_j} ~|~ B
+    }
 \end{gather*}
 
 \begin{align*}
-  &\APP(\Gamma', B, x_1 \ldots x_n, T, L, B^\text{used}, B^\text{result}) \\
+  &\APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result}) \\
   &= 1 \leq n \\
   &~\wedge \forall 1 \leq i \leq n, \forall 1 \leq j \leq n, (i \neq j \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear})) \\
   &~\wedge L = \{ x_i | 1 \leq i \leq n \wedge \text{$x_i$ is linear} \} \\
   &~\wedge B^\text{used} = B \cup \{ B' | 1 \leq i \leq n \wedge \lassum{x_i^{B'}}{T'} \in \Gamma' \} \\
   &~\wedge B^\text{result} = B^\text{used} ~\text{filtered with the type $T$} \\
   &~\wedge B^\text{used} \cap L = \varnothing \\
+  &\text{where} \quad n = |x|
 \end{align*}
 
 We mix borrow information and set of variables in set-operations.
@@ -871,7 +908,7 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 \begin{itemize}
   \item borrow-fix-fun annotates $f_1^\varnothing \ldots f_n^\varnothing$.
     This is not correct because $f_1\ldots f_n$ may refer borrowed values via free variables in
-    $\fixT{f_i}{T_i}{t_i}{i=1\ldots h}{f_j}$.
+    $\ofix{\overline{f{:}T:=t}}{f_j}$.
     However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
 \end{itemize}}
 
@@ -1044,7 +1081,6 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item $\NA_t$ is the number of arguments of $t$: \quad $\NA_t=m$ if $t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0$ and $T_0$ is an inductive type.
   \item The variables in $t$ are unique.
     \codegen{} uses de Bruijn's indexes for $N$ and $T$;
     the variables renamed by \secref{sec:cvaralloc} for $R$.
