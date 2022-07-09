@@ -11,6 +11,7 @@
 \usepackage{url}
 \usepackage{microtype}
 \usepackage{balance}
+\usepackage{mathtools}
 
 \definecolor{myviolet}{rgb}{0.6,0.0,0.65}
 \definecolor{myblue}{rgb}{0.1,0.0,0.8}
@@ -112,6 +113,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.\:#3}
 \newcommand{\lamB}[1]{\lambda #1.\:}
 \newcommand{\lamTB}[2]{\lambda #1\mathord{:}#2.\:}
+\newcommand{\lamM}[3]{\lambda \rep{#1}.\:#3}
+\newcommand{\lamTM}[3]{\lambda \rep{#1\mathord{:}#2}.\:#3}
 
 \newcommand{\gassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\glodef}[3]{(#1:=#2\mathord{:}#3)}
@@ -122,6 +125,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \newcommand{\letin}[3]{\kwlet\:#1:=#2\:\kwin\:#3}
 \newcommand{\letinB}[2]{\kwlet\:#1:=#2\:\kwin}
+\newcommand{\letinM}[3]{\kwlet\:\rep{#1:=#2}\:\kwin\:#3}
 
 \newcommand{\omatch}[2]{\kwmatch\:#1\:\kwwith\:{#2}\:\kwend}
 \newcommand{\match}[4]{\kwmatch\:#1\:\kwwith\:(#2 \Rightarrow #3)_{#4}\:\kwend}
@@ -251,6 +255,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \newcommand{\reltri}{\mathrel{\triangleright}}
 
+\newcommand{\rep}[1]{\overline{#1}}
+\newcommand{\repop}[2]{\overline{#1\underbracket[0.4pt][1pt]{#2}}}
+\newcommand{\repopi}[3]{\overline{#1\underbracket[0.4pt][1pt]{#2}}^{#3}}
+\newcommand{\repi}[2]{\overline{#1}^{#2}}
+
 \title{codegen development memo}
 
 \begin{document}
@@ -263,22 +272,28 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \begin{itemize}
   \item We use overline to represent repetition:
-    $\overline{x_i+y_i}^{1\leq i \leq n}$ means $x_1+y_1, \ldots, x_n+y_n$.
-  \item We assume appropriate separator for the context (``,'' in the above example) are inserted.
-    (The separator may inserted at beginning or end if appropriate.)
-  \item We omit indexes when the range of index are known:
-    $\overline{x+y}$ means $\overline{x_i+y_i}^{1\leq i \leq n}$ if $x$ and $y$ are $n$-element sequences.
-    The index is added to the all meta-variables under the overline
-  \item We use nested overline to represent two- or more-dimensional indexes.
-    $\omatch{t}{\overline{C\:\overline{x}\Rightarrow u}}$ means
-    $\omatch{t}{ C_1\: x_{11}\ldots x_{1m_1} \Rightarrow u_1
-                \:|\: C_2\: x_{21}\ldots x_{2m_2} \Rightarrow u_2
+    $\repop{x_i+y_i}{<}^{1\leq i \leq n}$ means $x_1+y_1 < \ldots < x_n+y_n$.
+  \item We omit the operator part ($\underbracket[0.4pt][1pt]{<}$) when the operator is just a punctuation to separate each term.
+    We write $\repi{x_i+y_i}{1\leq i \leq n}$ for $x_1+y_1, \ldots, x_n+y_n$ if comma is appropriate separator for the context.
+  \item We omit the range part ($1\leq i \leq n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
+    We write $\repop{x+y}{<}$ for $x_1+y_1 < \ldots < x_n+y_n$ when $x$ and $y$ are $n$-element sequences.
+  \item We omit both the operator and range part if appropriate.
+    We write $\rep{x+y}$ for $x_1+y_1, \ldots, x_n+y_n$ if $x$ and $y$ are $n$-element sequences and comma is appropriate separator for the context.
+    We use this form in most case.
+  \item We use underline to distinguish metavariables which index is added by overline or not.
+    We write $\rep{x+\underline{y}}$ for $x_1+y, \ldots, x_n+y$.
+  \item We use nested overline to represent multi-dimensional indexes. \\
+    $\omatch{t}{\rep{C\:\rep{x}\Rightarrow u}}$ means \\
+    $\omatch{t}{C_1\:\rep{x_1}\Rightarrow u_1 \:|\: \ldots \:|\: C_n\:\rep{x_n}\Rightarrow u_n}$ and \\
+    $\omatch{t}{C_1\: x_{11}\ldots x_{1m_1} \Rightarrow u_1
                 \:|\: \ldots
                 \:|\: C_n\: x_{n1}\ldots x_{nm_n} \Rightarrow u_n}$.
-  \item We use underline to suppress adding indexes.
-    $\overline{\letinB{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}}$ means \\
-    $\letinB{f'_1}{\ofix{\overline{(f/k:=t)}}{f_1}} ~\ldots~
-     \letinB{f'_h}{\ofix{\overline{(f/k:=t)}}{f_h}}$.
+  \item Nested overline and underline can be combined. \\
+    $\rep{\letinB{f'}{\ofix{\underline{(\rep{f:=t})}}{f}}}$ means \\
+    $\letinB{f'_1}{\ofix{\rep{(f:=t)}}{f_1}} ~\ldots~
+     \letinB{f'_h}{\ofix{\rep{(f:=t)}}{f_h}}$ and \\
+    $\letinB{f'_1}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_1}} ~\ldots~
+     \letinB{f'_h}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_h}}$.
   \item This notation is taken from \cite{steele2017s}.
 \end{itemize}
 
@@ -327,7 +342,9 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 {\small Note:
 \begin{itemize}
   \item $u, a, b, c$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
-  \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$.
+  \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$ or $t\:\rep{u}$.
+  \item We write $\lamT{x_1}{T_1}{(\ldots (\lamT{x_n}{T_n}{u}) \ldots)}$ as $\lamTM{x}{T}{u}$.
+  \item We write $\letin{x_1}{t_1{:}T_1}{(\ldots(\letin{x_n}{t_n{:}T_n}{u})\ldots)}$ as $\letinM{x}{t{:}T}{u}$.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
   \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) in the syntax.
@@ -431,6 +448,48 @@ This makes beta-var applicable for partial applications without worrying to expo
 (CIC~\cite{coqrefman8.12.0} uses lambdas for match-branches but our syntax uses no lambdas for them.
 Thus match-branches doesn't trigger the eta expansion.)
 
+\begin{gather*}
+  \text{eta-top:}~
+    \dfrac{
+      E[] \vdash t : \prodT{x}{T}{U} \quad
+      \text{$t$ is not an abstraction nor fixpoint} \quad
+      \text{$t$ is a entire function}
+    }{
+      E[] \vdash t \reltri \lamT{x}{T}{(t\:x)}
+    } \\
+  \text{eta-fix:}~
+    \dfrac{
+      E[\Gamma;\rep{\lassum{f}{T}}] \vdash t : \prodT{x}{U_1}{U_2} \quad
+      \text{$t$ is not an abstraction nor fixpoint}
+    }{
+      E[\Gamma] \vdash \ofix{\overline{f/k{:}T:=t}}{f_j} \reltri \ofix{\overline{f/k{:}T:=(\lamT{x}{U_1}{(t\:x)})}}{f_j}
+    } \\
+  \text{eta-abs:}~
+    \dfrac{
+      E[\Gamma;\lassum{y}{T}] \vdash t : \prodT{x}{U_1}{U_2} \quad
+      \text{$t$ is not an abstraction nor fixpoint}
+    }{
+      E[\Gamma] \vdash \lamT{y}{T}{t} \reltri \lamT{y}{T}{(\lamT{x}{U_1}{(t\:x)})}
+    }
+\end{gather*}
+
+This transformations makes a term in following syntax.
+The entire function is represented as $t_F$.
+
+\begin{align*}
+  t_F =&\ \lamT{x}{T}{t_F} \\
+      |&\ \ofix{\overline{f/k{:}T:=t_F}}{f_j} \\
+      |&\ t   & \text{the type of $t$ is an inductive type} \\
+  t =&\ x \\
+    |&\ c \\
+    |&\ C \\
+    |&\ T \\
+    |&\ t\:u \\
+    |&\ \letin{x}{t:T}{u} \\
+    |&\ \omatch{t}{\overline{C\:\overline{x}\Rightarrow u}} \\
+    |&\ t_F  & \text{$t_F$ is abstraction or fixpoint} \\
+\end{align*}
+
 \subsection{V-Normalization}\label{sec:v-normalization}
 \subsubsection{V-Reductions}\label{sec:v-reductions}
 \begin{gather*}
@@ -470,7 +529,26 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
     |&\ \omatch{x}{\overline{C\:\overline{x} \Rightarrow t}} & \leftarrow (2)
 \end{align*}
 
+Since we apply V-reductions for a eta-expanded term,
+the result term can be represented in following syntax.
+
+\begin{align*}
+  t_F =&\ \lamT{x}{T}{t_F} \\
+      |&\ \ofix{\overline{f/k{:}T:=t_F}}{f_j} \\
+      |&\ t   & \text{the type of $t$ is an inductive type} \\
+  t =&\ x \\
+    |&\ c \\
+    |&\ C \\
+    |&\ T \\
+    |&\ t\:x & \leftarrow (1) \\
+    |&\ \letin{x}{t:T}{u} \\
+    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}} & \leftarrow (2) \\
+    |&\ t_F  & \text{$t_F$ is abstraction or fixpoint} \\
+\end{align*}
+
 \subsection{S-Normalization}\label{sec:s-normalization}
+
+\subsubsection{S-Reductions}\label{sec:s-reductions}
 \begin{gather*}
   \text{beta-var:}~
     E[\Gamma] \vdash (\lam{x}{t})\:y \reltri \subst{t}{x}{y} \\
@@ -566,6 +644,32 @@ V-normal form restricts \gallina{} terms that (1) application arguments and (2) 
 \begin{itemize}
   \item match-app is not convertible
 \end{itemize}}
+
+\subsubsection{S-Normal Form}\label{sec:s-normal-form}
+S-reductions transforms application to restrict constructions at function positions of applications.
+\begin{itemize}
+  \item beta-var removes an abstraction at the function position of an application.
+  \item zeta-app removes a let-in at the function position of an application.
+  \item match-app removes a conditional at the function position of an application.
+  \item zeta-flat removes a let-in at the first term of a let-in.
+\end{itemize}
+Also, types cannot be a function.
+We treat multi-arguments application as single application, application is not occur at the function position of an application.
+Thus, function position can be variable, constant, construcor, or fixpoint in the S-normal form.
+
+\begin{align*}
+  t^\textrm{D} =&\ \lamT{x}{T}{t^\textrm{D}} \\
+      |&\ \ofix{\overline{f/k{:}T:=t^\textrm{D}}}{f_j} \\
+      |&\ t^\textrm{L}   & \text{the type of $t^\textrm{L}$ is an inductive type} \\
+  t^\textrm{L} =&\ \letinM{x}{t^\textrm{M}:T}{t^\textrm{M}} \\
+  t^\textrm{M} =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow t^\textrm{L}}} \\
+      |&\ t^\textrm{E} \\
+  t^\textrm{E} =&\ x ~|~ c ~|~ C ~|~ T \\
+      |&\ t^\textrm{F}\:\rep{x} & \text{$0 < |x|$} \\
+      |&\ t^\textrm{D}  & \text{$t^\textrm{D}$ is abstraction or fixpoint} \\
+  t^\textrm{F} =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=t^\textrm{D}}}{f_j}
+\end{align*}
+
 
 \subsection{Type Normalization}\label{sec:type-normalization}
 \subsection{Static Argument Normalization}\label{sec:static-argument-normalization}
