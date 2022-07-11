@@ -118,6 +118,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \newcommand{\gassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\glodef}[3]{(#1:=#2\mathord{:}#3)}
+\newcommand{\glodefB}[2]{(#1:=#2)}
 \newcommand{\lassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\ldef}[3]{(#1:=#2\mathord{:}#3)}
 
@@ -140,7 +141,20 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \DeclareMathOperator{\NI}{NI} % number of indexes for the inductive type
 \DeclareMathOperator{\NM}{NM} % number of members for the constructor
 
+\DeclareMathOperator{\Arr}{Arr} % Arr(t) is arity of the inductive type t.
+\newcommand{\arr}[1]{\Gamma_{\Arr(#1)}}
+
 \DeclareMathOperator{\FV}{FV}
+
+\newcommand{\tD}{{t^\mathrm{D}}}
+\newcommand{\tE}{{t^\mathrm{E}}}
+\newcommand{\tL}{{t^\mathrm{L}}}
+\newcommand{\tM}{{t^\mathrm{M}}}
+\newcommand{\tF}{{t^\mathrm{F}}}
+\newcommand{\tC}{{t^\mathrm{C}}}
+\newcommand{\tA}{{t^\mathrm{A}}}
+
+\DeclareMathOperator{\merg}{merge}
 
 \newcommand{\BRA}[1]{\llbracket #1 \rrbracket}
 
@@ -308,9 +322,15 @@ We use $|x|$ to represent the number of elements: $|x|=n$ if $x$ is an $n$-eleme
   \item $\NP_I$ is the number of the parameters of the inductive type $I$: \\
     $\NP_I=p$ if $I$ is defined in an inductive definitions $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$.
   \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
-    $\NI_I=m$ if $I : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow S$ and $S$ is a sort.
+    $\NI_I=|\arr{I}|$ where
+    $\arr{t}$ is the arity of the inductive type $t$.
+    It means $(t : \forall (\Gamma_P; \arr{t}), S)$ is defined in $\Gamma_I$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
+    $|\Gamma_P|$ = $p$ and $S$ is a sort.
   \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
-    $\NM_C=m$ if $C : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow T_{p+1} \rightarrow \dotsb \rightarrow T_{p+m} \rightarrow T_0$ and $T_0$ is an inductive type which has $p$ parameters.
+    $\NM_C=|\Gamma|$ where
+    $\Gamma$ is the non-parameter arguments of the constructor $C$.
+    It means $(t : \forall (\Gamma_P; \Gamma), S)$ is defined in $\Gamma_C$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
+    $|\Gamma_P|$ = $p$ and $S$ is a sort.
 \end{itemize}
 
 \subsection{Substitution}
@@ -341,7 +361,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item $u, a, b, c$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
+  \item $u, a, b$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
   \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$ or $t\:\rep{u}$.
   \item We write $\lamT{x_1}{T_1}{(\ldots (\lamT{x_n}{T_n}{u}) \ldots)}$ as $\lamTM{x}{T}{u}$.
   \item We write $\letin{x_1}{t_1{:}T_1}{(\ldots(\letin{x_n}{t_n{:}T_n}{u})\ldots)}$ as $\letinM{x}{t{:}T}{u}$.
@@ -382,7 +402,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
       E[\Gamma] \vdash
       \omatch{(C_j\:\overline{a}\:\overline{b})}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
-      (\lam{\overline{x}}{t_j})\:\overline{b}
+      (\lam{\overline{x_j}}{t_j})\:\overline{b}
     } \\
   \text{iota-fix:}~
     \dfrac{
@@ -439,6 +459,24 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 
 \section{\gallina-to-\gallina{} Transformations}\label{sec:gallina-to-gallina-transformations}
 
+We define transformations as a judgement $E[\Gamma] \vdash t \reltri u$.
+This means a subterm $t$ is substituted to $u$ where
+$E$ and $\Gamma$ are the global environment and the local context of them.
+
+We also use $E[\Gamma] \vdash_K t \reltri u$ to represent transformations restricted with a syntactical context $K$.
+
+$K$ is a single-hole context: a term with a subterm is sustituted with a hole, $[]$.
+$K[u]$ is $K$ with the hole is substituted with $u$.
+
+$E[\Gamma] \vdash_K t \reltri u$ is similar to $E[\Gamma] \vdash K[t] \reltri K[u]$ but
+$\Gamma$ is the local context of $t$ (not $K[t]$).
+
+Also, we use $E[] \vdash_\$ t \reltri u$ which defines a tranformation of an entire term (not subterm).
+(The local context is empty because an entire term has no local context.)
+
+When we define a new constant in a transformation,
+We use $E[\Gamma] \vdash t \reltri (E;\glodef{c}{a}{T})[\Gamma] \vdash u$.
+
 \subsection{Inlining}\label{sec:inlining}
 \subsection{Strip Cast}\label{sec:strip-cast}
 \subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
@@ -449,46 +487,56 @@ This makes beta-var applicable for partial applications without worrying to expo
 Thus match-branches doesn't trigger the eta expansion.)
 
 \begin{gather*}
-  \text{eta-top:}~
+  \text{etaex-top:}~
     \dfrac{
       E[] \vdash t : \prodT{x}{T}{U} \quad
       \text{$t$ is not an abstraction nor fixpoint} \quad
-      \text{$t$ is a entire function}
     }{
-      E[] \vdash t \reltri \lamT{x}{T}{(t\:x)}
+      E[] \vdash_\$ t \reltri \lamT{x}{T}{(t\:x)}
     } \\
-  \text{eta-fix:}~
+  \text{etaex-fix:}~
     \dfrac{
-      E[\Gamma;\rep{\lassum{f}{T}}] \vdash t : \prodT{x}{U_1}{U_2} \quad
-      \text{$t$ is not an abstraction nor fixpoint}
+      \begin{aligned}
+        & E[\Gamma] \vdash t_i : \prodT{x}{U_1}{U_2} \quad
+          \text{$t_i$ is not an abstraction nor fixpoint} \\
+        & K = \ofix{\repi{(f{:}T:=t)}{1\leq l < i} (f_i{:}T_i:=[]) \repi{(f{:}T:=t)}{i < l \leq h}}{f_j}
+      \end{aligned}
     }{
-      E[\Gamma] \vdash \ofix{\overline{f/k{:}T:=t}}{f_j} \reltri \ofix{\overline{f/k{:}T:=(\lamT{x}{U_1}{(t\:x)})}}{f_j}
+        E[\Gamma] \vdash_K t_i \reltri \lamT{x}{U_1}{(t_i\:x)}
     } \\
-  \text{eta-abs:}~
+  \text{etaex-abs:}~
     \dfrac{
-      E[\Gamma;\lassum{y}{T}] \vdash t : \prodT{x}{U_1}{U_2} \quad
-      \text{$t$ is not an abstraction nor fixpoint}
+      \begin{aligned}
+        & E[\Gamma] \vdash t : \prodT{x}{U_1}{U_2} \quad
+          \text{$t$ is not an abstraction nor fixpoint} \\
+        & K = \lamT{y}{T}{[]}
+      \end{aligned}
     }{
-      E[\Gamma] \vdash \lamT{y}{T}{t} \reltri \lamT{y}{T}{(\lamT{x}{U_1}{(t\:x)})}
+      E[\Gamma] \vdash_K t \reltri \lamT{x}{U_1}{(t\:x)}
     }
 \end{gather*}
 
 This transformations makes a term in following syntax.
-The entire function is represented as $t_F$.
+The entire term is represented as $\tD'$.
+($\tD$ for functions and $\tE$ for non-function constants.)
 
 \begin{align*}
-  t_F =&\ \lamT{x}{T}{t_F} \\
-      |&\ \ofix{\overline{f/k{:}T:=t_F}}{f_j} \\
-      |&\ t   & \text{the type of $t$ is an inductive type} \\
-  t =&\ x \\
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
+  \tE =&\ x \\
     |&\ c \\
     |&\ C \\
     |&\ T \\
-    |&\ t\:u \\
-    |&\ \letin{x}{t:T}{u} \\
-    |&\ \omatch{t}{\overline{C\:\overline{x}\Rightarrow u}} \\
-    |&\ t_F  & \text{$t_F$ is abstraction or fixpoint} \\
+    |&\ \tE\:\tE \\
+    |&\ \letin{x}{\tE:T}{\tE} \\
+    |&\ \omatch{\tE}{\overline{C\:\overline{x}\Rightarrow \tE}} \\
+    |&\ \tD \\
 \end{align*}
+
+The type of $\tE$ in $\tD'$ is an inductive type because
+the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction and fixpoint until its type is not function type.
 
 \subsection{V-Normalization}\label{sec:v-normalization}
 \subsubsection{V-Reductions}\label{sec:v-reductions}
@@ -533,17 +581,18 @@ Since we apply V-reductions for a eta-expanded term,
 the result term can be represented in following syntax.
 
 \begin{align*}
-  t_F =&\ \lamT{x}{T}{t_F} \\
-      |&\ \ofix{\overline{f/k{:}T:=t_F}}{f_j} \\
-      |&\ t   & \text{the type of $t$ is an inductive type} \\
-  t =&\ x \\
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
+  \tE =&\ x \\
     |&\ c \\
     |&\ C \\
     |&\ T \\
-    |&\ t\:x & \leftarrow (1) \\
-    |&\ \letin{x}{t:T}{u} \\
-    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}} & \leftarrow (2) \\
-    |&\ t_F  & \text{$t_F$ is abstraction or fixpoint} \\
+    |&\ \tE\:x & \leftarrow (1) \\
+    |&\ \letin{x}{\tE:T}{\tE} \\
+    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tE}} \leftarrow (2) \\
+    |&\ \tD \\
 \end{align*}
 
 \subsection{S-Normalization}\label{sec:s-normalization}
@@ -584,7 +633,7 @@ the result term can be represented in following syntax.
       E[\Gamma] \vdash
       \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
-      (\lam{\overline{x}}{t_j})\:\overline{z}
+      (\lam{\overline{x_j}}{t_j})\:\overline{z}
     } \\
   \text{iota-fix-var:}~
     \dfrac
@@ -599,7 +648,7 @@ the result term can be represented in following syntax.
         E[\Gamma] \vdash\;
           (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
           \reltri
-          \overline{\letinB{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}} \: \substm{t_j}{f}{f'} \: \overline{x}
+          \letinM{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}{\substm{t_j}{f}{f'}} \: \overline{x}
     } \\
   \text{iota-fix-var':}~
     \dfrac
@@ -646,34 +695,81 @@ the result term can be represented in following syntax.
 \end{itemize}}
 
 \subsubsection{S-Normal Form}\label{sec:s-normal-form}
-S-reductions transforms application to restrict constructions at function positions of applications.
+S-reductions transform applications to restrict function positions.
 \begin{itemize}
   \item beta-var removes an abstraction at the function position of an application.
   \item zeta-app removes a let-in at the function position of an application.
   \item match-app removes a conditional at the function position of an application.
-  \item zeta-flat removes a let-in at the first term of a let-in.
 \end{itemize}
 Also, types cannot be a function.
-We treat multi-arguments application as single application, application is not occur at the function position of an application.
+We treat multi-arguments application as single application, application is not occur at a function position.
 Thus, function position can be variable, constant, construcor, or fixpoint in the S-normal form.
 
+Also, zeta-flat removes a let-in at the binder term of a let-in.
+
 \begin{align*}
-  t^\textrm{D} =&\ \lamT{x}{T}{t^\textrm{D}} \\
-      |&\ \ofix{\overline{f/k{:}T:=t^\textrm{D}}}{f_j} \\
-      |&\ t^\textrm{L}   & \text{the type of $t^\textrm{L}$ is an inductive type} \\
-  t^\textrm{L} =&\ \letinM{x}{t^\textrm{M}:T}{t^\textrm{M}} \\
-  t^\textrm{M} =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow t^\textrm{L}}} \\
-      |&\ t^\textrm{E} \\
-  t^\textrm{E} =&\ x ~|~ c ~|~ C ~|~ T \\
-      |&\ t^\textrm{F}\:\rep{x} & \text{$0 < |x|$} \\
-      |&\ t^\textrm{D}  & \text{$t^\textrm{D}$ is abstraction or fixpoint} \\
-  t^\textrm{F} =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=t^\textrm{D}}}{f_j}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C ~|~ T \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
-
 \subsection{Type Normalization}\label{sec:type-normalization}
+
+We normalize type annotations in the term.
+
+This transformation makes that types contain no variable bounded by let-ins
+because such variables are redex of delta reduction.
+Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-deletion}) more effective.
+
 \subsection{Static Argument Normalization}\label{sec:static-argument-normalization}
+
+We normalize static arguments.
+We assume the normalized static arguments have no free variables.
+
+It makes the syntax as follows.
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C ~|~ T \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+    |&\ \tC\:\rep{\tA} & \text{$0 < |\tA|$} \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+  \tC =&\ c ~|~ C \\
+  \tA =&\ x ~|~ u & \text{$u$ is a static argument (normal \gallina{} term without free variables)}
+\end{align*}
+
+The application in previous section, $\tF\:\rep{x}$, is changed to $\tC\:\rep{\tA}$ for constant and constructor applications.
+(Thus, this is not V-normal form.)
+
+Static arguments are defined as follows by default.
+\begin{itemize}
+  \item non-monomorphic arguments for constant functions.
+    (The non-monomorphic argument means an argument which type is a sort or a polymorphic function type,  )
+  \item parameters for constructors.
+\end{itemize}
+The static arguments can be configured with \lstinline!CodeGen Arguments! command.
+
+This transformation makes that static arguments contain no variable bounded by let-ins
+because such variables are redex of delta reduction.
+Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-deletion}) more effective.
+
 \subsection{Unused let-in Deletion}\label{sec:let-in-deletion}
+
 \begin{gather*}
   \text{zeta-del:}~
     \dfrac{
@@ -686,10 +782,74 @@ Thus, function position can be variable, constant, construcor, or fixpoint in th
 
 \subsection{Call Site Replacement}\label{sec:call-site-replacement}
 
+\begin{gather*}
+  \text{replace:}~
+    \dfrac{
+      \begin{gathered}
+        \text{$t$ is a constant or constructor} \\
+        \text{$a_{|a|}$ is not a variable} \\
+        \rep{a} = \merg_t(\rep{x}, \rep{u}) \\
+        \text{$\rep{y}$ are fresh variables} \quad
+        |x| = |y| \\
+        \rep{b} = \merg_t(\rep{y}, \rep{u}) \\
+        \text{$c$ is a fresh constant} \\
+      \end{gathered}
+    }{E[\Gamma] \vdash_K t\:\rep{a}\:\rep{z}
+      \reltri
+      (E;\glodefB{c}{\lam{\rep{y}}{t\:\rep{b}}})[\Gamma] \vdash c\:\rep{x}\:\rep{z}
+    }
+\end{gather*}
+
+$K$ is a non-application context to restrict $t\:\rep{a}\:\rep{z}$ is not at a function position of an application.
+($K = (\lam{x}{[]})$, $(\letin{x}{[]}{u})$, $(\letin{x}{t}{[]})$, or \ldots but NOT $([]\:u)$.)
+
+$\merg_t(\rep{x}, \rep{u})$ represents a sequence of terms which two sequences of terms are merged according to the static arguments definition of $t$.
+The first argument $\rep{x}$ specifies dynamic arguments.
+The second argument $\rep{u}$ specifies static arguments.
+For example, assuming the 1st and 4th arguments are static for $t$, $\merg_t((x_1, x_2, x_3), (u_1, u_2)) = (u_1, x_1, x_2, u_2, x_3)$.
+
+This transformation removes non-variable arguments from applications.
+Thus the result will be V-normal form again.
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C ~|~ T \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+\end{align*}
+
+\subsection{Check Monomorphism}\label{sec:check-monomorphism}
+
+We check the transformed term is monomorphic term.
+
+All type annotations are inductive or function types without free variables.
+Types and sorts doesn't occur at expression.
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{No $T$ here} \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+\end{align*}
+
 \subsection{Eta Reduction to Expose Fixpoint}\label{sec:eta-reduction}
 
 \begin{gather*}
-  \text{eta-fix:}~
+  \text{etared-fix:}~
     \dfrac{
       E[\Gamma] \vdash t : \forall \overline{x{:}T}.\: U \quad
       \text{$\overline{x}$ does not occur in $t$} \quad
