@@ -840,7 +840,7 @@ Types and sorts doesn't occur at expression.
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
-  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{No $T$ here} \\
+  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{$T$ is removed} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
   \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
@@ -887,74 +887,37 @@ The code generator generates single C function (\secref{sec:genfuns}) from post-
 
 \subsection{Argument Completion}\label{sec:argcomp}
 Argument completion removes partial applications by applying eta expansions.
-\begin{itemize}
-  \item $\F{t}$ considers t to be a top-level function or a closure-generating expression.  $\Fop$ transforms $t$ to be a nested abstraction expression that takes all arguments.
-    Fixpoint expressions are allowed outside or between the abstractions.
-  \item $\BR{t}{m}{q}$ transforms a branch of a match expression into a nested abstraction expression that takes constructor members.
-    Fixpoint expressions are not allowed.
-  \item $\E{t}{x_1\ldots x_p}{q}$ is a term convertible with $t\:x_1\ldots x_p$ that does not contain a partial application.
-    $\E{t}{x_1\ldots x_p}{q}$ traverses $t$ while tracking the arguments for $t$ to find closure-generating expressions.
-    The number of arguments given to $t$ is $p+q$.
-    The first $p$ arguments are $x_1\ldots x_p$ and they can be the argument of beta-var redex.
-    The last $q$ arguments cannot be the argument of beta-var redex.
-\end{itemize}
-\[
-  \F{t} =
-  \begin{cases}
-    \lam{x}{\F{u}} & t = \lam{x}{u} \\
-    \fix{f_i}{\F{t_i}}{i=1\ldots h}{f_j}  & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-    \lambda x_1\ldots\lamB{x_m}\E{t}{x_1\ldots x_m}{0}        & \text{otherwise} \quad \text{(eta expansion)}
-  \end{cases}
-\]
-\[ \quad\text{where} \quad
-  \begin{aligned}[t]
-    & t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0 \\
-    & \text{$T_0$ is an inductive type} \\
-    & \text{$x_1\ldots x_m$ are fresh variables}
-  \end{aligned}
-\]
-\[
-  \BR{t}{m}{q} =
-  \begin{cases}
-    \E{t}{}{q}    & m = 0 \\
-    \lam{x}{\BR{u}{m-1}{q}} & (m > 0) \wedge (t = \lam{x}{u}) \\
-    \lambda x_1\ldots\lamB{x_m}\E{t}{x_1\ldots x_m}{q}        & \text{otherwise} \quad \text{(eta expansion)}
-  \end{cases}
-\]
-\[ \quad\text{where} \quad
-  \begin{aligned}[t]
-    & \text{$x_1\ldots x_m$ are fresh variables}
-  \end{aligned}
-\]
-\[
-  \E{t}{x_1\ldots x_p}{q} =
-  \begin{cases}
-    x                                                                                                 & (t = x) \wedge (p = q = 0) \\
-    x\:x_1\ldots x_p                                                                                    & (t = x) \wedge \neg (p = q = 0) \wedge (r = 0) \\
-    \F{x\:x_1\ldots x_p}                                                                                 & (t = x) \wedge \neg (p = q = 0) \wedge (r > 0) \\
-    t\:x_1\ldots x_p                                                                                    & ((t = c) \vee (t = C)) \wedge (r = 0) \\
-    \F{t\:x_1\ldots x_p}                                                                                 & ((t = c) \vee (t = C)) \wedge (r > 0) \\
-    \E{\subst{u}{x}{x_1}}{x_2\ldots x_p}{q}                                                             & (t = \lam{x}{u}) \wedge (p > 0) \quad \text{(beta-var)} \\
-    \F{t}                                                                                              & (t = \lam{x}{u}) \wedge (p = 0) \\
-    \E{u}{x_0\:x_1\ldots x_p}{q}                                                                & t = u\:x_0 \\
-    \letin{x}{\E{t_1}{}{0}}{\E{t_2}{x_1\ldots x_p}{q}}                                                            & t = \letin{x}{t_1}{t_2} \quad \text{(zeta-app)} \\
-    \match{x}{C_i}{\BR{t_i}{\NM_{C_i}}{p+q}}{i=1\ldots h}\:x_1\ldots x_p                                   & t = \match{x}{C_i}{t_i}{i=1\ldots h} \\
-    (\fix{f_i}{\F{t_i}}{i=1\ldots h}{f_j})\:x_1\ldots x_p                                             & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \wedge (r = 0) \\
-    \F{t\:x_1\ldots x_p}                                             & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \wedge (r > 0)
-  \end{cases}
-\]
-\[ \quad\text{where} \quad
-  \begin{aligned}[t]
-    & t : T_1 \rightarrow \dotsb \rightarrow T_p \rightarrow
-          T_{p+1} \rightarrow \dotsb \rightarrow T_{p+q} \rightarrow
-          T_{p+q+1} \rightarrow \dotsb \rightarrow T_{p+q+r} \rightarrow T_0 \\
-    & \text{$T_0$ is an inductive type} \\
-  \end{aligned}
-\]
-{\small Note:
-\begin{itemize}
-  \item This transformation assumes $t$ is not dependently typed: no type terms and no dependent \kwmatch-expressions.
-\end{itemize}}
+
+\begin{gather*}
+  \text{arg-comp:}~
+    \dfrac{
+      \begin{gathered}
+        E[\Gamma] \vdash t : \forall \rep{(y{:}T)}\:\rep{(z{:}T')}, U \\
+        |x| = |y| \\
+        \text{$U$ is an inductive type}
+      \end{gathered}
+    }{E[\Gamma] \vdash
+        t\:\rep{x}
+        \reltri_K
+        \lam{\rep{z{:}T'}}{t\:\rep{x}\:\rep{z}}
+    }
+\end{gather*}
+
+$K$ is a non-application context as in \secref{sec:call-site-replacement}.
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+\end{align*}
 
 \subsection{Borrow Check}\label{sec:borrow-check}
 
