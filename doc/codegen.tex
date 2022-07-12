@@ -448,6 +448,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \item Call Site Replacement
   \item Eta Reduction to Expose Fixpoint
   \item Argument Completion
+  \item Monomorphism Check
   \item Borrow Check
   \item C Variable Allocation
   \end{itemize}
@@ -522,7 +523,7 @@ The entire term is represented as $\tD'$.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE =&\ x \\
@@ -582,7 +583,7 @@ the result term can be represented in following syntax.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE =&\ x \\
@@ -709,9 +710,9 @@ Also, zeta-flat removes a let-in at the binder term of a let-in.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
-       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
@@ -738,9 +739,9 @@ It makes the syntax as follows.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
-       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
@@ -813,34 +814,13 @@ Thus the result will be V-normal form again.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
-       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ c ~|~ C ~|~ T \\
-    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
-    |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
-\end{align*}
-
-\subsection{Check Monomorphism}\label{sec:check-monomorphism}
-
-We check the transformed term is monomorphic term.
-
-All type annotations are inductive or function types without free variables.
-Types and sorts doesn't occur at expression.
-
-\begin{align*}
-  \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
-  \tD' =&\ \tD \\
-       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
-  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
-      |&\ \tE \\
-  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{$T$ is removed} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
   \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
@@ -889,9 +869,11 @@ The code generator generates single C function (\secref{sec:genfuns}) from post-
 Argument completion removes partial applications by applying eta expansions.
 
 \begin{gather*}
-  \text{arg-comp:}~
+  \text{argcomp-papp:}~
     \dfrac{
       \begin{gathered}
+        \text{$t$ is not an application} \\
+        0 < |x| \\
         E[\Gamma] \vdash t : \forall \rep{(y{:}T)}\:\rep{(z{:}T')}, U \\
         |x| = |y| \\
         \text{$U$ is an inductive type}
@@ -900,21 +882,58 @@ Argument completion removes partial applications by applying eta expansions.
         t\:\rep{x}
         \reltri_K
         \lam{\rep{z{:}T'}}{t\:\rep{x}\:\rep{z}}
+    } \\[1em]
+  \text{argcomp-cnst-cstr:}~
+    \dfrac{
+      \begin{gathered}
+        \text{$t$ is a constant or constructor} \\
+        E[\Gamma] \vdash t : \forall \rep{z{:}T}, U \\
+        \text{$U$ is an inductive type}
+      \end{gathered}
+    }{E[\Gamma] \vdash
+        t
+        \reltri_K
+        \lam{\rep{z{:}T}}{t\:\rep{z}}
     }
 \end{gather*}
 
 $K$ is a non-application context as in \secref{sec:call-site-replacement}.
 
+This transformation makes the result of an application inductive type.
+Also, constants and constructors are always fully applied to arguments.
+
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD'}}{f_j} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
-       |&\ \tL & \text{the type of $\tE$ is an inductive type} \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
-  \tE =&\ x ~|~ c ~|~ C \\
+  \tE =&\ x \\
+    |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+\end{align*}
+
+\subsection{Monomorphism Check}\label{sec:check-monomorphism}
+
+We check the transformed term is monomorphic term.
+
+All type annotations are inductive or function types without free variables.
+Types and sorts doesn't occur at expression.
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{$T$ is removed} \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
   \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
 \end{align*}
