@@ -156,6 +156,8 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \DeclareMathOperator{\merg}{merge}
 
+\newcommand{\breakrule}{\\[0.5em]}
+
 \newcommand{\BRA}[1]{\llbracket #1 \rrbracket}
 
 \DeclareMathOperator{\genbody}{GENBODY}
@@ -494,7 +496,7 @@ Thus match-branches doesn't trigger the eta expansion.)
       \text{$t$ is not an abstraction nor fixpoint} \quad
     }{
       E[] \vdash_\$ t \reltri \lamT{x}{T}{(t\:x)}
-    } \\
+    } \breakrule
   \text{etaex-fix:}~
     \dfrac{
       \begin{aligned}
@@ -504,7 +506,7 @@ Thus match-branches doesn't trigger the eta expansion.)
       \end{aligned}
     }{
         E[\Gamma] \vdash_K t_i \reltri \lamT{x}{U_1}{(t_i\:x)}
-    } \\
+    } \breakrule
   \text{etaex-abs:}~
     \dfrac{
       \begin{aligned}
@@ -554,7 +556,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
       a\:\overline{x}\:t\:\overline{u}
       \reltri
       \letin{y}{t:T}{a\:\overline{x}\:y\:\overline{u}}
-    } \\
+    } \breakrule
   \text{zeta-item:}~
     \dfrac
     {
@@ -601,30 +603,30 @@ the result term can be represented in following syntax.
 \subsubsection{S-Reductions}\label{sec:s-reductions}
 \begin{gather*}
   \text{beta-var:}~
-    E[\Gamma] \vdash (\lam{x}{t})\:y \reltri \subst{t}{x}{y} \\
+    E[\Gamma] \vdash (\lam{x}{t})\:y \reltri \subst{t}{x}{y} \breakrule
   \text{delta-var:}~
-    \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \\
+    \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \breakrule
   \text{delta-fun:}~
-     \dfrac
-     {
-       0 \leq |x| \quad
-       0 < |y| \quad
-       (f := t\:\overline{x}) \in \Gamma \quad
-       \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\overline{f/k:=t}}{f_j})$}
-     }{
-       E[\Gamma] \vdash f\:\overline{y}
-                        \reltri
-                        t\:\overline{x}\:\overline{y}
-     } \\
+    \dfrac
+    {
+      0 \leq |x| \quad
+      0 < |y| \quad
+      (f := t\:\overline{x}) \in \Gamma \quad
+      \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\overline{f/k:=t}}{f_j})$}
+    }{
+      E[\Gamma] \vdash f\:\overline{y}
+                       \reltri
+                       t\:\overline{x}\:\overline{y}
+    } \breakrule
   \text{zeta-flat:}~
     E[\Gamma] \vdash \letin{y}{(\letin{x}{t_1}{t_2})}{t_0}
                        \reltri
-                       \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \\
+                       \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \breakrule
   \text{zeta-app:}~
     E[\Gamma] \vdash
      (\letin{y}{t}{u})\:\overline{x}
      \reltri
-     \letin{y}{t}{(u\:\overline{x})} \\
+     \letin{y}{t}{(u\:\overline{x})} \breakrule
   \text{iota-match-var:}~
     \dfrac
     {
@@ -635,7 +637,7 @@ the result term can be represented in following syntax.
       \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
       (\lam{\overline{x_j}}{t_j})\:\overline{z}
-    } \\
+    } \breakrule
   \text{iota-fix-var:}~
     \dfrac
     {
@@ -650,7 +652,7 @@ the result term can be represented in following syntax.
           (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
           \reltri
           \letinM{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}{\substm{t_j}{f}{f'}} \: \overline{x}
-    } \\
+    } \breakrule
   \text{iota-fix-var':}~
     \dfrac
     {
@@ -665,7 +667,7 @@ the result term can be represented in following syntax.
       (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
       \reltri
       \substm{t_j}{f}{f'} \:\overline{x}
-    } \\
+    } \breakrule
   \text{match-app:}~
     \dfrac
     {
@@ -882,7 +884,7 @@ Argument completion removes partial applications by applying eta expansions.
         t\:\rep{x}
         \reltri_K
         \lam{\rep{z{:}T'}}{t\:\rep{x}\:\rep{z}}
-    } \\[1em]
+    } \breakrule
   \text{argcomp-cnst-cstr:}~
     \dfrac{
       \begin{gathered}
@@ -989,23 +991,23 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \lassum{x^B}{T} \in \Gamma' \quad \text{$x$ is linear}
     }{
       E[\Gamma'] \vdash x ~|~ (\{x\}, B, B)
-    } \\
+    } \breakrule
   \text{borrow-var:}~
     \dfrac
     {
       \lassum{x^B}{T} \in \Gamma' \quad \text{$x$ is not linear}
     }{
       E[\Gamma'] \vdash x ~|~ (\varnothing, B, B)
-    } \\
+    } \breakrule
   \text{borrow-constant:}~
     \dfrac
     {
       \text{$c$ is not a borrow function}
     }{
       E[\Gamma'] \vdash c ~|~ (\varnothing, \varnothing, \varnothing)
-    } \\
+    } \breakrule
   \text{borrow-constructor:}~
-    E[\Gamma'] \vdash C ~|~ (\varnothing, \varnothing, \varnothing) \\
+    E[\Gamma'] \vdash C ~|~ (\varnothing, \varnothing, \varnothing) \breakrule
   \text{borrow-letin:}~
     \dfrac
     {
@@ -1018,7 +1020,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash \letin{x}{t_1:T}{t_2} ~|~ (L_1\cup L_2 - \{x\}, B^\text{used}_1\cup B^\text{used}_2 - \{x\}, B^\text{result}_2 - \{x\})
-    } \\
+    } \breakrule
   \text{borrow-match:}~
     \dfrac{
       \begin{gathered}
@@ -1041,7 +1043,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash \omatch{y}{\overline{C\: \overline{x} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}, B^\text{result})
-    } \\
+    } \breakrule
   \text{borrow-var-app:}~
     \dfrac{
       \begin{gathered}
@@ -1050,7 +1052,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash f\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
-    } \\
+    } \breakrule
   \text{borrow-constant-app:}~
     \dfrac{
       \begin{gathered}
@@ -1059,13 +1061,13 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash c\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
-    } \\
+    } \breakrule
   \text{borrow-constructor-app:}~
     \dfrac{
       \APP(\Gamma', \varnothing, \overline{x}, T, L, B^\text{used}, B^\text{result})
     }{
       E[\Gamma'] \vdash C\: \overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
-    } \\
+    } \breakrule
   \text{borrow-fix-app:}~
     \dfrac{
       \begin{gathered}
@@ -1074,7 +1076,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash (\ofix{\overline{f:=t}}{f_j})\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
-    } \\
+    } \breakrule
   \text{borrow-borrow:}~
     \dfrac{
       \begin{gathered}
@@ -1088,19 +1090,19 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma'] \vdash c\:x ~|~ (\varnothing, B, B)
-    } \\
+    } \breakrule
   \text{borrow-fix-clo:}~
     \dfrac{
       E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ B
     }{
       E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ (\varnothing, B, B)
-    } \\
+    } \breakrule
   \text{borrow-abs-clo:}~
     \dfrac{
       E[\Gamma'] \vdash \lam{x}{t} ~|~ B
     }{
       E[\Gamma'] \vdash \lam{x}{t} ~|~ (\varnothing, B, B)
-    } \\
+    }
 \end{gather*}
 
 \begin{gather*}
@@ -1211,21 +1213,21 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 \begin{gather*}
   E[\Gamma] \vdashb x \qquad
   E[\Gamma] \vdashb c \qquad
-  E[\Gamma] \vdashb C \\
+  E[\Gamma] \vdashb C \breakrule
   \dfrac{
     E[\Gamma] \vdashb t \quad
     E[\Gamma] \vdash x : T \quad
     \text{$T$ is a non-dependent inductive type}
   }{
     E[\Gamma] \vdashb t\:x
-  } \\
+  } \breakrule
   \dfrac{
     E[\Gamma] \vdashb t \quad
     E[\Gamma;\ldef{x}{t}{T}] \vdashb u \quad
     \text{$T$ is a non-dependent inductive type}
   }{
     E[\Gamma] \vdashb \letin{x}{t:T}{u}
-  } \\
+  } \breakrule
   \dfrac{
     \begin{gathered}
       E[\Gamma] \vdash x:T \quad
@@ -1236,32 +1238,31 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
     \end{gathered}
   }{
     E[\Gamma] \vdashb \match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}
-  } \\
+  } \breakrule
   \dfrac{
     E[\Gamma;\lassum{x}{T}] \vdashb t \quad
     \text{$T$ is a non-dependent inductive type}
   }{
     E[\Gamma] \vdashb \lamT{x}{T}{t}
-  } \\
+  } \breakrule
   \dfrac{
     E[\Gamma] \vdashf \fix{f_i:T_i}{t_i}{i=1\ldots h}{f_j}
   }{
     E[\Gamma] \vdashb \fix{f_i:T_i}{t_i}{i=1\ldots h}{f_j}
-  } \\
-  \\
+  } \breakrule
   \dfrac{
     E[\Gamma] \vdash t : T \quad
     \text{$T$ is a non-dependent inductive type} \quad
     E[\Gamma] \vdashb t
   }{
     E[\Gamma] \vdashf t
-  } \\
+  } \breakrule
   \dfrac{
     E[\Gamma;\lassum{x}{T}] \vdashf t \quad
     \text{$T$ is a non-dependent inductive type}
   }{
     E[\Gamma] \vdashf \lamT{x}{T}{t}
-  } \\
+  } \breakrule
   \dfrac{
     E[\Gamma;\lassum{f_1}{T_1};\ldots;\lassum{f_h}{T_h}] \vdashf t_i
   }{
