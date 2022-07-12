@@ -919,10 +919,16 @@ Also, constants and constructors are always fully applied to arguments.
 
 \subsection{Monomorphism Check}\label{sec:check-monomorphism}
 
-We check the transformed term is monomorphic term.
+We check the transformed term is a monomorphic term.
 
-All type annotations are inductive or function types without free variables.
-Types and sorts doesn't occur at expression.
+Although our transformations removes many rank-1 polymorphism,
+it still possible to retain polymorphic term.
+For example, our transformations don't remove polymorphic recursion unless
+the recursion is completely unrolled.
+
+This step checks
+(1) all type annotations are inductive or function types without free variables, and
+(2) types and sorts doesn't occur at expression.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
