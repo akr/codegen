@@ -876,26 +876,25 @@ Argument completion removes partial applications by applying eta expansions.
       \begin{gathered}
         \text{$t$ is not an application} \\
         0 < |x| \\
-        E[\Gamma] \vdash t : \forall \rep{(y{:}T)}\:\rep{(z{:}T')}, U \\
-        |x| = |y| \\
+        E[\Gamma] \vdash t\:\rep{x} : \forall \rep{(y{:}T)}, U \\
         \text{$U$ is an inductive type}
       \end{gathered}
-    }{E[\Gamma] \vdash
+    }{E[\Gamma] \vdash_K
         t\:\rep{x}
-        \reltri_K
-        \lam{\rep{z{:}T'}}{t\:\rep{x}\:\rep{z}}
+        \reltri
+        \lam{\rep{y{:}T}}{t\:\rep{x}\:\rep{y}}
     } \breakrule
   \text{argcomp-cnst-cstr:}~
     \dfrac{
       \begin{gathered}
         \text{$t$ is a constant or constructor} \\
-        E[\Gamma] \vdash t : \forall \rep{z{:}T}, U \\
+        E[\Gamma] \vdash t : \forall \rep{y{:}T}, U \\
         \text{$U$ is an inductive type}
       \end{gathered}
-    }{E[\Gamma] \vdash
+    }{E[\Gamma] \vdash_K
         t
-        \reltri_K
-        \lam{\rep{z{:}T}}{t\:\rep{z}}
+        \reltri
+        \lam{\rep{y{:}T}}{t\:\rep{y}}
     }
 \end{gather*}
 
