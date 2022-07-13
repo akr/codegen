@@ -156,6 +156,10 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \DeclareMathOperator{\merg}{merge}
 
+\newcommand{\tbigcap}{{\textstyle\bigcap}}
+\newcommand{\tbigcup}{{\textstyle\bigcup}}
+\newcommand{\tbigvee}{{\textstyle\bigvee}}
+\newcommand{\tbigwedge}{{\textstyle\bigwedge}}
 \newcommand{\breakrule}{\\[0.5em]}
 
 \newcommand{\BRA}[1]{\llbracket #1 \rrbracket}
@@ -804,7 +808,7 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
 \end{gather*}
 
 $K$ is a non-application context to restrict $t\:\rep{a}\:\rep{z}$ is not at a function position of an application.
-($K = (\lam{x}{[]})$, $(\letin{x}{[]}{u})$, $(\letin{x}{t}{[]})$, or \ldots but NOT $([]\:u)$.)
+($K = \$, (\lam{x}{[]})$, $(t\:[])$, $(\letin{x}{[]}{u})$, $(\letin{x}{t}{[]})$, or \ldots but NOT $([]\:u)$.)
 
 $\merg_t(\rep{x}, \rep{u})$ represents a sequence of terms which two sequences of terms are merged according to the static arguments definition of $t$.
 The first argument $\rep{x}$ specifies dynamic arguments.
@@ -947,23 +951,28 @@ This step checks
 
 \subsection{Borrow Check}\label{sec:borrow-check}
 
-We define two judgements $E[\Gamma'] \vdash t:T~|~B$ and $E[\Gamma'] \vdash t:T~|~(L, B^\text{used}, B^\text{result})$ for borrow check.
-$\Gamma'$ is an annotated local context.
+We define two judgements $E[\Gamma] \vdash t:T~|~B$ and $E[\Gamma] \vdash t:T~|~(L, B^\text{used}, B^\text{result})$ for borrow check.
+We extend $\Gamma$ in this section.
+$\Gamma$ is an annotated local context.
 It is a list of $\lassum{x^B}{T}$ and $\ldef{x^B}{t}{T}$.
-The variable $x$ is annotated with a borrow information $B$.
+They are same as local assumption and local definitions except that
+the variable $x$ is annotated with a borrow information $B$.
 $B$ is a set of pair of borrow type and linear variable, such as $\{\overline{(T,x)}\}$.
 $B^\text{used}$ and $B^\text{result}$ are also borrow information.
 $L$ is a set of linear variables.
 $T$ is the type of $t$.
 
+We write $\Bop_\Gamma x$ to refer the borrow information for $x$ in $\Gamma$.
+$\Bop_\Gamma x = B$ if $\Gamma$ contains $\lassum{x^B}{T}$ or $\ldef{x^B}{t}{T}$.
+
 We omit $:T$ in a rule which does not use $T$.
 
 The borrow information $B=\{\overline{(T,x)}\}$ represents a linear variable $x_i$ is used via borrow type $T_i$.
-$\lassum{x^{\{(T',y)\}}}{T}\in \Gamma'$ represents $x$ may contain a value of type $T'$ which is a (part of) content of the linear variable $y$.
+$\lassum{x^{\{(T',y)\}}}{T}\in \Gamma$ represents $x$ may contain a value of type $T'$ which is a (part of) content of the linear variable $y$.
 
-$E[\Gamma'] \vdash t~|~B$ means a function $t$ may use linear variables via borrow $B$.
+$E[\Gamma] \vdash t~|~B$ means a function $t$ may use linear variables via borrow $B$.
 
-$E[\Gamma'] \vdash t~|~(L, B^\text{used}, B^\text{result})$ means an expression $t$
+$E[\Gamma] \vdash t~|~(L, B^\text{used}, B^\text{result})$ means an expression $t$
 (1) consumes linear variables $L$,
 (2) may use linear values via borrow $B^\text{used}$,
 (3) result value may contain linear values via borrow $B^\text{result}$.
@@ -980,6 +989,7 @@ In a code fragment \\
 It is represented as
 $\texttt{y}^{\{(\texttt{bseq nat},\texttt{x})\}}:\text{\texttt{bseq nat}}$ and
 $\texttt{t}^{\{(\texttt{bseq nat},\texttt{x})\}}:\text{\texttt{bseq nat}}$.
+\texttt{h} is annotated as $\texttt{h}^\varnothing$ which means \texttt{h} does not contain borrowed values.
 The type of \texttt{h} is \texttt{nat}.
 Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} is consumed.
 
@@ -987,120 +997,117 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-lvar:}~
     \dfrac
     {
-      \lassum{x^B}{T} \in \Gamma' \quad \text{$x$ is linear}
+      \lassum{x^B}{T} \in \Gamma \quad \text{$x$ is linear}
     }{
-      E[\Gamma'] \vdash x ~|~ (\{x\}, B, B)
+      E[\Gamma] \vdash x ~|~ (\{x\}, B, B)
     } \breakrule
   \text{borrow-var:}~
     \dfrac
     {
-      \lassum{x^B}{T} \in \Gamma' \quad \text{$x$ is not linear}
+      \lassum{x^B}{T} \in \Gamma \quad \text{$x$ is not linear}
     }{
-      E[\Gamma'] \vdash x ~|~ (\varnothing, B, B)
+      E[\Gamma] \vdash x ~|~ (\varnothing, B, B)
     } \breakrule
   \text{borrow-constant:}~
     \dfrac
     {
       \text{$c$ is not a borrow function}
     }{
-      E[\Gamma'] \vdash c ~|~ (\varnothing, \varnothing, \varnothing)
+      E[\Gamma] \vdash c ~|~ (\varnothing, \varnothing, \varnothing)
     } \breakrule
   \text{borrow-constructor:}~
-    E[\Gamma'] \vdash C ~|~ (\varnothing, \varnothing, \varnothing) \breakrule
+    E[\Gamma] \vdash C ~|~ (\varnothing, \varnothing, \varnothing) \breakrule
   \text{borrow-letin:}~
     \dfrac
     {
       \begin{gathered}
-        E[\Gamma'] \vdash t_1 ~|~ (L_1, B^\text{used}_1, B^\text{result}_1) \\
-        E[\Gamma';\ldef{x^{B^\text{result}_1}}{t_1}{T}] \vdash t_2 ~|~ (L_2, B^\text{used}_2, B^\text{result}_2) \\
+        E[\Gamma] \vdash t_1 ~|~ (L_1, B^\text{used}_1, B^\text{result}_1) \\
+        E[\Gamma;\ldef{x^{B^\text{result}_1}}{t_1}{T}] \vdash t_2 ~|~ (L_2, B^\text{used}_2, B^\text{result}_2) \\
         L_1 \cap L_2 = \varnothing \\
         \text{$x$ is linear} \rightarrow x \in L_2 \\
         L_1 \cap B^\text{used}_2 = \varnothing
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \letin{x}{t_1:T}{t_2} ~|~ (L_1\cup L_2 - \{x\}, B^\text{used}_1\cup B^\text{used}_2 - \{x\}, B^\text{result}_2 - \{x\})
+      E[\Gamma] \vdash \letin{x}{t_1:T}{t_2} ~|~ (L_1\cup L_2 - \{x\}, B^\text{used}_1\cup B^\text{used}_2 - \{x\}, B^\text{result}_2 - \{x\})
     } \breakrule
   \text{borrow-match:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma'] \vdash y ~|~(L_\text{item}, B^\text{used}_\text{item}, B^\text{result}_\text{item}) \\
+        E[\Gamma] \vdash y ~|~(L_\text{item}, B^\text{used}_\text{item}, B^\text{result}_\text{item}) \\
         B_{ij} = B^\text{result}_\text{item} ~\text{filtered with the type of $x_{ij}$} \\
-        \overline{\Gamma' = \overline{\lassum{x^{B}}{T}}} \\
-        \overline{\underline{E}[\underline{\Gamma'} ; \Gamma'] \vdash t ~|~(L, B^\text{used}, B^\text{result})} \\
+        \rep{\Gamma' = \rep{\lassum{x^{B}}{T}}} \\
+        \rep{\underline{E}[\underline{\Gamma} ; \Gamma'] \vdash t ~|~(L, B^\text{used}, B^\text{result})} \\
         % M stands for member (of constructor).
         % F stands for free variable.
-        \overline{L^\text{M} = L \cap \{\overline{x}\}} \quad
-        \overline{L^\text{F} = L - \{\overline{x}\}} \\
-        \overline{L^\text{M} = \{ z ~|~ z \in \{\overline{x}\} ~\wedge~ \text{$z$ is linear} \}} \\
-        \bigwedge_i L^\text{F}_1 = L^\text{F}_i \quad
+        \rep{L \cap \{\rep{x}\} = \{ z ~|~ z \in \{\rep{x}\} ~\wedge~ \text{$z$ is linear} \}} \\
+        \rep{L^\text{F} = L - \{\rep{x}\}} \quad
+        \tbigwedge_i L^\text{F}_1 = L^\text{F}_i \quad
         L_\text{item} \cap L^{F}_1 = \varnothing \\
-        \overline{{B'}^\text{used} = B^\text{used} - \{\overline{x}\}} \quad
-        \overline{{B'}^\text{result} = B^\text{result} - \{\overline{x}\}} \\
-        B^\text{used} = \bigcup_i {B'}^\text{used}_i \quad
-        B^\text{result} = \bigcup_i {B'}^\text{result}_i \quad
-        L_\text{item} \cap B^\text{used} = \varnothing \\
+        B^\text{used}_\text{branches} = \tbigcup_i ({B^\text{used}_i - \{\rep{x_i}\}}) \quad
+        B^\text{result}_\text{branches} = \tbigcup_i (B^\text{result}_i - \{\rep{x_i}\}) \quad
+        L_\text{item} \cap B^\text{used}_\text{branches} = \varnothing \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \omatch{y}{\overline{C\: \overline{x} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}, B^\text{result})
+      E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
     } \breakrule
   \text{borrow-var-app:}~
     \dfrac{
       \begin{gathered}
-        \lassum{f^{B}}{T'} \in \Gamma' \quad
-        \APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result})
+        \lassum{f^{B}}{T'} \in \Gamma \quad
+        \APP(\Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash f\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma] \vdash f\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
   \text{borrow-constant-app:}~
     \dfrac{
       \begin{gathered}
         \text{$c$ is not a borrow function} \quad
-        \APP(\Gamma', \varnothing, \overline{x}, T, L, B^\text{used}, B^\text{result})
+        \APP(\Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash c\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma] \vdash c\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
   \text{borrow-constructor-app:}~
     \dfrac{
-      \APP(\Gamma', \varnothing, \overline{x}, T, L, B^\text{used}, B^\text{result})
+      \APP(\Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
     }{
-      E[\Gamma'] \vdash C\: \overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma] \vdash C\: \rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
   \text{borrow-fix-app:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ B \quad
-        \APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result})
+        E[\Gamma] \vdash \ofix{\rep{f:=t}}{f_j} ~|~ B \quad
+        \APP(\Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
-      E[\Gamma'] \vdash (\ofix{\overline{f:=t}}{f_j})\:\overline{x} : T ~|~ (L, B^\text{used}, B^\text{result})
+      E[\Gamma] \vdash (\ofix{\rep{f:=t}}{f_j})\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
   \text{borrow-borrow:}~
     \dfrac{
       \begin{gathered}
         \text{$c$ is a borrow function} \\
-        E[\Gamma'] \vdash c : T^\text{arg} \rightarrow T^\text{result} \quad
+        E[\Gamma] \vdash c : T^\text{arg} \rightarrow T^\text{result} \quad
         \text{$T^\text{arg}$ is a linear type} \quad
         \text{$T^\text{result}$ is a borrow type} \\
         \text{$T^\text{result}$ does not contain function} \\
-        \text{$\{\overline{T}\}$ is a set of borrow types contained in $T^\text{result}$} \\
-        B = \{\overline{(T,\underline{x})}\}
+        \text{$\{\rep{T}\}$ is a set of borrow types contained in $T^\text{result}$} \\
+        B = \{\rep{(T,\underline{x})}\}
       \end{gathered}
     }{
-      E[\Gamma'] \vdash c\:x ~|~ (\varnothing, B, B)
+      E[\Gamma] \vdash c\:x ~|~ (\varnothing, B, B)
     } \breakrule
   \text{borrow-fix-clo:}~
     \dfrac{
-      E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ B
+      E[\Gamma] \vdash \ofix{\rep{f:=t}}{f_j} ~|~ B
     }{
-      E[\Gamma'] \vdash \ofix{\overline{f:=t}}{f_j} ~|~ (\varnothing, B, B)
+      E[\Gamma] \vdash \ofix{\rep{f:=t}}{f_j} ~|~ (\varnothing, B, B)
     } \breakrule
   \text{borrow-abs-clo:}~
     \dfrac{
-      E[\Gamma'] \vdash \lam{x}{t} ~|~ B
+      E[\Gamma] \vdash \lam{x}{t} ~|~ B
     }{
-      E[\Gamma'] \vdash \lam{x}{t} ~|~ (\varnothing, B, B)
+      E[\Gamma] \vdash \lam{x}{t} ~|~ (\varnothing, B, B)
     }
 \end{gather*}
 
@@ -1110,43 +1117,41 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \begin{gathered}
         \text{$t$ is not an abstraction} \\
         \text{$t$ is not a fixpoint} \\
-        E[\Gamma';\overline{\lassum{x^\varnothing}{T}}] \vdash t : T ~|~ (L,B^\text{used},B^\text{result}) \\
-        \{ z | z \in \{\overline{x}\} \wedge \text{$z$ is linear} \} = L \\
-        B' = (B^\text{used} - \{\overline{x}\}) ~\text{filtered with the type of $T$} \\
+        E[\Gamma;\rep{\lassum{x^\varnothing}{T}}] \vdash t ~|~ (L,B^\text{used},B^\text{result}) \\
+        \{ z | z \in \{\rep{x}\} \wedge \text{$z$ is linear} \} = L \\
+        B' = (B^\text{used} - \{\rep{x}\}) \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \lam{\overline{x{:}T}}{t} ~|~ B'
-    } \\
+      E[\Gamma] \vdash \lam{\rep{x{:}T}}{t} ~|~ B'
+    } \breakrule
   \text{borrow-abs-fix:}~
     \dfrac{
       \begin{gathered}
         \text{$t$ is a fixpoint} \\
-        E[\Gamma';\overline{\lassum{x^\varnothing}{T}}] \vdash t ~|~ B \\
-        \forall z \in \{\overline{x}\}~ \text{$z$ is not linear} \\
+        E[\Gamma;\rep{\lassum{x^\varnothing}{T}}] \vdash t ~|~ B \\
+        \forall z \in \{\rep{x}\}~ \text{$z$ is not linear} \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \lam{\overline{x{:}T}}{t} ~|~ B
-    } \\
+      E[\Gamma] \vdash \lam{\rep{x{:}T}}{t} ~|~ B
+    } \breakrule
   \text{borrow-fix-fun:}~
     \dfrac{
       \begin{gathered}
-        E[\Gamma';\overline{\lassum{f^\varnothing}{T}}] \vdash t_i ~|~ B_i \\
-        B = \bigcup_i B_i
+        \rep{\underline{E[\Gamma;\rep{\lassum{f^\varnothing}{T}}]} \vdash t ~|~ B} \\
       \end{gathered}
     }{
-      E[\Gamma'] \vdash \ofix{\overline{f{:}T:=t}}{f_j} ~|~ B
+      E[\Gamma] \vdash \ofix{\rep{f{:}T:=t}}{f_j} ~|~ {\tbigcup_i B_i}
     }
 \end{gather*}
 
 \begin{align*}
-  &\APP(\Gamma', B, \overline{x}, T, L, B^\text{used}, B^\text{result}) \\
-  &= 1 \leq n \\
-  &~\wedge \forall 1 \leq i \leq n, \forall 1 \leq j \leq n, (i \neq j \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear})) \\
-  &~\wedge L = \{ x_i | 1 \leq i \leq n \wedge \text{$x_i$ is linear} \} \\
-  &~\wedge B^\text{used} = B \cup \{ B' | 1 \leq i \leq n \wedge \lassum{x_i^{B'}}{T'} \in \Gamma' \} \\
+  &\APP(\Gamma, B^\text{func}, \rep{x}, T, L, B^\text{used}, B^\text{result}) \\
+  &= 1 \leq |x| \\
+  &~\wedge \forall i, \forall j, (i \neq j \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear})) \\
+  &~\wedge L = \{ z | z \in \{\rep{x}\} ~\wedge~ \text{$z$ is linear} \} \\
+  &~\wedge B^\text{used} = B^\text{func} \cup \tbigcup_i (\Bop_\Gamma x_i) \\
   &~\wedge B^\text{result} = B^\text{used} ~\text{filtered with the type $T$} \\
   &~\wedge B^\text{used} \cap L = \varnothing \\
-  &\text{where} \quad n = |x|
 \end{align*}
 
 We mix borrow information and set of variables in set-operations.
@@ -1160,7 +1165,7 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 {\small Note:
 \begin{itemize}
   \item borrow-fix-fun annotates $f_1^\varnothing \ldots f_n^\varnothing$.
-    This is not correct because $f_1\ldots f_n$ may refer borrowed values via free variables in
+    This is not correct because invoking $f_1\ldots f_n$ may refer borrowed values via free variables in
     $\ofix{\overline{f{:}T:=t}}{f_j}$.
     However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
 \end{itemize}}
@@ -1310,23 +1315,23 @@ $R$ distinguishes fixpoint bounded functions translatable without actual functio
     (R, N-\{x\}, T - \{x\})                                           & (t = \lam{x}{u}) \wedge (n > 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{n-1} \\
     (R, (N \cup T) - \{x\}, \varnothing)                             & (t = \lam{x}{u}) \wedge (n = 0) \quad \text{where}\quad  (R, N, T) = \RNT{u}{\NA_u} \quad \text{(closure)} \\
     \begin{aligned}[t]
-      \bigl( & \textstyle\bigcup_{i=1}^h R_i \cup \{f_1,\dotsc, f_h\}, \\
-             & \textstyle\bigcup_{i=1}^h N_i - \{f_1,\dotsc, f_h\}, \\
-             & \textstyle\bigcup_{i=1}^h T_i - \{f_1,\dotsc, f_h\} \bigr)
+      \bigl( & \tbigcup_{i=1}^h R_i \cup \{f_1,\dotsc, f_h\}, \\
+             & \tbigcup_{i=1}^h N_i - \{f_1,\dotsc, f_h\}, \\
+             & \tbigcup_{i=1}^h T_i - \{f_1,\dotsc, f_h\} \bigr)
     \end{aligned} &
       \begin{aligned}[t]
         & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \\
-        & {} \wedge (n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr) \\
+        & {} \wedge (n = \NA_t) \wedge \bigl(\tbigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned} \\
     \begin{aligned}[t]
-      \bigl( & \textstyle\bigcup_{i=1}^h R_i, \\
-             & \textstyle\bigcup_{i=1}^h (N_i \cup T_i) - \{f_1,\dotsc, f_h\}, \\
+      \bigl( & \tbigcup_{i=1}^h R_i, \\
+             & \tbigcup_{i=1}^h (N_i \cup T_i) - \{f_1,\dotsc, f_h\}, \\
              & \varnothing \bigr)
     \end{aligned} &
       \begin{aligned}[t]
         & (t = \fix{f_i}{t_i}{i=1\ldots h}{f_j}) \quad \text{(real function, maybe closure)} \\
-        & {} \wedge \neg \bigl((n = \NA_t) \wedge \bigl(\textstyle\bigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr)\bigr) \\
+        & {} \wedge \neg \bigl((n = \NA_t) \wedge \bigl(\tbigcup_{i=1}^h N_i \cap \{f_1,\dotsc, f_h\} = \varnothing\bigr)\bigr) \\
         & \text{where}\quad (R_i, N_i, T_i) = \RNT{t_i}{\NA_{t_i}}
       \end{aligned}
   \end{cases}
