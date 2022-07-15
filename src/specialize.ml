@@ -1904,174 +1904,96 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       mkApp (reduce_eta env sigma f, args)
 
 (*
-  - complete_args_fun transforms "term" to begin with p lambdas.
-    (fix can be mixed in the lambdas.)
-  - "term" is evaluated with p arguments.
-  - p = numargs_of_exp env sigma term
-  - complete_args_fun is used for top-level functions and closure creations.
+  complete_args_fun transforms "term" which does not contain partial applications.
 *)
-let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) : EConstr.t =
+let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_complete_arguments then
-    msg_debug_hov (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term +++ Pp.str "(p=" ++ Pp.int p ++ Pp.str ")"));
-  let result = complete_args_fun1 env sigma term p in
+    msg_debug_hov (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term));
+  let result = complete_args_fun1 env sigma term in
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "complete_args_fun" env sigma term result;
   result
-and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (p : int) : EConstr.t =
-  if p = 0 then
-    complete_args_exp env sigma term [||] 0
-  else
-    match EConstr.kind sigma term with
-    | Lambda (x,t,e) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
-        mkLambda (x, t, complete_args_fun env2 sigma e (p-1))
-    | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-        let env2 = push_rec_types prec env in
-        let fary2 = Array.map2
-          (fun t f ->
-            let p' = numargs_of_type env sigma t in
-            complete_args_fun env2 sigma f p')
-          tary fary
-        in
-        mkFix ((ks, j), (nary, tary, fary2))
-    | _ ->
-        (* reduction/expansion: eta-expansion *)
-        let t = Retyping.get_type_of env sigma term in
-        let t = Reductionops.nf_all env sigma t in
-        let (fargs, result_type) = decompose_prod sigma t in
-        let term' = Vars.lift p term in
-        let vs = array_rev (iota_ary 1 p) in
-        let env2 = EConstr.push_rel_context (List.map (fun (x, t) -> Context.Rel.Declaration.LocalAssum (x,t)) fargs) env in
-        let term'' = complete_args_exp env2 sigma term' vs 0 in
-        compose_lam fargs term''
+and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,e) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      mkLambda (x, t, complete_args_fun env2 sigma e)
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary2 = Array.map (complete_args_fun env2 sigma) fary in
+      mkFix ((ks, j), (nary, tary, fary2))
+  | _ ->
+      complete_args_exp env sigma term
 
 (*
-  - complete_args_exp transforms closure creation expressions in "term vs" to
+  - complete_args_exp transforms closure creation expressions in "term" to
     lambda-expressions with all arguments. (fix-term is permitted.)
-  - "term" is evaluated with argument variables denoted by vs and q unknown values.
-  - p = |vs|
-  - r = number of arguments of "term" minus p + q
-    (term : x1 -> ... -> xp -> y1 -> ... -> yq -> z1 -> ... -> zr -> inductive-type)
-  - Note that v (with empty vs) is not closure creation but
-    c and C (with empty vs) is closure creation.
-    Because local variable (v) is already bound to a closure but
-    constant (c) and constructor (C) has no corresponding closure.
+  - closure creation are
+    - partial application, and
+    - constant and constructor of function type which is not positioned
+      at a function position of application.
+  - We don't consider a variable as closure creation.
+    (because the closure is already creaated and bounded to the variable.)
 *)
-and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
+and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_exp arg:" +++
-    Printer.pr_econstr_env env sigma term +++ Pp.str "[" ++ pp_sjoinmap_ary (fun i -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) ++ Pp.str "(" ++ Pp.int i ++ Pp.str ")") vs ++ Pp.str "]" +++ Pp.str "(p=" ++ Pp.int (Array.length vs) ++ Pp.str " q=" ++ Pp.int q ++ Pp.str ")"));
-  let term' = mkApp (term, Array.map (fun j -> mkRel j) vs) in
-  let result = complete_args_exp1 env sigma term vs q in
+    Printer.pr_econstr_env env sigma term));
+  let result = complete_args_exp1 env sigma term in
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result));
-  check_convertible "complete_args_exp" env sigma term' result;
+  check_convertible "complete_args_exp" env sigma term result;
   result
-and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int array) (q : int) : EConstr.t =
-  let p = Array.length vs in
-  let fargs = lazy (
+and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  let eta term =
+    let fargs =
       let ty = Retyping.get_type_of env sigma term in
       let ty = Reductionops.nf_all env sigma ty in
-      fst (decompose_prod sigma ty))
+      fst (decompose_prod sigma ty)
       (* fargs is a list from innermost formal argument to outermost formal argument *)
-  in
-  let r = lazy (List.length (Lazy.force fargs) - p - q) in
-  let mkClosure () =
-    let lazy fargs = fargs in
-    let lazy r = r in
-    let fargs' = CList.firstn (q+r) fargs in (* innermost q+r formal arguments *)
-    let term' = Vars.lift (q+r) term in
-    let args =
-      Array.append
-        (Array.map (fun j -> mkRel (j+q+r)) vs)
-        (Array.map (fun j -> mkRel j) (array_rev (iota_ary 1 (q+r))))
     in
-    (* reduction/expansion: eta-expansion *)
-    compose_lam fargs' (mkApp (term', args))
-  in
-  let mkOriginalApp () =
-    mkApp (term, Array.map (fun j -> mkRel j) vs)
-  in
-  let mkAppOrClosure () =
-    let lazy r = r in
-    if r = 0 then
-      mkOriginalApp ()
+    if CList.is_empty fargs then
+      term
     else
-      mkClosure ()
+      let r = List.length fargs in
+      let term' = Vars.lift r term in
+      let args = (Array.map (fun j -> mkRel j) (array_rev (iota_ary 1 r))) in
+      (* reduction/expansion: eta-expansion *)
+      compose_lam fargs (mkApp (term', args))
   in
   match EConstr.kind sigma term with
   | App (f,args) ->
-      let vs' = Array.map (fun a -> destRel sigma a) args in
-      complete_args_exp env sigma f (Array.append vs' vs) q
-  | Cast (e,ck,t) -> complete_args_exp env sigma e vs q
-  | Rel i ->
-      if p = 0 && q = 0 then
-        term
-      else
-        mkAppOrClosure ()
-  | Const _ -> mkAppOrClosure ()
-  | Construct _ -> mkAppOrClosure ()
-  | Lambda (x,t,e) ->
-      (* p = 0, q = 0, r = 0 is not possible because Lambda is a function *)
-      let lazy r = r in
-      if p > 0 then
-        (* apply beta-var reduction.
-           p > 0, q = 0, r = 0
-           p > 0, q > 0, r = 0
-           p > 0, q = 0, r > 0
-           p > 0, q > 0, r > 0 *)
-        let term' = Vars.subst1 (mkRel vs.(0)) e in (* reduction/expansion: beta *)
-        let vs' = Array.sub vs 1 (p-1) in
-        complete_args_exp env sigma term' vs' q
-      else (* p = 0 *)
-        (* Conceptually, the lambda (term) generates a closure.
-           It will be invoked immediately (r = 0), or
-           it will actually generate a closure (r > 0).
-           p = 0, q = 0, r > 0
-           p = 0, q > 0, r > 0
-           p = 0, q > 0, r = 0 *)
-        complete_args_fun env sigma term (q+r)
+      (match EConstr.kind sigma f with
+      | Rel _ | Const _ | Construct _ -> eta term
+      | Fix _  -> eta (mkApp (complete_args_fun env sigma f, args))
+      | _ -> user_err (Pp.str "[codegen:complete_args_exp:bug] unexpected function position:" +++ Printer.pr_econstr_env env sigma f))
+  | Cast (e,ck,t) -> complete_args_exp env sigma e
+  | Rel i -> term
+  | Const _ -> eta term
+  | Construct _ -> eta term
+  | Lambda _ ->
+      complete_args_fun env sigma term
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let vs' = Array.map (fun j -> j+1) vs in
       mkLetIn (x,
-        complete_args_exp env sigma e [||] 0,
+        complete_args_exp env sigma e,
         t,
-        complete_args_exp env2 sigma b vs' q)
+        complete_args_exp env2 sigma b)
   | Case (ci,u,pms,mpred,iv,item,bl) ->
-      let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
-      mkApp (
-        mkCase (ci,u,pms,mpred,iv,item,
-          Array.map2
-            (fun (nas,body) (ctx,_) ->
-              let env2 = EConstr.push_rel_context ctx env in
-              (nas, complete_args_exp env2 sigma body [||] (p+q)))
-            bl bl0),
-        Array.map (fun j -> mkRel j) vs)
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let lazy r = r in
-      if r > 0 then
-        complete_args_fun env sigma (mkOriginalApp ()) (p+q+r)
-      else
-        let env2 = push_rec_types prec env in
-        mkApp (
-          mkFix ((ks, j),
-            (nary,
-             tary,
-             Array.map2
-               (fun t f ->
-                 let n = numargs_of_type env sigma t in
-                 complete_args_fun env2 sigma f n)
-               tary fary)),
-          Array.map (fun i -> mkRel i) vs)
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
+      mkCase (ci,u,pms,mpred,iv,item,
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            (nas, complete_args_exp env2 sigma body))
+          bl bl0)
+  | Fix _ ->
+      complete_args_fun env sigma term
   | Proj (proj, e) ->
-      mkApp (
-        mkProj (proj,
-          complete_args_exp env sigma e [||] 0),
-        Array.map (fun j -> mkRel j) vs)
+      mkProj (proj, complete_args_exp env sigma e)
   | Var _ | Meta _ | Evar _
   | Sort _ | Prod _ | Ind _
   | CoFix _
@@ -2081,7 +2003,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (*msg_debug_hov (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
-  let result = complete_args_fun env sigma term (numargs_of_exp env sigma term) in
+  let result = complete_args_fun env sigma term in
   (*msg_debug_hov (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
   result
 
