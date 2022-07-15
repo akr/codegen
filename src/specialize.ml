@@ -2030,34 +2030,22 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   let make_new_var old_name = Context.map_annot (fun old_name -> make_new_name "v" num_vars old_name) old_name in
   let num_fixfuncs = ref 0 in
   let make_new_fixfunc old_name = Context.map_annot (fun old_name -> make_new_name "fixfunc" num_fixfuncs old_name) old_name in
-  let rec r (env : Environ.env) (term : EConstr.t) (vars : Name.t Context.binder_annot list) =
+  let rec r (env : Environ.env) (term : EConstr.t) =
     match EConstr.kind sigma term with
     | Lambda (x,t,e) ->
-        (match vars with
-        | [] ->
-            let x2 = make_new_var x in
-            let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
-            let env2 = EConstr.push_rel decl env in
-            mkLambda (x2, t, r env2 e vars)
-        | var :: rest ->
-            if Name.is_anonymous (Context.binder_name var) then
-              let x2 = make_new_var x in
-              let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
-              let env2 = EConstr.push_rel decl env in
-              mkLambda (x2, t, r env2 e rest)
-            else
-              let decl = Context.Rel.Declaration.LocalAssum (var, t) in
-              let env2 = EConstr.push_rel decl env in
-              mkLambda (var, t, r env2 e rest))
+        let x2 = make_new_var x in
+        let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
+        let env2 = EConstr.push_rel decl env in
+        mkLambda (x2, t, r env2 e)
     | LetIn (x,e,t,b) ->
         let x2 = make_new_var x in
         let decl = Context.Rel.Declaration.LocalDef (x2, e, t) in
         let env2 = EConstr.push_rel decl env in
-        mkLetIn (x2, r env e [], t, r env2 b vars)
+        mkLetIn (x2, r env e, t, r env2 b)
     | Fix ((ks, j), (nary, tary, fary)) ->
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in
         let env2 = push_rec_types (nary2, tary, fary) env in
-        let fary2 = Array.map (fun e -> r env2 e []) fary in
+        let fary2 = Array.map (fun e -> r env2 e) fary in
         let tary2 = Array.map2 (fun t f ->
             let argnames = List.rev (formal_argument_names env2 sigma f) in
             let (args, result_type) = decompose_prod sigma t in
@@ -2069,28 +2057,19 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         in
         mkFix ((ks, j), (nary2, tary2, fary2))
     | App (f,args) ->
-        let vars2 =
-          (List.append
-            (CArray.map_to_list
-              (fun a ->
-                let decl = Environ.lookup_rel (destRel sigma a) env in
-                Context.Rel.Declaration.get_annot decl)
-              args)
-            vars)
-        in
-        mkApp (r env f vars2, args)
-    | Cast (e,ck,t) -> mkCast (r env e vars, ck, t)
+        mkApp (r env f, args)
+    | Cast (e,ck,t) -> mkCast (r env e, ck, t)
     | Rel i -> term
     | Const _ -> term
     | Construct _ -> term
     | Case (ci,u,pms,mpred,iv,item,bl) ->
-        let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
+        let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
         mkCase (ci, u, pms, mpred, iv, item,
           Array.map2
             (fun (nas,body) (ctx,_) ->
               let env2 = EConstr.push_rel_context ctx env in
               let nas' = Array.map make_new_var nas in
-              (nas', r env2 body vars))
+              (nas', r env2 body))
             bl bl0)
     | Proj _ -> term
     | Var _ | Meta _ | Evar _ | Sort _ | Prod (_, _, _) | Ind _
@@ -2098,7 +2077,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       user_err (Pp.str "[codegen:rename_vars] unexpected term:" +++
         Printer.pr_econstr_env env sigma term)
   in
-  r env term []
+  r env term
 
 let prevterm : EConstr.t option ref = ref None
 let specialization_time = ref (Unix.times ())
