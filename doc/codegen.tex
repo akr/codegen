@@ -915,7 +915,7 @@ Also, constants and constructors are always fully applied to arguments.
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
-  \tE =&\ x \\
+  \tE =&\ x ~|~ T \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
@@ -943,8 +943,9 @@ This step checks
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
   \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
       |&\ \tE \\
-  \tE =&\ x ~|~ c ~|~ C & \leftarrow \text{$T$ is removed} \\
-    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+  \tE =&\ x & \leftarrow \text{$T$ is removed} \\
+    |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
   \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
 \end{align*}
@@ -1172,45 +1173,29 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 
 \subsection{C Variable Allocation}\label{sec:cvaralloc}
 
-\begin{align*}
-  x :&\ \mbox{\gallina{} variable} \\
-  v :&\ \mbox{C variable} \\
-  V =&\ \mathit{empty} ~|~ x \mapsto v ~|~ V;V
-\end{align*}
+We rename variables to be unique and approproate for C.
 
-\begin{itemize}
-  \item $\cv{t}{x_1\ldots x_n}{V}$ is the variable mapping of the variables declared in $t$.
-  \item $x_1\ldots x_n$ are arguments for $t$.
-  \item $V$ is the variable mapping for variables declared outside.
-\end{itemize}
-\[
-  \cv{t}{x_1\ldots x_n}{V} =
-  \begin{cases}
-    empty                                             & (t = x) \vee (t = c) \vee (t = C) \vee (t = T) \\
-    \cv{u}{}{V; M}; M                                & (t = \lam{x}{u}) \wedge (n = 0) \quad \text{where}~M = x\mapsto v \\
-    \cv{u}{x_2\ldots x_n}{V; M}; M                    & (t = \lam{x}{u}) \wedge (n > 0) \quad \text{where}~M = x\mapsto V(x_1) \\
-    \cv{u}{x_0\:x_1\ldots x_n}V                        & t = u\:x_0 \\
-    \cv{t_1}{}{V}; \cv{t_2}{x_1\ldots x_n}{V; M}; M    & t = \letin{x}{t_1}{t_2} \quad \text{where}~M = x\mapsto v \\
-    \begin{aligned}[t]
-      (&\cv{t_1}{x_1\ldots x_n}{V;M_1};\ldots; \\
-       &\cv{t_h}{x_1\ldots x_n}{V;M_h}; \\
-       &M_1;\ldots;M_h)
-    \end{aligned} &                                   \begin{aligned}[t]
-                                                        &t = \match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h} \\
-                                                        &\text{where}~M_i = y_{i1}\mapsto v_{i1}; \ldots; y_{i\NM_{C_i}}\mapsto v_{i\NM_{C_i}}
-                                                      \end{aligned} \\
-    \cv{t_1}{}{V;M}; \ldots; \cv{t_h}{}{V;M}; M &    \begin{aligned}[t]
-                                                        &t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-                                                        &\text{where}~M = f_1\mapsto v_1;\ldots; f_h\mapsto v_h
-                                                      \end{aligned}
-  \end{cases}
-\]
-\[ \text{where} \quad
-  \begin{aligned}[t]
-    & \text{$v, v_i, v_{ij}$ are fresh C variables}
-  \end{aligned}
-\]
-{\small Note: \quad We consider \gallina{} variables unique.}
+Since \gallina{} variables are represented by de Bruijn's indexes,
+we only need to change variable names in binders:
+(1) variable of abstraction,
+(2) functions of fixpoint,
+(3) variable of let-in, and
+(4) variables of constructor members of conditional.
+
+\begin{align*}
+  \tD =&\ \lamT{\fbox{x}}{T}{\tD'} & \leftarrow (1) \\
+      |&\ \ofix{\overline{\fbox{f}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tL =&\ \letinM{\fbox{x}}{\tM:T}{\tM} & \leftarrow (3) \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{\fbox{x}}\Rightarrow \tL}} & \leftarrow (4) \\
+      |&\ \tE \\
+  \tE =&\ x \\
+    |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{\fbox{f}/k{:}T:=\tD}}{f_j} & \leftarrow (1)
+\end{align*}
 
 \section{C Code Generation}\label{sec:c-code-gen}
 \subsection{The \gallina{} Subset For C Code Generation}\label{sec:gallinasubsetforcgen}
