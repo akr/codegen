@@ -1931,7 +1931,7 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   - complete_args_exp transforms closure creation expressions in "term" to
     lambda-expressions with all arguments. (fix-term is permitted.)
   - closure creation are
-    - partial application, and
+    - partial application, or
     - constant and constructor of function type which is not positioned
       at a function position of application.
   - We don't consider a variable as closure creation.
@@ -1959,7 +1959,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     else
       let r = List.length fargs in
       let term' = Vars.lift r term in
-      let args = (Array.map (fun j -> mkRel j) (array_rev (iota_ary 1 r))) in
+      let args = (Array.map mkRel (array_rev (iota_ary 1 r))) in
       (* reduction/expansion: eta-expansion *)
       compose_lam fargs (mkApp (term', args))
   in
