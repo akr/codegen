@@ -598,7 +598,7 @@ the result term can be represented in following syntax.
     |&\ T \\
     |&\ \tE\:x & \leftarrow (1) \\
     |&\ \letin{x}{\tE:T}{\tE} \\
-    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tE}} \leftarrow (2) \\
+    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tE}} & \leftarrow (2) \\
     |&\ \tD \\
 \end{align*}
 
@@ -1183,18 +1183,18 @@ we only need to change variable names in binders:
 (4) variables of constructor members of conditional.
 
 \begin{align*}
-  \tD =&\ \lamT{\fbox{x}}{T}{\tD'} & \leftarrow (1) \\
-      |&\ \ofix{\overline{\fbox{f}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
+  \tD =&\ \lamT{\fbox{$x$}}{T}{\tD'} & \leftarrow (1) \\
+      |&\ \ofix{\overline{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
-  \tL =&\ \letinM{\fbox{x}}{\tM:T}{\tM} & \leftarrow (3) \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{\fbox{x}}\Rightarrow \tL}} & \leftarrow (4) \\
+  \tL =&\ \letinM{\fbox{$x$}}{\tM:T}{\tM} & \leftarrow (3) \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{\fbox{$x$}}\Rightarrow \tL}} & \leftarrow (4) \\
       |&\ \tE \\
   \tE =&\ x \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{\fbox{f}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
 \end{align*}
 
 \section{C Code Generation}\label{sec:c-code-gen}
