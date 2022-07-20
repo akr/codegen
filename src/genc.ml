@@ -164,10 +164,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b in
       let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
       let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
-      let nontailset = IntSet.union
-        (IntSet.union tailset_e nontailset_e)
-        nontailset_b
-      in
+      let nontailset = intset_union3 tailset_e nontailset_e nontailset_b in
       let inlinable = disjoint_id_map_union inlinable_e inlinable_b in
       (inlinable, nontailset, tailset_b)
   | Case (ci,u,pms,p,iv,item,bl) ->

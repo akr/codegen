@@ -496,6 +496,9 @@ let intset_union_ary (sets : IntSet.t array) : IntSet.t =
   done;
   !result
 
+let intset_union3 (set1 : IntSet.t) (set2 : IntSet.t) (set3 : IntSet.t) : IntSet.t =
+  IntSet.union (IntSet.union set1 set2) set3
+
 let (++) = Pp.app
 
 let (+++) d1 d2 =
