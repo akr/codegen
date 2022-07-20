@@ -92,25 +92,22 @@ let disjoint_id_map_union (m1 : 'a Id.Map.t) (m2 : 'a Id.Map.t) =
     m1 m2
 
 (*
-  detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term]_numargs in doc/codegen.tex.
+  detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term] in doc/codegen.tex.
   R is a map from fix-bounded IDs to bool.
   R[n] = true if n is fix-bounded function which is inlinable (only used for goto so do not need to be a real function).
   R[n] = false if n is fix-bounded function not inlinable.
   R can also be usable to determine an ID is fix-bounded function or not.
 *)
-let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) :
+let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
     (* fixterms inlinable or not *) bool Id.Map.t *
     (* variables at non-tail position *) IntSet.t *
     (* variables at tail position *) IntSet.t =
   (*msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] start:" +++
-    Printer.pr_econstr_env env sigma term +++
-    Pp.str "numargs=" ++ Pp.int numargs);*)
-  let result = detect_inlinable_fixterm_rec1 env sigma term numargs in
+    Printer.pr_econstr_env env sigma term);*)
+  let result = detect_inlinable_fixterm_rec1 env sigma term in
   (*let (argmap, nontailset, tailset, argset) = result in
   msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] end:" +++
     Printer.pr_econstr_env env sigma term +++
-    Pp.str "numargs=" ++ Pp.int numargs
-    +++
     Pp.str "tailset={" ++
     pp_joinmap_list (Pp.str ",")
       (fun i ->
@@ -132,11 +129,19 @@ let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) 
     Pp.str "}");
     *)
   result
-and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) :
+and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
     (* fixterms inlinable or not *) bool Id.Map.t *
     (* variables at non-tail position *) IntSet.t *
     (* variables at tail position *) IntSet.t =
+  let (term, args) = decompose_appvect sigma term in
+  let numargs = Array.length args in
+  (if 0 < numargs then
+    match EConstr.kind sigma term with
+    | Rel _ | Const _ | Construct _ | Fix _ -> ()
+    | _ -> user_err (Pp.str "[codegen] unexpected term in function position:" +++ Printer.pr_econstr_env env sigma term));
+  let args_set = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) IntSet.empty args in
   match EConstr.kind sigma term with
+  | App _ -> user_err (Pp.str "[codegen] App unexpected here")
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
   | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
   | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
@@ -146,20 +151,17 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
   | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
   | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
   | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Rel i -> (Id.Map.empty, IntSet.empty, IntSet.singleton i)
-  | Int _ | Float _ | Const _ | Construct _ -> (Id.Map.empty, IntSet.empty, IntSet.empty)
+  | Int _ | Float _ -> (Id.Map.empty, IntSet.empty, IntSet.empty)
+  | Rel i -> (Id.Map.empty, args_set, IntSet.singleton i)
+  | Const _ | Construct _ -> (Id.Map.empty, args_set, IntSet.empty)
   | Proj (proj, e) ->
       (* e must be a Rel which type is inductive (non-function) type *)
       (Id.Map.empty, IntSet.empty, IntSet.empty)
-  | App (f, args) ->
-      let (inlinable_f, nontailset_f, tailset_f) = detect_inlinable_fixterm_rec env sigma f (Array.length args + numargs) in
-      let nontailset = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) nontailset_f args in
-      (inlinable_f, nontailset, tailset_f)
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
-      let (inlinable_e, nontailset_e, tailset_e) = detect_inlinable_fixterm_rec env sigma e 0 in
-      let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b numargs in
+      let (inlinable_e, nontailset_e, tailset_e) = detect_inlinable_fixterm_rec env sigma e in
+      let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b in
       let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
       let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
       let nontailset = IntSet.union
@@ -175,7 +177,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
         (fun (nas,body) (ctx,_) ->
           let env2 = EConstr.push_rel_context ctx env in
           let n = Array.length nas in
-          let (inlinable_br, nontailset_br, tailset_br) = detect_inlinable_fixterm_rec env2 sigma body numargs in
+          let (inlinable_br, nontailset_br, tailset_br) = detect_inlinable_fixterm_rec env2 sigma body in
           let tailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) tailset_br) in
           let nontailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) nontailset_br) in
           (inlinable_br, nontailset_br, tailset_br))
@@ -206,24 +208,20 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let env2 = EConstr.push_rel decl env in
       if numargs = 0 then
         (* closure creation *)
-        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b (numargs_of_exp env sigma b) in
+        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b in
         let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
         let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
         let nontailset = IntSet.union tailset_b nontailset_b in
         (inlinable_b, nontailset, IntSet.empty)
       else
-        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b (numargs-1) in
+        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec env2 sigma b in
         let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
         let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
         (inlinable_b, nontailset_b, tailset_b)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
-      let fixfuncs_result = Array.map2
-        (fun t f -> detect_inlinable_fixterm_rec env2 sigma f
-          (numargs_of_type env sigma t))
-        tary fary
-      in
+      let fixfuncs_result = Array.map (detect_inlinable_fixterm_rec env2 sigma) fary in
       let tailset_fs =
         Array.fold_left
           (fun set (inlinable_f, nontailset_f, tailset_f) ->
@@ -258,7 +256,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
             inlinable_fs
             nary
         in
-        (inlinable_fs', nontailset, IntSet.empty)
+        (inlinable_fs', IntSet.union nontailset args_set, IntSet.empty)
       else
         let inlinable_fs' =
           Array.fold_left
@@ -266,13 +264,13 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
             inlinable_fs
             nary
         in
-        (inlinable_fs', nontailset_fs', tailset_fs')
+        (inlinable_fs', IntSet.union nontailset_fs' args_set, tailset_fs')
 
 (*
   detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
 *)
-let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (numargs : int) : bool Id.Map.t =
-  let (inlinable, nontailset, tailset) = detect_inlinable_fixterm_rec env sigma term numargs in
+let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
+  let (inlinable, nontailset, tailset) = detect_inlinable_fixterm_rec env sigma term in
   inlinable
 
 (*
@@ -656,8 +654,7 @@ let fixfunc_initialize_outer_variables
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : fixterm_t list * fixfunc_table =
-  let numargs = numargs_of_exp env sigma term in
-  let inlinable_fixterms = detect_inlinable_fixterm env sigma term numargs in
+  let inlinable_fixterms = detect_inlinable_fixterm env sigma term in
   let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
   fixfunc_initialize_top_calls env sigma name term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
