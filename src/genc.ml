@@ -91,6 +91,12 @@ let disjoint_id_map_union (m1 : 'a Id.Map.t) (m2 : 'a Id.Map.t) =
     (fun id b1 b2 -> user_err (Pp.str "[codegen:bug] unexpected duplicated variable name:" +++ Id.print id))
     m1 m2
 
+let disjoint_id_map_union_ary (ms : 'a Id.Map.t array) : 'a Id.Map.t =
+  Array.fold_left
+    (fun m0 m1 ->
+      disjoint_id_map_union m0 m1)
+    Id.Map.empty ms
+
 (*
   detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term] in doc/codegen.tex.
   R is a map from fix-bounded IDs to bool.
@@ -180,25 +186,9 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
           (inlinable_br, nontailset_br, tailset_br))
         bl bl0
       in
-      let tailset =
-        Array.fold_left
-          (fun set (inlinable_br, nontailset_br, tailset_br) ->
-            IntSet.union set tailset_br)
-          IntSet.empty
-          branches_result
-      in
-      let nontailset =
-        Array.fold_left
-          (fun set (inlinable_br, nontailset_br, tailset_br) ->
-            IntSet.union set nontailset_br)
-          IntSet.empty branches_result
-      in
-      let inlinable =
-        Array.fold_left
-          (fun m (inlinable_br, nontailset_br, tailset_br) ->
-            disjoint_id_map_union m inlinable_br)
-          Id.Map.empty branches_result
-      in
+      let tailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> tailset_br) branches_result) in
+      let nontailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> nontailset_br) branches_result) in
+      let inlinable = disjoint_id_map_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> inlinable_br) branches_result) in
       (inlinable, nontailset, tailset)
   | Lambda (x,t,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
@@ -219,24 +209,9 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
       let fixfuncs_result = Array.map (detect_inlinable_fixterm_rec env2 sigma) fary in
-      let tailset_fs =
-        Array.fold_left
-          (fun set (inlinable_f, nontailset_f, tailset_f) ->
-            IntSet.union set tailset_f)
-          IntSet.empty fixfuncs_result
-      in
-      let nontailset_fs =
-        Array.fold_left
-          (fun set (inlinable_f, nontailset_f, tailset_f) ->
-            IntSet.union set nontailset_f)
-          IntSet.empty fixfuncs_result
-      in
-      let inlinable_fs =
-        Array.fold_left
-          (fun m (inlineable_f, nontailset_f, tailset_f) ->
-            disjoint_id_map_union m inlineable_f)
-          Id.Map.empty fixfuncs_result
-      in
+      let tailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> tailset_f) fixfuncs_result) in
+      let nontailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> nontailset_f) fixfuncs_result) in
+      let inlinable_fs = disjoint_id_map_union_ary (Array.map (fun (inlineable_f, nontailset_f, tailset_f) -> inlineable_f) fixfuncs_result) in
       let inlinable_fixterm = not (IntSet.exists ((>=) h) nontailset_fs) in
       let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
       let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
@@ -245,7 +220,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
         (* At least one fix-bounded function is used at
           non-tail position or argument position.
           Assuming fix-bounded functions are strongly-connected,
-          there is no tail position in this fix term. *)
+          there is no tail position in this fix-term. *)
         let nontailset = IntSet.union tailset_fs' nontailset_fs' in
         let inlinable_fs' =
           Array.fold_left
