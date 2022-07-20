@@ -367,7 +367,9 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item $u, a, b$ represents a term as $t$. \\ $y, z,$ and $f$ represent a variable as $x$. \\ $U$ represents a type as $T$.
+  \item $u, a, b$ represents a term as $t$. \\
+    $v, w, y, z,$ and $f$ represent a variable as $x$. \\
+    $U, V$ represents a type as $T$.
   \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$ or $t\:\rep{u}$.
   \item We write $\lamT{x_1}{T_1}{(\ldots (\lamT{x_n}{T_n}{u}) \ldots)}$ as $\lamTM{x}{T}{u}$.
   \item We write $\letin{x_1}{t_1{:}T_1}{(\ldots(\letin{x_n}{t_n{:}T_n}{u})\ldots)}$ as $\letinM{x}{t{:}T}{u}$.
@@ -506,7 +508,7 @@ Thus match-branches doesn't trigger the eta expansion.)
       \begin{aligned}
         & E[\Gamma] \vdash t_i : \prodT{x}{U_1}{U_2} \quad
           \text{$t_i$ is not an abstraction nor fixpoint} \\
-        & K = \ofix{\repi{(f{:}T:=t)}{1\leq l < i} (f_i{:}T_i:=[]) \repi{(f{:}T:=t)}{i < l \leq h}}{f_j}
+        & K = \ofix{\repi{(f_l{:}T_l:=t_l)}{1\leq l < i} (f_i{:}T_i:=[]) \repi{(f_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}
       \end{aligned}
     }{
         E[\Gamma] \vdash_K t_i \reltri \lamT{x}{U_1}{(t_i\:x)}
@@ -551,27 +553,27 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
   \text{zeta-arg:}~
     \dfrac
     {
-      E[\Gamma] \vdash t : T \quad
-      \text{$a$ is not an application} \quad
-      \text{$t$ is not a variable} \quad
+      E[\Gamma] \vdash u : U \quad
+      \text{$t$ is not an application} \quad
+      \text{$u$ is not a variable} \quad
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-      a\:\overline{x}\:t\:\overline{u}
+      t\:\overline{x}\:u\:\overline{a}
       \reltri
-      \letin{y}{t:T}{a\:\overline{x}\:y\:\overline{u}}
+      \letin{y}{u:U}{t\:\overline{x}\:y\:\overline{a}}
     } \breakrule
   \text{zeta-item:}~
     \dfrac
     {
-      E[\Gamma] \vdash t : T \quad
-      \text{$t$ is not a variable} \quad
+      E[\Gamma] \vdash u : U \quad
+      \text{$u$ is not a variable} \quad
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-        \omatch{t}{\overline{C\:\overline{x} \Rightarrow u}}
+        \omatch{u}{\overline{C\:\overline{x} \Rightarrow t}}
         \reltri
-        \letin{y}{t:T}{\omatch{y}{\overline{C\:\overline{x} \Rightarrow u}}}
+        \letin{y}{u:U}{\omatch{y}{\overline{C\:\overline{x} \Rightarrow t}}}
     }
 \end{gather*}
 
@@ -634,11 +636,11 @@ the result term can be represented in following syntax.
   \text{iota-match-var:}~
     \dfrac
     {
-      (x:=C_j\:\overline{y}\:\overline{z}:T) \in \Gamma \quad
+      (v:=C_j\:\overline{y}\:\overline{z}:T) \in \Gamma \quad
       |y|=\NP_T
     }{
       E[\Gamma] \vdash
-      \omatch{x}{\overline{C\:\overline{x}\Rightarrow t}}
+      \omatch{v}{\overline{C\:\overline{x}\Rightarrow t}}
       \reltri
       (\lam{\overline{x_j}}{t_j})\:\overline{z}
     } \breakrule
@@ -736,6 +738,24 @@ This transformation makes that types contain no variable bounded by let-ins
 because such variables are redex of delta reduction.
 Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-deletion}) more effective.
 
+\begin{align*}
+  \tD =&\ \lamT{x}{\fbox{$T$}}{\tD'} & \leftarrow \\
+      |&\ \ofix{\overline{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:\fbox{$T$}}{\tM} & \leftarrow \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x ~|~ c ~|~ C ~|~ T \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow
+\end{align*}
+
+We also normalize types in \kwmatch-expressions to make less free variables.
+\gallina{} internal representation of \kwmatch-expressions contains
+parameters for the inductive type, return clause, and SProp inversion data.
+
 \subsection{Static Argument Normalization}\label{sec:static-argument-normalization}
 
 We normalize static arguments.
@@ -761,12 +781,12 @@ It makes the syntax as follows.
 \end{align*}
 
 The application in previous section, $\tF\:\rep{x}$, is changed to $\tC\:\rep{\tA}$ for constant and constructor applications.
-(Thus, this is not V-normal form.)
+(This is not V-normal form because $\tA$ can be non-variable.)
 
 Static arguments are defined as follows by default.
 \begin{itemize}
   \item non-monomorphic arguments for constant functions.
-    (The non-monomorphic argument means an argument which type is a sort or a polymorphic function type,  )
+    (The non-monomorphic argument means an argument which type is a sort or a polymorphic function type.)
   \item parameters for constructors.
 \end{itemize}
 The static arguments can be configured with \lstinline!CodeGen Arguments! command.
@@ -1199,65 +1219,21 @@ we only need to change variable names in binders:
 
 \section{C Code Generation}\label{sec:c-code-gen}
 \subsection{The \gallina{} Subset For C Code Generation}\label{sec:gallinasubsetforcgen}
-\begin{gather*}
-  E[\Gamma] \vdashb x \qquad
-  E[\Gamma] \vdashb c \qquad
-  E[\Gamma] \vdashb C \breakrule
-  \dfrac{
-    E[\Gamma] \vdashb t \quad
-    E[\Gamma] \vdash x : T \quad
-    \text{$T$ is a non-dependent inductive type}
-  }{
-    E[\Gamma] \vdashb t\:x
-  } \breakrule
-  \dfrac{
-    E[\Gamma] \vdashb t \quad
-    E[\Gamma;\ldef{x}{t}{T}] \vdashb u \quad
-    \text{$T$ is a non-dependent inductive type}
-  }{
-    E[\Gamma] \vdashb \letin{x}{t:T}{u}
-  } \breakrule
-  \dfrac{
-    \begin{gathered}
-      E[\Gamma] \vdash x:T \quad
-      \text{$T$ is a non-dependent inductive type with $p$ parameters:}~I\:u_1\ldots u_p \\
-      E[] \vdash C_i\:u_1\ldots u_p: T_{i1} \rightarrow \dotsb \rightarrow T_{i\NM_{C_i}} \rightarrow T \quad
-      \text{$T_{ij}$ are non-dependent inductive types} \\
-      E[\Gamma;\lassum{y_{i1}}{T_{i1}};\ldots;\lassum{y_{i\NM_{C_i}}}{T_{i\NM_{C_i}}}] \vdashb t_i
-    \end{gathered}
-  }{
-    E[\Gamma] \vdashb \match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}
-  } \breakrule
-  \dfrac{
-    E[\Gamma;\lassum{x}{T}] \vdashb t \quad
-    \text{$T$ is a non-dependent inductive type}
-  }{
-    E[\Gamma] \vdashb \lamT{x}{T}{t}
-  } \breakrule
-  \dfrac{
-    E[\Gamma] \vdashf \fix{f_i:T_i}{t_i}{i=1\ldots h}{f_j}
-  }{
-    E[\Gamma] \vdashb \fix{f_i:T_i}{t_i}{i=1\ldots h}{f_j}
-  } \breakrule
-  \dfrac{
-    E[\Gamma] \vdash t : T \quad
-    \text{$T$ is a non-dependent inductive type} \quad
-    E[\Gamma] \vdashb t
-  }{
-    E[\Gamma] \vdashf t
-  } \breakrule
-  \dfrac{
-    E[\Gamma;\lassum{x}{T}] \vdashf t \quad
-    \text{$T$ is a non-dependent inductive type}
-  }{
-    E[\Gamma] \vdashf \lamT{x}{T}{t}
-  } \breakrule
-  \dfrac{
-    E[\Gamma;\lassum{f_1}{T_1};\ldots;\lassum{f_h}{T_h}] \vdashf t_i
-  }{
-    E[\Gamma] \vdashf \fix{f_i:T_i}{t_i}{i=1\ldots h}{f_j}
-  }
-\end{gather*}
+
+\begin{align*}
+  \tD =&\ \lamT{x}{T}{\tD'} \\
+      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+  \tD' =&\ \tD \\
+       |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tL =&\ \letinM{x}{\tM:T}{\tM} \\
+  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+      |&\ \tE \\
+  \tE =&\ x \\
+    |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
+    |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
+    |&\ \tD \\
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+\end{align*}
 
 \subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
 We detect inlinable fixpoints.
