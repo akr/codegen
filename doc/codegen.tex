@@ -1267,6 +1267,7 @@ $\TRop$ distinguishes fixpoint bounded functions translatable without actual fun
   \RNT{C\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
   \RNT{\letin{x}{t}{u}} &= (\TR{t} \cup \TR{u}, \N{t} \cup \T{t} \cup \N{u} - \{x\}, \T{u} - \{x\}) \\
   \RNT{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TR{t_i}, \tbigcup_i \N{t_i}, \tbigcup_i \T{t_i} \bigr) \\
+  \RNT{\lam{x}{t}} &= (\TR{t}, \N{t} \cup \T{t} - \{x\}, \varnothing) \\
   \RNT{(\ofix{\rep{f:=t}}{f_j})\:\rep{y}} &=
     \begin{cases}
       \begin{aligned}[t]
