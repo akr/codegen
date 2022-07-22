@@ -248,11 +248,14 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \DeclareMathOperator{\Aop}{A}
 \DeclareMathOperator{\Bop}{B}
-\newcommand{\A}[3]{\Aop_{#1}\BRA{#2\,/\,#3}}
-\newcommand{\B}[3]{\Bop_{#1}\BRA{#2\,/\,#3}}
+\newcommand{\A}[2]{\Aop_{#1}\BRA{#2}}
+\newcommand{\B}[2]{\Bop_{#1}\BRA{#2}}
 
 \newcommand{\AbreakEq}[3]{\Aop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & /\, #3 \rrbracket = \end{aligned}}
 \newcommand{\BbreakEq}[3]{\Bop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & /\, #3 \rrbracket = \end{aligned}}
+
+\newcommand{\AbreakEqn}[2]{\Aop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & \rrbracket = \end{aligned}}
+\newcommand{\BbreakEqn}[2]{\Bop_{#1}\llbracket \begin{aligned}[t] & #2 \\ & \rrbracket = \end{aligned}}
 
 \DeclareMathOperator{\Fop}{F}
 \newcommand{\F}[1]{\Fop\BRA{#1}}
@@ -1299,42 +1302,38 @@ If a fixpoint needs recursive call in C, we need a real C function for it.
 \subsection{Outer-Variable}\label{sec:outer-variable}
 
 \subsection{Translation to C for a Non-Tail Position}\label{sec:AK}
-$\A{K}{t}{x_1\ldots x_n}$ generates C code for $t\:x_1\ldots x_n$ in a non-tail position.
+$\A{K}{t}$ generates C code for $t$ in a non-tail position.
 The result expression is passed to $K$. \\
 $K(e) = \dq{v = e\ttsemi}$ in simple situations.
 \begin{align*}
-  &\A{K}{x}{} = K(\dq{x}) \\
-  &\A{K}{x}{x_1\ldots x_n} =
-      \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1 \ldots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
-    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge {} \\ & x \in \tr \end{aligned} \\
-  &\A{K}{x}{x_1\ldots x_n} = K(\dq{x\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma  x_n}})
-    && \begin{aligned}[t] & (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \wedge {} \\ & x \not\in \tr \end{aligned} \\
-  &\A{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
-  &\A{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
-  &\A{K}{t\:x_0}{x_1\ldots x_n} = \A{K}{t}{x_0\:x_1\ldots x_n} \\
-  &\A{K}{\letin{x}{t_1}{t_2}}{x_1\ldots x_n} =
-      \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \A{K}{t_2}{x_1\ldots x_n} \rdq \end{aligned}
+  &\A{K}{x} = K(\dq{x}) \\
+  &\A{K}{f\:\rep{x}} =
+      \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
+    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \in \tr \end{aligned} \\
+  &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
+    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \wedge \text{$\rep{y}$ are outer variables of $f$} \end{aligned} \\
+      &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
+  &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
+  &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
     && \text{where}\quad K'(e) = \dq{x\:\tteq\:e\ttsemi} \\
-  &\A{K}{\lam{x}{t}}{x_1\:x_2\ldots x_n} = \A{K}{t}{x_2\ldots x_n}                                  && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
-  &\AbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
+  &\A{K}{\omatch{x}{\rep{C\:\rep{y}\Rightarrow t}}} && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-              & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
-              & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+              & \rep{y_{i}\:\tteq\:\mathit{get\_member}_{\underline{C_i}}(\underline{x})\ttsemi} \\
               & \mathit{linear\_dealloc}_{T}(x)\ttsemi \\
-              & {\A{K}{t_i}{x_1\ldots x_n}} \\
+              & {\A{K}{t_i}} \\
               & \kwbreak\ttsemi
               \end{aligned} \\
             & \cdots \\
             & \ttrbrace\rdq
        \end{alignedat} \\
-  &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                   && f_j \in \tr \\
+  &\A{K}{(\ofix{\rep{f:=t}}{f_j})\:\rep{x}} =                   && f_j \in \tr \\
      & \quad\begin{alignedat}[t]{2}
-       \ldq & \passign(\fvars{t_j}, x_1\ldots x_n) \\
-            & {\genbodyat{K'}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \\
+       \ldq & \passign(\fvars{t_j}, \rep{x}) \\
+            & {\genbodyat{K'}{\ofix{\rep{f:=t}}{f_j}}} \\
             & \mathtt{exit\_}f_j\ttcolon \rdq
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
@@ -1348,13 +1347,17 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                     \end{aligned} & \text{otherwise}
                   \end{cases}
                 \end{alignedat} \\
-  &\A{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =                      && f_j \not\in \tr \\
+  &\A{K}{(\ofix{\rep{f:=t}}{f_j})\:\rep{x}} =                      && f_j \not\in \tr \\
      & \quad\begin{alignedat}[t]{2}
-       \ldq & K(f_j\ttparen{y_1\ttcomma\dotsc\ttcomma y_o\ttcomma x_1\ttcomma\dotsc\ttcomma x_n})                  \\
+       \ldq & K(f_j\ttparen{\rep{y}\ttcomma \rep{x}})                  \\
             & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
-            & {\genbodyan{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}}                          \\
+            & {\genbodyan{\ofix{\rep{f:=t}}{f_j}}}                          \\
             & \mathtt{skip\_}f_j\ttcolon \rdq
-       \end{alignedat}
+       \end{alignedat} &&
+               \begin{alignedat}[t]{1}
+                  & \text{where} \\
+                  & \text{$\rep{y}$ are the outer variables of the fixpoint}
+               \end{alignedat}
 \end{align*}
 {\small Note:
 \begin{itemize}
@@ -1364,53 +1367,48 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
     The latter embeds the value of the expression (with name translation from \gallina{} to C).
   \item \gallina{} types, constants, and constructors have corresponding (user-configurable) C names and they are implicitly translated.
     \gallina{} variables are translated by the mapping defined in \secref{sec:cvaralloc}.
-  \item $\tr = \TR{t}$ where the translating function is defined as \kwDefinition~$c := t$ and $t$ is an $n$-arguments function.
+  \item $\tr = \TR{t}$ where the translating function is defined as \kwDefinition~$c := t$.
   \item $\mathit{swfunc}_T, \mathit{caselabel}_{C_i}$, and $\mathit{get\_member}_{C_i j}$ are defined by a user to translate \kwmatch-expressions for the inductive type $T$.
-  \item $\passign(y_1\ldots y_n, x_1\ldots x_n)$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\ldots x_n$ into $y_1\ldots y_n$.  It may require temporary variables.
-  \item $y_1,\dotsc,y_o$ are the outer variables of the fixpoint.
-  \item We do not define $\A{K}{\lam{x}{t}}{}$ because we do not support closures yet.
-  \item Actual \codegen{} generates $\genbodyan{}$ in a different position to avoid the label $\mathtt{skip\_}f_j$ and $\kwgoto\:\mathtt{skip\_}f_j\ttsemi$.
   \item $\mathit{linear\_dealloc}_{T}(x)$ is the deallocation function for the linear type $T$.  It is empty for unrestricted types.
+  \item $\passign(\rep{y}, \rep{x})$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\ldots x_n$ into $y_1\ldots y_n$.  It may require temporary variables.
+  \item We do not define $\A{K}{\lam{x}{t}}$ because we do not support closures yet.
+  \item Actual \codegen{} generates $\genbodyan{}$ in a different position to avoid the label $\mathtt{skip\_}f_j$ and $\kwgoto\:\mathtt{skip\_}f_j\ttsemi$.
 \end{itemize}}
 
 \subsection{Translation to C for a Tail Position}\label{sec:BK}
-$\B{K}{t}{x_1\ldots x_n}$ generates C code for $t\:x_1\ldots x_n$ in a tail position.
+$\B{K}{t}$ generates C code for $t$ in a tail position.
 The result expression is passed to $K$. \\
 $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 \begin{align*}
-  &\B{K}{x}{} = K(\dq{x}) \\
-  &\B{K}{x}{x_1\ldots x_n} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{x}, x_1\ldots x_n)} \\ & \kwgoto\:\mathtt{entry\_}x\ttsemi \rdq \end{aligned}
-    && (n > 0) \wedge \text{$x$ is bounded by a fixpoint} \\
-  &\B{K}{c}{x_1\ldots x_n} = K(\dq{c\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
-  &\B{K}{C}{x_1\ldots x_n} = K(\dq{C\ttparen{x_1\ttcomma\dotsc\ttcomma x_n}})                                   && n \geq 0 \\
-  &\B{K}{t\:x_0}{x_1\ldots x_n} = \B{K}{t}{x_0\:x_1\ldots x_n} \\
-  &\B{K}{\letin{x}{t_1}{t_2}}{x_1\ldots x_n} =
-      \begin{aligned}[t] \ldq & \A{K'}{t_1}{} \\ & \B{K}{t_2}{x_1\ldots x_n} \rdq \end{aligned}
+  &\B{K}{x} = K(\dq{x}) \\
+  &\B{K}{f\:\rep{x}} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
+    && (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \\
+  &\B{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
+  &\B{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
+  &\B{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \B{K}{t_2} \rdq
     && \text{where}\quad K'(e) = \dq{x\:\tteq\:e\ttsemi} \\
-  &\B{K}{\lam{x}{t}}{x_1\:x_2\ldots x_n} = \B{K}{t}{x_2\ldots x_n}                                 && \text{($x$ and $x_1$ are mapped to the same C variable)} \\
-  &\BbreakEq{K}{\match{x}{C_i}{\lambda y_{i1}\ldots\lamB{y_{i\NM_{C_i}}}t_i}{i=1\ldots h}}{x_1\ldots x_n} && \text{where}\quad x : T \\
+  &\B{K}{\omatch{x}{\rep{C\:\rep{y}\Rightarrow t}}} = && \text{where}\quad x : T \\
      & \quad\begin{alignedat}{2}
        \ldq & \kwswitch\:\ttparen{\mathit{swfunc}_T\ttparen{x}}\:\ttlbrace \\
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-                & y_{i1}\:\tteq\:\mathit{get\_member}_{C_i1}(x)\ttsemi \:\ldots\ttsemi \\
-                & y_{i\NM_{C_i}}\:\tteq\:\mathit{get\_member}_{C_i\NM_{C_i}}(x)\ttsemi \\
+                & \rep{y_{i}\:\tteq\:\mathit{get\_member}_{\underline{C_i}}(\underline{x})\ttsemi} \\
                 & \mathit{linear\_dealloc}_{T}(x)\ttsemi \\
-                & {\B{K}{t_i}{x_1\ldots x_n}}
+                & {\B{K}{t_i}}
               \end{aligned} \\
             & \cdots \\
             & \ttrbrace\rdq
      \end{alignedat} \\
-  &\B{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}{x_1\ldots x_n} =       \\
+  &\B{K}{(\ofix{\rep{f:=t}}{f_j})\:\rep{x}} =       \\
      & \quad\begin{alignedat}{2}
-       \ldq & {\passign(\fvars{t_j}, x_1\ldots x_n)} \\
-            & {\genbodyb{K}{\fix{f_i}{t_i}{i=1\ldots h}{f_j}}} \rdq
+       \ldq & {\passign(\fvars{t_j}, \rep{x})} \\
+            & {\genbodyb{K}{\ofix{\rep{f:=t}}{f_j}}} \rdq
        \end{alignedat}
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item We do not define $\B{K}{\lam{x}{t}}{}$ because a tail position cannot be a function after the argument completion.
+  \item We do not define $\B{K}{\lam{x}{t}}$ because a tail position cannot be a function after the argument completion.
 \end{itemize}}
 
 \subsection{Auxiliary Functions for Translation to C}\label{sec:aux-function}
@@ -1431,7 +1429,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
     \genbodyat{K}{u}                            & t = \lam{x}{u} \\
     \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyat{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
     \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, h \\
-    \A{K}{t}{}                            & \text{otherwise}
+    \A{K}{t}                            & \text{otherwise}
   \end{cases}
 \]
 \[
@@ -1440,7 +1438,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
     \genbodyan{u}                            & t = \lam{x}{u} \\
     \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyan{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
     \quad \text{for}~i=1,\dotsc, h \\
-    \B{K}{t}{}                            & \begin{aligned}[t]
+    \B{K}{t}                            & \begin{aligned}[t]
                                             & \text{otherwise} \\
                                             & \text{where} \\
                                             & \quad t:T \\
@@ -1454,7 +1452,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
     \genbodyb{K}{u}                            & t = \lam{x}{u} \\
     \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyb{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
     \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, h \\
-    \B{K}{t}{}                            & \text{otherwise}
+    \B{K}{t}                            & \text{otherwise}
   \end{cases}
 \]
 {\small Note:
