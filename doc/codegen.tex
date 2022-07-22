@@ -368,8 +368,8 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
     |&\ \lamT{x}{T}{t}        & \text{abstraction} \\
     |&\ t\:u                  & \text{application} \\
     |&\ \letin{x}{t:T}{u}     & \text{let-in} \\
-    |&\ \omatch{t}{\overline{C\:\overline{x}\Rightarrow u}} & \text{conditional} \\
-    |&\ \ofix{\overline{f/k{:}T:=t}}{f_j} & \text{fixpoint}
+    |&\ \omatch{t}{\rep{C\:\rep{x{:}T}\Rightarrow u}} & \text{conditional} \\
+    |&\ \ofix{\rep{f/k{:}T:=t}}{f_j} & \text{fixpoint}
 \end{align*}
 {\small Note:
 \begin{itemize}
@@ -382,7 +382,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
   \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) in the syntax.
-  \item We omitted the dummy parameters (underscores between $C$ and $\overline{x}$) in conditionals.
+  \item We omitted the dummy parameters (underscores between $C$ and $\rep{x}$) in conditionals.
   \item We consider inductive types and constructor types has no let-in in binders.
   \item We omitted the detail of the types.  Actual \gallina{} permits any \gallina{} term which evaluates to a type.
 \end{itemize}}
@@ -410,20 +410,20 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \text{iota-match:}~
     \dfrac
     {
-      E[\Gamma] \vdash C_j\:\overline{a}\:\overline{b} : T \quad
+      E[\Gamma] \vdash C_j\:\rep{a}\:\rep{b} : T \quad
       \text{$|a| = \NP_T$}
     }{
       E[\Gamma] \vdash
-      \omatch{(C_j\:\overline{a}\:\overline{b})}{\overline{C\:\overline{x}\Rightarrow t}}
+      \omatch{(C_j\:\rep{a}\:\rep{b})}{\rep{C\:\rep{x}\Rightarrow t}}
       \reltri
-      (\lam{\overline{x_j}}{t_j})\:\overline{b}
+      (\lam{\rep{x_j}}{t_j})\:\rep{b}
     } \\
   \text{iota-fix:}~
     \dfrac{
-      u_{k_j} = C\:\overline{a} \quad
+      u_{k_j} = C\:\rep{a} \quad
       |u| = k_j
     }{
-      E[\Gamma] \vdash\; (\ofix{\overline{f/k:=t}}{f_j})\:\overline{u} \reltri\; \substm{t_j}{f}{\ofix{\underline{(\overline{f/k:=t})}}{f}} \: \overline{u}
+      E[\Gamma] \vdash\; (\ofix{\rep{f/k:=t}}{f_j})\:\rep{u} \reltri\; \substm{t_j}{f}{\ofix{\underline{(\rep{f/k:=t})}}{f}} \: \rep{u}
     } \\
   \text{eta expansion:}~
     \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t\:x)}}
@@ -537,7 +537,7 @@ The entire term is represented as $\tD'$.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE =&\ x \\
@@ -546,7 +546,7 @@ The entire term is represented as $\tD'$.
     |&\ T \\
     |&\ \tE\:\tE \\
     |&\ \letin{x}{\tE:T}{\tE} \\
-    |&\ \omatch{\tE}{\overline{C\:\overline{x}\Rightarrow \tE}} \\
+    |&\ \omatch{\tE}{\rep{C\:\rep{x}\Rightarrow \tE}} \\
     |&\ \tD \\
 \end{align*}
 
@@ -565,9 +565,9 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-      t\:\overline{x}\:u\:\overline{a}
+      t\:\rep{x}\:u\:\rep{a}
       \reltri
-      \letin{y}{u:U}{t\:\overline{x}\:y\:\overline{a}}
+      \letin{y}{u:U}{t\:\rep{x}\:y\:\rep{a}}
     } \breakrule
   \text{zeta-item:}~
     \dfrac
@@ -577,9 +577,9 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
-        \omatch{u}{\overline{C\:\overline{x} \Rightarrow t}}
+        \omatch{u}{\rep{C\:\rep{x} \Rightarrow t}}
         \reltri
-        \letin{y}{u:U}{\omatch{y}{\overline{C\:\overline{x} \Rightarrow t}}}
+        \letin{y}{u:U}{\omatch{y}{\rep{C\:\rep{x} \Rightarrow t}}}
     }
 \end{gather*}
 
@@ -587,9 +587,9 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
 V-normal form restricts \gallina{} terms that (1) application arguments and (2) match items to variables.
 \begin{align*}
   t =&\ x~|~c~|~C~|~T~|~\lamT{x}{T}{t}~|~ \letin{x}{t:T}{u} \\
-    |&\ \ofix{\overline{f/k{:}T:=t}}{f_j} \\
+    |&\ \ofix{\rep{f/k{:}T:=t}}{f_j} \\
     |&\ t\:x                               & \leftarrow (1) \\
-    |&\ \omatch{x}{\overline{C\:\overline{x} \Rightarrow t}} & \leftarrow (2)
+    |&\ \omatch{x}{\rep{C\:\rep{x} \Rightarrow t}} & \leftarrow (2)
 \end{align*}
 
 Since we apply V-reductions for a eta-expanded term,
@@ -597,7 +597,7 @@ the result term can be represented in following syntax.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE =&\ x \\
@@ -606,7 +606,7 @@ the result term can be represented in following syntax.
     |&\ T \\
     |&\ \tE\:x & \leftarrow (1) \\
     |&\ \letin{x}{\tE:T}{\tE} \\
-    |&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tE}} & \leftarrow (2) \\
+    |&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tE}} & \leftarrow (2) \\
     |&\ \tD \\
 \end{align*}
 
@@ -623,12 +623,12 @@ the result term can be represented in following syntax.
     {
       0 \leq |x| \quad
       0 < |y| \quad
-      (f := t\:\overline{x}) \in \Gamma \quad
-      \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\overline{f/k:=t}}{f_j})$}
+      (f := t\:\rep{x}) \in \Gamma \quad
+      \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\rep{f/k:=t}}{f_j})$}
     }{
-      E[\Gamma] \vdash f\:\overline{y}
+      E[\Gamma] \vdash f\:\rep{y}
                        \reltri
-                       t\:\overline{x}\:\overline{y}
+                       t\:\rep{x}\:\rep{y}
     } \breakrule
   \text{zeta-flat:}~
     E[\Gamma] \vdash \letin{y}{(\letin{x}{t_1}{t_2})}{t_0}
@@ -636,49 +636,49 @@ the result term can be represented in following syntax.
                        \letin{x}{t_1}{(\letin{y}{t_2}{t_0})} \breakrule
   \text{zeta-app:}~
     E[\Gamma] \vdash
-     (\letin{y}{t}{u})\:\overline{x}
+     (\letin{y}{t}{u})\:\rep{x}
      \reltri
-     \letin{y}{t}{(u\:\overline{x})} \breakrule
+     \letin{y}{t}{(u\:\rep{x})} \breakrule
   \text{iota-match-var:}~
     \dfrac
     {
-      (v:=C_j\:\overline{y}\:\overline{z}:T) \in \Gamma \quad
+      (v:=C_j\:\rep{y}\:\rep{z}:T) \in \Gamma \quad
       |y|=\NP_T
     }{
       E[\Gamma] \vdash
-      \omatch{v}{\overline{C\:\overline{x}\Rightarrow t}}
+      \omatch{v}{\rep{C\:\rep{x}\Rightarrow t}}
       \reltri
-      (\lam{\overline{x_j}}{t_j})\:\overline{z}
+      (\lam{\rep{x_j}}{t_j})\:\rep{z}
     } \breakrule
   \text{iota-fix-var:}~
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C\:\overline{y}) \in \Gamma \quad
-        \text{$\overline{f'}$ are fresh variables} \\
-        E[\Gamma] \vdash (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x} : T \quad
+        (x_{k_j} := C\:\rep{y}) \in \Gamma \quad
+        \text{$\rep{f'}$ are fresh variables} \\
+        E[\Gamma] \vdash (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
         E[\Gamma] \vdash\;
-          (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
+          (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x}
           \reltri
-          \letinM{f'}{\ofix{\underline{(\overline{f/k:=t})}}{f}}{\substm{t_j}{f}{f'}} \: \overline{x}
+          \letinM{f'}{\ofix{\underline{(\rep{f/k:=t})}}{f}}{\substm{t_j}{f}{f'}} \: \rep{x}
     } \breakrule
   \text{iota-fix-var':}~
     \dfrac
     {
       \begin{gathered}
-        (x_{k_j} := C\:\overline{y}) \in \Gamma \quad
-        \overline{(f' := \ofix{\underline{(\overline{f/k:=t})}}{f}) \in \underline{\Gamma}} \\
-        E[\Gamma] \vdash (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x} : T \quad
+        (x_{k_j} := C\:\rep{y}) \in \Gamma \quad
+        \rep{(f' := \ofix{\underline{(\rep{f/k:=t})}}{f}) \in \underline{\Gamma}} \\
+        E[\Gamma] \vdash (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
     }{
       E[\Gamma] \vdash
-      (\ofix{\overline{f/k:=t}}{f_j})\:\overline{x}
+      (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x}
       \reltri
-      \substm{t_j}{f}{f'} \:\overline{x}
+      \substm{t_j}{f}{f'} \:\rep{x}
     } \breakrule
   \text{match-app:}~
     \dfrac
@@ -689,16 +689,16 @@ the result term can be represented in following syntax.
         E[\Gamma] \vdash\; &
           \kwmatch\:x\:
           \kwas\:x'\:
-          \kwin\:I\:\overline{y}\:
-          \kwreturn\:{T \rightarrow P\:\overline{y}\:x'}
-          \kwwith\:(\overline{{C\: \overline{x}} \Rightarrow {t}})\:
+          \kwin\:I\:\rep{y}\:
+          \kwreturn\:{T \rightarrow P\:\rep{y}\:x'}
+          \kwwith\:(\rep{{C\: \rep{x}} \Rightarrow {t}})\:
           \kwend\:z \\
         \reltri\; &
           \kwmatch\:x\:
           \kwas\:x'\:
-          \kwin\:I\:\overline{y}\:
-          \kwreturn\:{P\:\overline{y}\:x'}
-          \kwwith\:(\overline{{C\: \overline{x}} \Rightarrow {t\:\underline{z}}})\:
+          \kwin\:I\:\rep{y}\:
+          \kwreturn\:{P\:\rep{y}\:x'}
+          \kwwith\:(\rep{{C\: \rep{x}} \Rightarrow {t\:\underline{z}}})\:
           \kwend
       \end{aligned}
     }
@@ -724,16 +724,16 @@ Also, zeta-flat removes a let-in at the binder term of a let-in.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ c ~|~ C ~|~ T \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Type Normalization}\label{sec:type-normalization}
@@ -746,16 +746,16 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
 
 \begin{align*}
   \tD =&\ \lamT{x}{\fbox{$T$}}{\tD'} & \leftarrow \\
-      |&\ \ofix{\overline{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
+      |&\ \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:\fbox{$T$}}{\tM} & \leftarrow \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ c ~|~ C ~|~ T \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow
 \end{align*}
 
 We also normalize types in \kwmatch-expressions to make less free variables.
@@ -771,17 +771,17 @@ It makes the syntax as follows.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ c ~|~ C ~|~ T \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tC\:\rep{\tA} & \text{$0 < |\tA|$} \\
     |&\ \tD \\
-  \tF =&\ x ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+  \tF =&\ x ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tC =&\ c ~|~ C \\
   \tA =&\ x ~|~ u & \text{$u$ is a static argument (normal \gallina{} term without free variables)}
 \end{align*}
@@ -846,16 +846,16 @@ Thus the result will be V-normal form again.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ c ~|~ C ~|~ T \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$} \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Eta Reduction to Expose Fixpoint}\label{sec:eta-reduction}
@@ -863,17 +863,17 @@ Thus the result will be V-normal form again.
 \begin{gather*}
   \text{etared-fix:}~
     \dfrac{
-      E[\Gamma] \vdash t : \forall \overline{x{:}T}.\: U \quad
-      \text{$\overline{x}$ does not occur in $t$} \quad
+      E[\Gamma] \vdash t : \forall \rep{x{:}T}.\: U \quad
+      \text{$\rep{x}$ does not occur in $t$} \quad
       \text{$t$ is a fixpoint}
-    }{E[\Gamma] \vdash \lam{\overline{x{:}T}}{t\: \overline{x}}
+    }{E[\Gamma] \vdash \lam{\rep{x{:}T}}{t\: \rep{x}}
                        \reltri
                        t
     }
 \end{gather*}
 {\small Note:
 \begin{itemize}
-  \item We require the types of arguments of $t$ as $\overline{T}$ to prevent this transfomation changes the type.
+  \item We require the types of arguments of $t$ as $\rep{T}$ to prevent this transfomation changes the type.
   \item The premise ``$t$ is a fixpoint'' guarantees the result is not partial application.
 \end{itemize}}
 
@@ -935,17 +935,17 @@ Also, constants and constructors are always fully applied to arguments.
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x ~|~ T \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Monomorphism Check}\label{sec:check-monomorphism}
@@ -963,17 +963,17 @@ This step checks
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x & \leftarrow \text{$T$ is removed} \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Borrow Check}\label{sec:borrow-check}
@@ -984,7 +984,7 @@ $\Gamma$ is an annotated local context.
 It is a list of $\lassum{x^B}{T}$ and $\ldef{x^B}{t}{T}$.
 They are same as local assumption and local definitions except that
 the variable $x$ is annotated with a borrow information $B$.
-$B$ is a set of pair of borrow type and linear variable, such as $\{\overline{(T,x)}\}$.
+$B$ is a set of pair of borrow type and linear variable, such as $\{\rep{(T,x)}\}$.
 $B^\text{used}$ and $B^\text{result}$ are also borrow information.
 $L$ is a set of linear variables.
 $T$ is the type of $t$.
@@ -994,7 +994,7 @@ $\Bop_\Gamma x = B$ if $\Gamma$ contains $\lassum{x^B}{T}$ or $\ldef{x^B}{t}{T}$
 
 We omit $:T$ in a rule which does not use $T$.
 
-The borrow information $B=\{\overline{(T,x)}\}$ represents a linear variable $x_i$ is used via borrow type $T_i$.
+The borrow information $B=\{\rep{(T,x)}\}$ represents a linear variable $x_i$ is used via borrow type $T_i$.
 $\lassum{x^{\{(T',y)\}}}{T}\in \Gamma$ represents $x$ may contain a value of type $T'$ which is a (part of) content of the linear variable $y$.
 
 $E[\Gamma] \vdash t~|~B$ means a function $t$ may use linear variables via borrow $B$.
@@ -1193,7 +1193,7 @@ Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 \begin{itemize}
   \item borrow-fix-fun annotates $f_1^\varnothing \ldots f_n^\varnothing$.
     This is not correct because invoking $f_1\ldots f_n$ may refer borrowed values via free variables in
-    $\ofix{\overline{f{:}T:=t}}{f_j}$.
+    $\ofix{\rep{f{:}T:=t}}{f_j}$.
     However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
 \end{itemize}}
 
@@ -1210,17 +1210,17 @@ we only need to change variable names in binders:
 
 \begin{align*}
   \tD =&\ \lamT{\fbox{$x$}}{T}{\tD'} & \leftarrow (1) \\
-      |&\ \ofix{\overline{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
+      |&\ \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{\fbox{$x$}}{\tM:T}{\tM} & \leftarrow (3) \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{\fbox{$x$}}\Rightarrow \tL}} & \leftarrow (4) \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{\fbox{$x$}}\Rightarrow \tL}} & \leftarrow (4) \\
       |&\ \tE \\
   \tE =&\ x \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
 \end{align*}
 
 \section{C Code Generation}\label{sec:c-code-gen}
@@ -1228,17 +1228,17 @@ we only need to change variable names in binders:
 
 \begin{align*}
   \tD =&\ \lamT{x}{T}{\tD'} \\
-      |&\ \ofix{\overline{f/k{:}T:=\tD}}{f_j} \\
+      |&\ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tD' =&\ \tD \\
        |&\ \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL =&\ \letinM{x}{\tM:T}{\tM} \\
-  \tM =&\ \omatch{x}{\overline{C\:\overline{x}\Rightarrow \tL}} \\
+  \tM =&\ \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       |&\ \tE \\
   \tE =&\ x \\
     |&\ c ~|~ C & \text{The type of $c$ and $C$ are inductive type} \\
     |&\ \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     |&\ \tD \\
-  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\overline{f/k{:}T:=\tD}}{f_j}
+  \tF =&\ x ~|~ c ~|~ C ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
