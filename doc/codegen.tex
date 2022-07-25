@@ -885,18 +885,22 @@ For example, assume the standard list concatenation function,
 $\textrm{app}: \forall A, \textrm{list}\:A \rightarrow \textrm{list}\:A \rightarrow \textrm{list}\:A$,
 is monomorphized to $\textrm{bool}$.
 
+\newcommand{\ttA}{\texttt{A}}
+\newcommand{\ttT}{\texttt{T}}
+\newcommand{\ttl}{\texttt{l}}
+\newcommand{\ttm}{\texttt{m}}
 \begin{align*}
-  & \textrm{app}\:\textrm{bool} \\
-  \reltri_\textrm{inline}\; & (\lam{A}{(\kwfix \ldots)})\:\textrm{bool} \\
-  \reltri_\textrm{eta-expansion}\; & \lam{l}{\lam{m}{(\lam{A}{(\kwfix \ldots)})\:\textrm{bool}\:l\:m}} \\
-  \reltri_\textrm{V-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\lam{A}{(\kwfix \ldots)})\:T\:l\:m}}} \\
-  \reltri_\textrm{S-normalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} \\
-  \reltri_\textrm{Type-nomalization}\; & \lam{l}{\lam{m}{\letin{T}{\textrm{bool}}{(\kwfix \ldots)\:l\:m}}} & \textrm{(expand $T$ in the \kwfix-term)} \\
-  \reltri_\textrm{unused-letin-deletion}\; & \lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}} \\
+  & \texttt{app}\:\texttt{bool} \\
+  \reltri_\textrm{inline}\; & (\lam{\ttA}{(\kwfix \ldots)})\:\texttt{bool} \\
+  \reltri_\textrm{eta-expansion}\; & \lam{\ttl}{\lam{\ttm}{(\lam{\ttA}{(\kwfix \ldots)})\:\texttt{bool}\:\ttl\:\ttm}} \\
+  \reltri_\textrm{V-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\lam{\ttA}{(\kwfix \ldots)})\:\ttT\:\ttl\:\ttm}}} \\
+  \reltri_\textrm{S-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\kwfix \ldots)\:\ttl\:\ttm}}} \\
+  \reltri_\textrm{Type-nomalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\kwfix \ldots)\:\ttl\:\ttm}}} & \textrm{(expand $\ttT$ in the \kwfix-term)} \\
+  \reltri_\textrm{unused-letin-deletion}\; & \lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}} \\
   \reltri_\textrm{eta-reduction}\; & (\kwfix \ldots) \\
 \end{align*}
 
-The code generator (\secref{sec:c-code-gen}) generates multiple C functions (\secref{sec:genfunm}) from the pre-eta-reduction term, $\lam{l}{\lam{m}{(\kwfix \ldots)\:l\:m}}$.
+The code generator (\secref{sec:c-code-gen}) generates multiple C functions (\secref{sec:genfunm}) from the pre-eta-reduction term, $\lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}}$.
 This eta-reduction avoid this.
 The code generator generates single C function (\secref{sec:genfuns}) from post-eta-reduction term, $(\kwfix \ldots)$.
 
