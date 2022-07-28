@@ -2856,6 +2856,16 @@ let test_prototype (ctx : test_ctxt) : unit =
     |}) {|
     |}
 
+let test_monocheck_failure (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] let-in type must be monomorphic:") ctx
+    ({|
+      Definition f (z : Empty_set) (n : nat) : nat :=
+        let T : Type := match z with end in
+        (fix h (T : Type) (n : nat) := n) T n.
+      CodeGen Function f.
+    |}) {| |}
+
 let boolbox_src = {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
@@ -3859,6 +3869,7 @@ let suite : OUnit2.test =
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
+    "test_monocheck_failure" >:: test_monocheck_failure;
     "test_linear_types" >:: test_linear_types;
     "test_linear_novar" >:: test_linear_novar;
     "test_linear_twovar" >:: test_linear_twovar;

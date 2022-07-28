@@ -623,17 +623,20 @@ let format_deep (pp : Pp.t) : string =
 let pr_deep (pp : Pp.t) : Pp.t =
   Pp.str (format_deep pp)
 
-let rec is_monomorphic_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
-  match EConstr.kind sigma ty with
-  | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
-      is_monomorphic_type env sigma t &&
-      is_monomorphic_type env2 sigma b
-  | Ind _ -> true
-  | App (f,args) when isInd sigma f -> true
-  | Rel _ -> true (* type variable *)
-  | _ -> false
+let is_monomorphic_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
+  let rec aux env ty =
+    match EConstr.kind sigma ty with
+    | Prod (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        aux env t &&
+        aux env2 b
+    | Ind _ -> true
+    | App (f,args) when isInd sigma f ->
+        Array.for_all (aux env) args
+    | _ -> false
+  in
+  aux env ty
 
 let new_env_with_rels (env : Environ.env) : Environ.env =
   let n = Environ.nb_rel env in

@@ -195,13 +195,34 @@ let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty 
       is_type_arg :: determine_type_arguments env sigma b
   | _ -> []
 
+let is_monomorphic_type_for_determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
+  let rec aux env ty =
+    match EConstr.kind sigma ty with
+    | Prod (x,t,b) ->
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        is_monomorphic_type env sigma t &&
+        is_monomorphic_type env2 sigma b
+    | Ind _ -> true
+    | App (f,args) when isInd sigma f -> Array.for_all (aux env) args
+    | Rel _ -> true
+        (* type variable.
+          Since type variables are defined as static in determine_static_arguments,
+          the variable will be instantiated with a monomorphic type. *)
+    | _ -> false
+  in
+  aux env ty
+
 let rec determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
   (* msg_info_hov (Printer.pr_econstr_env env sigma ty); *)
   let ty = Reductionops.whd_all env sigma ty in
   match EConstr.kind sigma ty with
   | Prod (x,t,b) ->
+      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] t=" ++ Printer.pr_econstr_env env sigma t);
       let t = Reductionops.nf_all env sigma t in
-      let is_static_arg = not (is_monomorphic_type env sigma t) in
+      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] normalized_t=" ++ Printer.pr_econstr_env env sigma t);
+      let is_static_arg = not (is_monomorphic_type_for_determine_static_arguments env sigma t) in
+      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] is_static_arg=" ++ Pp.bool is_static_arg);
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env = EConstr.push_rel decl env in
       is_static_arg :: determine_static_arguments env sigma b
@@ -2018,6 +2039,70 @@ let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term :
       formal_argument_names env2 sigma fary.(j)
   | _ -> []
 
+let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
+  let ty = Retyping.get_type_of env sigma term in
+  if not (is_monomorphic_type env sigma (Reductionops.nf_all env sigma ty)) then
+    user_err (Pp.str "[codegen] function must be monomorphic:" +++
+      Printer.pr_econstr_env env sigma term +++
+      Pp.str ":" +++
+      Printer.pr_econstr_env env sigma ty);
+  let rec aux env term =
+    match EConstr.kind sigma term with
+    | Var _ | Meta _ | Evar _ | Cast _
+    | CoFix _ | Int _ | Float _ | Array _ ->
+      user_err (Pp.str "[codegen] unexpected term:" +++
+        Printer.pr_econstr_env env sigma term)
+    | Sort _ | Prod (_, _, _) | Ind _ ->
+      user_err (Pp.str "[codegen] type in expression:" +++
+        Printer.pr_econstr_env env sigma term)
+    | Lambda (x,t,b) ->
+        if not (is_monomorphic_type env sigma t) then
+          user_err (Pp.str "[codegen] lambda argument type must be monomorphic:" +++ Printer.pr_econstr_env env sigma t);
+        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+        let env2 = EConstr.push_rel decl env in
+        aux env2 b
+    | LetIn (x,e,t,b) ->
+        if not (is_monomorphic_type env sigma t) then
+          user_err (Pp.str "[codegen] let-in type must be monomorphic:" +++ Printer.pr_econstr_env env sigma t);
+        aux env e;
+        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+        let env2 = EConstr.push_rel decl env in
+        aux env2 b;
+    | Fix ((ks, j), (nary, tary, fary)) ->
+        Array.iter
+          (fun t ->
+            if not (is_monomorphic_type env sigma t) then
+              user_err (Pp.str "[codegen] fix-function must be monomorphic:" +++ Printer.pr_econstr_env env sigma t))
+          tary;
+        let env2 = push_rec_types (nary, tary, fary) env in
+        Array.iter (fun f -> aux env2 f) fary
+    | App (f,args) -> aux env f
+    | Rel _ -> ()
+    | Const _ -> ()
+    | Construct _ -> ()
+    | Case (ci,u,pms,mpred,iv,item,bl) ->
+        let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
+        (let (nas,body), (ctx,_) = mpred, mpred0 in
+          let env2 = EConstr.push_rel_context ctx env in
+          let body = Reductionops.nf_all env2 sigma body in
+          if not (is_monomorphic_type env2 sigma body) then
+            user_err (Pp.str "[codegen] match-predicate must be monomorphic:" +++ Printer.pr_econstr_env env sigma body));
+        Array.iter2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            (for i = List.length ctx downto 1 do
+              let ty = Context.Rel.Declaration.get_type (lookup_rel i env2) in
+              let env1 = Environ.pop_rel_context i env2 in
+              let ty = Reductionops.nf_all env1 sigma ty in
+              if not (is_monomorphic_type env1 sigma ty) then
+                user_err (Pp.str "[codegen] constructor argument type in match-expression must be monomorphic:" +++ Printer.pr_econstr_env env sigma ty)
+            done);
+            aux env2 body)
+          bl bl0;
+    | Proj _ -> ()
+  in
+  aux env term
+
 let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let make_new_name prefix counter old_name =
     counter := !counter +1;
@@ -2195,6 +2280,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
+  monomorphism_check env sigma term;
   Linear.borrowcheck env sigma term;
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
