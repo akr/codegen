@@ -385,7 +385,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
   \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) in the syntax.
-  \item We omitted the dummy parameters (underscores between $C$ and $\rep{x}$) in conditionals.
+  \item We omitted the dummy parameters (underscores between $C$ and $\rep{x{:}T}$) in conditionals.
   \item We consider inductive types and constructor types has no let-in in binders.
   \item We omitted the detail of the types.  Actual \gallina{} permits any \gallina{} term which evaluates to a type.
 \end{itemize}}
@@ -1571,17 +1571,19 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 Since all transformations except match-app are convertible,
 \codegen{} checks convertibility of such transformations.
 
-Assuming $L = (\match{x}{C_i\: x_{i1}\ldots x_{i\NM_{C_i}}}{t_i}{i=1\ldots h}\: z)$ and \\
-$R = (\match{x}{C_i\: x_{i1}\ldots x_{i\NM_{C_i}}}{t_i\:z}{i=1\ldots h})$,
-match-app transformation is $L \reltri R$.
-The match-app redex, $L$, is a subterm of a whole function.
-The function is $K[L]$ for some context $K$.
-Free variables in $L$ and $R$ are bounded by $K$.
+  %&\B{K}{\omatch{x}{\rep{C\:\rep{y}\Rightarrow t}}} = && \text{where}\quad x : T \\
 
-\codegen{} verifies match-app transformation by proving $L = R$ internally.
+Assuming $t = (\omatch{x}{\rep{C\: \rep{y}\Rightarrow t}}\: z)$,
+$u = (\omatch{x}{\rep{C\: \rep{y} \Rightarrow t\: \underline{z}}})$, and
+some context $K$,
+match-app transformation is $K[t] \reltri K[u]$.
+The match-app redex, $t$, is a subterm of a whole function, $K[t]$.
+Free variables in $t$ and $u$ are bounded by $K$.
+
+\codegen{} verifies match-app transformation by proving $t = u$ internally.
 The proof term is not visible from a user.
 
-\codegen{} does not verify $K[L] = K[R]$ because
+\codegen{} does not verify $K[t] = K[u]$ because
 (1) this verification does not add big guarantee over above because we know same context $K$ is used in LHS and RHS,
 (2) induction is required if $x$ is a decreasing argument of fixpoint in $K$ and it is difficult to automate.
 
