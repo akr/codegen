@@ -297,6 +297,15 @@ keywordstyle=[3]\color{myred}\ttfamily,
 
 \section{Notations}\label{sec:notations}
 
+\subsection{Parenthesis}
+
+We use parenthesis to represent grouping of syntax trees.
+This is not restricted for expressions but for any syntax trees.
+For example, we may use parenthesis as $\lam{(x{:}T)}{t}$ for $\lam{x{:}T}{t}$.
+($x{:}T$ is not an expression.)
+
+We don't include parenthesis in syntax definition in BNF.
+
 \subsection{Repetition}
 
 \begin{itemize}
@@ -319,10 +328,21 @@ keywordstyle=[3]\color{myred}\ttfamily,
                 \:|\: C_n\: x_{n1}\ldots x_{nm_n} \Rightarrow u_n}$.
   \item Nested overline and underline can be combined. \\
     $\rep{\letinB{f'}{\ofix{\underline{(\rep{f:=t})}}{f}}}$ means \\
-    $\letinB{f'_1}{\ofix{\rep{(f:=t)}}{f_1}} ~\ldots~
-     \letinB{f'_h}{\ofix{\rep{(f:=t)}}{f_h}}$ and \\
+    $\letinB{f'_1}{\ofix{\rep{f:=t}}{f_1}} ~\ldots~
+     \letinB{f'_h}{\ofix{\rep{f:=t}}{f_h}}$ and \\
     $\letinB{f'_1}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_1}} ~\ldots~
      \letinB{f'_h}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_h}}$.
+
+    Overlines and underlines must construct a nested structure.
+    If an underline and an overline covers same range,
+    we consider the underline covers the overline.
+    For example,
+    we consider $\rep{a \rep{\underline{b}} c}$ as
+    $\rep{a \underline{(\rep{b})} c} = a_1 \rep{b} c_1 \ldots a_n \rep{b} c_n$.
+    We don't consider it as
+    $\rep{a \rep{(\underline{b})} c} = a_1 \rep{(\underline{b_1})} c_1 \ldots a_n \rep{(\underline{b_n})} c_n$.
+    We cannot define how to repeat $\rep{(\underline{b})}$ because no variable without underline.
+
   \item This notation is taken from \cite{steele2017s}.
 \end{itemize}
 
