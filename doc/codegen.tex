@@ -341,7 +341,7 @@ We don't include parenthesis in syntax definition in BNF.
     $\rep{a \underline{(\rep{b})} c} = a_1 \rep{b} c_1 \ldots a_n \rep{b} c_n$.
     We don't consider it as
     $\rep{a \rep{(\underline{b})} c} = a_1 \rep{(\underline{b_1})} c_1 \ldots a_n \rep{(\underline{b_n})} c_n$.
-    We cannot define how to repeat $\rep{(\underline{b})}$ because no variable without underline.
+    We cannot define how to repeat $\rep{(\underline{b})}$ because it has no variable without underline.
 
   \item This notation is taken from \cite{steele2017s}.
 \end{itemize}
@@ -391,8 +391,8 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
     |&\ \lamT{x}{T}{t}        & \text{abstraction} \\
     |&\ t\:u                  & \text{application} \\
     |&\ \letin{x}{t:T}{u}     & \text{let-in} \\
-    |&\ \omatch{t}{\rep{C\:\rep{x{:}T}\Rightarrow u}} & \text{conditional} \\
-    |&\ \ofix{\rep{f/k{:}T:=t}}{f_j} & \text{fixpoint}
+    |&\ \omatch{t}{\repop{C\:\rep{x{:}T}\Rightarrow u}{|}} & \text{conditional} \\
+    |&\ \ofix{\repop{f/k{:}T:=t}{\kwwith}}{f_j} & \text{fixpoint}
 \end{align*}
 {\small Note:
 \begin{itemize}
@@ -535,22 +535,22 @@ Thus match-branches doesn't trigger the eta expansion.)
   \text{etaex-fix:}~
     \dfrac{
       \begin{aligned}
-        & E[\Gamma] \vdash t_i : \prodT{x}{U_1}{U_2} \quad
+        & E[\Gamma] \vdash t_i : \prodT{x}{T}{U} \quad
           \text{$t_i$ is not an abstraction nor fixpoint} \\
-        & K = \ofix{\repi{(f_l{:}T_l:=t_l)}{1\leq l < i} (f_i{:}T_i:=[]) \repi{(f_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}
+        & K = \ofix{\repi{(f_l:=t_l)}{1\leq l < i} (f_i:=[]) \repi{(f_l:=t_l)}{i < l \leq h}}{f_j}
       \end{aligned}
     }{
-        E[\Gamma] \vdash_K t_i \reltri \lamT{x}{U_1}{(t_i\:x)}
+        E[\Gamma] \vdash_K t_i \reltri \lamT{x}{T}{(t_i\:x)}
     } \breakrule
   \text{etaex-abs:}~
     \dfrac{
       \begin{aligned}
-        & E[\Gamma] \vdash t : \prodT{x}{U_1}{U_2} \quad
+        & E[\Gamma] \vdash t : \prodT{x}{T}{U} \quad
           \text{$t$ is not an abstraction nor fixpoint} \\
-        & K = \lamT{y}{T}{[]}
+        & K = \lam{y}{[]}
       \end{aligned}
     }{
-      E[\Gamma] \vdash_K t \reltri \lamT{x}{U_1}{(t\:x)}
+      E[\Gamma] \vdash_K t \reltri \lamT{x}{T}{(t\:x)}
     }
 \end{gather*}
 
