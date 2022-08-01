@@ -313,7 +313,9 @@ We don't include parenthesis in syntax definition in BNF.
     $\repop{x_i+y_i}{<}^{1\leq i \leq n}$ means $x_1+y_1 < \ldots < x_n+y_n$.
   \item We omit the operator part ($\underbracket[0.4pt][1pt]{<}$) when the operator is just a punctuation to separate each term.
     We write $\repi{x_i+y_i}{1\leq i \leq n}$ for $x_1+y_1, \ldots, x_n+y_n$ if comma is appropriate separator for the context.
-  \item We omit the range part ($1\leq i \leq n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
+  \item We may write the range part, $1\leq i \leq n$, as $i=1\ldots n$.
+  \item We may write the range part as only an index metavariable if the range is clear from the context: $\repi{x_i+y_i}{i}$.
+  \item We may omit the range part ($1\leq i \leq n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
     We write $\repop{x+y}{<}$ for $x_1+y_1 < \ldots < x_n+y_n$ when $x$ and $y$ are $n$-element sequences.
   \item We omit both the operator and range part if appropriate.
     We write $\rep{x+y}$ for $x_1+y_1, \ldots, x_n+y_n$ if $x$ and $y$ are $n$-element sequences and comma is appropriate separator for the context.
@@ -1348,7 +1350,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-              & \rep{y_{i}\:\tteq\:\mathit{get\_member}_{\underline{C_i}}(\underline{x})\ttsemi} \\
+              & \repi{y_{ij}\:\tteq\:\mathit{get\_member}_{C_i j}(x)\ttsemi}{j} \\
               & \mathit{linear\_dealloc}_{T}(x)\ttsemi \\
               & {\A{K}{t_i}} \\
               & \kwbreak\ttsemi
@@ -1419,7 +1421,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
             & \cdots \\
             & \mathit{caselabel}_{C_i}\ttcolon\quad
               \begin{aligned}[t]
-                & \rep{y_{i}\:\tteq\:\mathit{get\_member}_{\underline{C_i}}(\underline{x})\ttsemi} \\
+                & \repi{y_{ij}\:\tteq\:\mathit{get\_member}_{C_i j}(x)\ttsemi}{j} \\
                 & \mathit{linear\_dealloc}_{T}(x)\ttsemi \\
                 & {\B{K}{t_i}}
               \end{aligned} \\
@@ -1511,18 +1513,18 @@ We iterate it until no fixpoint functions.
 \[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c \repi{\ttcomma \mathtt{func\_}f_i}{i=1\ldots n} }\ttsemi} \]
 \[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\repi{\auxstructdef{c}{i}}{i=1\ldots n} } \]
 \[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:\repi{T_{0j}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_0} \:}\ttsemi} \]
-\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repopi{U_{ij}\:\mathtt{outer}j}{\ttsemi}{j=1\ldots o_i}\ttsemi\:\repopi{T_{ij}\:\mathtt{arg}j}{\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
+\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repi{U_{ij}\:\mathtt{outer}j\ttsemi}{j=1\ldots o_i}\:\repi{T_{ij}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\repi{\auxfunction{c}{i}}{i=1\ldots n}} \]
 \begin{alignat*}{2}
   \mainfunction{c} &= \ldq && \kwstatic\:T_{00}\:c\ttparen{\repopi{T_{0j}\:x_{0j}}{\ttcomma}{j=1\ldots m_0}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{x_{0i}}{\ttcomma}{i=1\ldots m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
+  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ \repi{x_{0i}\ttcomma}{i=1\ldots m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
   \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots o_i}\ttcomma\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{y_{ij}}{\ttcomma}{j=1\ldots o_i}\ttcomma\; \repopi{x_{ij}}{\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
+  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repi{y_{ij}\ttcomma}{j=1\ldots o_i}\; \repi{x_{ij}\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
