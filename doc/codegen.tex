@@ -644,10 +644,12 @@ the result term can be represented in following syntax.
   \text{delta-fun:}~
     \dfrac
     {
+      \begin{gathered}
       0 \leq |x| \quad
       0 < |y| \quad
-      (f := t\:\rep{x}) \in \Gamma \quad
-      \text{$t$ is one of $x, c, C, (\lam{x}{u}), (\ofix{\rep{f/k:=t}}{f_j})$}
+      (f := t\:\rep{x}) \in \Gamma \\
+      \text{$t$ is one of variable, constant, constructor, abstraction, or fixpoint}
+      \end{gathered}
     }{
       E[\Gamma] \vdash f\:\rep{y}
                        \reltri
@@ -714,14 +716,14 @@ the result term can be represented in following syntax.
           \kwas\:x'\:
           \kwin\:I\:\rep{y}\:
           \kwreturn\:{T \rightarrow P\:\rep{y}\:x'}
-          \kwwith\:(\rep{{C\: \rep{x}} \Rightarrow {t}})\:
+          \kwwith\:\rep{{C\: \rep{x}} \Rightarrow {t}}\:
           \kwend\:z \\
         \reltri\; &
           \kwmatch\:x\:
           \kwas\:x'\:
           \kwin\:I\:\rep{y}\:
           \kwreturn\:{P\:\rep{y}\:x'}
-          \kwwith\:(\rep{{C\: \rep{x}} \Rightarrow {t\:\underline{z}}})\:
+          \kwwith\:\rep{{C\: \rep{x}} \Rightarrow {t\:\underline{z}}}\:
           \kwend
       \end{aligned}
     }
@@ -806,7 +808,7 @@ It makes the syntax as follows.
     |&\ \tD \\
   \tF =&\ x ~|~ \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tC =&\ c ~|~ C \\
-  \tA =&\ x ~|~ u & \text{$u$ is a static argument (normal \gallina{} term without free variables)}
+  \tA =&\ x ~|~ u & \text{$u$ is a static argument (normal \gallina{} term without FV)}
 \end{align*}
 
 The application in previous section, $\tF\:\rep{x}$, is changed to $\tC\:\rep{\tA}$ for constant and constructor applications.
