@@ -1295,8 +1295,8 @@ $\TRop$ distinguishes fixpoint bounded functions translatable without actual fun
   \RNT{c\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
   \RNT{C\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
   \RNT{\letin{x}{t}{u}} &= (\TR{t} \cup \TR{u}, \N{t} \cup \T{t} \cup \N{u} - \{x\}, \T{u} - \{x\}) \\
-  \RNT{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TR{t_i}, \tbigcup_i \N{t_i}, \tbigcup_i \T{t_i} \bigr) \\
-  \RNT{\lam{x}{t}} &= (\TR{t}, \N{t} \cup \T{t} - \{x\}, \varnothing) \\
+  \RNT{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TR{t_i}, \tbigcup_i \N{t_i} - \{\rep{x_i}\}, \tbigcup_i \T{t_i} - \{\rep{x_i}\} \bigr) \\
+  \RNT{\lam{x}{t}} &= (\TR{t}, (\N{t} \cup \T{t}) - \{x\}, \varnothing) \\
   \RNT{(\ofix{\rep{f:=t}}{f_j})\:\rep{y}} &=
     \begin{cases}
       \begin{aligned}[t]
@@ -1318,7 +1318,7 @@ $\TRop$ distinguishes fixpoint bounded functions translatable without actual fun
   \item The variables in $t$ are unique.
     \codegen{} uses de Bruijn's indexes for $\Nop$ and $\Top$;
     the variables renamed by \secref{sec:cvaralloc} for $\TRop$.
-  \item $y$ of $\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}$ is not counted because $y$ is not a function and does not affect the final result.
+  \item $y$ of $\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}$ is not counted because $y$ is not a function and does not affect the final $\TRop$.
 \end{itemize}}
 
 \subsection{Top-Level Functions Detection}\label{sec:top-level-function-detection}
@@ -1337,7 +1337,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
     && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \in \tr \end{aligned} \\
   &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
-    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \wedge \text{$\rep{y}$ are outer variables of $f$} \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \text{$\rep{y}$ are the outer variables of $f$} \end{aligned} \\
       &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
@@ -1442,19 +1442,19 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   \fvars{t} =
   \begin{cases}
     \dq{x;\:\fvars{u}} & t = \lam{x}{u} \\
-    \fvars{t_j}       & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
+    \fvars{t_j}       & t = \ofix{\rep{f:=t}}{f_j} \\
     \dq{}             & \text{otherwise}
   \end{cases}
 \]
 \[
-  \fvarsd{f_i} = \fvars{t_i} \quad \text{for functions bounded by $\fix{f_i}{t_i}{i=1\ldots h}{f_j}$}
+  \fvarsd{f_i} = \fvars{t_i} \quad \text{for functions bounded by $\ofix{\rep{f:=t}}{f_j}$}
 \]
 \[
   \genbodyat{K}{t} =
   \begin{cases}
     \genbodyat{K}{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyat{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-    \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, h \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyat{K}{t_i}} & t = \ofix{\rep{f:=t}}{f_j} \\
+    \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, |f| \\
     \A{K}{t}                            & \text{otherwise}
   \end{cases}
 \]
@@ -1462,8 +1462,8 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   \genbodyan{t} =
   \begin{cases}
     \genbodyan{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyan{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-    \quad \text{for}~i=1,\dotsc, h \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyan{t_i}} & t = \ofix{\rep{f:=t}}{f_j} \\
+    \quad \text{for}~i=1,\dotsc, |f| \\
     \B{K}{t}                            & \begin{aligned}[t]
                                             & \text{otherwise} \\
                                             & \text{where} \\
@@ -1476,8 +1476,8 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
   \genbodyb{K}{t} =
   \begin{cases}
     \genbodyb{K}{u}                            & t = \lam{x}{u} \\
-    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyb{K}{t_i}} & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
-    \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, h \\
+    \dq{\mathtt{entry\_}f_i\ttcolon\:\genbodyb{K}{t_i}} & t = \ofix{\rep{f:=t}}{f_j} \\
+    \quad \text{for}~i=j, 1,\dotsc, (j-1), (j+1),\dotsc, |f| \\
     \B{K}{t}                            & \text{otherwise}
   \end{cases}
 \]
@@ -1508,21 +1508,21 @@ We iterate it until no fixpoint functions.
 \begin{alignat*}{2}
   \genfunm{c} &= \ldq && \enumentries{c}~\argstructdefs{c}~\forwarddecl{c}~\entryfunctions{c}~\bodyfunction{c} \rdq
 \end{alignat*}
-\[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c\ttcomma \mathtt{func\_}f_1\ttcomma \dotsc\ttcomma \mathtt{func\_}f_n }\ttsemi} \]
-\[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\auxstructdef{c}{1} \ldots \auxstructdef{c}{n}} \]
-\[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:T_{01}\:\mathtt{arg}1\ttsemi \ldots\ttsemi\: T_{0m_0}\:\mathtt{arg}m_0\ttsemi\:}\ttsemi} \]
-\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:U_{i1}\:\mathtt{outer}1\ttsemi \ldots\ttsemi\: U_{io_i}\:\mathtt{outer}o_i\ttsemi\:T_{i1}\:\mathtt{arg}1\ttsemi \ldots\ttsemi\: T_{im_i}\:\mathtt{arg}m_i\ttsemi\:}\ttsemi} \]
+\[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c \repi{\ttcomma \mathtt{func\_}f_i}{i=1\ldots n} }\ttsemi} \]
+\[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\repi{\auxstructdef{c}{i}}{i=1\ldots n} } \]
+\[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:\repi{T_{0j}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_0} \:}\ttsemi} \]
+\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repopi{U_{ij}\:\mathtt{outer}j}{\ttsemi}{j=1\ldots o_i}\ttsemi\:\repopi{T_{ij}\:\mathtt{arg}j}{\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
-\[ \entryfunctions{c} = \dq{\mainfunction{c}\:\auxfunction{c}{1} \ldots \auxfunction{c}{n}} \]
+\[ \entryfunctions{c} = \dq{\mainfunction{c}\:\repi{\auxfunction{c}{i}}{i=1\ldots n}} \]
 \begin{alignat*}{2}
-  \mainfunction{c} &= \ldq && \kwstatic\:T_{00}\:c\ttparen{T_{01}\:x_{01}\ttcomma\dotsc\ttcomma\, T_{0m_0}\:x_{0m_0}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ x_{01}\ttcomma\dotsc\ttcomma\, x_{0m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
+  \mainfunction{c} &= \ldq && \kwstatic\:T_{00}\:c\ttparen{\repopi{T_{0j}\:x_{0j}}{\ttcomma}{j=1\ldots m_0}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{x_{0i}}{\ttcomma}{i=1\ldots m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
-  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{U_{i1}\:y_{i1}\ttcomma\dotsc\ttcomma U_{io_i}\:y_{io_i}\ttcomma T_{i1}\:x_{i1}\ttcomma\dotsc\ttcomma T_{im_i}\:x_{im_i}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ y_{i1}\ttcomma\dotsc\ttcomma y_{io_i}\ttcomma x_{i1}\ttcomma\dotsc\ttcomma x_{im_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
+  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots o_i}\ttcomma\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{y_{ij}}{\ttcomma}{j=1\ldots o_i}\ttcomma\; \repopi{x_{ij}}{\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
@@ -1530,19 +1530,19 @@ We iterate it until no fixpoint functions.
   \bodyfunction{c} &= \ldq
     && \kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\ttstar\mathtt{arg}\ttcomma \kwvoid\:\ttstar\mathtt{ret}}\:\ttlbrace \\
   & && \quad \mathit{decls} \\
-  & && \quad \kwswitch\:\ttparen{\mathtt{g}}\:\ttbrace{\:\auxcase{c}{1} \ldots \auxcase{c}{n}\:\maincase{c}\:} \\
+  & && \quad \kwswitch\:\ttparen{\mathtt{g}}\:\ttbrace{\:\repi{\auxcase{c}{i}}{i=1\ldots n} \:\maincase{c}\:} \\
   & && \quad {\genbodyb{K}{t}} \\
   & && \ttrbrace \rdq
 \end{alignat*}
 \begin{align*}
   \auxcase{c}{i} = \ldq & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
-  & y_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}1\ttsemi \ldots\ttsemi\:y_{io_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}o_i\ttsemi \\
-  & x_{i1}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \ldots\ttsemi\:x_{im_i}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_i\ttsemi \\
+  & \repi{y_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}j\ttsemi}{j=1\ldots o_i} \\
+  & \repi{x_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}j\ttsemi}{j=1\ldots m_i} \\
   & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \rdq
 \end{align*}
 \begin{align*}
   \maincase{c} = \ldq & \kwdefault\ttcolon\ttsemi \\
-  & x_{01}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}1\ttsemi \ldots\ttsemi\:x_{0m_0}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}m_0\ttsemi \rdq
+  & \repi{x_{0j}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}c\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}j\ttsemi}{j=1\ldots m_0} \rdq
 \end{align*}
 \[ \text{where} \quad
   \begin{aligned}[t]
@@ -1565,7 +1565,7 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
     & \fargs{t} =
       \begin{cases}
         \dq{T\:x\ttcomma\:\fargs{u}}      & t = \lamT{x}{T}{u} \\
-        \fargs{t_j}       & t = \fix{f_i}{t_i}{i=1\ldots h}{f_j} \\
+        \fargs{t_j}       & t = \ofix{\rep{f:=t}}{f_j} \\
         \dq{}    & \text{otherwise}
       \end{cases} \\
     & \fargsd{t} = \fargs{t}~\text{without the trailing comma}
