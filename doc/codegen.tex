@@ -310,9 +310,22 @@ We don't include parenthesis in syntax definition in BNF.
 
 \begin{itemize}
   \item We use overline to represent repetition:
-    $\repop{x_i+y_i}{<}^{1\leq i \leq n}$ means $x_1+y_1 < \ldots < x_n+y_n$.
-  \item We omit the operator part ($\underbracket[0.4pt][1pt]{<}$) when the operator is just a punctuation to separate each term.
+    $\repopi{x_i+y_i}{<}{1\leq i \leq n}$ means $x_1+y_1 < \ldots < x_n+y_n$.
+  \item If the operator part ($\underbracket[0.4pt][1pt]{<}$) is just a punctuation to separate each term,
+    we consider the punctuation can be added at first and/or last if appropriate for the context.
+    $\repopi{x_i}{,}{1\leq i \leq n}$ represents
+    ``$x_1,\ldots ,x_n$'',
+    ``$x_1,\ldots ,x_n,$'',
+    ``$,x_1,\ldots ,x_n$'', or
+    ``$,x_1,\ldots ,x_n,$''. \\
+    Thus, $(\repopi{x_i}{,}{1\leq i \leq m}\;\repopi{y_i}{,}{1\leq i \leq n})$ can represent \\
+    $(x_1,\ldots, x_m, y_1,\ldots, y_n)$ when $(0<m) \wedge (0<n)$, \\
+    $(x_1,\ldots, x_m)$ when $(0<m)\wedge(n=0)$, \\
+    $(y_1,\ldots, y_n)$ when $(m=0)\wedge(0<n)$, and \\
+    $()$ when $m=n=0$.
+  \item We may omit the operator part when the operator is just a punctuation to separate each term.
     We write $\repi{x_i+y_i}{1\leq i \leq n}$ for $x_1+y_1, \ldots, x_n+y_n$ if comma is appropriate separator for the context.
+    (Also, comma can be added at first and/or end as described above.)
   \item We may write the range part, $1\leq i \leq n$, as $i=1\ldots n$.
   \item We may write the range part as only an index metavariable if the range is clear from the context: $\repi{x_i+y_i}{i}$.
   \item We may omit the range part ($1\leq i \leq n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
@@ -1518,13 +1531,13 @@ We iterate it until no fixpoint functions.
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\repi{\auxfunction{c}{i}}{i=1\ldots n}} \]
 \begin{alignat*}{2}
   \mainfunction{c} &= \ldq && \kwstatic\:T_{00}\:c\ttparen{\repopi{T_{0j}\:x_{0j}}{\ttcomma}{j=1\ldots m_0}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ \repi{x_{0i}\ttcomma}{i=1\ldots m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
+  & && \quad \kwstruct\:\mathtt{arg\_}c\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{x_{0i}}{\ttcomma}{i=1\ldots m_0} }\ttsemi\:T_{00}\:\mathtt{ret}\ttsemi \\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}c\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi \kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
-  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots o_i}\ttcomma\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repi{y_{ij}\ttcomma}{j=1\ldots o_i}\; \repi{x_{ij}\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
+  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots o_i}\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{y_{ij}}{\ttcomma}{j=1\ldots o_i}\; \repopi{x_{ij}}{\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
