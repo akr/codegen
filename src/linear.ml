@@ -112,7 +112,7 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive
   let ind_id = oind_body.mind_typename in
   Array.iter2
     (fun cons_id nf_lc ->
-      (* ctx is a list of decls from innermost to outermost *)
+      (* ctx is a list of innermost-first binder decls of the constructor (including inductive type parameters) *)
       let (ctx, t) = nf_lc in
       (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] reduce" +++
                      Pp.str "typename=" ++ Id.print ind_id +++
@@ -138,9 +138,8 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive
             | [] ->
                 let ty' = nf_all !env2 sigma ty in
                 (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
-                if not (Vars.noccur_between sigma 1 j ty') then
+                if not (Vars.closed0 sigma ty') then
                   user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env2 sigma ty');
-                let ty' = Vars.lift (-j) ty' in
                 f ind_id cons_id ty';
                 env2 := Environ.push_rel decl !env2)
       done)
