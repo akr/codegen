@@ -1106,7 +1106,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
     \dfrac{
       \begin{gathered}
         E[\Gamma] \vdash y ~|~(L_\text{item}, B^\text{used}_\text{item}, B^\text{result}_\text{item}) \\
-        B_{ij} = B^\text{result}_\text{item} ~\text{filtered with the type of $x_{ij}$} \\
+        B_{ij} = B^\text{result}_\text{item} \cap \components_E(T_{ij}) \\
         \rep{\Gamma' = \rep{\lassum{x^{B}}{T}}} \\
         \rep{\underline{E}[\underline{\Gamma} ; \Gamma'] \vdash t ~|~(L, B^\text{used}, B^\text{result})} \\
         % M stands for member (of constructor).
@@ -1120,13 +1120,13 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
         L_\text{item} \cap B^\text{used}_\text{branches} = \varnothing \\
       \end{gathered}
     }{
-      E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
+      E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x{:}T} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
     } \breakrule
   \text{borrow-var-app:}~
     \dfrac{
       \begin{gathered}
         \lassum{f^{B}}{T'} \in \Gamma \quad
-        \APP(\Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
+        \APP(E, \Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
       E[\Gamma] \vdash f\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
@@ -1135,14 +1135,14 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
     \dfrac{
       \begin{gathered}
         \text{$c$ is not a borrow function} \quad
-        \APP(\Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
+        \APP(E, \Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
       E[\Gamma] \vdash c\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
   \text{borrow-constructor-app:}~
     \dfrac{
-      \APP(\Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
+      \APP(E, \Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
     }{
       E[\Gamma] \vdash C\: \rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
     } \breakrule
@@ -1150,7 +1150,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
     \dfrac{
       \begin{gathered}
         E[\Gamma] \vdash \ofix{\rep{f:=t}}{f_j} ~|~ B \quad
-        \APP(\Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
+        \APP(E, \Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
       E[\Gamma] \vdash (\ofix{\rep{f:=t}}{f_j})\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
@@ -1217,12 +1217,12 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
 \end{gather*}
 
 \begin{align*}
-  &\APP(\Gamma, B^\text{func}, \rep{x}, T, L, B^\text{used}, B^\text{result}) \\
+  &\APP(E, \Gamma, B^\text{func}, \rep{x}, T, L, B^\text{used}, B^\text{result}) \\
   &= 1 \leq |x| \\
   &~\wedge \forall i, \forall j, (i \neq j \rightarrow \neg (x_i = x_j \wedge \text{$x_i$ is linear})) \\
   &~\wedge L = \{ z | z \in \{\rep{x}\} ~\wedge~ \text{$z$ is linear} \} \\
   &~\wedge B^\text{used} = B^\text{func} \cup \tbigcup_i (\Bop_\Gamma x_i) \\
-  &~\wedge B^\text{result} = B^\text{used} ~\text{filtered with the type $T$} \\
+  &~\wedge B^\text{result} = B^\text{used} \cap \components_E(T) \\
   &~\wedge B^\text{used} \cap L = \varnothing \\
 \end{align*}
 
