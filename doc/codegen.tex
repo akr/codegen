@@ -203,6 +203,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\T}[1]{\Top\BRA{#1}}
 
 \DeclareMathOperator{\APP}{APP}
+\DeclareMathOperator{\components}{components}
 
 \newcommand{\ldq}{\text{``}}
 \newcommand{\rdq}{\text{''}}
@@ -384,7 +385,7 @@ We use $|x|$ to represent the number of elements: $|x|=n$ if $x$ is an $n$-eleme
 \end{itemize}
 
 \subsection{Substitution}
-$\subst{t}{x}{u}$ means a term in which $x$ in term $t$ is replaced by $u$.
+$\subst{t}{x}{u}$ means a term in which variable $x$ in term $t$ is replaced by term $u$.
 This notation is taken from the Coq reference manual~\cite{coqrefman8.12.0}.
 
 We use $\substm{t}{x}{u}$ for parallel substituion.
@@ -1225,12 +1226,58 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   &~\wedge B^\text{used} \cap L = \varnothing \\
 \end{align*}
 
+We use a function $\components_E(T)$ to obtain the component types of a type $T$ under the global environment $E$.
+It returns a set of types or $\top$.
+$\top$ is a set which contains all types.
+$\components_E(T)$ is defined as the minimum set which satisfy following equations.
+
+\begin{align*}
+  & \components_E(I\:\rep{t}) = \{I\:\rep{t}\} \cup \tbigcup_{(x{}:T) \in \Gamma_B} \components_E(T) \\
+  & \begin{aligned}
+    \quad \text{where}~
+    & E[] \vdash I\:\rep{t} : S \\
+    & \text{$S$ is a sort} \\
+    & \text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C) \in E \\
+    & \text{$p$ the is number of recursively uniform parameters of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$} \\
+    & I \in \Gamma_I \\
+    & |t| = p \\
+    & (C:\forall \Gamma_P, \forall \Gamma_A, I\:\rep{u}) \in \Gamma_C \\
+    & \subst{(I\:\rep{u})}{\Gamma_P}{\rep{t}} = I\:\rep{t} \\
+    & \Gamma_B = \subst{\Gamma_A}{\Gamma_P}{\rep{t}}
+    \end{aligned} \\
+  & \components_E(\forall T, U) = \top \\
+  & \components_E(S) = \top \\
+  & \quad \text{where}~ \text{$S$ is a sort} \\
+\end{align*}
+
+We extend substitution for local contexts here.
+$\subst{t}{\Gamma}{\rep{u}}$ represents the term $t$ which variables in $\Gamma$ are substituted with terms $\rep{u}$.
+$\subst{\Gamma'}{\Gamma}{\rep{u}}$ represents the local context $\Gamma'$ which variables in $\Gamma$ are substituted with terms $\rep{u}$.
+If $\Gamma$ contains a local definition, its variable is substituted with the corresponding definition.
+($\epsilon$ is the empty local context. $\varepsilon$ is the empty list of terms.)
+
+\begin{align*}
+  \subst{t}{\epsilon}{\varepsilon} &= t \\
+  \subst{t}{(\lassum{x}{T};\Gamma)}{(a\:\rep{u})} &= \subst{\subst{t}{x}{a}}{\subst{\Gamma}{x}{a}}{\rep{u}} \\
+  \subst{t}{(\ldef{x}{a}{T};\Gamma)}{\rep{u}} &= \subst{\subst{t}{x}{a}}{\subst{\Gamma}{x}{a}}{\rep{u}} \\
+  \subst{\epsilon}{\Gamma}{\rep{u}} &= \epsilon \\
+  \subst{(\lassum{x}{T};\Gamma')}{\Gamma}{\rep{u}} &= \lassum{x}{\subst{T}{\Gamma}{\rep{u}}};\subst{\Gamma'}{\Gamma}{\rep{u}} \\
+  \subst{(\ldef{x}{a}{T};\Gamma')}{\Gamma}{\rep{u}} &= \ldef{x}{\subst{a}{\Gamma}{\rep{u}}}{\subst{T}{\Gamma}{\rep{u}}};\subst{\Gamma'}{\Gamma}{\rep{u}}
+\end{align*}
+
 We mix borrow information and set of variables in set-operations.
 Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 
 \begin{align*}
   B \cap L = L \cap B &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \in L \} \\
   B - L &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \not\in L \}
+\end{align*}
+
+We also mix borrow information and set of types (including $\top$) in set-operations.
+
+\begin{align*}
+  B \cap D = D \cap B &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ T_i \in D \} & D = \{U_1, \ldots, U_n\} \\
+  B \cap \top = \top \cap B &= B
 \end{align*}
 
 {\small Note:
