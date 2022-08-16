@@ -1425,16 +1425,28 @@ If $x$ is not a fix-bounded function, $\FIXFV(x)=\varnothing$.
   \end{cases}
 \]
 
-$\OVARS'(x)$ is the minimum set which satisfy the following equation.
+$\OVARS'(x)$ is a set which satisfy the following condition.
 $\OVARS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
 But if it contains a function bounded by an outer fixpoint, the free variable of the outer fixpoint are also contained.
 
 \[
-  \OVARS'(x) = \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \OVARS'(y)
+  \OVARS'(x) \supseteq \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \OVARS'(y)
+\]
+
+\codegen{} chooses the minimal set for $\OVARS'(f)$ if a dedicated internal C function is generated for $f$.
+But if $f$ is callable via $c$ like follows, \codegen{} generate a call to $c$ for $f$
+to avoid generating the dedicated C function for \texttt{f}.
+This means $\texttt{f}\:\texttt{y'}$ is translated to $\texttt{c}\:\texttt{x}\:\texttt{y'}$.
+In this case, the arguments of the external C function for $c$ must corresponds to the type of $c$.
+Thus \codegen{} chooses the maximal set (all bound variables) for $\OVARS'(f)$.
+(This means that \texttt{x} is passed even if \texttt{f} does not use \texttt{x}.)
+
+\[
+  \kwDefinition~\texttt{c} := \lam{\texttt{x}}{\ofix{\texttt{f}:=\lam{\texttt{y}}{\ldots \texttt{f}\:\texttt{y'} \ldots}}{\texttt{f}}}
 \]
 
 $\OVARS(x)$ is defined as follows.
-It is $\OVARS(x)$ except fix-bounded functions.
+It is $\OVARS'(x)$ except fix-bounded functions.
 
 \[
   \OVARS(x) = \OVARS'(x) - \FIXFUNCS
