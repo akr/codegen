@@ -147,7 +147,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \DeclareMathOperator{\FV}{FV}
 \DeclareMathOperator{\FIXFUNCS}{FIXFUNCS}
 \DeclareMathOperator{\FIXFV}{FIXFV}
-\DeclareMathOperator{\OVARS}{OVARS}
+\DeclareMathOperator{\FLARGS}{FLARGS}
 
 \newcommand{\tD}{{t^\mathrm{D}}}
 \newcommand{\tE}{{t^\mathrm{E}}}
@@ -1390,23 +1390,38 @@ $\TRop$ distinguishes fixpoint bounded functions translatable without actual fun
 If a fixpoint needs recursive call in C, we need a real C function for it.
 \codegen{} detects such fixpoints by simulating $A_K$ and $B_K$ in \secref{sec:AK} and \secref{sec:BK} to collect application of fixpoint-bounded functions.
 
-\subsection{Outer-Variable}\label{sec:outer-variable}
+\subsection{Fix-lifting}\label{sec:fix-lifting}
 
-We define outer-variables for recursion.
+We use lambda-lifting-like technique to translate fixpoint expressions without closures.
 
-\codegen{} translates a recursive call to C function invocation (if \kwgoto{} is not usable).
-For example, the fixpoint in
-$\letin{\texttt{y}}{\ldots}{\ofix{\texttt{f}:=\lam{\texttt{x}}{\ldots \texttt{f}\:\texttt{x'} \ldots \texttt{y}}}{\texttt{f}}}$ is
-translated to a C function.
-The function needs to refernce $\texttt{y}$.
-Conceptually, $\texttt{f}$ is a closure which contains $\texttt{y}$.
-But \codegen{} translates fixpoints without closures:
-\codegen{} adds extra arguments, $\texttt{y}$ to the function.
-We call such argument as outer-variable.
+Consider following (artificial) example.
 
-We define $\FIXFUNCS$, $\FIXFV$, $\OVARS'$, and $\OVARS$ for each definition \kwDefinition~$c := u$.
+\begin{lstlisting}
+Definition c x y :=
+  fix f n :=
+  match n with
+  | O => x                  (* f references x *)
+  | S n' =>
+    (fix g m :=
+    match m with
+    | O => y + f n'         (* g references y and f *)
+    | S m' => S (g m')
+    end) n
+  end.
+\end{lstlisting}
 
-$\OVARS(f)$ is the outer-variables of a fix-bounded function $f$ in the definition.
+\codegen{} translate a Gallina application to C function call.
+In this scenario, internal functions \lstinline[style=Cstyle]!g! and \lstinline[style=Cstyle]!f! has corresponding C functions.
+\lstinline!g m'! is translated to \lstinline[style=Cstyle]!g(m')! where \lstinline[style=Cstyle]!g! is a C function.
+But it does not work because \lstinline!g! needs \lstinline!y!.
+Also, \lstinline!g! needs \lstinline!f!.
+Although there is a C function \lstinline!f!, \lstinline!f! needs \lstinline!x!.
+Thus, \codegen{} need to add extra arguments as \lstinline[style=Cstyle]!g(x, y, m')! which is similar to lambda-lifting.
+We call such argument as fix-lifting-arguments.
+
+We define $\FIXFUNCS$, $\FIXFV$, $\FLARGS'$, and $\FLARGS$ for each definition \kwDefinition~$c := u$.
+
+$\FLARGS(f)$ is the fix-lifting-arguments of a fix-bounded function $f$ in the definition.
 
 $\FIXFUNCS$ is the set of fix-bounded functions in $u$.
 
@@ -1425,38 +1440,38 @@ If $x$ is not a fix-bounded function, $\FIXFV(x)=\varnothing$.
   \end{cases}
 \]
 
-$\OVARS'(x)$ is a set which satisfy the following condition.
-$\OVARS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
+$\FLARGS'(x)$ is a set which satisfy the following condition.
+$\FLARGS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
 But if it contains a function bounded by an outer fixpoint, the free variable of the outer fixpoint are also contained.
 
 \[
-  \OVARS'(x) \supseteq \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \OVARS'(y)
+  \FLARGS'(x) \supseteq \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \FLARGS'(y)
 \]
 
-\codegen{} chooses the minimal set for $\OVARS'(f)$ if a dedicated internal C function is generated for $f$.
+\codegen{} chooses the minimal set for $\FLARGS'(f)$ if a dedicated internal C function is generated for $f$.
 But if $f$ is callable via $c$ like follows, \codegen{} generate a call to $c$ for $f$
 to avoid generating the dedicated C function for \texttt{f}.
 This means $\texttt{f}\:\texttt{y'}$ is translated to $\texttt{c}\:\texttt{x}\:\texttt{y'}$.
 In this case, the arguments of the external C function for $c$ must corresponds to the type of $c$.
-Thus \codegen{} chooses the maximal set (all bound variables) for $\OVARS'(f)$.
+Thus \codegen{} chooses the maximal set (all bound variables) for $\FLARGS'(f)$.
 (This means that \texttt{x} is passed even if \texttt{f} does not use \texttt{x}.)
 
 \[
   \kwDefinition~\texttt{c} := \lam{\texttt{x}}{\ofix{\texttt{f}:=\lam{\texttt{y}}{\ldots \texttt{f}\:\texttt{y'} \ldots}}{\texttt{f}}}
 \]
 
-$\OVARS(x)$ is defined as follows.
-It is $\OVARS'(x)$ except fix-bounded functions.
+$\FLARGS(x)$ is defined as follows.
+It is $\FLARGS'(x)$ except fix-bounded functions.
 
 \[
-  \OVARS(x) = \OVARS'(x) - \FIXFUNCS
+  \FLARGS(x) = \FLARGS'(x) - \FIXFUNCS
 \]
 
-When $\OVARS(x)$ is used in a context which the order matters,
+When $\FLARGS(x)$ is used in a context which the order matters,
 we consider it is a list of variables from declared ouside to inside.
 (used in \secref{sec:AK})
 
-When $\OVARS(x)$ is used in a context which require types,
+When $\FLARGS(x)$ is used in a context which require types,
 we consider it is a set of pairs of variable and its type.
 (used in \secref{sec:genfunm})
 
@@ -1470,7 +1485,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
     && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \in \tr \end{aligned} \\
   &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
-    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \rep{y} = \OVARS(f) \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \rep{y} = \FLARGS(f) \end{aligned} \\
       &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
@@ -1515,7 +1530,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
                   & \text{where} \\
-                  & \rep{y} = \OVARS(f_j)
+                  & \rep{y} = \FLARGS(f_j)
                \end{alignedat}
 \end{align*}
 {\small Note:
@@ -1634,7 +1649,7 @@ We assume the types of them:
 The formal arguments of $c$ are $x_{01}\ldots x_{0m_0} = \fvars{t}$ and
 the formal arguments of $f_i$ are $x_{i1}\ldots x_{im_i} = \fvarsd{f_i}$.
 
-$f_i$ invocation in C needs extra arguments, $\OVARS(f_i) = y_{i1}\mathord{:}U_{i1} \ldots y_{io_i}\mathord{:}U_{io_i}$, addition to the actual arguments in \gallina{} application because the free variables of the fixpoint should also be passed.
+$f_i$ invocation in C needs extra arguments, $\FLARGS(f_i) = y_{i1}\mathord{:}U_{i1} \ldots y_{il_i}\mathord{:}U_{il_i}$, addition to the actual arguments in \gallina{} application because the free variables of the fixpoint should also be passed.
 If the free variables contain a function bounded by an outer fixpoint, the function itself is not passed but the free variables of the outer fixpoint are also passed.
 We iterate it until no fixpoint functions.
 
@@ -1644,7 +1659,7 @@ We iterate it until no fixpoint functions.
 \[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c \repi{\ttcomma \mathtt{func\_}f_i}{i=1\ldots n} }\ttsemi} \]
 \[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\repi{\auxstructdef{c}{i}}{i=1\ldots n} } \]
 \[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:\repi{T_{0j}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_0} \:}\ttsemi} \]
-\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repi{U_{ij}\:\mathtt{outer}j\ttsemi}{j=1\ldots o_i}\:\repi{T_{ij}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
+\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repi{U_{ij}\:\mathtt{fl}j\ttsemi}{j=1\ldots l_i}\:\repi{T_{ij}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\repi{\auxfunction{c}{i}}{i=1\ldots n}} \]
 \begin{alignat*}{2}
@@ -1654,8 +1669,8 @@ We iterate it until no fixpoint functions.
   & && \ttrbrace \rdq
 \end{alignat*}
 \begin{alignat*}{2}
-  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots o_i}\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
-  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{y_{ij}}{\ttcomma}{j=1\ldots o_i}\; \repopi{x_{ij}}{\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
+  \auxfunction{c}{i} &= \ldq && \kwstatic\:T_{i0}\:f_i\ttparen{\repopi{U_{ij}\:y_{ij}}{\ttcomma}{j=1\ldots l_i}\; \repopi{T_{ij}\:x_{ij}}{\ttcomma}{j=1\ldots m_i}}\:\ttlbrace \\
+  & && \quad \kwstruct\:\mathtt{arg\_}f_i\:\mathtt{arg}\:\tteq\:\ttbrace{ \repopi{y_{ij}}{\ttcomma}{j=1\ldots l_i}\; \repopi{x_{ij}}{\ttcomma}{j=1\ldots m_i} }\ttsemi\:T_{i0}\:\mathtt{ret}\ttsemi\\
   & && \quad \mathtt{body\_function\_}c\ttparen{\mathtt{func\_}f_i\ttcomma \ttamp\mathtt{arg}\ttcomma \ttamp\mathtt{ret}}\ttsemi\:\kwCreturn\:\mathtt{ret}\ttsemi \\
   & && \ttrbrace \rdq
 \end{alignat*}
@@ -1669,7 +1684,7 @@ We iterate it until no fixpoint functions.
 \end{alignat*}
 \begin{align*}
   \auxcase{c}{i} = \ldq & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
-  & \repi{y_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{outer}j\ttsemi}{j=1\ldots o_i} \\
+  & \repi{y_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{fl}j\ttsemi}{j=1\ldots l_i} \\
   & \repi{x_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}j\ttsemi}{j=1\ldots m_i} \\
   & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \rdq
 \end{align*}
