@@ -509,15 +509,15 @@ We call syntactic context just as context if it is not ambiguous.
 $\FV(t)$ means the free variables of $t$.
 
 \begin{align*}
-  \FV(x) =& \{x\} \\
-  \FV(c) =& \varnothing \\
-  \FV(C) =& \varnothing \\
-  \FV(T) =& \varnothing \\
-  \FV(\lamT{x}{T}{t}) =& \FV(t) - \{x\} \\
-  \FV(t\:u) =& \FV(t) \cup \FV(u) \\
-  \FV(\letin{x}{t:T}{u}) =& \FV(t) \cup \FV(u) - \{x\} \\
-  \FV(\omatch{t}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) =& \FV(t) \cup \tbigcup_i (\FV(u_i) - \{\rep{x_i}\}) \\
-  \FV(\ofix{\rep{f/k{:}T:=t}}{f_j}) =& (\tbigcup_i \FV(t_i)) - \{\rep{f}\}
+  \FV(x) &= \{x\} \\
+  \FV(c) &= \varnothing \\
+  \FV(C) &= \varnothing \\
+  \FV(T) &= \varnothing \\
+  \FV(\lamT{x}{T}{t}) &= \FV(t) - \{x\} \\
+  \FV(t\:u) &= \FV(t) \cup \FV(u) \\
+  \FV(\letin{x}{t:T}{u}) &= \FV(t) \cup \FV(u) - \{x\} \\
+  \FV(\omatch{t}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \FV(t) \cup \tbigcup_i (\FV(u_i) - \{\rep{x_i}\}) \\
+  \FV(\ofix{\rep{f/k{:}T:=t}}{f_j}) &= (\tbigcup_i \FV(t_i)) - \{\rep{f}\}
 \end{align*}
 {\small Note:
 \begin{itemize}
@@ -529,15 +529,15 @@ $\FV(t)$ means the free variables of $t$.
 $\BV(K)$ means the bound variables usable in the hole of the context $K$.
 
 \begin{align*}
-  \BV([]) =& \varnothing \\
-  \BV(\lamT{x}{T}{K}) =& \{x\} \cup \BV(K) \\
-  \BV(K\:t) =& \BV(K) \\
-  \BV(t\:K) =& \BV(K) \\
-  \BV(\letin{x}{K:T}{t}) =& BV(K) \\
-  \BV(\letin{x}{t:T}{K}) =& \{x\} \cup \BV(K) \\
-  \BV(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) =& \BV(K) \\
-  \BV(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} | (C_i\:\rep{x_i{:}T_i}\Rightarrow K) | \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} =& \{\rep{x_i}\} \cup \BV(K) \\
-  \BV(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) =& \{\rep{f}\} \cup \BV(K)
+  \BV([]) &= \varnothing \\
+  \BV(\lamT{x}{T}{K}) &= \{x\} \cup \BV(K) \\
+  \BV(K\:t) &= \BV(K) \\
+  \BV(t\:K) &= \BV(K) \\
+  \BV(\letin{x}{K:T}{t}) &= BV(K) \\
+  \BV(\letin{x}{t:T}{K}) &= \{x\} \cup \BV(K) \\
+  \BV(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \BV(K) \\
+  \BV(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} (C_i\:\rep{x_i{:}T_i}\Rightarrow K) \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} &= \{\rep{x_i}\} \cup \BV(K) \\
+  \BV(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) &= \{\rep{f}\} \cup \BV(K)
 \end{align*}
 
 \section{CodeGen}\label{sec:codegen}
