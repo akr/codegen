@@ -548,7 +548,7 @@ let _ = ignore check_eq_outer_variables
 
 (*
   compute_naive_outer_variables computes outer variables in "naive" way:
-  It may contain unused variables.
+  It contains all variables in env except fix-bounded functions.
   Note that the result is ordered from outside to inside of the term.
 *)
 let compute_naive_outer_variables ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) (sigma : Evd.evar_map) : (string * string) list =

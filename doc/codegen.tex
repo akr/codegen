@@ -145,9 +145,11 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\arr}[1]{\Gamma_{\Arr(#1)}}
 
 \DeclareMathOperator{\FV}{FV}
+\DeclareMathOperator{\BV}{BV}
 \DeclareMathOperator{\FIXFUNCS}{FIXFUNCS}
+\DeclareMathOperator{\FIXK}{FIXK}
 \DeclareMathOperator{\FIXFV}{FIXFV}
-\DeclareMathOperator{\FLARGS}{FLARGS}
+\DeclareMathOperator{\EXARGS}{EXARGS}
 
 \newcommand{\tD}{{t^\mathrm{D}}}
 \newcommand{\tE}{{t^\mathrm{E}}}
@@ -393,10 +395,19 @@ This notation is taken from the Coq reference manual~\cite{coqrefman8.12.0}.
 
 We use $\substm{t}{x}{u}$ for parallel substituion.
 
+\subsection{Syntactic Context}
+
+We use syntactic context $K$.
+$K$ is a single-hole context: a \gallina{} term with a subterm is sustituted with a hole, $[]$.
+$K[u]$ is $K$ with the hole is substituted with $u$.
+
+We call syntactic context just as context if it is not ambiguous.
+
 \subsection{Others}
 
 \begin{itemize}
   \item $\FV(t)$ means the free variables of $t$.
+  \item $\BV(K)$ means the bound variables usable in the hole of the context $K$.
 \end{itemize}
 
 \section{\gallina{}}\label{sec:gallina}
@@ -521,9 +532,6 @@ This means a subterm $t$ is substituted to $u$ where
 $E$ and $\Gamma$ are the global environment and the local context of them.
 
 We also use $E[\Gamma] \vdash_K t \reltri u$ to represent transformations restricted with a syntactical context $K$.
-
-$K$ is a single-hole context: a term with a subterm is sustituted with a hole, $[]$.
-$K[u]$ is $K$ with the hole is substituted with $u$.
 
 $E[\Gamma] \vdash_K t \reltri u$ is similar to $E[\Gamma] \vdash K[t] \reltri K[u]$ but
 $\Gamma$ is the local context of $t$ (not $K[t]$).
@@ -1400,33 +1408,44 @@ Consider following (artificial) example.
 Definition c x y :=
   fix f n :=
   match n with
-  | O => x                  (* f references x *)
+  | O => x                  (* invocation of f needs x *)
   | S n' =>
     (fix g m :=
     match m with
-    | O => y + f n'         (* g references y and f *)
+    | O => y + f n'         (* invocation of g needs y and f *)
     | S m' => S (g m')
     end) n
   end.
 \end{lstlisting}
 
-\codegen{} translate a Gallina application to C function call.
-In this scenario, internal functions \lstinline[style=Cstyle]!g! and \lstinline[style=Cstyle]!f! has corresponding C functions.
-\lstinline!g m'! is translated to \lstinline[style=Cstyle]!g(m')! where \lstinline[style=Cstyle]!g! is a C function.
+\codegen{} translate a Gallina application to C function call (if \kwgoto{} is not usable).
+In this scenario, \codegen{} generates C functions corresponding to internal functions \lstinline[style=Cstyle]!f! and \lstinline[style=Cstyle]!g!.
+The application, \lstinline!g m'!, is translated to \lstinline[style=Cstyle]!g(m')!.
 But it does not work because \lstinline!g! needs \lstinline!y!.
 Also, \lstinline!g! needs \lstinline!f!.
-Although there is a C function \lstinline!f!, \lstinline!f! needs \lstinline!x!.
+Although there is the C function \lstinline!f!, \lstinline!f! needs \lstinline!x!.
 Thus, \codegen{} need to add extra arguments as \lstinline[style=Cstyle]!g(x, y, m')! which is similar to lambda-lifting.
-We call such argument as fix-lifting-arguments.
+We call this translation, adding extra arguments for functions bounded by fixpoints, fix-lifting.
 
-We define $\FIXFUNCS$, $\FIXFV$, $\FLARGS'$, and $\FLARGS$ for each definition \kwDefinition~$c := u$.
+We define $\FIXFUNCS$, $\FIXFV$, $\EXARGS'$, and $\EXARGS$ for each definition \kwDefinition~$c := u$.
 
-$\FLARGS(f)$ is the fix-lifting-arguments of a fix-bounded function $f$ in the definition.
+$\EXARGS(f)$ is the extra arguments for the fix-bounded function $f$ in the definition.
 
 $\FIXFUNCS$ is the set of fix-bounded functions in $u$.
 
 \[
   \FIXFUNCS = \bigcup_{K\left[\ofix{\rep{f:=t}}{f_j}\right] = u} \{\rep{f}\}
+\]
+
+$\FIXK(x)$ is the context of the fixpoint which bounds $x$.
+It is $\bot$ if $x$ is not a function bounded by a fixpoint.
+
+\[
+  \FIXK(x) =
+  \begin{cases}
+    K & u = K[\ofix{\repi{(f_l:=t_l)}{1\leq l < i} (x:=t_i) \repi{(f_l:=t_l)}{i < l \leq h}}{f_j}]  \\
+    \bot & \text{otherwise}
+  \end{cases}
 \]
 
 $\FIXFV(x)$ is the set of free variables of the fixpoint which bounds $x$.
@@ -1435,43 +1454,44 @@ If $x$ is not a fix-bounded function, $\FIXFV(x)=\varnothing$.
 \[
   \FIXFV(x) =
   \begin{cases}
-    \FV(F) & \text{$u$ contains $F$ where $F = \ofix{\repi{(f_l:=t_l)}{1\leq l < i} (x:=t_i) \repi{(f_l:=t_l)}{i < l \leq h}}{f_j}$}  \\
+    \FV(t) & u = \FIXK(x)[t]  \\
     \varnothing & \text{otherwise}
   \end{cases}
 \]
 
-$\FLARGS'(x)$ is a set which satisfy the following condition.
-$\FLARGS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
+$\EXARGS'(x)$ is a set which satisfy the following conditions.
+$\EXARGS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
 But if it contains a function bounded by an outer fixpoint, the free variable of the outer fixpoint are also contained.
 
-\[
-  \FLARGS'(x) \supseteq \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \FLARGS'(y)
-\]
+\begin{align*}
+  \EXARGS'(x) \supseteq& \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \EXARGS'(y) \\
+  \EXARGS'(x) \subseteq& \BV(\FIXK(x))
+\end{align*}
 
-\codegen{} chooses the minimal set for $\FLARGS'(f)$ if a dedicated internal C function is generated for $f$.
+\codegen{} chooses the minimal set for $\EXARGS'(f)$ if a dedicated internal C function is generated for $f$.
 But if $f$ is callable via $c$ like follows, \codegen{} generate a call to $c$ for $f$
 to avoid generating the dedicated C function for \texttt{f}.
-This means $\texttt{f}\:\texttt{y'}$ is translated to $\texttt{c}\:\texttt{x}\:\texttt{y'}$.
+This means $\texttt{f}\:\texttt{y'}$ is translated to \lstinline[style=Cstyle]!c(x, y')!.
 In this case, the arguments of the external C function for $c$ must corresponds to the type of $c$.
-Thus \codegen{} chooses the maximal set (all bound variables) for $\FLARGS'(f)$.
+Thus \codegen{} chooses the maximal set (all bound variables) for $\EXARGS'(f)$.
 (This means that \texttt{x} is passed even if \texttt{f} does not use \texttt{x}.)
 
 \[
   \kwDefinition~\texttt{c} := \lam{\texttt{x}}{\ofix{\texttt{f}:=\lam{\texttt{y}}{\ldots \texttt{f}\:\texttt{y'} \ldots}}{\texttt{f}}}
 \]
 
-$\FLARGS(x)$ is defined as follows.
-It is $\FLARGS'(x)$ except fix-bounded functions.
+$\EXARGS(x)$ is defined as follows.
+It is $\EXARGS'(x)$ except fix-bounded functions.
 
 \[
-  \FLARGS(x) = \FLARGS'(x) - \FIXFUNCS
+  \EXARGS(x) = \EXARGS'(x) - \FIXFUNCS
 \]
 
-When $\FLARGS(x)$ is used in a context which the order matters,
+When $\EXARGS(x)$ is used in a context which the order matters,
 we consider it is a list of variables from declared ouside to inside.
 (used in \secref{sec:AK})
 
-When $\FLARGS(x)$ is used in a context which require types,
+When $\EXARGS(x)$ is used in a context which require types,
 we consider it is a set of pairs of variable and its type.
 (used in \secref{sec:genfunm})
 
@@ -1485,7 +1505,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
     && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \in \tr \end{aligned} \\
   &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
-    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \rep{y} = \FLARGS(f) \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \rep{y} = \EXARGS(f) \end{aligned} \\
       &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
@@ -1530,7 +1550,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
        \end{alignedat} &&
                \begin{alignedat}[t]{1}
                   & \text{where} \\
-                  & \rep{y} = \FLARGS(f_j)
+                  & \rep{y} = \EXARGS(f_j)
                \end{alignedat}
 \end{align*}
 {\small Note:
@@ -1649,7 +1669,7 @@ We assume the types of them:
 The formal arguments of $c$ are $x_{01}\ldots x_{0m_0} = \fvars{t}$ and
 the formal arguments of $f_i$ are $x_{i1}\ldots x_{im_i} = \fvarsd{f_i}$.
 
-$f_i$ invocation in C needs extra arguments, $\FLARGS(f_i) = y_{i1}\mathord{:}U_{i1} \ldots y_{il_i}\mathord{:}U_{il_i}$, addition to the actual arguments in \gallina{} application because the free variables of the fixpoint should also be passed.
+$f_i$ invocation in C needs extra arguments, $\EXARGS(f_i) = y_{i1}\mathord{:}U_{i1} \ldots y_{il_i}\mathord{:}U_{il_i}$, addition to the actual arguments in \gallina{} application because the free variables of the fixpoint should also be passed.
 If the free variables contain a function bounded by an outer fixpoint, the function itself is not passed but the free variables of the outer fixpoint are also passed.
 We iterate it until no fixpoint functions.
 
@@ -1659,7 +1679,7 @@ We iterate it until no fixpoint functions.
 \[ \enumentries{c} = \dq{\kwenum\:\mathtt{enum\_func\_}c\:\ttbrace{ \mathtt{func\_}c \repi{\ttcomma \mathtt{func\_}f_i}{i=1\ldots n} }\ttsemi} \]
 \[ \argstructdefs{c} = \dq{\mainstructdef{c}\:\repi{\auxstructdef{c}{i}}{i=1\ldots n} } \]
 \[ \mainstructdef{c} = \dq{\kwstruct\:\mathtt{arg\_}c\:\ttbrace{\:\repi{T_{0j}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_0} \:}\ttsemi} \]
-\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repi{U_{ij}\:\mathtt{fl}j\ttsemi}{j=1\ldots l_i}\:\repi{T_{ij}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
+\[ \auxstructdef{c}{i} = \dq{\kwstruct\:\mathtt{arg\_}f_i\:\ttbrace{\:\repi{U_{ij}\:\mathtt{exarg}j\ttsemi}{j=1\ldots l_i}\:\repi{T_{ij}\:\mathtt{arg}j\ttsemi}{j=1\ldots m_i}\:}\ttsemi} \]
 \[ \forwarddecl{c} = \dq{\kwstatic\:\kwvoid\:\mathtt{body\_function\_}c\ttparen{\kwenum\:\mathtt{enum\_func\_}c\:\mathtt{g}\ttcomma \kwvoid\:\mathtt{\ttstar arg}\ttcomma \kwvoid\:\mathtt{\ttstar ret}}\ttsemi} \]
 \[ \entryfunctions{c} = \dq{\mainfunction{c}\:\repi{\auxfunction{c}{i}}{i=1\ldots n}} \]
 \begin{alignat*}{2}
@@ -1684,7 +1704,7 @@ We iterate it until no fixpoint functions.
 \end{alignat*}
 \begin{align*}
   \auxcase{c}{i} = \ldq & \kwcase\:\mathtt{func\_}f_i\ttcolon \\
-  & \repi{y_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{fl}j\ttsemi}{j=1\ldots l_i} \\
+  & \repi{y_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{exarg}j\ttsemi}{j=1\ldots l_i} \\
   & \repi{x_{ij}\:\tteq\:\ttparen{\ttparen{\kwstruct\:\mathtt{arg\_}f_i\:\ttstar}\mathtt{arg}}\texttt{->}\mathtt{arg}j\ttsemi}{j=1\ldots m_i} \\
   & \kwgoto\:\mathtt{entry\_}f_i\ttsemi \rdq
 \end{align*}
