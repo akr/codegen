@@ -149,7 +149,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\arr}[1]{\Gamma_{\Arr(#1)}}
 
 \DeclareMathOperator{\FV}{FV}
-\DeclareMathOperator{\BV}{BV}
+\DeclareMathOperator{\KV}{KV}
 \DeclareMathOperator{\FIXFUNCS}{FIXFUNCS}
 \DeclareMathOperator{\FIXK}{FIXK}
 \DeclareMathOperator{\FIXFV}{FIXFV}
@@ -530,18 +530,18 @@ $\FV(t)$ means the free variables of $t$.
 
 \subsection{Bound Variables of Syntactic Context}
 
-$\BV(K)$ means the bound variables usable in the hole of the context $K$.
+$\KV(K)$ means the bound variables usable in the hole of the context $K$.
 
 \begin{align*}
-  \BV([]) &= \varnothing \\
-  \BV(\lamT{x}{T}{K}) &= \{x\} \cup \BV(K) \\
-  \BV(K\:t) &= \BV(K) \\
-  \BV(t\:K) &= \BV(K) \\
-  \BV(\letin{x}{K:T}{t}) &= BV(K) \\
-  \BV(\letin{x}{t:T}{K}) &= \{x\} \cup \BV(K) \\
-  \BV(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \BV(K) \\
-  \BV(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} (C_i\:\rep{x_i{:}T_i}\Rightarrow K) \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} &= \{\rep{x_i}\} \cup \BV(K) \\
-  \BV(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) &= \{\rep{f}\} \cup \BV(K)
+  \KV([]) &= \varnothing \\
+  \KV(\lamT{x}{T}{K}) &= \{x\} \cup \KV(K) \\
+  \KV(K\:t) &= \KV(K) \\
+  \KV(t\:K) &= \KV(K) \\
+  \KV(\letin{x}{K:T}{t}) &= KV(K) \\
+  \KV(\letin{x}{t:T}{K}) &= \{x\} \cup \KV(K) \\
+  \KV(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \KV(K) \\
+  \KV(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} (C_i\:\rep{x_i{:}T_i}\Rightarrow K) \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} &= \{\rep{x_i}\} \cup \KV(K) \\
+  \KV(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) &= \{\rep{f}\} \cup \KV(K)
 \end{align*}
 
 \section{CodeGen}\label{sec:codegen}
@@ -1510,7 +1510,7 @@ But if it contains a function bounded by an outer fixpoint, the free variable of
 
 \begin{align*}
   \EXARGS'(x) \supseteq& \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \EXARGS'(y) \\
-  \EXARGS'(x) \subseteq& \BV(\FIXK(x))
+  \EXARGS'(x) \subseteq& \KV(\FIXK(x))
 \end{align*}
 
 \codegen{} chooses the minimal set for $\EXARGS'(f)$ if a dedicated internal C function is generated for $f$.
