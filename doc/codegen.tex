@@ -149,6 +149,7 @@ keywordstyle=[3]\color{myred}\ttfamily,
 \newcommand{\arr}[1]{\Gamma_{\Arr(#1)}}
 
 \DeclareMathOperator{\FV}{FV}
+\DeclareMathOperator{\LC}{LC}
 \DeclareMathOperator{\KV}{KV}
 \DeclareMathOperator{\FIXFUNCS}{FIXFUNCS}
 \DeclareMathOperator{\FIXK}{FIXK}
@@ -474,15 +475,6 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 \begin{itemize}
   \item The rules shown here are reductions, except the eta expansion.
   \item Variables cannot conflict because \coq{} uses de Bruijn's indexes to represent variables.
-  \item $E$ is a global environment which is a list of
-    global assumptions $\gassum{c}{T}$,
-    global definitions $\glodef{c}{t}{T}$, and
-    inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
-  \item $\Gamma$ is a local context which is a list of
-    local assumptions $\lassum{x}{T}$ and
-    local definitions $\ldef{x}{t}{T}$.
-    The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
-    The local definitions represent variables bounded by outer let-in.
   \item If it is unambiguous, we omit type annotations in these definitions for the sake of simplicity.
   \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:|\:(\mathtt{cons}\:\mathtt{h}\:\mathtt{t} \Rightarrow t_2)\:\kwend$ to $(\lam{\mathtt{h}}{\lam{\mathtt{t}}{t_2}})\:1\:\mathtt{nil}$
     because \lstinline!list! has one parameter $(\NP_\mathtt{nat}=1)$ and \lstinline!cons! has two members $(\NM_\mathtt{cons}=2)$.
@@ -508,6 +500,19 @@ $\FV(t)$ is the free variables of $t$.
   \item We assume $\FV(T) = \varnothing$ because we consider non-dependent expressions.
 \end{itemize}}
 
+\subsection{Global Context and Local Context}
+
+$E$ is a global environment which is a list of
+global assumptions $\gassum{c}{T}$,
+global definitions $\glodef{c}{t}{T}$, and
+inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
+
+$\Gamma$ is a local context which is a list of
+local assumptions $\lassum{x}{T}$ and
+local definitions $\ldef{x}{t}{T}$.
+The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
+The local definitions represent variables bounded by outer let-in.
+
 \subsection{Syntactic Context}
 
 We use syntactic context $K$.
@@ -528,21 +533,25 @@ We call syntactic context just as context if it is not ambiguous.
     &\bnfor \ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}
 \end{align*}
 
-\subsection{Bound Variables of Syntactic Context}
+\subsection{Local Context of Syntactic Context}
 
-$\KV(K)$ means the bound variables usable in the hole of the context $K$.
-
+$\LC(K)$ is the local context of the hole of $K$.
 \begin{align*}
-  \KV([]) &= \varnothing \\
-  \KV(\lamT{x}{T}{K}) &= \{x\} \cup \KV(K) \\
-  \KV(K\:t) &= \KV(K) \\
-  \KV(t\:K) &= \KV(K) \\
-  \KV(\letin{x}{K:T}{t}) &= KV(K) \\
-  \KV(\letin{x}{t:T}{K}) &= \{x\} \cup \KV(K) \\
-  \KV(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \KV(K) \\
-  \KV(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} (C_i\:\rep{x_i{:}T_i}\Rightarrow K) \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} &= \{\rep{x_i}\} \cup \KV(K) \\
-  \KV(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) &= \{\rep{f}\} \cup \KV(K)
+  \LC([]) &= \text{empty} \\
+  \LC(\lamT{x}{T}{K}) &= \lassum{x}{T};  \LC(K) \\
+  \LC(K\:t) &= \LC(K) \\
+  \LC(t\:K) &= \LC(K) \\
+  \LC(\letin{x}{K:T}{t}) &= \LC(K) \\
+  \LC(\letin{x}{t:T}{K}) &= \ldef{x}{t}{T}; \LC(K) \\
+  \LC(\omatch{K}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \LC(K) \\
+  \LC(\omatch{t}{\repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{1\leq l < i} (C_i\:\rep{x_i{:}T_i}\Rightarrow K) \repi{(C_l\:\rep{x_l{:}T_l}\Rightarrow u_l)}{i < l \leq h}} &= \rep{\lassum{x_i}{T_i};} \LC(K) \\
+  \LC(\ofix{\repi{(f_l/k_l{:}T_l:=t_l)}{1\leq l < i} (f_i/k_i{:}T_i:=K) \repi{(f_l/k_l{:}T_l:=t_l)}{i < l \leq h}}{f_j}) &= \rep{\lassum{f_i}{T_i};} \LC(K)
 \end{align*}
+
+$\KV(K)$ is the bound variables usable in the hole of the context $K$.
+\[
+  \KV(K) = \{\, x \;|\; (\exists T. \lassum{x}{T} \in \LC(K)) \vee (\exists t,T. \ldef{x}{t}{T} \in LC(K)) \}
+\]
 
 \section{CodeGen}\label{sec:codegen}
 
@@ -1463,7 +1472,7 @@ Definition c x y :=
   end.
 \end{lstlisting}
 
-\codegen{} translate a Gallina application to C function call (if \kwgoto{} is not usable).
+\codegen{} translate a \gallina{} application to C function call (if \kwgoto{} is not usable).
 In this scenario, \codegen{} generates C functions corresponding to internal functions \lstinline[style=Cstyle]!f! and \lstinline[style=Cstyle]!g!.
 The application, \lstinline!g m'!, is translated to \lstinline[style=Cstyle]!g(m')!.
 But it does not work because \lstinline!g! needs \lstinline!y!.
