@@ -501,7 +501,7 @@ $\FV(t)$ is the free variables of $t$.
   \FV(t\:u) &= \FV(t) \cup \FV(u) \\
   \FV(\letin{x}{t:T}{u}) &= \FV(t) \cup \FV(u) - \{x\} \\
   \FV(\omatch{t}{\rep{C\:\rep{x{:}T}\Rightarrow u}}) &= \FV(t) \cup \tbigcup_i (\FV(u_i) - \{\rep{x_i}\}) \\
-  \FV(\ofix{\rep{f/k{:}T:=t}}{f_j}) &= (\tbigcup_i \FV(t_i)) - \{\rep{f}\}
+  \FV(\ofix{\rep{f/k{:}T:=t}}{f_j}) &= \big(\tbigcup_i \FV(t_i)\big) - \{\rep{f}\}
 \end{align*}
 {\small Note:
 \begin{itemize}
