@@ -19,44 +19,31 @@
 \definecolor{myred}{rgb}{0.8,0.0,0.0}
 
 \lstdefinelanguage{coq}{
-  keywords=[1]{Check,Section,Definition,Defined,CoInductive,Coercion,Inductive,Extraction,Fixpoint,Parameter,Module,Import,Record,Structure,Axiom,Lemma,Theorem,Notation,Reserved,End,Proof,Goal,Qed,From,Require,Variable,Variables,Hypothesis,Let,Inline,Eval},
+  keywords=[1]{Check,Section,Definition,Defined,CoInductive,Coercion,Inductive,Extraction,Fixpoint,Parameter,Module,Import,Record,Structure,Axiom,Lemma,Theorem,Notation,Reserved,End,Proof,Goal,Qed,From,Require,Variable,Variables,Hypothesis,Let,Eval},
   keywordstyle=\color{myviolet}\ttfamily,
   morekeywords=[2]{match,with,end,Set,Prop,Type,fun,of,let,in,struct,if,is,then,else,as,return,fix,for,leta,letr,letn,letd,letp,nmatch,dmatch,app,rapp},
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
+  morekeywords=[4]{CodeGen,Global,Local,Inline,Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
 % The color of "in" is myviolet for
 % Definition c := Eval ... in ...
 \lstdefinelanguage{vernacular}{
-  keywords=[1]{Check,Section,Definition,Defined,CoInductive,Coercion,Inductive,Extraction,Fixpoint,Parameter,Module,Import,Record,Structure,Axiom,Lemma,Theorem,Notation,Reserved,End,Proof,Goal,Qed,From,Require,Variable,Variables,Hypothesis,Let,Inline,Eval,in},
+  keywords=[1]{Check,Section,Definition,Defined,CoInductive,Coercion,Inductive,Extraction,Fixpoint,Parameter,Module,Import,Record,Structure,Axiom,Lemma,Theorem,Notation,Reserved,End,Proof,Goal,Qed,From,Require,Variable,Variables,Hypothesis,Let,Eval,in},
   keywordstyle=\color{myviolet}\ttfamily,
   morekeywords=[2]{match,with,end,Set,Prop,Type,fun,of,let,struct,if,is,then,else,as,return,fix,for,leta,letr,letn,letd,letp,nmatch,dmatch,app,rapp},
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
+  morekeywords=[4]{CodeGen,Global,Local,Inline,Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
   keywordstyle=[4]\color{myblue}\ttfamily,
-}
-
-\lstdefinelanguage{AST}{
-keywords=[1]{Check,Section,Definition,Defined,CoInductive,Coercion,Inductive,Extraction,Fixpoint,Parameter,Module,Import,Record,Structure,Axiom,Lemma,Theorem,Notation,Reserved,End,Proof,Goal,Qed,
-From,Require,Variable,Variables,Hypothesis,Let,Inline},
-keywordstyle=\color{myviolet}\ttfamily,
-morekeywords=[2]{nmatch,dmatch,with,end,leta,letr,letn,letd,letp,letapp,letrapp,letnmatch,letdmatch,letproof,in},
-keywordstyle=[2]\color{mygreen}\ttfamily,
-morekeywords=[3]{reflexivity},
-keywordstyle=[3]\color{myred}\ttfamily,
-%morekeywords=[4]{Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
-%keywordstyle=[4]\color{myblue}\ttfamily
 }
 
 \lstdefinestyle{Cstyle} {language=C,basicstyle=\small\ttfamily}
 \lstdefinestyle{OCamlstyle} {language=Caml,basicstyle=\small\ttfamily}
-\lstdefinestyle{ASTstyle} {language=AST,basicstyle=\small\ttfamily}
 \lstdefinestyle{Vernacularstyle} {language=vernacular,basicstyle=\small\ttfamily}
 
 \def\pipe{\char`\|}
@@ -597,7 +584,24 @@ When we define a new constant in a transformation,
 We use $E[\Gamma] \vdash t \reltri (E;\glodef{c}{a}{T})[\Gamma] \vdash u$.
 
 \subsection{Inlining}\label{sec:inlining}
+
+\codegen{} apply delta-global reductions to inline definitions.
+
+Two command, \lstinline!CodeGen Global Inline! and \lstinline!CodeGen Local Inline!, specifies
+what definitions will be inlined.
+\begin{lstlisting}
+CodeGen Global Inline QUALID...
+CodeGen Local Inline QUALID : QUALID...
+\end{lstlisting}
+
+\lstinline[mathescape=true]!CodeGen Global Inline $c_1\ldots c_n$! specifies
+global constants $c_1\ldots c_n$ will be expanded.
+
+\lstinline[mathescape=true]!CodeGen Local Inline $c_0$ : $c_1\ldots c_n$! specifies
+global constants $c_1\ldots c_n$ will be expanded in $c_0$.
+
 \subsection{Strip Cast}\label{sec:strip-cast}
+
 \subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
 We apply eta-expansion to functions of top-level functions, fix-bounded functions, and closure generating lambdas.
 We consider explicit lambdas are closure generation.
