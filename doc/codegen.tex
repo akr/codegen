@@ -602,6 +602,12 @@ global constants $c_1\ldots c_n$ will be expanded in $c_0$.
 
 \subsection{Strip Cast}\label{sec:strip-cast}
 
+\codegen{} removes cast expressions.
+For example, \lstinline!(1 : nat) + 2! is transformed to \lstinline!1 + 2!.
+
+Note that we ignore casts mostly in this document.
+Even the \gallina{} syntax in \secref{sec:gallina-syntax} has no rule for casts.
+
 \subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
 We apply eta-expansion to functions of top-level functions, fix-bounded functions, and closure generating lambdas.
 We consider explicit lambdas are closure generation.
