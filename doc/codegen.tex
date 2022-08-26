@@ -25,7 +25,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,Global,Local,Inline,Arguments},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,Arguments},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -38,7 +38,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,Global,Local,Inline,Arguments},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,Arguments},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -587,17 +587,17 @@ We use $E[\Gamma] \vdash t \reltri (E;\glodef{c}{a}{T})[\Gamma] \vdash u$.
 
 \codegen{} apply delta-global reductions to inline definitions.
 
-Two command, \lstinline!CodeGen Global Inline! and \lstinline!CodeGen Local Inline!, specifies
+Two command, \lstinline!CodeGen GlobalInline! and \lstinline!CodeGen LocalInline!, specifies
 what definitions will be inlined.
 \begin{lstlisting}
-CodeGen Global Inline QUALID...
-CodeGen Local Inline QUALID : QUALID...
+CodeGen GlobalInline QUALID...
+CodeGen LocalInline QUALID : QUALID...
 \end{lstlisting}
 
-\lstinline[mathescape=true]!CodeGen Global Inline $c_1\ldots c_n$! specifies
+\lstinline[mathescape=true]!CodeGen GlobalInline $c_1\ldots c_n$! specifies
 global constants $c_1\ldots c_n$ will be expanded.
 
-\lstinline[mathescape=true]!CodeGen Local Inline $c_0$ : $c_1\ldots c_n$! specifies
+\lstinline[mathescape=true]!CodeGen LocalInline $c_0$ : $c_1\ldots c_n$! specifies
 global constants $c_1\ldots c_n$ will be expanded in $c_0$.
 
 \subsection{Strip Cast}\label{sec:strip-cast}

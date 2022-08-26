@@ -22,21 +22,21 @@ Fixpoint fastpow_iter a k x :=
 
 Definition fastpow a k := fastpow_iter a k 1.
 
-CodeGen Inductive Type bool => "bool".
-CodeGen Inductive Match bool => ""
+CodeGen InductiveType bool => "bool".
+CodeGen InductiveMatch bool => ""
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen Source File "sample/pow_generated.c".
+CodeGen SourceFile "sample/pow_generated.c".
 
 CodeGen Snippet "
 #include <stdbool.h> /* for bool, true and false */
 ".
 
-CodeGen Inductive Type nat => "nat".
-CodeGen Inductive Match nat => ""
+CodeGen InductiveType nat => "nat".
+CodeGen InductiveMatch nat => ""
 | O => "case 0"
 | S => "default" "nat_pred".
 CodeGen Constant O => "0".
@@ -61,7 +61,7 @@ CodeGen Snippet "
 #define uphalf(n) (((n)+1)>>1)
 ".
 
-CodeGen Static Function fastpow_iter.
-CodeGen Static Function fastpow.
+CodeGen StaticFunction fastpow_iter.
+CodeGen StaticFunction fastpow.
 
 CodeGen GenerateFile.

@@ -82,8 +82,8 @@ It is possible to configure code generation of inductive types.
       | S m' => add m' (S n)
       end.
 
-    CodeGen Inductive Type nat => "uint64_t".
-    CodeGen Inductive Match nat => ""
+    CodeGen InductiveType nat => "uint64_t".
+    CodeGen InductiveMatch nat => ""
     | O => "case 0"
     | S => "default" "pred".
     CodeGen Constant O => "0".

@@ -100,20 +100,20 @@ Definition rank_lookup aux i :=
   lookupD D1 j1 + lookupD D2 j2 +
   bcount b (j2 * sz2) j3 s.
 
-CodeGen Header File "sample/rank_generated.h".
-CodeGen Source File "sample/rank_generated.c".
+CodeGen HeaderFile "sample/rank_generated.h".
+CodeGen SourceFile "sample/rank_generated.c".
 
 CodeGen Linear MDArr.
 
-CodeGen Inductive Type bool => "bool".
-CodeGen Inductive Match bool => ""
+CodeGen InductiveType bool => "bool".
+CodeGen InductiveMatch bool => ""
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen Inductive Type nat => "nat".
-CodeGen Inductive Match nat => ""
+CodeGen InductiveType nat => "nat".
+CodeGen InductiveMatch nat => ""
 | O => "case 0"
 | S => "default" "predn".
 CodeGen Constant O => "0".
@@ -129,31 +129,31 @@ CodeGen Primitive eqb => "eqb".
 CodeGen Primitive negb => "negb".
 CodeGen Primitive eqn => "eqn".
 
-CodeGen Inductive Type bits => "bits".
-CodeGen Inductive Type DArr => "DArr".
-CodeGen Inductive Type MDArr => "MDArr".
+CodeGen InductiveType bits => "bits".
+CodeGen InductiveType DArr => "DArr".
+CodeGen InductiveType MDArr => "MDArr".
 CodeGen Deallocator MDArr => "dealloc_MDArr".
 
-CodeGen Inductive Type MDArr*MDArr => "pair_MDArr_MDArr".
-CodeGen Inductive Match MDArr*MDArr => ""
+CodeGen InductiveType MDArr*MDArr => "pair_MDArr_MDArr".
+CodeGen InductiveMatch MDArr*MDArr => ""
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
-CodeGen Deallocator (MDArr * MDArr) => "dealloc_MDArr_MDArr".
+CodeGen Deallocator prod MDArr MDArr => "dealloc_MDArr_MDArr".
 
-CodeGen Inductive Type MDArr*nat => "pair_MDArr_nat".
-CodeGen Inductive Match MDArr*nat => ""
+CodeGen InductiveType MDArr*nat => "pair_MDArr_nat".
+CodeGen InductiveMatch MDArr*nat => ""
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
-CodeGen Deallocator (MDArr * nat) => "dealloc_MDArr_nat".
+CodeGen Deallocator prod MDArr nat => "dealloc_MDArr_nat".
 
-CodeGen Inductive Type MDArr*MDArr*nat => "pair_2MDArr_nat".
-CodeGen Inductive Match MDArr*MDArr*nat => ""
+CodeGen InductiveType MDArr*MDArr*nat => "pair_2MDArr_nat".
+CodeGen InductiveMatch MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
-CodeGen Deallocator (MDArr * MDArr * nat) => "dealloc_2MDArr_nat".
+CodeGen Deallocator prod (prod MDArr MDArr) nat => "dealloc_2MDArr_nat".
 
-CodeGen Inductive Type Aux => "Aux".
-CodeGen Inductive Match Aux => ""
+CodeGen InductiveType Aux => "Aux".
+CodeGen InductiveMatch Aux => ""
 | mkAux => ""
   "aux_query_bit" "aux_input_bits" "aux_blksz2"
   "aux_ratio" "aux_dir1" "aux_dir2".
@@ -172,17 +172,17 @@ CodeGen Primitive pushD.
 CodeGen Primitive lookupD.
 
 (*
-CodeGen Static Function Nat.pred.
-CodeGen Static Function neq0.
-CodeGen Static Function buildDir2.
-CodeGen Static Function buildDir1.
-CodeGen Static Function buildDir.
+CodeGen StaticFunction Nat.pred.
+CodeGen StaticFunction neq0.
+CodeGen StaticFunction buildDir2.
+CodeGen StaticFunction buildDir1.
+CodeGen StaticFunction buildDir.
 *)
 
-CodeGen Static Function rank_init.
-CodeGen Static Function rank_lookup.
+CodeGen StaticFunction rank_init.
+CodeGen StaticFunction rank_lookup.
 
-CodeGen Resolve Dependencies.
+CodeGen ResolveDependencies.
 (*Print CodeGen Generation List.*)
 CodeGen GenerateFile.
 

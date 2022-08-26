@@ -234,7 +234,7 @@ let codegen_test_template
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
-    "CodeGen Source File \"gen.c\".\n" ^
+    "CodeGen SourceFile \"gen.c\".\n" ^
     "CodeGen Snippet " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent (expand_tab coq_commands) ^ "\n" ^
     "CodeGen GenerateFile" ^
@@ -302,12 +302,12 @@ let template_coq_success
     ctx coq_commands ""
 
 let unit_src = {|
-      CodeGen Inductive Type unit => "void".
+      CodeGen InductiveType unit => "void".
 |}
 
 let bool_src = {|
-      CodeGen Inductive Type bool => "bool".
-      CodeGen Inductive Match bool => ""
+      CodeGen InductiveType bool => "bool".
+      CodeGen InductiveMatch bool => ""
       | true => "default"
       | false => "case 0".
       CodeGen Constant true => "true".
@@ -319,8 +319,8 @@ let bool_src = {|
 |}
 
 let nat_src = {|
-      CodeGen Inductive Type nat => "nat".
-      CodeGen Inductive Match nat => ""
+      CodeGen InductiveType nat => "nat".
+      CodeGen InductiveMatch nat => ""
       | O => "case 0"
       | S => "default" "nat_pred".
       CodeGen Constant O => "0".
@@ -372,8 +372,8 @@ let nat_src = {|
 |}
 
 let list_bool_src = {|
-      CodeGen Inductive Type list bool => "list_bool".
-      CodeGen Inductive Match list bool => "list_bool_is_nil"
+      CodeGen InductiveType list bool => "list_bool".
+      CodeGen InductiveMatch list bool => "list_bool_is_nil"
       | nil => "default"
       | cons => "case 0" "list_bool_head" "list_bool_tail".
       CodeGen Constant nil bool => "((list_bool)NULL)".
@@ -412,8 +412,8 @@ let list_bool_src = {|
 |}
 
 let list_nat_src = {|
-      CodeGen Inductive Type list nat => "list_nat".
-      CodeGen Inductive Match list nat => "list_nat_is_nil"
+      CodeGen InductiveType list nat => "list_nat".
+      CodeGen InductiveMatch list nat => "list_nat_is_nil"
       | nil => "default"
       | cons => "case 0" "list_nat_head" "list_nat_tail".
       CodeGen Constant nil nat => "((list_nat)NULL)".
@@ -467,8 +467,8 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
-      CodeGen Inductive Type bool_pair => "bool_pair".
-      CodeGen Inductive Match bool_pair => ""
+      CodeGen InductiveType bool_pair => "bool_pair".
+      CodeGen InductiveMatch bool_pair => ""
       | bpair => "default" "bool_pair_fst" "bool_pair_snd".
       CodeGen Primitive bpair => "bpair".
 
@@ -553,8 +553,8 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Inductive singleton : Set := C : bool -> singleton.
-      CodeGen Inductive Type singleton => "singleton".
-      CodeGen Inductive Match singleton => ""
+      CodeGen InductiveType singleton => "singleton".
+      CodeGen InductiveMatch singleton => ""
       | C => "unused-case-label" "access".
       CodeGen Snippet "
       typedef bool singleton;
@@ -581,8 +581,8 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
-      CodeGen Inductive Type mybool => "mybool".
-      CodeGen Inductive Match mybool => ""
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => ""
       | mytrue => "default"
       | myfalse => "case 0".
       CodeGen Constant mytrue => "mytrue".
@@ -603,8 +603,8 @@ let test_mybool_true (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
-      CodeGen Inductive Type mybool => "mybool".
-      CodeGen Inductive Match mybool => ""
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => ""
       | mytrue => "default"
       | myfalse => "case 0".
       CodeGen Constant mytrue => "mytrue".
@@ -634,8 +634,8 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
 let test_pair_bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Inductive Type bool*bool => "pair_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "pair_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "make_pair_bool_bool".
       CodeGen Snippet "
@@ -663,13 +663,13 @@ let test_pair_bool_bool (ctx : test_ctxt) : unit =
 let test_pair_2bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Inductive Type bool*bool => "pair_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "pair_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "make_pair_bool_bool".
 
-      CodeGen Inductive Type bool*bool*bool => "pair_2bool_bool".
-      CodeGen Inductive Match bool*bool*bool => ""
+      CodeGen InductiveType bool*bool*bool => "pair_2bool_bool".
+      CodeGen InductiveMatch bool*bool*bool => ""
       | pair => "" "pair_2bool_bool_fst" "pair_2bool_bool_snd".
       CodeGen Primitive pair (bool*bool) bool => "make_pair_2bool_bool".
 
@@ -807,7 +807,7 @@ let test_add3 (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition add3 (n : nat) : nat := 3 + n.
-      CodeGen Global Inline Nat.add.
+      CodeGen GlobalInline Nat.add.
       CodeGen Function add3.
     |}) {|
       assert(add3(4) == 7);
@@ -818,7 +818,7 @@ let test_mul3 (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition mul3 (n : nat) : nat := 3 * n.
-      CodeGen Global Inline Nat.mul.
+      CodeGen GlobalInline Nat.mul.
       CodeGen Function mul3.
     |}) {|
       assert(mul3(4) == 12);
@@ -838,7 +838,7 @@ let test_even_odd (ctx : test_ctxt) : unit =
         | O => false
         | S n' => even n'
         end.
-      CodeGen Global Inline even.
+      CodeGen GlobalInline even.
       Definition even3 := even 3.
       CodeGen Function even.
       CodeGen Function odd.
@@ -1035,8 +1035,8 @@ let test_cast (ctx : test_ctxt) : unit =
     |}
 
 let bool_matchcount_src = {|
-      CodeGen Inductive Type bool => "bool".
-      CodeGen Inductive Match bool => "sw_bool"
+      CodeGen InductiveType bool => "bool".
+      CodeGen InductiveMatch bool => "sw_bool"
       | true => "default"
       | false => "case 0".
       CodeGen Constant true => "true".
@@ -1470,7 +1470,7 @@ let test_ackermann_plus1 (ctx : test_ctxt) : unit =
             end
           end.
       Definition f x y := let z := ack x y in S z.
-      CodeGen Global Inline ack.
+      CodeGen GlobalInline ack.
       CodeGen Function f.
     |}) {|
       assert(f(0, 0) == 2);
@@ -1583,7 +1583,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
       Require Import List.
       Definition map_succ (s : list nat) : list nat :=
         map S s.
-      CodeGen Global Inline map.
+      CodeGen GlobalInline map.
       CodeGen Function map_succ.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
@@ -1602,7 +1602,7 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
       CodeGen Function add1 => add1_p add1_s.
       Print add1_p.
       Fail Print add1_s.
-      CodeGen Simplify Function "add1_p".
+      CodeGen SimplifyFunction "add1_p".
       Print add1_s.
     |})
 
@@ -1610,8 +1610,8 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
   template_coq_success ctx
     (bool_src ^
     {|
-      CodeGen Inductive Type bool*bool => "pair_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "pair_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
       Definition swap_bb p := @swap bool bool p.
@@ -1693,7 +1693,7 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
         | S _ => mytrue
         end.
       CodeGen Function f.
-      CodeGen Inductive Type mybool => "mybool".
+      CodeGen InductiveType mybool => "mybool".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
     |}) {|
@@ -1909,7 +1909,7 @@ let test_mutual_static1 (ctx : test_ctxt) : unit =
         end.
       CodeGen Snippet "extern nat idnat1(nat v1_n);".
       CodeGen Function idnat1.
-      CodeGen Static Function idnat2.
+      CodeGen StaticFunction idnat2.
       CodeGen Snippet "static nat idnat2(nat v1_n);".
     |})
     {|
@@ -1932,7 +1932,7 @@ let test_mutual_static2 (ctx : test_ctxt) : unit =
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "extern nat idnat2(nat v1_n);".
-      CodeGen Static Function idnat1.
+      CodeGen StaticFunction idnat1.
       CodeGen Function idnat2.
       CodeGen Snippet "static nat idnat1(nat v1_n);".
     |})
@@ -2191,8 +2191,8 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       Set Primitive Projections. (* enables Proj *)
       Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
-      CodeGen Inductive Type bool_pair => "bool_pair".
-      CodeGen Inductive Match bool_pair => ""
+      CodeGen InductiveType bool_pair => "bool_pair".
+      CodeGen InductiveMatch bool_pair => ""
       | make_bool_pair => "" "bool_pair_fst" "bool_pair_snd".
       CodeGen Primitive make_bool_pair => "make_bool_pair".
 
@@ -2227,8 +2227,8 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       Set Primitive Projections. (* enables Proj *)
       Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
-      CodeGen Inductive Type bool_pair => "bool_pair".
-      CodeGen Inductive Match bool_pair => ""
+      CodeGen InductiveType bool_pair => "bool_pair".
+      CodeGen InductiveMatch bool_pair => ""
       | make_bool_pair => "" "bool_pair_fst" "bool_pair_snd".
       CodeGen Primitive make_bool_pair => "make_bool_pair".
 
@@ -2483,8 +2483,8 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Inductive Type option bool => "option_bool".
-      CodeGen Inductive Match option bool => "sw_option_bool"
+      CodeGen InductiveType option bool => "option_bool".
+      CodeGen InductiveMatch option bool => "sw_option_bool"
       | None => "default"
       | Some => "case option_bool_Some" "option_bool_Some_member1".
       CodeGen Primitive None bool => "None_bool".
@@ -2605,8 +2605,8 @@ let test_indimp_bool_pair (ctx : test_ctxt) : unit =
         end.
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_ynpair (ynpair_of_boolpair bb).
-      CodeGen Inductive Type bool*bool => "prod_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "prod_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
       CodeGen Snippet "
@@ -2648,8 +2648,8 @@ let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
         end.
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_ynpair (ynpair_of_boolpair bb).
-      CodeGen Inductive Type bool*bool => "prod_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "prod_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
       CodeGen Snippet "
@@ -2688,8 +2688,8 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
         end.
       Definition id_option_bool (ob : option bool) : option bool :=
         opt_of_myopt (myopt_of_opt ob).
-      CodeGen Inductive Type option bool => "option_bool".
-      CodeGen Inductive Match option bool => "sw_option_bool"
+      CodeGen InductiveType option bool => "option_bool".
+      CodeGen InductiveMatch option bool => "sw_option_bool"
       | Some => "default" "option_bool_get_some"
       | None => "case 0".
       CodeGen Primitive Some bool => "some_bool".
@@ -2731,8 +2731,8 @@ let test_indimp_record (ctx : test_ctxt) : unit =
         end.
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_bool2 (bool2_of_boolpair bb).
-      CodeGen Inductive Type bool*bool => "prod_bool_bool".
-      CodeGen Inductive Match bool*bool => ""
+      CodeGen InductiveType bool*bool => "prod_bool_bool".
+      CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
       CodeGen Snippet "
@@ -2834,8 +2834,8 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
-      CodeGen Header File "foo.h".
-      CodeGen Header Snippet "static void foo(void) {}".
+      CodeGen HeaderFile "foo.h".
+      CodeGen HeaderSnippet "static void foo(void) {}".
       CodeGen Snippet "#include ""foo.h""".
     |} {|
       foo();
@@ -2849,7 +2849,7 @@ let test_prototype (ctx : test_ctxt) : unit =
        So, this test examines that the prototype declaration exists. *)
     (bool_src ^
     {|
-      CodeGen Header File "foo.h".
+      CodeGen HeaderFile "foo.h".
       CodeGen Snippet "#include ""foo.h""".
       CodeGen Snippet "void f(void) { id_bool(true); }".
       CodeGen Function id bool => "id_bool".
@@ -2870,8 +2870,8 @@ let boolbox_src = {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
       CodeGen Linear boolbox.
-      CodeGen Inductive Type boolbox => "boolbox".
-      CodeGen Inductive Match boolbox => ""
+      CodeGen InductiveType boolbox => "boolbox".
+      CodeGen InductiveMatch boolbox => ""
       | BoolBox => "" "boolbox_get".
       CodeGen Deallocator boolbox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
@@ -2911,14 +2911,14 @@ let test_linear_types (ctx : test_ctxt) : unit =
 
       CodeGen Linear L.
 
-      CodeGen Test Unrestricted Type Type.
-      CodeGen Test Unrestricted Type nat -> nat.
-      CodeGen Test Unrestricted Type nat.
-      CodeGen Test Unrestricted Type list nat.
+      CodeGen TestUnrestrictedType Type.
+      CodeGen TestUnrestrictedType nat -> nat.
+      CodeGen TestUnrestrictedType nat.
+      CodeGen TestUnrestrictedType list nat.
 
-      CodeGen Test Linear Type L.
-      CodeGen Test Linear Type M.
-      CodeGen Test Linear Type list L.
+      CodeGen TestLinearType L.
+      CodeGen TestLinearType M.
+      CodeGen TestLinearType list L.
     |}) {| |}
 
 let test_linear_novar (ctx : test_ctxt) : unit =
@@ -3021,8 +3021,8 @@ let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
-      CodeGen Inductive Type boolbox*boolbox => "pair_boolbox_boolbox".
-      CodeGen Inductive Match boolbox*boolbox => ""
+      CodeGen InductiveType boolbox*boolbox => "pair_boolbox_boolbox".
+      CodeGen InductiveMatch boolbox*boolbox => ""
       | pair => "" "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
       CodeGen Primitive pair boolbox boolbox => "make_pair_boolbox_boolbox".
       CodeGen Snippet "
@@ -3118,7 +3118,7 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
           return (struct prod_T_T_struct){ arg1, arg2 };
         }
       ".
-      CodeGen Inductive Type T => "T".
+      CodeGen InductiveType T => "T".
       CodeGen Function f.
     |}) {|
       T x1 = C1();
@@ -3300,10 +3300,10 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
         #define sw_L(l) ((l) == NULL)
         #define LC2_tag 0
       ".
-      CodeGen Inductive Type L => "L".
-      CodeGen Inductive Match L => "sw_L" | LC1 => "default" | LC2 => "case 0" "L_member".
-      CodeGen Inductive Type B => "L".
-      CodeGen Inductive Match B => "sw_L" | BC1 => "default" | BC2 => "case 0" "L_member".
+      CodeGen InductiveType L => "L".
+      CodeGen InductiveMatch L => "sw_L" | LC1 => "default" | LC2 => "case 0" "L_member".
+      CodeGen InductiveType B => "L".
+      CodeGen InductiveMatch B => "sw_L" | BC1 => "default" | BC2 => "case 0" "L_member".
       CodeGen Function f.
     |}) {|
       assert(f(LC1()) == true);
@@ -3718,8 +3718,8 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       Definition f (x : TestRecord) : nat :=
         let x := umem x in
         constant_zero x.
-      CodeGen Inductive Type TestRecord => "TestRecord".
-      CodeGen Inductive Match TestRecord => ""
+      CodeGen InductiveType TestRecord => "TestRecord".
+      CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
       CodeGen Deallocator TestRecord => "dealloc_TestRecord".
@@ -3743,8 +3743,8 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       Set Primitive Projections.
       Record TestRecord : Set := mk { umem : unit; nmem : nat }.
       Definition f (x : TestRecord) : unit := umem x.
-      CodeGen Inductive Type TestRecord => "TestRecord".
-      CodeGen Inductive Match TestRecord => ""
+      CodeGen InductiveType TestRecord => "TestRecord".
+      CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
       CodeGen Deallocator TestRecord => "dealloc_TestRecord".

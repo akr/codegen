@@ -78,17 +78,17 @@ Compute sprintf (mkbuf 0) "bool:%b nat:%d" true 42 : buffer.
 
 Require Import codegen.codegen.
 
-CodeGen Source File "sample/sprintf_generated.c".
+CodeGen SourceFile "sample/sprintf_generated.c".
 
-CodeGen Inductive Type bool => "bool".
-CodeGen Inductive Match bool => ""
+CodeGen InductiveType bool => "bool".
+CodeGen InductiveMatch bool => ""
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen Inductive Type nat => "nat".
-CodeGen Inductive Match nat => ""
+CodeGen InductiveType nat => "nat".
+CodeGen InductiveMatch nat => ""
 | O => "case 0"
 | S => "default" "nat_pred".
 CodeGen Constant O => "0".
@@ -100,9 +100,9 @@ CodeGen Primitive Nat.mul => "nat_mul".
 CodeGen Primitive Nat.div => "nat_div".
 CodeGen Primitive Nat.modulo => "nat_mod".
 
-CodeGen Inductive Type ascii => "unsigned char".
+CodeGen InductiveType ascii => "unsigned char".
 CodeGen Primitive Ascii => "make_char".
-CodeGen Inductive Type buffer => "buffer".
+CodeGen InductiveType buffer => "buffer".
 
 CodeGen Primitive mkbuf => "make_buffer".
 CodeGen Primitive buf_addch => "buf_addch".
@@ -113,8 +113,8 @@ Definition add_mesg a b := sprintf (mkbuf 0) "%d + %d is %d" a b (a + b).
 Check add_mesg.
 
 CodeGen Linear buffer.
-CodeGen Static Function sprintf _ "%d + %d is %d".
-CodeGen Static Function add_mesg.
+CodeGen StaticFunction sprintf _ "%d + %d is %d".
+CodeGen StaticFunction add_mesg.
 
 (*Set Debug CodeGen Simplification.
 Set Debug CodeGen Reduction.*)

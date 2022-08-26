@@ -45,8 +45,8 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 }
 
 (*
-  CodeGen Inductive Type COQ_TYPE => "C_TYPE".
-  CodeGen Inductive Match COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
+  CodeGen InductiveType COQ_TYPE => "C_TYPE".
+  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -55,20 +55,20 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
   Example:
 
-  CodeGen Inductive Type bool => "bool".
-  CodeGen Inductive Match bool => "" | true => "default" | false => "case 0".
+  CodeGen InductiveType bool => "bool".
+  CodeGen InductiveMatch bool => "" | true => "default" | false => "case 0".
   CodeGen Primitive true => "true".
   CodeGen Primitive false => "false".
   Print CodeGen Inductive bool.
 
-  CodeGen Inductive Type nat => "uint64_t".
-  CodeGen Inductive Match nat => "" | O "case 0" | S "default" "pred".
+  CodeGen InductiveType nat => "uint64_t".
+  CodeGen InductiveMatch nat => "" | O "case 0" | S "default" "pred".
   CodeGen Primitive O => "0".
   CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
-  CodeGen Inductive Type option bool => "int".
-  CodeGen Inductive Match option bool => "" | None => "case -1" | Some => "default" "".
+  CodeGen InductiveType option bool => "int".
+  CodeGen InductiveMatch option bool => "" | None => "case -1" | Some => "default" "".
   CodeGen Primitive None bool => "(-1)".
   CodeGen Primitive Some bool => "(int)".
   Print CodeGen Inductive (option bool).
@@ -80,14 +80,14 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Arguments FUNCTION SorD*.
   CodeGen AutoArguments FUNCTION*.
   CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
-  CodeGen Static Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
+  CodeGen StaticFunction FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PRESIMP_NAME.
 
   CodeGen Snippet "...".                (* append the string into the source file *)
   CodeGen RawSnippet "...".             (* same as CodeGen Snippet but it does not strip indent *)
-  CodeGen Header Snippet "...".         (* append the string into the header file *)
-  CodeGen Header RawSnippet "...".      (* same as CodeGen Header Snippet but it does not strip indent *)
+  CodeGen HeaderSnippet "...".          (* append the string into the header file *)
+  CodeGen HeaderRawSnippet "...".       (* same as CodeGen Header Snippet but it does not strip indent *)
 
   CodeGen IndImp COQ_TYPE.
 
@@ -95,11 +95,11 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen GenerateTest.
   CodeGen Gen FUNCTION_OR_C_FUNCNAME+.
 
-  CodeGen Global Inline QUALID...
-  CodeGen Local Inline QUALID : QUALID...
+  CodeGen GlobalInline QUALID...
+  CodeGen LocalInline QUALID : QUALID...
 
-  CodeGen Simplify Function C_FUNCNAME*.
-  CodeGen Simplify Dependencies C_FUNCNAME*.
+  CodeGen SimplifyFunction C_FUNCNAME*.
+  CodeGen SimplifyDependencies C_FUNCNAME*.
 
   CodeGen Linear COQ_TYPE.
   CodeGen LinearCheck FUNCTION*.
@@ -107,10 +107,10 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
-  "CodeGen Function", "CodeGen Static Function" and "CodeGen Primitive"
+  "CodeGen Function", "CodeGen StaticFunction" and "CodeGen Primitive"
   declares C function name for a Gallina function.
   "CodeGen GenerateFile" generates functions declared by
-  "CodeGen Function" and "CodeGen Static Function".
+  "CodeGen Function" and "CodeGen StaticFunction".
   The actual C definition of functions declared by "CodeGen Primitive"
   should be provided by a user.
 
@@ -124,7 +124,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Function id nat => "id_nat" id_nat.
   CodeGen Function id nat => "id_nat" id_nat id_nat_specialized.
 
-  CodeGen Simplify Function id nat
+  CodeGen SimplifyFunction id nat
 
   Print CodeGen Specialization id.
 
@@ -195,14 +195,14 @@ VERNAC COMMAND EXTEND CodeGenQuery CLASSIFIED AS QUERY
       { command_print_inductive coq_type_list }
     | [ "Print" "CodeGen" "Specialization" ref_list(funcs)] ->
       { command_print_specialization funcs }
-    | [ "Print" "CodeGen" "Generation" "List"] ->
+    | [ "Print" "CodeGen" "GenerationList"] ->
       { command_print_generation_map () }
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
-    | [ "CodeGen" "Inductive" "Type" lconstr(coq_type) "=>" string(c_type) ] ->
+    | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
       { command_ind_type coq_type c_type }
-    | [ "CodeGen" "Inductive" "Match" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
     | [ "CodeGen" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
@@ -212,7 +212,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
       { command_function func args names }
-    | [ "CodeGen" "Static" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
+    | [ "CodeGen" "StaticFunction" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
       { command_static_function func args names }
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names2(names) ] ->
       { command_primitive func args names }
@@ -220,39 +220,39 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_constant func args names }
 
     | [ "CodeGen" "Snippet" string(str) ] -> { command_snippet str }
-    | [ "CodeGen" "Header" "Snippet" string(str) ] -> { command_header_snippet str }
+    | [ "CodeGen" "HeaderSnippet" string(str) ] -> { command_header_snippet str }
     | [ "CodeGen" "RawSnippet" string(str) ] -> { command_rawsnippet str }
-    | [ "CodeGen" "Header" "RawSnippet" string(str) ] -> { command_header_rawsnippet str }
+    | [ "CodeGen" "HeaderRawSnippet" string(str) ] -> { command_header_rawsnippet str }
 
     | [ "CodeGen" "IndImp" constr(coq_type) ] ->
       { command_indimp coq_type }
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
-    | [ "CodeGen" "Header" "File" string_or_none(fnopt) ] -> { current_header_filename := fnopt }
-    | [ "CodeGen" "Source" "File" string_or_none(fnopt) ] -> { current_source_filename := fnopt }
+    | [ "CodeGen" "HeaderFile" string_or_none(fnopt) ] -> { current_header_filename := fnopt }
+    | [ "CodeGen" "SourceFile" string_or_none(fnopt) ] -> { current_source_filename := fnopt }
 
     | [ "CodeGen" "GenerateFile" genflag_list(gflist) ] -> { command_generate_file gflist }
     | [ "CodeGen" "GenerateTest" genflag_list(gflist) ] -> { command_generate_test gflist }
 
-    | [ "CodeGen" "Global" "Inline" ref_list(funcs) ] ->
+    | [ "CodeGen" "GlobalInline" ref_list(funcs) ] ->
       { command_global_inline funcs }
-    | [ "CodeGen" "Local" "Inline" ref(func) ":" ref_list(funcs) ] ->
+    | [ "CodeGen" "LocalInline" ref(func) ":" ref_list(funcs) ] ->
       { command_local_inline func funcs }
 
-    | [ "CodeGen" "Simplify" "Function" string_list(cfuncs) ] ->
+    | [ "CodeGen" "SimplifyFunction" string_list(cfuncs) ] ->
       { command_simplify_function cfuncs }
-    | [ "CodeGen" "Simplify" "Dependencies" string_list(cfuncs) ] ->
+    | [ "CodeGen" "SimplifyDependencies" string_list(cfuncs) ] ->
       { command_simplify_dependencies cfuncs }
 
-    | [ "CodeGen" "Resolve" "Dependencies" ] ->
+    | [ "CodeGen" "ResolveDependencies" ] ->
       { command_resolve_dependencies () }
 
     | [ "CodeGen" "Linear" lconstr(ty) ] ->
       { command_linear ty }
-    | [ "CodeGen" "Test" "Linear" "Type" lconstr(t) ] ->
+    | [ "CodeGen" "TestLinearType" lconstr(t) ] ->
       { command_test_linear t }
-    | [ "CodeGen" "Test" "Unrestricted" "Type" lconstr(t) ] ->
+    | [ "CodeGen" "TestUnrestrictedType" lconstr(t) ] ->
       { command_test_unrestricted t }
 
     | [ "CodeGen" "Deallocator" ref(ind_or_cstr) constr_list(args) "=>" string(cfunc) ] ->
