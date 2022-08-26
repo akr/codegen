@@ -25,7 +25,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,Global,Local,Inline,Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
+  morekeywords=[4]{CodeGen,Global,Local,Inline,Arguments},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -38,7 +38,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,Global,Local,Inline,Monadify,Action,Monomorphization,Return,Bind,Pure,Monadification,Terminate,GenC,Reset},
+  morekeywords=[4]{CodeGen,Global,Local,Inline,Arguments},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -605,7 +605,7 @@ global constants $c_1\ldots c_n$ will be expanded in $c_0$.
 \codegen{} removes cast expressions.
 For example, \lstinline!(1 : nat) + 2! is transformed to \lstinline!1 + 2!.
 
-Note that we ignore casts mostly in this document.
+Note that we ignore casts in this document except this section.
 Even the \gallina{} syntax in \secref{sec:gallina-syntax} has no rule for casts.
 
 \subsection{Eta Expansion for Functions}\label{sec:eta-expand-funcs}
