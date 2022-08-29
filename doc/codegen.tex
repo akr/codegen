@@ -425,6 +425,19 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 % CoFix is ignored because lazy-evaluation is not suitable to C.
 % Proj is ignored because it is similar to \kwmatch.}
 
+\subsection{Global Context and Local Context}
+
+$E$ is a global environment which is a list of
+global assumptions $\gassum{c}{T}$,
+global definitions $\glodef{c}{t}{T}$, and
+inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
+
+$\Gamma$ is a local context which is a list of
+local assumptions $\lassum{x}{T}$ and
+local definitions $\ldef{x}{t}{T}$.
+The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
+The local definitions represent variables bounded by outer let-in.
+
 \subsection{\gallina{} Conversion Rules}\label{sec:conversion-rules}
 
 % based on sphinx/language/core/conversion.rst and doc/sphinx/language/core/inductive.rst
@@ -486,19 +499,6 @@ $\FV(t)$ is the free variables of $t$.
 \begin{itemize}
   \item We assume $\FV(T) = \varnothing$ because we consider non-dependent expressions.
 \end{itemize}}
-
-\subsection{Global Context and Local Context}
-
-$E$ is a global environment which is a list of
-global assumptions $\gassum{c}{T}$,
-global definitions $\glodef{c}{t}{T}$, and
-inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
-
-$\Gamma$ is a local context which is a list of
-local assumptions $\lassum{x}{T}$ and
-local definitions $\ldef{x}{t}{T}$.
-The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
-The local definitions represent variables bounded by outer let-in.
 
 \subsection{Syntactic Context}
 
