@@ -619,7 +619,7 @@ Thus match-branches doesn't trigger the eta expansion.)
   \text{etaex-top:}~
     \dfrac{
       E[] \vdash t : \prodT{x}{T}{U} \quad
-      \text{$t$ is not an abstraction nor fixpoint} \quad
+      \text{$t$ is neither an abstraction nor fixpoint} \quad
     }{
       E[] \vdash_\$ t \reltri \lamT{x}{T}{(t\:x)}
     } \breakrule
@@ -627,7 +627,7 @@ Thus match-branches doesn't trigger the eta expansion.)
     \dfrac{
       \begin{aligned}
         & E[\Gamma] \vdash t_i : \prodT{x}{T}{U} \quad
-          \text{$t_i$ is not an abstraction nor fixpoint} \\
+          \text{$t_i$ is neither an abstraction nor fixpoint} \\
         & K = \ofix{\repi{(f_l:=t_l)}{1\leq l < i} (f_i:=[]) \repi{(f_l:=t_l)}{i < l \leq h}}{f_j}
       \end{aligned}
     }{
@@ -637,7 +637,7 @@ Thus match-branches doesn't trigger the eta expansion.)
     \dfrac{
       \begin{aligned}
         & E[\Gamma] \vdash t : \prodT{x}{T}{U} \quad
-          \text{$t$ is not an abstraction nor fixpoint} \\
+          \text{$t$ is neither an abstraction nor fixpoint} \\
         & K = \lam{y}{[]}
       \end{aligned}
     }{
@@ -911,7 +911,7 @@ Static arguments are defined as follows by default.
     (The non-monomorphic argument means an argument which type is a sort or a polymorphic function type.)
   \item parameters for constructors.
 \end{itemize}
-The static arguments can be configured with \lstinline!CodeGen Arguments! command.
+The static arguments can be customized with \lstinline!CodeGen Arguments! command.
 
 This transformation makes that static arguments contain no variable bounded by let-ins
 because such variables are redex of delta reduction.
