@@ -993,24 +993,28 @@ Thus the result will be V-normal form again.
   \item The premise ``$t$ is a fixpoint'' guarantees the result is not partial application.
 \end{itemize}}
 
-This transformation is intended to remove eta-redexes introduced by static arguments and eta expansion (\secref{sec:eta-expand-funcs}).
-For example, assume the standard list concatenation function,
-$\textrm{app}: \forall A, \textrm{list}\:A \rightarrow \textrm{list}\:A \rightarrow \textrm{list}\:A$,
-is monomorphized to $\textrm{bool}$.
-
+\newcommand{\ttapp}{\texttt{app}}
+\newcommand{\ttlist}{\texttt{list}}
+\newcommand{\ttbool}{\texttt{bool}}
 \newcommand{\ttA}{\texttt{A}}
 \newcommand{\ttT}{\texttt{T}}
 \newcommand{\ttl}{\texttt{l}}
 \newcommand{\ttm}{\texttt{m}}
+
+This transformation is intended to remove eta-redexes introduced by static arguments and eta expansion (\secref{sec:eta-expand-funcs}).
+For example, assume the standard list concatenation function,
+$\ttapp: \forall \ttA, \ttlist\:\ttA \rightarrow \ttlist\:\ttA \rightarrow \ttlist\:\ttA$,
+is monomorphized to $\ttbool$.
+
 \begin{align*}
-  & \texttt{app}\:\texttt{bool} \\
-  \reltri_\textrm{inline}\; & (\lam{\ttA}{(\kwfix \ldots)})\:\texttt{bool} \\
-  \reltri_\textrm{eta-expansion}\; & \lam{\ttl}{\lam{\ttm}{(\lam{\ttA}{(\kwfix \ldots)})\:\texttt{bool}\:\ttl\:\ttm}} \\
-  \reltri_\textrm{V-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\lam{\ttA}{(\kwfix \ldots)})\:\ttT\:\ttl\:\ttm}}} \\
-  \reltri_\textrm{S-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\kwfix \ldots)\:\ttl\:\ttm}}} \\
-  \reltri_\textrm{Type-nomalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\texttt{bool}}{(\kwfix \ldots)\:\ttl\:\ttm}}} & \textrm{(expand $\ttT$ in the \kwfix-term)} \\
+  & \ttapp\:\ttbool \\
+  \reltri_\textrm{inline}\; & (\lam{\ttA}{(\kwfix \ldots)})\:\ttbool \\
+  \reltri_\textrm{eta-expansion}\; & \lam{\ttl}{\lam{\ttm}{(\lam{\ttA}{(\kwfix \ldots)})\:\ttbool\:\ttl\:\ttm}} \\
+  \reltri_\textrm{V-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\lam{\ttA}{(\kwfix \ldots)})\:\ttT\:\ttl\:\ttm}}} \\
+  \reltri_\textrm{S-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\kwfix \ldots)\:\ttl\:\ttm}}} \\
+  \reltri_\textrm{Type-nomalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\kwfix \ldots)\:\ttl\:\ttm}}} & \textrm{(expand $\ttT$ in the \kwfix-term)} \\
   \reltri_\textrm{unused-letin-deletion}\; & \lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}} \\
-  \reltri_\textrm{eta-reduction}\; & (\kwfix \ldots) \\
+  \reltri_\textrm{etared-fix}\; & (\kwfix \ldots) \\
 \end{align*}
 
 The code generator (\secref{sec:c-code-gen}) generates multiple C functions (\secref{sec:genfunm}) from the pre-eta-reduction term, $\lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}}$.
