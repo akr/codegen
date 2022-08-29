@@ -937,10 +937,10 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
       \begin{gathered}
         \text{$t$ is a constant or constructor} \\
         \text{$a_{|a|}$ is not a variable} \\
-        \rep{a} = \merg_t(\rep{x}, \rep{u}) \\
+        \rep{a} = \merg_t(\rep{u}, \rep{x}) \\
         \text{$\rep{y}$ are fresh variables} \quad
         |x| = |y| \\
-        \rep{b} = \merg_t(\rep{y}, \rep{u}) \\
+        \rep{b} = \merg_t(\rep{u}, \rep{y}) \\
         \text{$c$ is a fresh constant} \\
       \end{gathered}
     }{E[\Gamma] \vdash_K t\:\rep{a}\:\rep{z}
@@ -952,10 +952,10 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
 $K$ is a non-application context to restrict $t\:\rep{a}\:\rep{z}$ is not at a function position of an application.
 ($K = \$, (\lam{x}{[]})$, $(t\:[])$, $(\letin{x}{[]}{u})$, $(\letin{x}{t}{[]})$, or \ldots but NOT $([]\:u)$.)
 
-$\merg_t(\rep{x}, \rep{u})$ represents a sequence of terms which two sequences of terms are merged according to the static arguments definition of $t$.
-The first argument $\rep{x}$ specifies dynamic arguments.
-The second argument $\rep{u}$ specifies static arguments.
-For example, assuming the 1st and 4th arguments are static for $t$, $\merg_t((x_1, x_2, x_3), (u_1, u_2)) = (u_1, x_1, x_2, u_2, x_3)$.
+$\merg_t(\rep{u}, \rep{x})$ represents a sequence of terms which two sequences of terms are merged according to the static arguments definition of $t$.
+The first argument $\rep{u}$ specifies static arguments.
+The second argument $\rep{x}$ specifies dynamic arguments.
+For example, assuming the 1st and 4th arguments are static for $t$, $\merg_t((u_1, u_2), (x_1, x_2, x_3)) = (u_1, x_1, x_2, u_2, x_3)$.
 
 This transformation removes non-variable arguments from applications.
 Thus the result will be V-normal form again.
