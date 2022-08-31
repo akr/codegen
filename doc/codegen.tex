@@ -488,7 +488,6 @@ $\FV(t)$ is the free variables of $t$.
   \FV(x) &= \{x\} \\
   \FV(c) &= \varnothing \\
   \FV(C) &= \varnothing \\
-  \FV(T) &= \varnothing \\
   \FV(\lamT{x}{T}{t}) &= \FV(t) - \{x\} \\
   \FV(t\:u) &= \FV(t) \cup \FV(u) \\
   \FV(\letin{x}{t:T}{u}) &= \FV(t) \cup \FV(u) - \{x\} \\
@@ -497,7 +496,7 @@ $\FV(t)$ is the free variables of $t$.
 \end{align*}
 {\small Note:
 \begin{itemize}
-  \item We assume $\FV(T) = \varnothing$ because we consider non-dependent expressions.
+  \item We ommitted $\FV(T)$ here because it needs details of types.  It is defined as usual.
 \end{itemize}}
 
 \subsection{Syntactic Context}
@@ -1013,7 +1012,7 @@ is monomorphized to $\ttbool$.
   \reltri_\textrm{V-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\lam{\ttA}{(\kwfix \ldots)})\:\ttT\:\ttl\:\ttm}}} \\
   \reltri_\textrm{S-normalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\kwfix \ldots)\:\ttl\:\ttm}}} \\
   \reltri_\textrm{Type-nomalization}\; & \lam{\ttl}{\lam{\ttm}{\letin{\ttT}{\ttbool}{(\kwfix \ldots)\:\ttl\:\ttm}}} & \textrm{(expand $\ttT$ in the \kwfix-term)} \\
-  \reltri_\textrm{unused-letin-deletion}\; & \lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}} \\
+  \reltri_\textrm{zeta-del}\; & \lam{\ttl}{\lam{\ttm}{(\kwfix \ldots)\:\ttl\:\ttm}} \\
   \reltri_\textrm{etared-fix}\; & (\kwfix \ldots) \\
 \end{align*}
 
@@ -1187,19 +1186,17 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
         E[\Gamma] \vdash y ~|~(L_\text{item}, B^\text{used}_\text{item}, B^\text{result}_\text{item}) \\
         B_{ij} = B^\text{result}_\text{item} \cap \components_E(T_{ij}) \\
         \rep{\Gamma' = \rep{\lassum{x^{B}}{T}}} \\
-        \rep{\underline{E}[\underline{\Gamma} ; \Gamma'] \vdash t ~|~(L, B^\text{used}, B^\text{result})} \\
-        % M stands for member (of constructor).
-        % F stands for free variable.
-        \rep{L \cap \{\rep{x}\} = \{ z ~|~ z \in \{\rep{x}\} ~\wedge~ \text{$z$ is linear} \}} \\
-        \rep{L^\text{F} = L - \{\rep{x}\}} \quad
-        \tbigwedge_i L^\text{F}_1 = L^\text{F}_i \quad
-        L_\text{item} \cap L^{F}_1 = \varnothing \\
+        \rep{\underline{E}[\underline{\Gamma} ; \Gamma'] \vdash t ~|~(L^\text{branch}, B^\text{used}, B^\text{result})} \\
+        \rep{L^\text{branch} \cap \{\rep{x}\} = \{ z ~|~ z \in \{\rep{x}\} ~\wedge~ \text{$z$ is linear} \}} \\
+        \rep{L^\text{branch'} = L^\text{branch} - \{\rep{x}\}} \quad
+        \forall i, \forall j, \left(L^\text{branch'}_i = L^\text{branch'}_j\right) \quad
+        L_\text{item} \cap L^\text{branch'}_1 = \varnothing \\
         B^\text{used}_\text{branches} = \tbigcup_i ({B^\text{used}_i - \{\rep{x_i}\}}) \quad
         B^\text{result}_\text{branches} = \tbigcup_i (B^\text{result}_i - \{\rep{x_i}\}) \quad
         L_\text{item} \cap B^\text{used}_\text{branches} = \varnothing \\
       \end{gathered}
     }{
-      E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x{:}T} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{F}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
+      E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x{:}T} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{branch'}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
     } \breakrule
   \text{borrow-var-app:}~
     \dfrac{
@@ -1280,7 +1277,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \begin{gathered}
         \text{$t$ is a fixpoint} \\
         E[\Gamma;\rep{\lassum{x^\varnothing}{T}}] \vdash t ~|~ B \\
-        \forall z \in \{\rep{x}\}~ \text{$z$ is not linear} \\
+        \forall z \in \{\rep{x}\},~ \text{$z$ is not linear} \\
       \end{gathered}
     }{
       E[\Gamma] \vdash \lam{\rep{x{:}T}}{t} ~|~ B
@@ -1309,7 +1306,6 @@ We use a function $\components_E(T)$ to obtain the component types of a type $T$
 It returns a set of types or $\top$.
 $\top$ is a set which contains all types.
 $\components_E(T)$ is defined as the minimum set which satisfy following equations.
-
 \begin{align*}
   & \components_E(I\:\rep{t}) = \{I\:\rep{t}\} \cup \tbigcup_{(x{}:T) \in \Gamma_B} \components_E(T) \\
   & \begin{aligned}
@@ -1334,7 +1330,6 @@ $\subst{t}{\Gamma}{\rep{u}}$ represents the term $t$ which variables in $\Gamma$
 $\subst{\Gamma'}{\Gamma}{\rep{u}}$ represents the local context $\Gamma'$ which variables in $\Gamma$ are substituted with terms $\rep{u}$.
 If $\Gamma$ contains a local definition, its variable is substituted with the corresponding definition.
 ($\epsilon$ is the empty local context. $\varepsilon$ is the empty list of terms.)
-
 \begin{align*}
   \subst{t}{\epsilon}{\varepsilon} &= t \\
   \subst{t}{(\lassum{x}{T};\Gamma)}{(a\:\rep{u})} &= \subst{\subst{t}{x}{a}}{\subst{\Gamma}{x}{a}}{\rep{u}} \\
@@ -1346,14 +1341,12 @@ If $\Gamma$ contains a local definition, its variable is substituted with the co
 
 We mix borrow information and set of variables in set-operations.
 Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
-
 \begin{align*}
   B \cap L = L \cap B &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \in L \} \\
   B - L &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \not\in L \}
 \end{align*}
 
 We also mix borrow information and set of types (including $\top$) in set-operations.
-
 \begin{align*}
   B \cap D = D \cap B &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ T_i \in D \} & D = \{U_1, \ldots, U_n\} \\
   B \cap \top = \top \cap B &= B
