@@ -368,17 +368,17 @@ We use $|x|$ to represent the number of elements: $|x|=n$ if $x$ is an $n$-eleme
 \begin{itemize}
   \item $\NA_t$ is the number of arguments of $t$: \quad $\NA_t=m$ if $t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0$ and $T_0$ is an inductive type.
   \item $\NP_I$ is the number of the parameters of the inductive type $I$: \\
-    $\NP_I=p$ if $I$ is defined in an inductive definitions $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$.
+    $\NP_I=p$ if $I$ is defined in an inductive definition $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$.
   \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
     $\NI_I=|\arr{I}|$ where
     $\arr{t}$ is the arity of the inductive type $t$.
-    It means $(t : \forall (\Gamma_P; \arr{t}), S)$ is defined in $\Gamma_I$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
+    It means $(I : \forall (\Gamma_P; \arr{t}), S)$ is defined in $\Gamma_I$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
     $|\Gamma_P|$ = $p$ and $S$ is a sort.
   \item $\NM_C$ is the number of the members of the constructor $C$ (the number of arguments without the parameters for the inductive type): \\
     $\NM_C=|\Gamma|$ where
     $\Gamma$ is the non-parameter arguments of the constructor $C$.
-    It means $(t : \forall (\Gamma_P; \Gamma), S)$ is defined in $\Gamma_C$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
-    $|\Gamma_P|$ = $p$ and $S$ is a sort.
+    It means $(C : \forall (\Gamma_P; \Gamma), T)$ is defined in $\Gamma_C$ of $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$ in the global environment where
+    $|\Gamma_P|$ = $p$ and $T$ is an inductive type.
 \end{itemize}
 
 \subsection{Substitution}
@@ -1387,7 +1387,7 @@ we only need to change variable names in binders:
 \end{align*}
 
 \section{C Code Generation}\label{sec:c-code-gen}
-\subsection{The \gallina{} Subset For C Code Generation}\label{sec:gallinasubsetforcgen}
+\subsection{The \gallina{} Subset for C Code Generation}\label{sec:gallinasubsetforcgen}
 
 \begin{align*}
   \tD &= \lamT{x}{T}{\tD'} \\
@@ -1407,7 +1407,7 @@ we only need to change variable names in binders:
 \subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
 We detect inlinable fixpoints.
 ``Inlinable fixpoint'' means a fixpoint, $\ofix{\rep{f:=t}}{f_j}$,
-which all application to $f_i$ is located at the tail positions of $\rep{f}$.
+which all applications of $\rep{f}$ are located at the tail positions of $\rep{f}$.
 In this case, the continuation of the applications to $\rep{f}$
 in $\letin{x}{(\ofix{\rep{f:=t}}{f_j})\;\rep{y}}{u}$
 are always $\letin{x}{\Box}{u}$.
@@ -1481,8 +1481,8 @@ Definition c x y :=
 
 \codegen{} translate a \gallina{} application to C function call (if \kwgoto{} is not usable).
 In this scenario, \codegen{} generates C functions corresponding to internal functions \lstinline[style=Cstyle]!f! and \lstinline[style=Cstyle]!g!.
-The application, \lstinline!g m'!, is translated to \lstinline[style=Cstyle]!g(m')!.
-But it does not work because \lstinline!g! needs \lstinline!y!.
+The application in \gallina{}, \lstinline!g m'!, is translated to \lstinline[style=Cstyle]!g(m')! in C.
+But it does not work because \lstinline!g! needs \lstinline!y! but the global C function \lstinline[style=Cstyle]!g! does not know \lstinline!y!.
 Also, \lstinline!g! needs \lstinline!f!.
 Although there is the C function \lstinline!f!, \lstinline!f! needs \lstinline!x!.
 Thus, \codegen{} need to add extra arguments as \lstinline[style=Cstyle]!g(x, y, m')! which is similar to lambda-lifting.
@@ -1521,7 +1521,7 @@ If $x$ is not a fix-bounded function, $\FIXFV(x)=\varnothing$.
 \]
 
 $\EXARGS'(x)$ is a set which satisfy the following conditions.
-$\EXARGS'(f)$ is similar to $\FIXFV(f)$ which is the set of free variables of the fixpoint which bounds $f$.
+$\EXARGS'(f)$ is similar to $\FIXFV(f)$.
 But if it contains a function bounded by an outer fixpoint, the free variable of the outer fixpoint are also contained.
 
 \begin{align*}
