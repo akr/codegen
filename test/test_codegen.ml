@@ -1606,6 +1606,18 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
       Print add1_s.
     |})
 
+let test_specialized_func_with_presimp_name (ctx : test_ctxt) : unit =
+  template_coq_success ctx
+    (nat_src ^
+    {|
+      Definition myadd := Nat.add.
+      CodeGen Func myadd 1 => myadd1 myadd1_s.
+      Print myadd1.
+      Fail Print myadd1_s.
+      CodeGen SimplifyFunction "myadd1".
+      Print myadd1_s.
+    |})
+
 let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : unit =
   template_coq_success ctx
     (bool_src ^
@@ -3823,6 +3835,7 @@ let suite : OUnit2.test =
     "test_sum_nested_fix" >:: test_sum_nested_fix;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name;
+    "test_specialized_func_with_presimp_name" >:: test_specialized_func_with_presimp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_letin_in_constructor_type" >:: test_letin_in_constructor_type;
     "test_mftest" >:: test_mftest;
