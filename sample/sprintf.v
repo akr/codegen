@@ -113,8 +113,8 @@ Definition add_mesg a b := sprintf (mkbuf 0) "%d + %d is %d" a b (a + b).
 Check add_mesg.
 
 CodeGen Linear buffer.
-CodeGen StaticFunction sprintf _ "%d + %d is %d".
-CodeGen StaticFunction add_mesg.
+CodeGen StaticFunc sprintf _ "%d + %d is %d".
+CodeGen StaticFunc add_mesg.
 
 (*Set Debug CodeGen Simplification.
 Set Debug CodeGen Reduction.*)

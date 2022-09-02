@@ -168,7 +168,7 @@ let downward_type_set = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"
 
 let borrow_function_set = Summary.ref
-  (Cset.empty : Cset.t) ~name:"CodeGenBorrowFunctionSet"
+  (Cset.empty : Cset.t) ~name:"CodeGenBorrowFuncSet"
 
 let borrow_type_set = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
@@ -179,9 +179,9 @@ type simplified_status =
 | SpDefined of (Constant.t * StringSet.t) (* (defined-constant, referred-cfuncs) *)
 
 (*
-- CodeGenFunction
+- CodeGenFunc
   Codegen-generated function.  Gallina function only.  Any dynamic argument.
-- CodeGenStaticFunction
+- CodeGenStaticFunc
   Codegen-generated function.  Gallina function only.  Any dynamic argument.
   The generated function is defined as static function.
 - CodeGenPrimitive
@@ -191,8 +191,8 @@ type simplified_status =
   Generate C constant "foo", instead of function call "foo()".
 *)
 type instance_command =
-| CodeGenFunction
-| CodeGenStaticFunction
+| CodeGenFunc
+| CodeGenStaticFunc
 | CodeGenPrimitive
 | CodeGenConstant
 
@@ -223,10 +223,10 @@ let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config
 let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 
-(* CodeGenFunction and CodeGenStaticFunction needs unique C function name
+(* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunction or CodeGenStaticFunction *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunc or CodeGenStaticFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"

@@ -16,15 +16,15 @@ CodeGen Constant O => "0".
 CodeGen Primitive S => "succn".
 
 Definition succ2 n := S (S n).
-CodeGen Function succ2.
+CodeGen Func succ2.
 CodeGen Gen "succ2".
 
 Inductive TestType2 (A B : Type) := TestCons2 : A -> B -> TestType2 A B.
 Definition non_mangled_code := TestCons2 bool nat.
-CodeGen Function non_mangled_code => non_mangled_code_p non_mangled_code_s.
+CodeGen Func non_mangled_code => non_mangled_code_p non_mangled_code_s.
 Print non_mangled_code_p.
 Fail Print non_mangled_code_s.
-CodeGen Specialize "non_mangled_code".
+CodeGen SimplifyFunction "non_mangled_code_p".
 Print non_mangled_code_s.
 
 CodeGen InductiveType bool*bool => "pair_bool_bool".
@@ -34,10 +34,10 @@ CodeGen Primitive pair bool bool => "make_pair_bool_bool".
 
 Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
 Definition swap_bb p := @swap bool bool p.
-CodeGen Function swap bool bool => swap_p swap_s.
-CodeGen Function swap_bb => swap_bb_p swap_bb_s.
-CodeGen Specialize "swap_bb".
-CodeGen Specialize "swap".
+CodeGen Func swap bool bool => swap_p swap_s.
+CodeGen Func swap_bb => swap_bb_p swap_bb_s.
+CodeGen SimplifyFunction "swap_bb_p".
+CodeGen SimplifyFunction "swap_p".
 Print swap_bb_p.
 Print swap_bb_s.
 Print swap_p.
@@ -51,7 +51,7 @@ Print swap_s.
 Print swap_bb_p.
 Print swap_bb_s.
 
-CodeGen Gen "swap" "swap_bb".
+CodeGen Gen "swap_p" "swap_bb_p".
 (*
 static pair_bool_bool
 swap(pair_bool_bool v1_p)
@@ -70,7 +70,7 @@ swap_bb(pair_bool_bool v1_p)
 }
 *)
 
-CodeGen Function negb.
+CodeGen Func negb.
 CodeGen Gen "negb".
 (*
 static bool
@@ -87,46 +87,46 @@ negb(bool v1_b)
 *)
 
 Definition plus_1_2 := 1 + 2.
-CodeGen Function plus_1_2.
+CodeGen Func plus_1_2.
 CodeGen Gen "plus_1_2".
 
 Definition foo1 := fun (x : nat) => x.
-CodeGen Function foo1.
+CodeGen Func foo1.
 CodeGen Gen "foo1".
 
 Definition foo2 := fun (x : nat) => let y := x in y.
-CodeGen Function foo2.
+CodeGen Func foo2.
 CodeGen Gen "foo2".
 
 Definition foo3 := fun (x : nat) => let y := x in y.
-CodeGen Function foo3.
+CodeGen Func foo3.
 CodeGen Gen "foo3".
 
 Definition foo4 := fun (x y : nat) => x + y.
-CodeGen Function foo4.
+CodeGen Func foo4.
 CodeGen Gen "foo4".
 
 Definition foo5 := fun (x y z : nat) => x + y + z.
-CodeGen Function foo5.
+CodeGen Func foo5.
 CodeGen Gen "foo5".
 
 Definition foo6 := fun (x : nat) => match x with O => x | S _ => x end.
-CodeGen Function foo6.
+CodeGen Func foo6.
 CodeGen Gen "foo6".
 
 Definition zero := 0.
 Definition foo7 := zero.
-CodeGen Function zero.
-CodeGen Function foo7.
+CodeGen Func zero.
+CodeGen Func foo7.
 CodeGen Gen "zero".
 CodeGen Gen "foo7".
 
 Definition foo8 := fun (x : nat) => x + zero.
-CodeGen Function foo8.
+CodeGen Func foo8.
 CodeGen Gen "foo8".
 
 Definition foo9 := fun (x : nat) => match x with O => zero | S n => n + x end + x.
-CodeGen Function foo9.
+CodeGen Func foo9.
 CodeGen Gen "foo9".
 
 Section Sec1.
@@ -134,8 +134,8 @@ Variable a : nat.
 Fixpoint foo10 b := a + b.
 End Sec1.
 Definition foo10' := foo10.
-CodeGen Function foo10 => "foo10".
-CodeGen Function foo10' => "foo10x".
+CodeGen Func foo10 => "foo10".
+CodeGen Func foo10' => "foo10x".
 Print CodeGen Specialization.
 CodeGen Gen "foo10".
 
@@ -145,7 +145,7 @@ Fixpoint add1 a b :=
   | 0 => b
   | S n => S (add1 n b)
   end.
-CodeGen Function add1.
+CodeGen Func add1.
 CodeGen Gen "add1".
 
 (* tail recursion which is translated into goto *)
@@ -154,7 +154,7 @@ Fixpoint add2 a b :=
   | 0 => b
   | S n => add2 n (S b)
   end.
-CodeGen Function add2.
+CodeGen Func add2.
 CodeGen Gen "add2".
 
 Section Sec2.
@@ -165,7 +165,7 @@ Fixpoint add3 b :=
   | S n => S (add3 n)
   end.
 End Sec2.
-CodeGen Function add3.
+CodeGen Func add3.
 CodeGen Gen "add3".
 
 (* needs tmp. variable to swap x and y at tail recursion *)
@@ -174,7 +174,7 @@ Fixpoint swapargtest (n x y : nat) :=
   | 0 => x
   | S nn => swapargtest nn y x
   end.
-CodeGen Function swapargtest.
+CodeGen Func swapargtest.
 CodeGen Gen "swapargtest".
 
 (* mutual recursion.  only tail calls *)
@@ -197,11 +197,11 @@ Compute oddp 1.
 Compute oddp 2.
 
 (* beginning goto not required because the entry function is beginning *)
-CodeGen Function evenp.
+CodeGen Func evenp.
 CodeGen Gen "evenp".
 
 (* generate beginning goto because the entry function is not beginning *)
-CodeGen Function oddp.
+CodeGen Func oddp.
 CodeGen Gen "oddp".
 
 (* strange_pow2 n m = 2 ^ n + m *)
@@ -225,7 +225,7 @@ Compute strange_pow2 2 0.
 Compute strange_pow2 3 0.
 Compute strange_pow2 4 0.
 
-CodeGen Function strange_pow2.
+CodeGen Func strange_pow2.
 CodeGen Gen "strange_pow2".
 
 (* Two non-tail call.  No tail call. *)
@@ -245,7 +245,7 @@ Compute fib 5.
 Compute fib 6.
 Compute fib 7.
 
-CodeGen Function fib.
+CodeGen Func fib.
 CodeGen Gen "fib".
 
 (* mutually recursive.  tail call and non-tail call *)
@@ -269,7 +269,7 @@ Compute fib2 5.
 Compute fib2 6.
 Compute fib2 7.
 
-CodeGen Function fib2.
+CodeGen Func fib2.
 CodeGen Gen "fib2".
 
 (* artificial example.
@@ -290,10 +290,10 @@ with mftest3 n :=
   | S nn => mftest nn
   end.
 Compute mftest 5.
-CodeGen Function mftest.
+CodeGen Func mftest.
 Print CodeGen Specialization.
-CodeGen Specialize "mftest".
-Print codegen_s31_mftest.
+CodeGen SimplifyFunction "mftest".
+Print codegen_s27_mftest.
 CodeGen Gen "mftest".
 
 Fixpoint pow a k :=
@@ -301,7 +301,7 @@ Fixpoint pow a k :=
   | O => 1
   | S k' => a * pow a k'
   end.
-CodeGen Function pow.
+CodeGen Func pow.
 CodeGen Gen "pow".
 (*
 static nat
@@ -325,11 +325,11 @@ pow(nat v1_a, nat v2_k)
 
 Definition TypeAlias := unit.
 Definition f (x : TypeAlias) := x.
-CodeGen Function f.
-CodeGen Specialize "f".
-Print codegen_s34_f.
+CodeGen Func f.
+CodeGen SimplifyFunction "f".
+Print codegen_s30_f.
 
 Definition foo11 n := let ret := if n is 0 then 0 else 0 - n in ret.
-CodeGen Function foo11.
+CodeGen Func foo11.
 CodeGen Gen "foo11".
 

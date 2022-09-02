@@ -52,8 +52,8 @@ type simplified_status =
   | SpExpectedId of Names.Id.t (* simplified_id *)
   | SpDefined of (Names.Constant.t * StringSet.t)
 type instance_command =
-    CodeGenFunction
-  | CodeGenStaticFunction
+    CodeGenFunc
+  | CodeGenStaticFunc
   | CodeGenPrimitive
   | CodeGenConstant
 type specialization_instance = {
@@ -75,7 +75,7 @@ val gallina_instance_map :
   (specialization_config * specialization_instance) ConstrMap.t ref
 
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunction or CodeGenStaticFunction *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunc or CodeGenStaticFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 val cfunc_instance_map :
   cfunc_usage CString.Map.t ref

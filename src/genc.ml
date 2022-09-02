@@ -1749,8 +1749,8 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 
 let is_static_function_icommand (icommand : instance_command) : bool =
   match icommand with
-  | CodeGenFunction -> false
-  | CodeGenStaticFunction -> true
+  | CodeGenFunc -> false
+  | CodeGenStaticFunc -> true
   | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
   | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
 
@@ -1931,7 +1931,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
             user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));
           let (env, sp_inst) =
             match ConstrMap.find_opt func sp_cfg.sp_instance_map with
-            | None -> codegen_define_instance env sigma CodeGenFunction func [] None
+            | None -> codegen_define_instance env sigma CodeGenFunc func [] None
             | Some sp_inst -> (env, sp_inst)
           in
           GenFunc sp_inst.sp_cfunc_name)

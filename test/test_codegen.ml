@@ -445,7 +445,7 @@ let test_tail_rel (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
-      CodeGen Function mono_id_bool => "mono_id_bool".
+      CodeGen Func mono_id_bool => "mono_id_bool".
     |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
@@ -456,8 +456,8 @@ let test_tail_constructor_bool (ctx : test_ctxt) : unit =
     (bool_src ^ {|
       Definition constructor_true : bool := true.
       Definition constructor_false : bool := false.
-      CodeGen Function constructor_true.
-      CodeGen Function constructor_false.
+      CodeGen Func constructor_true.
+      CodeGen Func constructor_false.
     |}) {|
       assert(constructor_true() == true);
       assert(constructor_false() == false);
@@ -480,7 +480,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
       ".
 
       Definition call_bpair a b : bool_pair := bpair a b.
-      CodeGen Function call_bpair.
+      CodeGen Func call_bpair.
     |}) {|
       assert(call_bpair(false, false) == 0);
       assert(call_bpair(false, true) == 1);
@@ -501,8 +501,8 @@ let test_tail_constant_bool (ctx : test_ctxt) : unit =
       CodeGen Primitive my_false.
       Definition constant_true : bool := my_true.
       Definition constant_false : bool := my_false.
-      CodeGen Function constant_true.
-      CodeGen Function constant_false.
+      CodeGen Func constant_true.
+      CodeGen Func constant_false.
     |})
     {|
       assert(constant_true() == true);
@@ -515,7 +515,7 @@ let test_tail_constant_args (ctx : test_ctxt) : unit =
       CodeGen Primitive negb.
       CodeGen Snippet "#define negb(b) (!(b))".
       Definition call_negb (b : bool) : bool := negb b.
-      CodeGen Function call_negb.
+      CodeGen Func call_negb.
     |}) {|
       assert(call_negb(false) == true);
       assert(call_negb(true) == false);
@@ -529,7 +529,7 @@ let test_tail_match_bool (ctx : test_ctxt) : unit =
         | true => false
         | false => true
         end.
-      CodeGen Function f => "f".
+      CodeGen Func f => "f".
     |}) {|
       assert(f(true) == false);
       assert(f(false) == true);
@@ -543,7 +543,7 @@ let test_tail_match_nat (ctx : test_ctxt) : unit =
         | O => false
         | S n' => true
         end.
-      CodeGen Function f => "f".
+      CodeGen Func f => "f".
     |}) {|
       assert(f(0) == false);
       assert(f(1) == true);
@@ -561,7 +561,7 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
       #define access(s) s
       ".
       Definition f (x : singleton) := match x with C y => y end.
-      CodeGen Function f => "f".
+      CodeGen Func f => "f".
     |}) {|
       assert(f(true) == true);
       assert(f(false) == false);
@@ -571,7 +571,7 @@ let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
-      CodeGen Function mono_id_bool => "mono_id_bool".
+      CodeGen Func mono_id_bool => "mono_id_bool".
     |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
@@ -593,7 +593,7 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
       #define myfalse 0
       ".
       Definition mono_id_mybool (b : mybool) := b.
-      CodeGen Function mono_id_mybool => "mono_id_mybool".
+      CodeGen Func mono_id_mybool => "mono_id_mybool".
     |}) {|
       assert(mono_id_mybool(mytrue) == mytrue);
       assert(mono_id_mybool(myfalse) == myfalse);
@@ -615,7 +615,7 @@ let test_mybool_true (ctx : test_ctxt) : unit =
       #define myfalse 0
       ".
       Definition mybool_true (b : mybool) := mytrue.
-      CodeGen Function mybool_true => "mybool_true".
+      CodeGen Func mybool_true => "mybool_true".
     |}) {|
       assert(mybool_true(mytrue) == mytrue);
       assert(mybool_true(myfalse) == mytrue);
@@ -625,7 +625,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Definition mono_id_bool (b : bool) := b.
-      CodeGen Function mono_id_bool.
+      CodeGen Func mono_id_bool.
     |}) {|
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
@@ -649,8 +649,8 @@ let test_pair_bool_bool (ctx : test_ctxt) : unit =
       ".
       Definition fst_pair (v : bool * bool) := match v with pair x y => x end.
       Definition snd_pair (v : bool * bool) := match v with pair x y => y end.
-      CodeGen Function fst_pair.
-      CodeGen Function snd_pair.
+      CodeGen Func fst_pair.
+      CodeGen Func snd_pair.
     |}) {|
       pair_bool_bool v = make_pair_bool_bool(true, false);
       assert(fst_pair(v) == true);
@@ -685,8 +685,8 @@ let test_pair_2bool_bool (ctx : test_ctxt) : unit =
       ".
       Definition fst_pair (v : bool * bool * bool) := match v with pair x y => x end.
       Definition snd_pair (v : bool * bool * bool) := match v with pair x y => y end.
-      CodeGen Function fst_pair.
-      CodeGen Function snd_pair.
+      CodeGen Func fst_pair.
+      CodeGen Func snd_pair.
     |}) {|
       pair_2bool_bool v;
       v = make_pair_2bool_bool(make_pair_bool_bool(true, false), true);
@@ -707,7 +707,7 @@ let test_nat_add_rec (ctx : test_ctxt) : unit =
         | O => n
         | S m' => S (my_add_rec m' n)
         end.
-      CodeGen Function my_add_rec.
+      CodeGen Func my_add_rec.
     |}) {|
       assert(my_add_rec(2,3) == 5);
     |}
@@ -720,7 +720,7 @@ let test_nat_add_iter (ctx : test_ctxt) : unit =
         | O => n
         | S m' => my_add_iter m' (S n)
         end.
-      CodeGen Function my_add_iter.
+      CodeGen Func my_add_iter.
     |}) {|
       assert(my_add_iter(2,3) == 5);
     |}
@@ -733,7 +733,7 @@ let test_list_bool (ctx : test_ctxt) : unit =
         | nil => true
         | cons _ _ => false
         end.
-      CodeGen Function is_nil.
+      CodeGen Func is_nil.
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       assert(is_nil(NULL));
@@ -749,7 +749,7 @@ let test_list_bool_length (ctx : test_ctxt) : unit =
         | nil => 0
         | cons x s' => S (length s')
         end.
-      CodeGen Function length.
+      CodeGen Func length.
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       assert(length(NULL) == 0);
@@ -766,7 +766,7 @@ let test_sum (ctx : test_ctxt) : unit =
         | nil => 0
         | cons x s' => x + sum s'
         end.
-      CodeGen Function sum.
+      CodeGen Func sum.
     |}) {|
       #define cons(h,t) list_nat_cons(h,t)
       assert(sum(NULL) == 0);
@@ -779,7 +779,7 @@ let test_nil_nat (ctx : test_ctxt) : unit =
     (nat_src ^ list_nat_src ^
     {|
       Definition nil_nat := @nil nat.
-      CodeGen Function nil_nat.
+      CodeGen Func nil_nat.
     |}) {|
       list_nat s = nil_nat();
       assert(s == NULL);
@@ -790,7 +790,7 @@ let test_singleton_list (ctx : test_ctxt) : unit =
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Definition singleton_list (n : nat) : list nat := cons n nil.
-      CodeGen Function singleton_list.
+      CodeGen Func singleton_list.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -808,7 +808,7 @@ let test_add3 (ctx : test_ctxt) : unit =
     {|
       Definition add3 (n : nat) : nat := 3 + n.
       CodeGen GlobalInline Nat.add.
-      CodeGen Function add3.
+      CodeGen Func add3.
     |}) {|
       assert(add3(4) == 7);
     |}
@@ -819,7 +819,7 @@ let test_mul3 (ctx : test_ctxt) : unit =
     {|
       Definition mul3 (n : nat) : nat := 3 * n.
       CodeGen GlobalInline Nat.mul.
-      CodeGen Function mul3.
+      CodeGen Func mul3.
     |}) {|
       assert(mul3(4) == 12);
     |}
@@ -840,9 +840,9 @@ let test_even_odd (ctx : test_ctxt) : unit =
         end.
       CodeGen GlobalInline even.
       Definition even3 := even 3.
-      CodeGen Function even.
-      CodeGen Function odd.
-      CodeGen Function even3.
+      CodeGen Func even.
+      CodeGen Func odd.
+      CodeGen Func even3.
     |}) {|
       assert(even(0) == true);
       assert(even(1) == false);
@@ -875,8 +875,8 @@ let test_even_odd_count (ctx : test_ctxt) : unit =
         | O => false
         | S n' => even n'
         end.
-      CodeGen Function even.
-      CodeGen Function odd.
+      CodeGen Func even.
+      CodeGen Func odd.
     |})
     ~modify_generated_source:
       (fun s ->
@@ -916,7 +916,7 @@ let test_inner_fix_even_odd_1 (ctx : test_ctxt) : unit =
           | S n' => even n'
           end
         for even) n.
-      CodeGen Function even.
+      CodeGen Func even.
     |}) {|
       assert(even(0) == true);
       assert(even(1) == false);
@@ -941,7 +941,7 @@ let test_inner_fix_even_odd_2 (ctx : test_ctxt) : unit =
           | S n' => odd n'
           end
         for even) n.
-      CodeGen Function even.
+      CodeGen Func even.
     |}) {|
       assert(even(0) == true);
       assert(even(1) == false);
@@ -966,8 +966,8 @@ let test_two_even (ctx : test_ctxt) : unit =
         with odd (m : nat) : bool :=
           match m with | O => false | S n => even n end
         for even.
-      CodeGen Function even1.
-      CodeGen Function even2.
+      CodeGen Func even1.
+      CodeGen Func even2.
     |}) {|
       assert(even1(0) == true);
       assert(even1(1) == false);
@@ -986,7 +986,7 @@ let test_app_let (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition foo := (let x := 1 in Nat.add x) 2.
-      CodeGen Function foo.
+      CodeGen Func foo.
     |}) {|
       assert(foo() == 3);
     |}
@@ -1000,7 +1000,7 @@ let test_app_match (ctx : test_ctxt) : unit =
         | true => Nat.add 10
         | false => Nat.sub 10
         end) n.
-      CodeGen Function add_or_sub.
+      CodeGen Func add_or_sub.
     |}) {|
       assert(add_or_sub(true, 1) == 11);
       assert(add_or_sub(true, 2) == 12);
@@ -1015,7 +1015,7 @@ let test_let_app_match (ctx : test_ctxt) : unit =
       Definition f a b :=
         let g := Nat.add in
         (match tt with tt => g end) a b.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0, 0) == 0);
       assert(f(0, 1) == 1);
@@ -1029,7 +1029,7 @@ let test_cast (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition nat_id (n : nat) : nat := (n : nat) + 0.
-      CodeGen Function nat_id.
+      CodeGen Func nat_id.
     |}) {|
       assert(nat_id(4) == 4);
     |}
@@ -1056,7 +1056,7 @@ let test_beta_var_presimp (ctx : test_ctxt) : unit =
       Definition f (b : bool) : nat :=
         let g := (fun (b2 : bool) => if b2 then Nat.add else Nat.sub) b in
         g 1 1 + g 2 2.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(true) == 6);
       assert(bool_match_count == 2);
@@ -1075,7 +1075,7 @@ let test_matchapp_before_reduction (ctx : test_ctxt) : unit =
           fun z:bool => if z then 0 else 1
         else
           fun z:bool => if z then 2 else 3) y.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(true) == 0);
       assert(bool_match_count == 1);
@@ -1088,7 +1088,7 @@ let test_delta_fun_constant (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition add (a b : nat) : nat := let f := Nat.add in f a b.
-      CodeGen Function add.
+      CodeGen Func add.
     |}) {|
       assert(add(2,3) == 5);
     |}
@@ -1098,7 +1098,7 @@ let test_delta_fun_constructor (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition succ (n : nat) : nat := let f := S in f n.
-      CodeGen Function succ.
+      CodeGen Func succ.
     |}) {|
       assert(succ(2) == 3);
     |}
@@ -1108,7 +1108,7 @@ let test_delta_fun_lambda (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition succ (n : nat) : nat := let f x := S x in f n.
-      CodeGen Function succ.
+      CodeGen Func succ.
     |}) {|
       assert(succ(2) == 3);
     |}
@@ -1124,7 +1124,7 @@ let test_delta_fun_nested_let (ctx : test_ctxt) : unit =
         | O => false
         | S _ => true
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0) == true);
     |}
@@ -1142,8 +1142,8 @@ let test_reduce_proj (ctx : test_ctxt) : unit =
       Record TestRecord (par:Type) : Set := mk { f0 : nat; f1 : nat }.
       Definition f0_mk a b : nat := f0 bool (mk bool a b).
       Definition f1_mk a b : nat := f1 bool (mk bool a b).
-      CodeGen Function f0_mk.
-      CodeGen Function f1_mk.
+      CodeGen Func f0_mk.
+      CodeGen Func f1_mk.
     |}) {|
       assert(f0_mk(7, 8) == 7);
       assert(f1_mk(7, 8) == 8);
@@ -1160,8 +1160,8 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
         | cons true (cons true (cons true (cons true rest))) => f rest
         | cons _ rest => f rest
         end.
-      CodeGen Function f (repeat true 0) => "f0".
-      CodeGen Function f (repeat true 10) => "f10".
+      CodeGen Func f (repeat true 0) => "f0".
+      CodeGen Func f (repeat true 10) => "f10".
     |}) {|
       assert(f0() == 0);
       assert(f10() == 0);
@@ -1174,7 +1174,7 @@ let test_let_add (ctx : test_ctxt) : unit =
       Definition add3 (a b c : nat) : nat :=
         let ab := a + b in
         ab + c.
-      CodeGen Function add3.
+      CodeGen Func add3.
     |}) {|
       assert(add3(1,2,3) == 6);
     |}
@@ -1187,7 +1187,7 @@ let test_let_match (ctx : test_ctxt) : unit =
       Definition tst (b : bool) : bool :=
         let not_b := match b with true => false | false => true end in
         match not_b with true => false | false => true end.
-      CodeGen Function tst.
+      CodeGen Func tst.
     |}) {|
       assert(tst(true) == true);
       assert(tst(false) == false);
@@ -1201,7 +1201,7 @@ let test_let_match_let (ctx : test_ctxt) : unit =
       Definition tst (b : bool) : nat :=
         let n := match b with true => let z := O in S z | false => O end in
         S n.
-      CodeGen Function tst.
+      CodeGen Func tst.
     |}) {|
       assert(tst(false) == 1);
       assert(tst(true) == 2);
@@ -1220,7 +1220,7 @@ let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
           end y
         in
         v.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(true, 3) == 4);
       assert(f(false, 3) == 5);
@@ -1240,7 +1240,7 @@ let test_let_only_used_in_static_is_not_specialized (ctx : test_ctxt) : unit =
       Definition f a :=
         let only_used_in_static := Nat.mul 2 3 in
         Nat.add only_used_in_static a.
-      CodeGen Arguments Nat.add s d.
+      CodeGen StaticArgs Nat.add s d.
       CodeGen Gen f.
       Fail Print CodeGen Specialization Nat.mul.
     |}
@@ -1254,7 +1254,7 @@ let test_add_tailrec (ctx : test_ctxt) : unit =
         | O => b
         | S a' => add a' (S b)
         end.
-      CodeGen Function add.
+      CodeGen Func add.
     |}) {|
       assert(add(0,0) == 0);
       assert(add(0,1) == 1);
@@ -1271,7 +1271,7 @@ let test_add_nontailrec (ctx : test_ctxt) : unit =
         | O => b
         | S a' => S (add a' b)
         end.
-      CodeGen Function add.
+      CodeGen Func add.
     |})
 
 let test_tail_fix_double (ctx : test_ctxt) : unit =
@@ -1284,7 +1284,7 @@ let test_tail_fix_double (ctx : test_ctxt) : unit =
           | O => b
           | S a' => S (add a' b)
           end) n n.
-      CodeGen Function dbl.
+      CodeGen Func dbl.
     |}) {|
       assert(dbl(0) == 0);
       assert(dbl(1) == 2);
@@ -1295,7 +1295,7 @@ let test_nth (ctx : test_ctxt) : unit =
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Require Import List.
-      CodeGen Function nth nat => "nth".
+      CodeGen Func nth nat => "nth".
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1314,8 +1314,8 @@ let test_rev_append (ctx : test_ctxt) : unit =
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Require Import List.
-      CodeGen Function nth nat => "nth".
-      CodeGen Function rev_append nat => "rev_append".
+      CodeGen Func nth nat => "nth".
+      CodeGen Func rev_append nat => "rev_append".
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1356,9 +1356,9 @@ let test_merge (ctx : test_ctxt) : unit =
                         g s2' (cons v2 s)
                   end
               end.
-      CodeGen Function nth nat => "nth".
-      CodeGen Function rev_append nat => "rev_append".
-      CodeGen Function merge.
+      CodeGen Func nth nat => "nth".
+      CodeGen Func rev_append nat => "rev_append".
+      CodeGen Func merge.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1399,8 +1399,8 @@ let test_merge_nontailrec (ctx : test_ctxt) : unit =
                       cons v2 (g s2')
                 end
             end.
-      CodeGen Function nth nat => "nth".
-      CodeGen Function merge_nontailrec.
+      CodeGen Func nth nat => "nth".
+      CodeGen Func merge_nontailrec.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1435,7 +1435,7 @@ let test_ackermann (ctx : test_ctxt) : unit =
             | S n' => ack m' (ackm n')
             end
           end.
-      CodeGen Function ack.
+      CodeGen Func ack.
     |}) {|
       assert(ack(0, 0) == 1);
       assert(ack(0, 1) == 2);
@@ -1471,7 +1471,7 @@ let test_ackermann_plus1 (ctx : test_ctxt) : unit =
           end.
       Definition f x y := let z := ack x y in S z.
       CodeGen GlobalInline ack.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0, 0) == 2);
       assert(f(0, 1) == 3);
@@ -1497,8 +1497,8 @@ let test_uphalf (ctx : test_ctxt) : unit =
     {|
       Fixpoint half (n : nat) : nat := match n with O => n | S n' => uphalf n' end
       with uphalf (n : nat) : nat := match n with O => n | S n' => S (half n') end.
-      CodeGen Function half.
-      CodeGen Function uphalf.
+      CodeGen Func half.
+      CodeGen Func uphalf.
     |}) {|
       assert(half(0) == 0);
       assert(half(1) == 0);
@@ -1541,7 +1541,7 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
               | S m' => g m' (S n)
               end) s 0 n.
       (*Compute sum (1 :: 2 :: 3 :: 4 :: nil) 0.*)
-      CodeGen Function sum.
+      CodeGen Func sum.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1571,7 +1571,7 @@ let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
           | O => y
           | S x' => add2 x' (S y)
           end) ab c.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(1, 2, 3) == 6);
     |}
@@ -1584,7 +1584,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
       Definition map_succ (s : list nat) : list nat :=
         map S s.
       CodeGen GlobalInline map.
-      CodeGen Function map_succ.
+      CodeGen Func map_succ.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1599,7 +1599,7 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Definition add1 := Nat.add 1.
-      CodeGen Function add1 => add1_p add1_s.
+      CodeGen Func add1 => add1_p add1_s.
       Print add1_p.
       Fail Print add1_s.
       CodeGen SimplifyFunction "add1_p".
@@ -1615,7 +1615,7 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
       Definition swap_bb p := @swap bool bool p.
-      CodeGen Function swap_bb.
+      CodeGen Func swap_bb.
       CodeGen Gen "swap_bb".
     |})
 
@@ -1659,7 +1659,7 @@ let test_mftest (ctx : test_ctxt) : unit =
         | O => O
         | S nn => mftest nn
         end.
-      CodeGen Function mftest.
+      CodeGen Func mftest.
     |}) {|
       assert(mftest(0) == 0);
       assert(mftest(1) == 0);
@@ -1692,7 +1692,7 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
         | O => myfalse
         | S _ => mytrue
         end.
-      CodeGen Function f.
+      CodeGen Func f.
       CodeGen InductiveType mybool => "mybool".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
@@ -1715,8 +1715,8 @@ let test_multifunc_noargument (ctx : test_ctxt) : unit =
                   end
         in
         S (g f0).
-      CodeGen Function f0.
-      CodeGen Function f1.
+      CodeGen Func f0.
+      CodeGen Func f1.
     |}) {|
       assert(f0() == 0);
       assert(f1() == 1);
@@ -1786,8 +1786,8 @@ let test_mutual_sizet_sizef (ctx : test_ctxt) : unit =
         | emptyf => O
         | consf t f => plus (sizet t) (sizef f)
         end.
-      CodeGen Function sizet.
-      CodeGen Function sizef.
+      CodeGen Func sizet.
+      CodeGen Func sizef.
     |}) {|
       forest f0 = emptyf;
       tree t1 = node(f0);
@@ -1819,8 +1819,8 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
         | emptyf => O
         | consf t f => plus (sizet t) (sizef f)
         end.
-      CodeGen Function sizet.
-      CodeGen Function sizef.
+      CodeGen Func sizet.
+      CodeGen Func sizef.
     |})
     ~modify_generated_source:
       (fun s ->
@@ -1864,8 +1864,8 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
         | emptyf => O
         | consf t f => plus (sizet t) (sizef f)
         end.
-      CodeGen Function sizet.
-      CodeGen Function sizef.
+      CodeGen Func sizet.
+      CodeGen Func sizef.
     |})
     ~modify_generated_source:
       (fun s ->
@@ -1908,8 +1908,8 @@ let test_mutual_static1 (ctx : test_ctxt) : unit =
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "extern nat idnat1(nat v1_n);".
-      CodeGen Function idnat1.
-      CodeGen StaticFunction idnat2.
+      CodeGen Func idnat1.
+      CodeGen StaticFunc idnat2.
       CodeGen Snippet "static nat idnat2(nat v1_n);".
     |})
     {|
@@ -1932,8 +1932,8 @@ let test_mutual_static2 (ctx : test_ctxt) : unit =
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "extern nat idnat2(nat v1_n);".
-      CodeGen StaticFunction idnat1.
-      CodeGen Function idnat2.
+      CodeGen StaticFunc idnat1.
+      CodeGen Func idnat2.
       CodeGen Snippet "static nat idnat1(nat v1_n);".
     |})
     {|
@@ -1954,7 +1954,7 @@ let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
             end) x
         in
         S a.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0) == 1);
       assert(f(1) == 2);
@@ -1983,7 +1983,7 @@ let test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail (ctx : test_ctxt) : unit
             end) a b c
         in
         S d.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(1,2,3) == 7);
       assert(f(4,5,6) == 16);
@@ -1999,7 +1999,7 @@ let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
           (fix g (y : nat) := 0) x
         in
         S a.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0) == 1);
       assert(f(1) == 1);
@@ -2018,7 +2018,7 @@ let test_outer_variables (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Function test_outer_variables.
+      CodeGen Func test_outer_variables.
     |}) {|
       assert(test_outer_variables(1,2,3,4,5) == 10);
     |}
@@ -2044,7 +2044,7 @@ let test_outer_variables_nested_outer_used (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Function test_outer_variables_nested_outer_used.
+      CodeGen Func test_outer_variables_nested_outer_used.
     |}) {|
       assert(test_outer_variables_nested_outer_used(1,2,3,4,5) == 24);
     |}
@@ -2070,7 +2070,7 @@ let test_outer_variables_nested_outer_unused (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Function test_outer_variables_nested_outer_unused.
+      CodeGen Func test_outer_variables_nested_outer_unused.
     |}) {|
       assert(test_outer_variables_nested_outer_unused(1,2,3,4,5) == 15);
     |}
@@ -2086,7 +2086,7 @@ let test_unused_argument (ctx : test_ctxt) : unit =
           | O => 0
           | S y => S (f y)
           end.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(100, 0) == 0);
       assert(f(100, 1) == 1);
@@ -2114,7 +2114,7 @@ let test_inner_fixfunc_goto_outer_fixfunc (ctx : test_ctxt) : unit =
         with adda (u : nat) :=
           a + u
         for f.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(1, 2, 3) == 9);
     |}
@@ -2128,7 +2128,7 @@ let test_parallel_assignment (ctx : test_ctxt) : unit =
         | O => y
         | S x' => f x' z y
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0, 1, 2) == 1);
       assert(f(1, 1, 2) == 2);
@@ -2144,7 +2144,7 @@ let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
     {|
       Fixpoint f (n : nat) := 0
       with g (n : nat) := 0.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0) == 0);
     |}
@@ -2168,7 +2168,7 @@ let test_unused_fixfunc_in_external_fixterm (ctx : test_ctxt) : unit =
                   for g
         in
         S (gh a 0 0).
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(0) == 1);
       assert(f(1) == 3);
@@ -2199,9 +2199,9 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       Definition make (x y : bool) := make_bool_pair x y.
       Definition bbfst (x : bool_pair) := member1 x.
       Definition bbsnd (x : bool_pair) := member2 x.
-      CodeGen Function make.
-      CodeGen Function bbfst.
-      CodeGen Function bbsnd.
+      CodeGen Func make.
+      CodeGen Func bbfst.
+      CodeGen Func bbsnd.
     |}) {|
       assert(make(true,true).fst == true); assert(make(true,true).snd == true);
       assert(make(true,false).fst == true); assert(make(true,false).snd == false);
@@ -2235,10 +2235,10 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       Definition make (x y : bool) := make_bool_pair x y.
       Definition bbfst (x : bool_pair) := let y := member1 x in id y.
       Definition bbsnd (x : bool_pair) := let y := member2 x in id y.
-      CodeGen Function id bool.
-      CodeGen Function make.
-      CodeGen Function bbfst.
-      CodeGen Function bbsnd.
+      CodeGen Func id bool.
+      CodeGen Func make.
+      CodeGen Func bbfst.
+      CodeGen Func bbsnd.
     |}) {|
       assert(make(true,true).fst == true); assert(make(true,true).snd == true);
       assert(make(true,false).fst == true); assert(make(true,false).snd == false);
@@ -2259,7 +2259,7 @@ let test_matchapp_twoarg (ctx : test_ctxt) : unit =
         | true => fun (n2 : nat) (b2 : bool) => S (n_of_bn b2 n2)
         | false => fun (n2 : nat) (b2 : bool) => S (S (n_of_bn b2 n2))
         end n b.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
     assert(f(true, true, 10) == 11);
     assert(f(false, false, 20) == 22);
@@ -2289,7 +2289,7 @@ let test_matchapp_multiple_phases (ctx : test_ctxt) : unit =
             fun x => x + y + z3
           else
             fun x => x + y + z4) x.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
     assert(f(true, true, 100, 19, 1, 2, 3, 4) == 121);
     assert(f(true, false, 100, 19, 1, 2, 3, 4) == 122);
@@ -2322,7 +2322,7 @@ let test_matchapp_and_fix (ctx : test_ctxt) : unit =
         | O => fun n => n
         | S m' => fun n => g m'
         end n.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
     assert(f(10, 5) == 10);
     |}
@@ -2334,7 +2334,7 @@ let test_auto_ind_type (ctx : test_ctxt) : unit =
       CodeGen Snippet "typedef bool mybool;".
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       Definition id_mybool (x : mybool) : mybool := x.
-      CodeGen Function id_mybool.
+      CodeGen Func id_mybool.
     |}) {|
       assert(id_mybool(true) == true);
       assert(id_mybool(false) == false);
@@ -2356,7 +2356,7 @@ let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
         | mytrue => true
         | myfalse => false
         end.
-      CodeGen Function bool_of_mybool.
+      CodeGen Func bool_of_mybool.
     |}) {|
       assert(bool_of_mybool(true) == true);
       assert(bool_of_mybool(false) == false);
@@ -2374,8 +2374,8 @@ let test_auto_ind_match_cstrmember (ctx : test_ctxt) : unit =
       ".
       Definition bbfst (x : bool_pair) := match x with bpair a b => a end.
       Definition bbsnd (x : bool_pair) := match x with bpair a b => b end.
-      CodeGen Function bbfst.
-      CodeGen Function bbsnd.
+      CodeGen Func bbfst.
+      CodeGen Func bbsnd.
     |}) {|
       assert(bbfst(0) == 0); assert(bbsnd(0) == 0);
       assert(bbfst(1) == 0); assert(bbsnd(1) == 1);
@@ -2395,7 +2395,7 @@ let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
       #define pair_get_member_1(x) ((x) & 1)
       ".
       Definition mypair (x y : bool) : bool*bool := (x, y).
-      CodeGen Function mypair.
+      CodeGen Func mypair.
     |}) {|
       assert(mypair(false, false) == 0);
       assert(mypair(false, true) == 1);
@@ -2418,7 +2418,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
         | Some x => x
         | None => default
         end.
-      CodeGen Function value_of_optionbool.
+      CodeGen Func value_of_optionbool.
     |}) {|
       assert(value_of_optionbool(true, 0) == true);
       assert(value_of_optionbool(true, 1) == false);
@@ -2441,8 +2441,8 @@ let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
       ".
       Definition bbfst (x : bool*bool) := match x with (a,b) => a end.
       Definition bbsnd (x : bool*bool) := match x with (a,b) => b end.
-      CodeGen Function bbfst.
-      CodeGen Function bbsnd.
+      CodeGen Func bbfst.
+      CodeGen Func bbsnd.
     |}) {|
       assert(bbfst(0) == 0); assert(bbsnd(0) == 0);
       assert(bbfst(1) == 0); assert(bbsnd(1) == 1);
@@ -2458,7 +2458,7 @@ let test_auto_const (ctx : test_ctxt) : unit =
       CodeGen Snippet "#define one() 1".
       Definition one := 1.
       Definition add1 x := x + one.
-      CodeGen Function add1.
+      CodeGen Func add1.
     |}) {|
       assert(add1(0) == 1);
       assert(add1(1) == 2);
@@ -2474,7 +2474,7 @@ let test_auto_construct (ctx : test_ctxt) : unit =
       #define S(x) ((x)+1)
       ".
       Definition one := 1.
-      CodeGen Function one.
+      CodeGen Func one.
     |}) {|
       assert(one() == 1);
     |}
@@ -2509,7 +2509,7 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
         | Some x => x
         | None => default
         end.
-      CodeGen Function value_of_optionbool.
+      CodeGen Func value_of_optionbool.
     |}) {|
       assert(value_of_optionbool(true, None_bool()) == true);
       assert(value_of_optionbool(true, Some_bool(false)) == false);
@@ -2530,7 +2530,7 @@ let test_reduceeta_makes_single_function (ctx : test_ctxt) : unit =
           | nil => s2
           | cons x s => cons x (mycat s s2)
           end.
-      CodeGen Function mycat bool => "mycat_bool".
+      CodeGen Func mycat bool => "mycat_bool".
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       list_bool s1 = cons(true,(cons(false,NULL)));
@@ -2552,8 +2552,8 @@ let test_multiple_primitives_shares_cfunc (ctx : test_ctxt) : unit =
       Definition g a b := myadd a b.
       (* CodeGen Primitive Nat.add => "nat_add". *) (* nat_src contains this *)
       CodeGen Primitive myadd => "nat_add".
-      CodeGen Function f.
-      CodeGen Function g.
+      CodeGen Func f.
+      CodeGen Func g.
     |}) {|
       assert(f(2,3) == 5);
       assert(g(2,3) == 5);
@@ -2576,9 +2576,9 @@ let test_indimp_bool (ctx : test_ctxt) : unit =
       Definition id_bool (b : bool) : bool :=
         bool_of_yesno (yesno_of_bool b).
       CodeGen IndImp yesno.
-      CodeGen Function yesno_of_bool.
-      CodeGen Function bool_of_yesno.
-      CodeGen Function id_bool.
+      CodeGen Func yesno_of_bool.
+      CodeGen Func bool_of_yesno.
+      CodeGen Func id_bool.
     |}) {|
       assert(id_bool(true) == true);
       assert(id_bool(false) == false);
@@ -2617,9 +2617,9 @@ let test_indimp_bool_pair (ctx : test_ctxt) : unit =
       ".
       CodeGen IndImp yn.
       CodeGen IndImp ynpair.
-      CodeGen Function ynpair_of_boolpair.
-      CodeGen Function boolpair_of_ynpair.
-      CodeGen Function id_boolpair.
+      CodeGen Func ynpair_of_boolpair.
+      CodeGen Func boolpair_of_ynpair.
+      CodeGen Func id_boolpair.
     |}) {|
       assert(id_boolpair(0) == 0);
       assert(id_boolpair(1) == 1);
@@ -2660,9 +2660,9 @@ let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
       ".
       CodeGen IndImp yn.
       CodeGen IndImp (ynpair bool bool).
-      CodeGen Function ynpair_of_boolpair.
-      CodeGen Function boolpair_of_ynpair.
-      CodeGen Function id_boolpair.
+      CodeGen Func ynpair_of_boolpair.
+      CodeGen Func boolpair_of_ynpair.
+      CodeGen Func id_boolpair.
     |}) {|
       assert(id_boolpair(0) == 0);
       assert(id_boolpair(1) == 1);
@@ -2702,9 +2702,9 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
       #define none_bool 0
       ".
       CodeGen IndImp (myoption bool).
-      CodeGen Function myopt_of_opt.
-      CodeGen Function opt_of_myopt.
-      CodeGen Function id_option_bool.
+      CodeGen Func myopt_of_opt.
+      CodeGen Func opt_of_myopt.
+      CodeGen Func id_option_bool.
     |}) {|
       assert(id_option_bool(0) == 0);
       assert(id_option_bool(1) == 1);
@@ -2742,9 +2742,9 @@ let test_indimp_record (ctx : test_ctxt) : unit =
       #define pair_bool_bool_snd(x) ((x) & 1)
       ".
       CodeGen IndImp bool2.
-      CodeGen Function bool2_of_boolpair.
-      CodeGen Function boolpair_of_bool2.
-      CodeGen Function id_boolpair.
+      CodeGen Func bool2_of_boolpair.
+      CodeGen Func boolpair_of_bool2.
+      CodeGen Func id_boolpair.
     |}) {|
       assert(id_boolpair(0) == 0);
       assert(id_boolpair(1) == 1);
@@ -2768,9 +2768,9 @@ let test_indimp_nat (ctx : test_ctxt) : unit =
         end.
       Definition id_nat n := nat_of_mynat (mynat_of_nat n).
       CodeGen IndImp mynat.
-      CodeGen Function mynat_of_nat.
-      CodeGen Function nat_of_mynat.
-      CodeGen Function id_nat.
+      CodeGen Func mynat_of_nat.
+      CodeGen Func nat_of_mynat.
+      CodeGen Func id_nat.
     |}) {|
       assert(id_nat(0) == 0);
       assert(id_nat(1) == 1);
@@ -2813,12 +2813,12 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
       Definition id_list_odd (l : list bool) : list bool :=
         list_of_odd_list (odd_list_of_list l).
       CodeGen IndImp even_list.
-      CodeGen Function list_of_even_list.
-      CodeGen Function list_of_odd_list.
-      CodeGen Function even_list_of_list.
-      CodeGen Function odd_list_of_list.
-      CodeGen Function id_list_even.
-      CodeGen Function id_list_odd.
+      CodeGen Func list_of_even_list.
+      CodeGen Func list_of_odd_list.
+      CodeGen Func even_list_of_list.
+      CodeGen Func odd_list_of_list.
+      CodeGen Func id_list_even.
+      CodeGen Func id_list_odd.
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       list_bool s = NULL;
@@ -2852,7 +2852,7 @@ let test_prototype (ctx : test_ctxt) : unit =
       CodeGen HeaderFile "foo.h".
       CodeGen Snippet "#include ""foo.h""".
       CodeGen Snippet "void f(void) { id_bool(true); }".
-      CodeGen Function id bool => "id_bool".
+      CodeGen Func id bool => "id_bool".
     |}) {|
     |}
 
@@ -2863,7 +2863,7 @@ let test_monocheck_failure (ctx : test_ctxt) : unit =
       Definition f (z : Empty_set) (n : nat) : nat :=
         let T : Type := match z with end in
         (fix h (T : Type) (n : nat) := n) T n.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let boolbox_src = {|
@@ -2927,7 +2927,7 @@ let test_linear_novar (ctx : test_ctxt) : unit =
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := tt.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_linear_twovar (ctx : test_ctxt) : unit =
@@ -2936,7 +2936,7 @@ let test_linear_twovar (ctx : test_ctxt) : unit =
     (unit_src ^ bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := (x,x).
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
@@ -2949,7 +2949,7 @@ let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
         | true => x
         | false => BoolBox true
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
@@ -2959,7 +2959,7 @@ let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
     {|
       Definition f (x : boolbox) :=
         fix g (n : nat) := x.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_linear_dellet (ctx : test_ctxt) : unit =
@@ -2969,7 +2969,7 @@ let test_linear_dellet (ctx : test_ctxt) : unit =
       Definition f (x : boolbox) :=
         let unused := boolbox_dealloc x in
         true.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(boolbox_alloc(true)) == true);
       assert(boolbox_log_next - boolbox_log_buffer > 0);
@@ -2986,7 +2986,7 @@ let test_linear_dellet_match (ctx : test_ctxt) : unit =
       Definition f (x : boolbox) (u : unit) :=
         let unused := match u with tt => boolbox_dealloc x end in
         true.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(boolbox_alloc(true)) == true);
       assert(boolbox_log_next - boolbox_log_buffer > 0);
@@ -3004,7 +3004,7 @@ let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
         match x with
         | BoolBox b => b
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(boolbox_alloc(true)) == true);
       assert(f(boolbox_alloc(false)) == false);
@@ -3038,7 +3038,7 @@ let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
         match xy with
         | pair (BoolBox x) (BoolBox y) => x
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {|
       pair_boolbox_boolbox p = make_pair_boolbox_boolbox(boolbox_alloc(true), boolbox_alloc(false));
@@ -3060,7 +3060,7 @@ let test_downward_simple (ctx : test_ctxt) : unit =
       Inductive D : Set := C.
       Definition f (x : bool) : D := C.
       CodeGen Downward D.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_downward_in_pair (ctx : test_ctxt) : unit =
@@ -3071,7 +3071,7 @@ let test_downward_in_pair (ctx : test_ctxt) : unit =
       Inductive D : Set := C.
       Definition f (x : bool) : (bool * D) := (x, C).
       CodeGen Downward D.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_downward_fixfunc (ctx : test_ctxt) : unit =
@@ -3092,7 +3092,7 @@ let test_downward_fixfunc (ctx : test_ctxt) : unit =
 	| C1 _ => 1
 	end.
       CodeGen Downward D.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
@@ -3119,7 +3119,7 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
         }
       ".
       CodeGen InductiveType T => "T".
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       T x1 = C1();
       T x2 = C2(pair_T_T(C1(),C1()));
@@ -3279,7 +3279,7 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
         | BC1 => true
         | BC2 _ => false
         end.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen Snippet "
         typedef struct L_struct *L;
         typedef struct prod_L_L_struct {
@@ -3304,7 +3304,7 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch L => "sw_L" | LC1 => "default" | LC2 => "case 0" "L_member".
       CodeGen InductiveType B => "L".
       CodeGen InductiveMatch B => "sw_L" | BC1 => "default" | BC2 => "case 0" "L_member".
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {|
       assert(f(LC1()) == true);
       assert(f(LC2(pair_L_L(LC1(),LC1()))) == false);
@@ -3317,7 +3317,7 @@ let test_borrowcheck_simple_borrow (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (x : L) =>
         let b := borrow x in
@@ -3334,7 +3334,7 @@ let test_borrowcheck_proj (ctx : test_ctxt) : unit =
       Definition borrow (x : L) : B := BC.
       Set Primitive Projections.
       Record TestRecord : Set := mk { f0 : B; f1 : nat }.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (n : nat) (x : L) =>
         let b := borrow x in
@@ -3370,7 +3370,7 @@ let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (n : nat) (x : L) =>
         let b := borrow x in
@@ -3388,7 +3388,7 @@ let test_borrowcheck_fix_closure (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (n : nat) (x : L) =>
         let b := borrow x in
@@ -3406,7 +3406,7 @@ let test_borrowcheck_invalid_borrow_used_after_dealloc (ctx : test_ctxt) : unit 
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (x : L) =>
         let b := borrow x in
@@ -3422,7 +3422,7 @@ let test_borrowcheck_invalid_borrow_application (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       Definition g (x : L) (b : B) := tt.
       CodeGen TestBorrowCheck
 	fun (x : L) =>
@@ -3438,7 +3438,7 @@ let test_borrowcheck_invalid_borrow_match (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
 	fun (x : L) =>
 	let b := borrow x in
@@ -3457,7 +3457,7 @@ let test_borrowcheck_invalid_borrow_proj (ctx : test_ctxt) : unit =
       Record TestRecord : Set := mk { f0 : B }.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
         fun (n : nat) (x : L) =>
         let b := borrow x in
@@ -3486,7 +3486,7 @@ let test_borrowcheck_list_bool_has_true (ctx : test_ctxt) : unit =
 	| lnil => tt
 	| lcons x l' => dealloc_lseq_bool l'
 	end.
-      CodeGen BorrowFunction borrow_lseq_bool.
+      CodeGen BorrowFunc borrow_lseq_bool.
       CodeGen TestBorrowCheck
 	fun (l : lseq bool) =>
 	let l' := borrow_lseq_bool l in
@@ -3509,7 +3509,7 @@ let test_borrowcheck_invalid_borrow_in_match (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
 	fun (u : unit) (x : L) =>
 	let b := match u with tt => borrow x end in
@@ -3542,7 +3542,7 @@ let test_borrowcheck_invalid_borrow_mutual (ctx : test_ctxt) : unit =
         | emptyf => bemptyf
         | consf t f => bconsf (borrow_tree t) (borrow_forest f)
         end.
-      CodeGen BorrowFunction borrow_tree.
+      CodeGen BorrowFunc borrow_tree.
       CodeGen TestBorrowCheck
         fun (t : tree) =>
         let bt := borrow_tree t in
@@ -3559,7 +3559,7 @@ let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
       Inductive B : Set := BC.
       Definition dealloc (x : L) : unit := tt.
       Definition borrow (x : L) : B := BC.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       CodeGen TestBorrowCheck
 	fun (n : nat) => BC.
     |}) {| |}
@@ -3588,8 +3588,8 @@ let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
                   end in
         let _ := dealloc l in
         b'.
-      CodeGen BorrowFunction borrow.
-      CodeGen Function f.
+      CodeGen BorrowFunc borrow.
+      CodeGen Func f.
     |}) {| |}
 
 let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
@@ -3604,12 +3604,12 @@ let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
         end.
       CodeGen Linear nat.
       CodeGen BorrowType nat.
-      CodeGen BorrowFunction borrow.
+      CodeGen BorrowFunc borrow.
       Definition f (n : nat) :=
         let m := borrow n in
         let _ := consume m in
         consume n.
-      CodeGen Function f.
+      CodeGen Func f.
     |}) {| |}
 
 let test_void_tail (ctx : test_ctxt) : unit =
@@ -3617,7 +3617,7 @@ let test_void_tail (ctx : test_ctxt) : unit =
     (unit_src ^ bool_src ^ {|
       CodeGen Snippet "void f(bool);".
       Definition f (b : bool) : unit := tt.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {| |}
 
@@ -3631,7 +3631,7 @@ let test_void_head (ctx : test_ctxt) : unit =
 	| true => x
 	| false => x
 	end.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {| |}
 
@@ -3655,7 +3655,7 @@ let test_void_mutual (ctx : test_ctxt) : unit =
         end.
       CodeGen Primitive ignore_nat.
       CodeGen Primitive constant_zero.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {| |}
 
@@ -3673,7 +3673,7 @@ let test_void_empty_args (ctx : test_ctxt) : unit =
           | O => O
           | S m => S (g m)
           end) n.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {|
       assert(f() == 0);
@@ -3692,7 +3692,7 @@ let test_void_head_tt_var (ctx : test_ctxt) : unit =
           end
         in
         constant_zero u.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {| |}
 
@@ -3705,7 +3705,7 @@ let test_void_tail_tt_var (ctx : test_ctxt) : unit =
         | true => tt (* We don't define tt in C but tt is usable because codegen omit void constructor *)
         | false => u0 (* void variable reference is also omitted *)
         end.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {| |}
 
@@ -3730,7 +3730,7 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       CodeGen Snippet "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
       CodeGen Snippet "static nat constant_zero(void) { return 0; }".
       CodeGen Primitive constant_zero.
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {|
       f(0);
@@ -3753,7 +3753,7 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       CodeGen Snippet "#define TestRecord_umem(x) (abort(x))".
       CodeGen Snippet "#define TestRecord_nmem(x) (x)".
       CodeGen Snippet "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
-      CodeGen Function f.
+      CodeGen Func f.
     |})
     {|
       f(0);

@@ -77,10 +77,10 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 *)
 
 (*
-  CodeGen Arguments FUNCTION SorD*.
-  CodeGen AutoArguments FUNCTION*.
-  CodeGen Function FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
-  CodeGen StaticFunction FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
+  CodeGen StaticArgs FUNCTION SorD*.
+  CodeGen AutoArgs FUNCTION*.
+  CodeGen Func FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
+  CodeGen StaticFunc FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME SIMPLIFIED_NAME.
   CodeGen Primitive FUNCTION ARG_OR_HOLE* => "C_FUNCNAME" PRESIMP_NAME.
   CodeGen Constant FUNCTION ARG* => "C_CONSTANT" PRESIMP_NAME.
 
@@ -107,22 +107,22 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Print CodeGen Specialization.
   Print CodeGen Specialization FUNCTION+.
 
-  "CodeGen Function", "CodeGen StaticFunction" and "CodeGen Primitive"
+  "CodeGen Func", "CodeGen StaticFunc" and "CodeGen Primitive"
   declares C function name for a Gallina function.
   "CodeGen GenerateFile" generates functions declared by
-  "CodeGen Function" and "CodeGen StaticFunction".
+  "CodeGen Func" and "CodeGen StaticFunc".
   The actual C definition of functions declared by "CodeGen Primitive"
   should be provided by a user.
 
   Example:
 
-  CodeGen Arguments id s d.
-  CodeGen Function id nat.
-  CodeGen Function id nat => id_nat.
-  CodeGen Function id nat => id_nat id_nat_specialized.
-  CodeGen Function id nat => "id_nat".
-  CodeGen Function id nat => "id_nat" id_nat.
-  CodeGen Function id nat => "id_nat" id_nat id_nat_specialized.
+  CodeGen StaticArgs id s d.
+  CodeGen Func id nat.
+  CodeGen Func id nat => id_nat.
+  CodeGen Func id nat => id_nat id_nat_specialized.
+  CodeGen Func id nat => "id_nat".
+  CodeGen Func id nat => "id_nat" id_nat.
+  CodeGen Func id nat => "id_nat" id_nat id_nat_specialized.
 
   CodeGen SimplifyFunction id nat
 
@@ -205,14 +205,14 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
-    | [ "CodeGen" "Arguments" ref(func) s_or_d_list(sd_list) ] ->
+    | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
-    | [ "CodeGen" "AutoArguments" ref_list(func_list) ] ->
+    | [ "CodeGen" "AutoArgs" ref_list(func_list) ] ->
       { command_auto_arguments func_list }
 
-    | [ "CodeGen" "Function" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
+    | [ "CodeGen" "Func" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
       { command_function func args names }
-    | [ "CodeGen" "StaticFunction" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
+    | [ "CodeGen" "StaticFunc" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) ] ->
       { command_static_function func args names }
     | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names2(names) ] ->
       { command_primitive func args names }
@@ -259,7 +259,7 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_deallocator ind_or_cstr args cfunc }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
-    | [ "CodeGen" "BorrowFunction" ref(f) ] -> { command_borrow_function f }
+    | [ "CodeGen" "BorrowFunc" ref(f) ] -> { command_borrow_function f }
     | [ "CodeGen" "BorrowType" lconstr(ty) ] -> { command_borrow_type ty }
     | [ "CodeGen" "TestBorrowCheck" lconstr(t) ] -> { command_test_borrowcheck t }
 

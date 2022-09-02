@@ -25,7 +25,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,Arguments},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -38,7 +38,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,Arguments},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -910,7 +910,7 @@ Static arguments are defined as follows by default.
     (The non-monomorphic argument means an argument which type is a sort or a polymorphic function type.)
   \item parameters for constructors.
 \end{itemize}
-The static arguments can be customized with \lstinline!CodeGen Arguments! command.
+The static arguments can be customized with \lstinline!CodeGen StaticArgs! command.
 
 This transformation makes that static arguments contain no variable bounded by let-ins
 because such variables are redex of delta reduction.
