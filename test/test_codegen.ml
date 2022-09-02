@@ -1602,7 +1602,7 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
       CodeGen Func add1 => add1_p add1_s.
       Print add1_p.
       Fail Print add1_s.
-      CodeGen SimplifyFunction "add1_p".
+      CodeGen SimplifyFunction "add1".
       Print add1_s.
     |})
 

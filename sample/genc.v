@@ -24,7 +24,7 @@ Definition non_mangled_code := TestCons2 bool nat.
 CodeGen Func non_mangled_code => non_mangled_code_p non_mangled_code_s.
 Print non_mangled_code_p.
 Fail Print non_mangled_code_s.
-CodeGen SimplifyFunction "non_mangled_code_p".
+CodeGen SimplifyFunction "non_mangled_code".
 Print non_mangled_code_s.
 
 CodeGen InductiveType bool*bool => "pair_bool_bool".
@@ -34,10 +34,10 @@ CodeGen Primitive pair bool bool => "make_pair_bool_bool".
 
 Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
 Definition swap_bb p := @swap bool bool p.
-CodeGen Func swap bool bool => swap_p swap_s.
+CodeGen Func swap bool bool => "swap" swap_p swap_s.
 CodeGen Func swap_bb => swap_bb_p swap_bb_s.
-CodeGen SimplifyFunction "swap_bb_p".
-CodeGen SimplifyFunction "swap_p".
+CodeGen SimplifyFunction "swap_bb".
+CodeGen SimplifyFunction "swap".
 Print swap_bb_p.
 Print swap_bb_s.
 Print swap_p.
@@ -51,7 +51,7 @@ Print swap_s.
 Print swap_bb_p.
 Print swap_bb_s.
 
-CodeGen Gen "swap_p" "swap_bb_p".
+CodeGen Gen "swap" "swap_bb".
 (*
 static pair_bool_bool
 swap(pair_bool_bool v1_p)

@@ -408,9 +408,9 @@ let codegen_define_instance
     in
     let lazy_gensym_p () = let (id, _) = lazy_gensym_simplification () in id in
     let lazy_gensym_s () = let (_, id) = lazy_gensym_simplification () in id in
-    let need_presimplified_ctnt =
-      List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list ||
-      (match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false)
+    let has_static_arguments = List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list in
+    let presimp_id_specified = match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false in
+    let need_presimplified_ctnt = has_static_arguments || presimp_id_specified
     in
     let s_id () = match names_opt with
       | Some { spi_simplified_id = Some s_id } -> s_id
@@ -425,7 +425,7 @@ let codegen_define_instance
           (* We accept C's non-idetifier, such as "0" here. *)
           name
       | _ ->
-          if not need_presimplified_ctnt then
+          if not has_static_arguments then
             (* We use Gallina function name as-is for functions without static arguments *)
             if valid_c_id_p func_name then
               func_name
