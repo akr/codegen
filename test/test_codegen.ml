@@ -318,6 +318,18 @@ let bool_src = {|
       ".
 |}
 
+let bool_paren_src = {|
+      CodeGen InductiveType bool => "bool (" ")". (* redundant parenthesis *)
+      CodeGen InductiveMatch bool => ""
+      | true => "default"
+      | false => "case 0".
+      CodeGen Constant true => "true".
+      CodeGen Constant false => "false".
+      CodeGen Snippet "
+      #include <stdbool.h> /* for bool, true and false */
+      ".
+|}
+
 let nat_src = {|
       CodeGen InductiveType nat => "nat".
       CodeGen InductiveMatch nat => ""
@@ -3772,6 +3784,16 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       assert(dealloc_called == 1);
     |}
 
+let test_inductivetype_twoarg_bool_paren (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_paren_src ^ {|
+      Definition f (b : bool) := b.
+      CodeGen Func f.
+    |}) {|
+      assert(f(true) == true);
+      assert(f(false) == false);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -3932,6 +3954,7 @@ let suite : OUnit2.test =
     "test_void_tail_tt_var" >:: test_void_tail_tt_var;
     "test_void_head_proj" >:: test_void_head_proj;
     "test_void_tail_proj" >:: test_void_tail_proj;
+    "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
   ]
 
 let () =
