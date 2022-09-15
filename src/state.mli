@@ -23,9 +23,13 @@ type cstr_config = {
   c_caselabel : string;
   c_accessors : string array;
 }
+type c_typedata = {
+  c_type_left : string;
+  c_type_right : string;
+}
 type ind_config = {
   coq_type : Constr.t;
-  c_type : string option; (* None means void type *)
+  c_type : c_typedata;
   c_swfunc : string option;
   cstr_configs : cstr_config array;
   is_void_type : bool;

@@ -131,3 +131,7 @@ val check_convertible : string -> Environ.env -> Evd.evar_map -> EConstr.t -> EC
 val show_goals : unit -> unit Proofview.tactic
 val lib_ref : string -> EConstr.t
 val exact_term_eq : Evd.evar_map -> EConstr.t -> EConstr.t -> bool
+val compose_c_decl : State.c_typedata -> string -> string
+val compose_c_abstract_decl : State.c_typedata -> string
+val pr_c_decl : State.c_typedata -> Pp.t -> Pp.t
+val pr_c_abstract_decl : State.c_typedata -> Pp.t

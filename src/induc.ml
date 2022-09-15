@@ -32,10 +32,13 @@ let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.co
   let t = EConstr.to_constr sigma t in
   (sigma, t)
 
+let c_type_void = { c_type_left = "void"; c_type_right = "" }
+let c_type_is_void (c_type : c_typedata) : bool = (c_type = c_type_void)
+
 let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   Feedback.msg_info (Pp.str "CodeGen Inductive Type" +++
     Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-    Pp.str (quote_coq_string (Stdlib.Option.value ind_cfg.c_type ~default:"void")) ++ Pp.str ".")
+    Pp.str (quote_coq_string (compose_c_abstract_decl ind_cfg.c_type)) ++ Pp.str ".")
 
 let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
   let f cstr_cfg =
@@ -150,13 +153,10 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
   let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
-  let c_type =
-    if String.equal c_type "void" then
-      (check_void_type env sigma mutind_body coq_type; None)
-    else
-      Some c_type
-  in
-  let is_void_type = (c_type = None) in
+  let is_void_type = String.equal c_type "void" in
+  (if is_void_type then
+    check_void_type env sigma mutind_body coq_type);
+  let c_type = { c_type_left=c_type; c_type_right="" } in
   let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
     Array.map (fun cstrname -> {
       coq_cstr = cstrname;
@@ -273,9 +273,9 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
 let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
   (get_ind_config env sigma t).is_void_type
 
-let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string option =
+let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
   match EConstr.kind sigma t with
-  | Prod _ -> Some "codegen_closure_t" (* codegen_closure_t is not used yet *)
+  | Prod _ -> { c_type_left = "codegen_closure_t"; c_type_right = "" } (* codegen_closure_t is not used yet *)
   | _ -> (get_ind_config env sigma t).c_type
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
