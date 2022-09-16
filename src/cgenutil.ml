@@ -1275,6 +1275,83 @@ let c_needs_space_between_tokens (str1 : string) (str2 : string) =
   else
     c_needs_space_between_chars str1.[String.length str1 - 1] str2.[0]
 
+let str_first_non_white_space_character (s : string) : char option =
+  let n = String.length s in
+  let rec f i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | ' ' |
+        '\t' |
+        '\r' |
+        '\n' |
+        '\x0B' | (* vertical tab *)
+        '\x0C' (* form feed *)
+        -> f (i+1)
+      | '/' -> found_slash (i+1)
+      | _ -> Some c
+    else
+      None
+  and found_slash i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | '*' -> found_multiline_comment (i+1)
+      | '/' -> found_singleline_comment (i+1)
+      | _ -> f (i+1)
+    else
+      None
+  and found_multiline_comment i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | '*' -> found_asterisk_in_multiline_comment (i+1)
+      | _ -> found_multiline_comment (i+1)
+    else
+      None
+  and found_asterisk_in_multiline_comment i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | '/' -> f (i+1)
+      | '*' -> found_asterisk_in_multiline_comment (i+1)
+      | _ -> found_multiline_comment (i+1)
+    else
+      None
+  and found_singleline_comment i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | '\n' -> f (i+1)
+      | _ -> found_singleline_comment (i+1)
+    else
+      None
+  in
+  f 0
+
+let rec pp_first_non_white_space_character (pp : Pp.t) : char option =
+  doc_first_non_white_space_character (Pp.repr pp)
+and doc_first_non_white_space_character (doc : Pp.doc_view) : char option =
+  let open Pp in
+  match doc with
+  | Ppcmd_empty -> None
+  | Ppcmd_string str ->
+      str_first_non_white_space_character str
+  | Ppcmd_glue pps ->
+      List.fold_left
+        (fun c_opt pp -> Option.bind c_opt (fun _ -> pp_first_non_white_space_character pp))
+        None
+        pps
+  | Ppcmd_box (_, pp) -> pp_first_non_white_space_character pp
+  | Ppcmd_tag (_, pp) -> pp_first_non_white_space_character pp
+  | Ppcmd_print_break (nspaces, offset) -> None
+  | Ppcmd_force_newline -> None
+  | Ppcmd_comment strs ->
+      List.fold_left
+        (fun c_opt str -> Option.bind c_opt (fun _ -> str_first_non_white_space_character str))
+        None
+        strs
+
 let compose_c_tokens (strings : string list) : string =
   let rec f ss =
     match ss with
@@ -1291,7 +1368,10 @@ let compose_c_tokens (strings : string list) : string =
   String.concat "" (f strings)
 
 let compose_c_decl (c_type : c_typedata) (declarator : string) : string =
-  compose_c_tokens [c_type.c_type_left; declarator; c_type.c_type_right]
+  if str_first_non_white_space_character declarator = Some '*' then
+    compose_c_tokens [c_type.c_type_left; "("; declarator; ")"; c_type.c_type_right]
+  else
+    compose_c_tokens [c_type.c_type_left; declarator; c_type.c_type_right]
 
 let compose_c_abstract_decl (c_type : c_typedata) : string =
   compose_c_tokens [c_type.c_type_left; c_type.c_type_right]
@@ -1313,7 +1393,10 @@ let compose_c_pps (pps : Pp.t list) : Pp.t =
   Pp.seq (f ' ' pps)
 
 let pr_c_decl (c_type : c_typedata) (declarator : Pp.t) : Pp.t =
-  compose_c_pps [Pp.str c_type.c_type_left; declarator; Pp.str c_type.c_type_right]
+  if pp_first_non_white_space_character declarator = Some '*' then
+    compose_c_pps [Pp.str c_type.c_type_left; Pp.str "("; declarator; Pp.str ")"; Pp.str c_type.c_type_right]
+  else
+    compose_c_pps [Pp.str c_type.c_type_left; declarator; Pp.str c_type.c_type_right]
 
 let pr_c_abstract_decl (c_type : c_typedata) : Pp.t =
   compose_c_pps [Pp.str c_type.c_type_left; Pp.str c_type.c_type_right]

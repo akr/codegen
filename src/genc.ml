@@ -1165,7 +1165,7 @@ let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (exp : Pp.t
       Pp.hov 0 (exp ++ Pp.str ";") +++ Pp.str "return;"
   else
     if cont.tail_cont_multifunc then
-      let retvar = "(*(" ^ compose_c_decl cont.tail_cont_return_type "(*)" ^ ")codegen_ret)" in
+      let retvar = "(*(" ^ compose_c_decl cont.tail_cont_return_type "*" ^ ")codegen_ret)" in
       gen_assignment (Pp.str retvar) exp +++ Pp.str "return;"
     else
       Pp.hov 0 (Pp.str "return" +++ exp ++ Pp.str ";")
