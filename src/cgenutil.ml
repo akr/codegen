@@ -1367,8 +1367,25 @@ let compose_c_tokens (strings : string list) : string =
   in
   String.concat "" (f strings)
 
+(*
+  We wrap declarator by parenthesis if it start with '*' and
+  c_type_right starts with '[' or '('.
+
+  declarator is "prefix identifier postfix" or "prefix ( declarator ) postfix"
+  where prefix is zero or more asterisks and
+  postfix is zero or more brackets and parenthesis.
+
+  The postfix has stronger precedence over the prefix.
+
+  *foo(int) is parsed as *(foo(int)).
+  Thus, we need a parenthesis as ( *foo)(int) when D is substituted to *foo in D(int).
+*)
+
 let compose_c_decl (c_type : c_typedata) (declarator : string) : string =
-  if str_first_non_white_space_character declarator = Some '*' then
+  if str_first_non_white_space_character declarator = Some '*' &&
+     (let c_opt = str_first_non_white_space_character c_type.c_type_right in
+      c_opt = Some '[' || c_opt = Some '(')
+  then
     compose_c_tokens [c_type.c_type_left; "("; declarator; ")"; c_type.c_type_right]
   else
     compose_c_tokens [c_type.c_type_left; declarator; c_type.c_type_right]
@@ -1393,7 +1410,10 @@ let compose_c_pps (pps : Pp.t list) : Pp.t =
   Pp.seq (f ' ' pps)
 
 let pr_c_decl (c_type : c_typedata) (declarator : Pp.t) : Pp.t =
-  if pp_first_non_white_space_character declarator = Some '*' then
+  if pp_first_non_white_space_character declarator = Some '*' &&
+     (let c_opt = str_first_non_white_space_character c_type.c_type_right in
+      c_opt = Some '[' || c_opt = Some '(')
+  then
     compose_c_pps [Pp.str c_type.c_type_left; Pp.str "("; declarator; Pp.str ")"; Pp.str c_type.c_type_right]
   else
     compose_c_pps [Pp.str c_type.c_type_left; declarator; Pp.str c_type.c_type_right]
