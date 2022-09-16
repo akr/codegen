@@ -192,6 +192,54 @@ let make_temp_dir (prefix : string) (suffix : string) : string =
   in
   Unix.handle_unix_error f ()
 
+(*
+We don't like usual string literal for regexp because it needs too many backslashes.
+OCaml has quoted string {|...|} for no backslash-escapes.
+But Str.regexp does not recognize escaped newline character, {|\n|} or "\\n".
+So, we define regexp function here to convert escaped control characters to
+bare control characters.
+*)
+let regexp s =
+  let n = String.length s in
+  let buf = Buffer.create n in
+  let rec f i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | '\\' -> found_backslash (i+1)
+      | _ -> Buffer.add_char buf c; f (i+1)
+  and found_backslash i =
+    if i < n then
+      let c = s.[i] in
+      match c with
+      | 'a' -> Buffer.add_char buf '\x07'; f (i+1)
+      | 't' -> Buffer.add_char buf '\t'; f (i+1)
+      | 'n' -> Buffer.add_char buf '\n'; f (i+1)
+      | 'v' -> Buffer.add_char buf '\x0B'; f (i+1)
+      | 'f' -> Buffer.add_char buf '\x0C'; f (i+1)
+      | 'r' -> Buffer.add_char buf '\r'; f (i+1)
+      | 'e' -> Buffer.add_char buf '\x1B'; f (i+1)
+      | 'x' -> found_backslash_x (i+1)
+      | _ -> Buffer.add_char buf '\\'; Buffer.add_char buf c; f (i+1)
+    else
+      Buffer.add_char buf '\\'
+  and found_backslash_x i =
+    if i+1 < n then
+      let c1 = s.[i] in
+      let c2 = s.[i+1] in
+      match c1, c2 with
+      | ('0'..'9' | 'A'..'F' | 'a'..'f'), ('0'..'9' | 'A'..'F' | 'a'..'f') ->
+          let hex = Bytes.of_string "0xHH" in
+          Bytes.set hex 2 c1;
+          Bytes.set hex 3 c2;
+          Buffer.add_char buf (Char.chr (int_of_string (Bytes.to_string hex)))
+      | _, _ -> Buffer.add_char buf '\\'; Buffer.add_char buf 'x'; f i
+    else
+      Buffer.add_char buf '\\'; Buffer.add_char buf 'x'; f i
+  in
+  f 0;
+  Str.regexp (Buffer.contents buf)
+
 let my_temp_dir (ctx : test_ctxt) : string =
   match Sys.getenv_opt "CODEGEN_SAVE_TMP" with
   | Some _ -> make_temp_dir "codegen-test" ""
@@ -893,13 +941,13 @@ let test_even_odd_count (ctx : test_ctxt) : unit =
     ~modify_generated_source:
       (fun s ->
         let s = Str.replace_first
-          (Str.regexp "^bool[ \n]even\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^bool[ \n]even\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("bool tmp_even\\1" ^
            "bool even(nat n) { even_count++; return tmp_even(n); }\n")
           s
         in
         let s = Str.replace_first
-          (Str.regexp "^bool[ \n]odd\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^bool[ \n]odd\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("bool tmp_odd\\1" ^
            "bool odd(nat n) { odd_count++; return tmp_odd(n); }\n")
           s
@@ -1850,13 +1898,13 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (Str.regexp "^nat[ \n]sizet\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (Str.regexp "^nat[ \n]sizef\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
@@ -1895,13 +1943,13 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (Str.regexp "^nat[ \n]sizet\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (Str.regexp "^nat[ \n]sizef\\(.*\n\\(\\([^}].*\\)?\n\\)*}\n\\)")
+          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
