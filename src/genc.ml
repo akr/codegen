@@ -47,10 +47,10 @@ type fixfunc_t = {
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
 
-  fixfunc_outer_variables: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_outer_variables *)
-  (* outer variables are mostly same for fix-bouded functions in a fix-term.
+  fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_extra_arguments *)
+  (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different when some of them have Some X for fixfunc_top_call.
-    In such case, outer variables are all bounded variables by lambda and let-in and not filtered. *)
+    In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
 }
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
@@ -69,7 +69,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
         Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("Some " ^ top)) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
-        Pp.str "outer_variables=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_outer_variables ++ Pp.str ")" +++
+        Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.mt ()
       ))
     fixfunc_tbl
@@ -381,7 +381,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                 fixfunc_return_type = return_type;
                 fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                 fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
-                fixfunc_outer_variables = []; (* dummy. updated by fixfunc_initialize_outer_variables *)
+                fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
               })
             nary tary)
       in
@@ -533,27 +533,27 @@ let fixterm_free_variables (env : Environ.env) (sigma : Evd.evar_map)
   ignore (fixterm_free_variables_rec env sigma term ~result);
   result
 
-let pr_outer_variable (outer : (string * string) list) : Pp.t =
+let pr_extra_argument (exarg : (string * string) list) : Pp.t =
   Pp.str "[" ++
   pp_joinmap_list (Pp.str ",")
     (fun (x,t) -> Pp.str "(" ++ Pp.str x ++ Pp.str "," ++ Pp.str t ++ Pp.str ")")
-    outer ++
+    exarg ++
   Pp.str "]"
 
-let check_eq_outer_variables outer1 outer2 =
-  if outer1 <> outer2 then
-    user_err (Pp.str "[codegen:bug] outer length differ:" +++ pr_outer_variable outer1 +++ Pp.str "<>" +++ pr_outer_variable outer2)
+let check_eq_extra_arguments exarg1 exarg2 =
+  if exarg1 <> exarg2 then
+    user_err (Pp.str "[codegen:bug] exargs length differ:" +++ pr_extra_argument exarg1 +++ Pp.str "<>" +++ pr_extra_argument exarg2)
 
-let _ = ignore check_eq_outer_variables
+let _ = ignore check_eq_extra_arguments
 
 (*
-  compute_naive_outer_variables computes outer variables in "naive" way:
+  compute_naive_extra_arguments computes extra arguments in "naive" way:
   It contains all variables in env except fix-bounded functions.
   Note that the result is ordered from outside to inside of the term.
 *)
-let compute_naive_outer_variables ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) (sigma : Evd.evar_map) : (string * c_typedata) list =
+let compute_naive_extra_arguments ~(fixfunc_tbl : fixfunc_table) (env : Environ.env) (sigma : Evd.evar_map) : (string * c_typedata) list =
   let n = Environ.nb_rel env in
-  let outer = ref [] in
+  let exargs = ref [] in
   for i = 1 to n do
     let decl = Environ.lookup_rel i env in
     let x = Context.Rel.Declaration.get_name decl in
@@ -562,15 +562,15 @@ let compute_naive_outer_variables ~(fixfunc_tbl : fixfunc_table) (env : Environ.
     if not (Hashtbl.mem fixfunc_tbl id) then (* Don't include fix-bounded functions *)
       let c_ty = c_typename env sigma (EConstr.of_constr t) in
       if not (c_type_is_void c_ty) then
-        outer := (str_of_name x, c_ty) :: !outer
+        exargs := (str_of_name x, c_ty) :: !exargs
   done;
-  !outer
+  !exargs
 
-let compute_precise_outer_variables
+let compute_precise_extra_arguments
     ~(fixfunc_tbl : fixfunc_table)
     (env : Environ.env) (sigma : Evd.evar_map)
     (fixterm_free_variables : (Id.t, Id.Set.t) Hashtbl.t) :
-    ((*fixterm_id*)Id.t, (*outer_variables*)Id.Set.t) Hashtbl.t =
+    ((*fixterm_id*)Id.t, (*extra_arguments*)Id.Set.t) Hashtbl.t =
   let fixfunc_ids =
     Hashtbl.fold
       (fun fixfunc_id fixfunc set ->
@@ -578,16 +578,16 @@ let compute_precise_outer_variables
       fixfunc_tbl
       Id.Set.empty
   in
-  let fixterm_outer_variables = Hashtbl.create 0 in
+  let fixterm_extra_arguments = Hashtbl.create 0 in
   Hashtbl.iter
     (fun fixterm_id fixterm_fv ->
       let q = ref fixterm_fv in
-      let outer_variables = ref Id.Set.empty in
+      let extra_arguments = ref Id.Set.empty in
       while not (Id.Set.is_empty !q) do
         let id = Id.Set.choose !q in
         q := Id.Set.remove id !q;
-        if not (Id.Set.mem id !outer_variables) then
-          (outer_variables := Id.Set.add id !outer_variables;
+        if not (Id.Set.mem id !extra_arguments) then
+          (extra_arguments := Id.Set.add id !extra_arguments;
           match Hashtbl.find_opt fixfunc_tbl id with
           | None -> ()
           | Some fixfunc2 ->
@@ -597,31 +597,31 @@ let compute_precise_outer_variables
             | Some fv ->
                 q := Id.Set.union !q fv)
       done;
-      Hashtbl.add fixterm_outer_variables fixterm_id
-        (Id.Set.diff !outer_variables fixfunc_ids))
+      Hashtbl.add fixterm_extra_arguments fixterm_id
+        (Id.Set.diff !extra_arguments fixfunc_ids))
     fixterm_free_variables;
-  fixterm_outer_variables
+  fixterm_extra_arguments
 
-let fixfunc_initialize_outer_variables
+let fixfunc_initialize_extra_arguments
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     ~(fixfunc_tbl : fixfunc_table) : unit =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
-  let outer_variables = compute_precise_outer_variables ~fixfunc_tbl env sigma fixterm_free_variables in
+  let extra_arguments = compute_precise_extra_arguments ~fixfunc_tbl env sigma fixterm_free_variables in
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let fixterm_id = fixfunc.fixfunc_term_id in
-      let ov = compute_naive_outer_variables ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
+      let ov = compute_naive_extra_arguments ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
       let ov2 =
         if fixfunc.fixfunc_top_call <> None then
           ov
         else
-          let precise_outer_variables = Hashtbl.find outer_variables fixterm_id in
+          let precise_extra_arguments = Hashtbl.find extra_arguments fixterm_id in
           List.filter
             (fun (varname, vartype) ->
-              Id.Set.mem (Id.of_string varname) precise_outer_variables)
+              Id.Set.mem (Id.of_string varname) precise_extra_arguments)
             ov
       in
-      Some { fixfunc with fixfunc_outer_variables = ov2 })
+      Some { fixfunc with fixfunc_extra_arguments = ov2 })
     fixfunc_tbl
 
 let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
@@ -630,7 +630,7 @@ let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) 
   let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
   fixfunc_initialize_top_calls env sigma name term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
-  fixfunc_initialize_outer_variables env sigma term ~fixfunc_tbl;
+  fixfunc_initialize_extra_arguments env sigma term ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   (fixterms, fixfunc_tbl)
 
@@ -1034,7 +1034,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
               gen_head_cont cont
                 (gen_funcall fname
                   (Array.append
-                    (Array.of_list (List.map fst fixfunc.fixfunc_outer_variables))
+                    (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
   | Const (ctnt,_) ->
       gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)))
@@ -1086,7 +1086,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
         gen_head_cont cont
           (gen_funcall nj_funcname
             (Array.append
-              (Array.of_list (List.map fst fixfunc_j.fixfunc_outer_variables))
+              (Array.of_list (List.map fst fixfunc_j.fixfunc_extra_arguments))
               (Array.of_list (list_filter_none cargs))))
       else
         let assignments =
@@ -1151,7 +1151,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                     gen_head_cont cont2
                       (gen_funcall ni_funcname
                         (Array.append
-                          (Array.of_list (List.map fst fixfunc_i.fixfunc_outer_variables))
+                          (Array.of_list (List.map fst fixfunc_i.fixfunc_extra_arguments))
                           (Array.of_list (list_filter_none cargs)))))
             fix_bodies
         in
@@ -1346,7 +1346,7 @@ let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t lis
 let detect_fixterms_for_bodies
     ~(fixterms : fixterm_t list)
     ~(fixfunc_tbl : fixfunc_table) :
-    ((*outer_variables*)((string * c_typedata) list) * Environ.env * EConstr.t) list =
+    ((*extra_arguments*)((string * c_typedata) list) * Environ.env * EConstr.t) list =
   let non_inlinable_non_tail_position_fixterms =
     List.filter
       (fun fixterm ->
@@ -1357,8 +1357,8 @@ let detect_fixterms_for_bodies
   List.map
     (fun fixterm ->
       let fixterm_id = fixterm.fixterm_term_id in
-      let outer_variables = (Hashtbl.find fixfunc_tbl fixterm_id).fixfunc_outer_variables in
-      (outer_variables, fixterm.fixterm_term_env, fixterm.fixterm_term))
+      let extra_arguments = (Hashtbl.find fixfunc_tbl fixterm_id).fixfunc_extra_arguments in
+      (extra_arguments, fixterm.fixterm_term_env, fixterm.fixterm_term))
     non_inlinable_non_tail_position_fixterms
 
 let labels_for_stacked_fixfuncs
@@ -1427,7 +1427,7 @@ let obtain_function_bodies
      EConstr.t) list =
   let results =
     List.map
-      (fun (outer_variables, env1, term1) ->
+      (fun (extra_arguments, env1, term1) ->
         let (term1_fargs, term1_body) = EConstr.decompose_lam sigma term1 in
         let env2 = EConstr.push_rel_context (ctx_of_fargs term1_fargs) env1 in
         let fargs =
@@ -1440,7 +1440,7 @@ let obtain_function_bodies
                 Some (str_of_annotated_name x, c_ty))
             term1_fargs
         in
-        obtain_function_bodies1 ~fixfunc_tbl ~primary_cfunc env2 sigma (List.append fargs outer_variables) [] term1_body)
+        obtain_function_bodies1 ~fixfunc_tbl ~primary_cfunc env2 sigma (List.append fargs extra_arguments) [] term1_body)
       (([], env, term) ::
        detect_fixterms_for_bodies ~fixterms ~fixfunc_tbl)
   in
@@ -1521,14 +1521,14 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
       hovbrace (pr_members formal_arguments) ++ Pp.str ";")) +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        if CList.is_empty fixfunc.fixfunc_outer_variables &&
+        if CList.is_empty fixfunc.fixfunc_extra_arguments &&
            CList.is_empty fixfunc.fixfunc_formal_arguments then
           Pp.mt ()
         else
           Pp.hv 0 (
           Pp.str ("struct codegen_args_" ^ fixfunc.fixfunc_c_name) +++
           hovbrace (
-          pr_members fixfunc.fixfunc_outer_variables +++
+          pr_members fixfunc.fixfunc_extra_arguments +++
           pr_members (List.filter_map
                        (fun (c_arg, c_ty) ->
                          if c_type_is_void c_ty then None
@@ -1593,7 +1593,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
       (fun (static1, fixfunc) ->
         pr_entry_function static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
           (List.append
-            fixfunc.fixfunc_outer_variables
+            fixfunc.fixfunc_extra_arguments
             (List.filter_map
               (fun (c_arg, c_ty) ->
                 if c_type_is_void c_ty then None
@@ -1627,7 +1627,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         let pp_case =
           Pp.str "case" +++ Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name) ++ Pp.str ":"
         in
-        let pp_assign_outer =
+        let pp_assign_exargs =
           pp_sjoinmap_list
             (fun (c_arg, t) ->
               Pp.hov 0 (
@@ -1635,7 +1635,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
                 Pp.str "=" +++
                 Pp.str ("((struct codegen_args_" ^ fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
                 Pp.str ";"))
-            fixfunc.fixfunc_outer_variables
+            fixfunc.fixfunc_extra_arguments
         in
         let pp_assign_args =
           pp_sjoinmap_list
@@ -1657,7 +1657,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
         let pp_result =
           Pp.hov 0 pp_case ++ Pp.brk (1,2) ++
           Pp.v 0 (
-            pp_assign_outer +++
+            pp_assign_exargs +++
             pp_assign_args +++
             Pp.hov 0 pp_goto)
         in

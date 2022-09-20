@@ -2079,11 +2079,11 @@ let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
       assert(f(1) == 1);
     |}
 
-let test_outer_variables (ctx : test_ctxt) : unit =
+let test_extra_arguments (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
-      Definition test_outer_variables (a b c d e : nat) :=
+      Definition test_extra_arguments (a b c d e : nat) :=
         let y :=
           (fix g x :=
             match x with
@@ -2092,16 +2092,16 @@ let test_outer_variables (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Func test_outer_variables.
+      CodeGen Func test_extra_arguments.
     |}) {|
-      assert(test_outer_variables(1,2,3,4,5) == 10);
+      assert(test_extra_arguments(1,2,3,4,5) == 10);
     |}
 
-let test_outer_variables_nested_outer_used (ctx : test_ctxt) : unit =
+let test_extra_arguments_nested_exarg_used (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
-      Definition test_outer_variables_nested_outer_used (a b c d e : nat) :=
+      Definition test_extra_arguments_nested_exarg_used (a b c d e : nat) :=
         let y :=
           (fix g x :=
             match x with
@@ -2118,16 +2118,16 @@ let test_outer_variables_nested_outer_used (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Func test_outer_variables_nested_outer_used.
+      CodeGen Func test_extra_arguments_nested_exarg_used.
     |}) {|
-      assert(test_outer_variables_nested_outer_used(1,2,3,4,5) == 24);
+      assert(test_extra_arguments_nested_exarg_used(1,2,3,4,5) == 24);
     |}
 
-let test_outer_variables_nested_outer_unused (ctx : test_ctxt) : unit =
+let test_extra_arguments_nested_exarg_unused (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
-      Definition test_outer_variables_nested_outer_unused (a b c d e : nat) :=
+      Definition test_extra_arguments_nested_exarg_unused (a b c d e : nat) :=
         let y :=
           (fix g x :=
             match x with
@@ -2144,9 +2144,9 @@ let test_outer_variables_nested_outer_unused (ctx : test_ctxt) : unit =
             end) b
         in
         S y.
-      CodeGen Func test_outer_variables_nested_outer_unused.
+      CodeGen Func test_extra_arguments_nested_exarg_unused.
     |}) {|
-      assert(test_outer_variables_nested_outer_unused(1,2,3,4,5) == 15);
+      assert(test_extra_arguments_nested_exarg_unused(1,2,3,4,5) == 15);
     |}
 
 let test_unused_argument (ctx : test_ctxt) : unit =
@@ -2168,7 +2168,7 @@ let test_unused_argument (ctx : test_ctxt) : unit =
       assert(f(100, 3) == 3);
     |}
 
-let test_inner_fixfunc_goto_outer_fixfunc (ctx : test_ctxt) : unit =
+let test_inner_fixfunc_goto_exarg_fixfunc (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
     {|
@@ -3957,11 +3957,11 @@ let suite : OUnit2.test =
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
-    "test_outer_variables" >:: test_outer_variables;
-    "test_outer_variables_nested_outer_used" >:: test_outer_variables_nested_outer_used;
-    "test_outer_variables_nested_outer_unused" >:: test_outer_variables_nested_outer_unused;
+    "test_extra_arguments" >:: test_extra_arguments;
+    "test_extra_arguments_nested_exarg_used" >:: test_extra_arguments_nested_exarg_used;
+    "test_extra_arguments_nested_exarg_unused" >:: test_extra_arguments_nested_exarg_unused;
     "test_unused_argument" >:: test_unused_argument;
-    "test_inner_fixfunc_goto_outer_fixfunc" >:: test_inner_fixfunc_goto_outer_fixfunc;
+    "test_inner_fixfunc_goto_exarg_fixfunc" >:: test_inner_fixfunc_goto_exarg_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
