@@ -1377,9 +1377,18 @@ let compose_c_tokens (strings : string list) : string =
 
   The postfix has stronger precedence over the prefix.
 
-  *foo(int) is parsed as *(foo(int)).
+  *foo(int) is parsed as *(foo(int)), not ( *foo)(int).
   Thus, we need a parenthesis as ( *foo)(int) when D is substituted to *foo in D(int).
 *)
+
+let compose_c_type (c_type : c_typedata) (declarator_left : string) (declarator_right : string) : c_typedata =
+  if str_first_non_white_space_character declarator_left = Some '*' &&
+     (let c_opt = str_first_non_white_space_character c_type.c_type_right in
+      c_opt = Some '[' || c_opt = Some '(')
+  then
+    { c_type_left=c_type.c_type_left^"("^declarator_left; c_type_right=declarator_right^")"^c_type.c_type_right }
+  else
+    { c_type_left=c_type.c_type_left^declarator_left; c_type_right=declarator_right^c_type.c_type_right }
 
 let compose_c_decl (c_type : c_typedata) (declarator : string) : string =
   if str_first_non_white_space_character declarator = Some '*' &&
