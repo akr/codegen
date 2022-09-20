@@ -1006,6 +1006,10 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
         let decl = Environ.lookup_rel i env in
         let name = Context.Rel.Declaration.get_name decl in
         (match Hashtbl.find_opt fixfunc_tbl (id_of_name name) with
+        | None -> (* closure invocation *)
+            let closure_var = carg_of_garg env i in
+            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons (list_filter_none cargs) closure_var)) in
+            gen_head_cont cont pp
         | Some fixfunc ->
             let fname =
               match fixfunc.fixfunc_top_call with
@@ -1031,9 +1035,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                 (gen_funcall fname
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_outer_variables))
-                    (Array.of_list (list_filter_none cargs))))
-        | None ->
-          user_err (Pp.str "[codegen:gen_head] fix/closure call not supported yet"))
+                    (Array.of_list (list_filter_none cargs)))))
   | Const (ctnt,_) ->
       gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)))
   | Construct (cstr,_) ->
@@ -1210,7 +1212,10 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
         let key = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
         let fixfunc_opt = Hashtbl.find_opt fixfunc_tbl (id_of_name key) in
         (match fixfunc_opt with
-        | None -> user_err (Pp.str "[codegen] gen_tail doesn't support partial application to (non-fixpoint) Rel, yet:" +++ Printer.pr_econstr_env env sigma term)
+        | None -> (* closure invocation *)
+            let closure_var = carg_of_garg env i in
+            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons (list_filter_none cargs) closure_var)) in
+            gen_tail_cont cont pp
         | Some fixfunc ->
             let formal_arguments = fixfunc.fixfunc_formal_arguments in
             if List.length cargs < List.length formal_arguments then

@@ -228,6 +228,9 @@ let rec ntimes n f v =
   else
     ntimes (n-1) f (f v)
 
+let rcons s v =
+  List.append s [v]
+
 let list_prepend_map_rev (f : 'a -> 'b) (l1 : 'a list) (l2 : 'b list) : 'b list =
   let rec aux l1 result =
     match l1 with

@@ -270,6 +270,7 @@ let codegen_test_template
     ?(resolve_dependencies : bool = true)
     ?(mutual_recursion_detection : bool = true)
     ?(cc_exit_code : Unix.process_status option)
+    ?(main_toplevel_defs : string option)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -294,6 +295,7 @@ let codegen_test_template
     "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
     "#include <assert.h>\n" ^
     "#include \"gen.c\"\n" ^
+    delete_indent (expand_tab (Stdlib.Option.value main_toplevel_defs ~default:"")) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
     add_n_indent 2 (delete_indent (expand_tab c_body)) ^ "\n" ^
     "  return EXIT_SUCCESS;\n" ^
@@ -3842,6 +3844,42 @@ let test_inductivetype_twoarg_bool_paren (ctx : test_ctxt) : unit =
       assert(f(false) == false);
     |}
 
+let test_closure_call_at_tail_position (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition f (g : nat -> nat) x := g x.
+      CodeGen Func f.
+    |})
+    ~main_toplevel_defs:{|
+      struct closure_f_tag { uint64_t (*func)(uint64_t, void*); uint64_t m; };
+      uint64_t g(uint64_t n, void *closure) {
+        struct closure_f_tag *c = closure;
+        return n + c->m + 100;
+      }
+    |}
+    {|
+      struct closure_f_tag c = { g, 20 };
+      assert(f(&c.func, 3) == 123);
+    |}
+
+let test_closure_call_at_head_position (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition f (g : nat -> nat) x := S (g x).
+      CodeGen Func f.
+    |})
+    ~main_toplevel_defs:{|
+      struct closure_f_tag { uint64_t (*func)(uint64_t, void*); uint64_t m; };
+      uint64_t g(uint64_t n, void *closure) {
+        struct closure_f_tag *c = closure;
+        return n + c->m + 100;
+      }
+    |}
+    {|
+      struct closure_f_tag c = { g, 70 };
+      assert(f(&c.func, 3) == 174);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -4003,6 +4041,8 @@ let suite : OUnit2.test =
     "test_void_head_proj" >:: test_void_head_proj;
     "test_void_tail_proj" >:: test_void_tail_proj;
     "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
+    "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
+    "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
   ]
 
 let () =

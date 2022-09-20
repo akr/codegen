@@ -19,7 +19,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 open Names
 (*open Globnames*)
 open CErrors
-open Constr
+(*open Constr*)
 open EConstr
 
 open Cgenutil
@@ -273,10 +273,31 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
 let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
   (get_ind_config env sigma t).is_void_type
 
-let c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
-  match EConstr.kind sigma t with
-  | Prod _ -> { c_type_left = "codegen_closure_t"; c_type_right = "" } (* codegen_closure_t is not used yet *)
-  | _ -> (get_ind_config env sigma t).c_type
+let rec c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
+  let (args, ret_type) = decompose_prod sigma t in
+  if CList.is_empty args then
+    (get_ind_config env sigma t).c_type
+  else
+    let arg_types =
+      List.rev_map
+        (fun (x, ty) ->
+          if Vars.closed0 sigma ty then
+            c_typename env sigma ty
+          else
+            user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
+        args
+    in
+    let arg_types =
+      rcons
+        (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
+        { c_type_left="void *"; c_type_right="" } (* closure invocation pass the closure itself as the last argument *)
+    in
+    let arg_abstract_decls = List.map compose_c_abstract_decl arg_types in
+    (* closure type in C is a pointer to pointer to function that is actually
+       pointer to the first member of closure struct where the first member is a pointer to a function  *)
+    let declarator_left = "(**" in
+    let declarator_right = ")(" ^ String.concat ", " arg_abstract_decls ^ ")" in
+    compose_c_type (get_ind_config env sigma ret_type).c_type declarator_left declarator_right
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in

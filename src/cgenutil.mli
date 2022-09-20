@@ -29,6 +29,7 @@ val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
 val ncons : int -> 'a -> 'a list -> 'a list
 val ntimes : int -> ('a -> 'a) -> 'a -> 'a
+val rcons : 'a list -> 'a -> 'a list
 val list_prepend_map_rev : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_prepend_mapi_rev : (int -> 'a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_rev_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
