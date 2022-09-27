@@ -1357,7 +1357,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       in
       pp_assignments +++ pp_sjoin_list pp_fixfuncs
 
-let gen_function_header (static : bool) (return_type : c_typedata) (c_name : string)
+let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : string)
     (formal_arguments : (string * c_typedata) list) : Pp.t =
   let pp_static = (if static then Pp.str "static" else Pp.mt ()) in
   let pp_parameters =
@@ -1639,7 +1639,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
   in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   Pp.v 0 (
-  gen_function_header static return_type primary_cfunc c_fargs +++
+  gen_function_header ~static return_type primary_cfunc c_fargs +++
   vbrace (
     pp_sjoinmap_list
       (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
@@ -1653,6 +1653,15 @@ let pr_members (args : (string * c_typedata) list) : Pp.t =
     args
 
 let closure_entry_label (c_name : string) : string = "closure_entry_" ^ c_name
+
+let closure_args_struct_type (c_name : string) : string =
+  "struct codegen_closure_args_" ^ c_name
+
+let fixfunc_args_struct_type (c_name : string) : string =
+  "struct codegen_fixfunc_args_" ^ c_name
+
+let topfunc_args_struct_type (c_name : string) : string =
+  "struct codegen_topfunc_args_" ^ c_name
 
 let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
@@ -1695,18 +1704,12 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
         ) ++ Pp.str ";"))
       closure_list
   in
-  let args_struct_type ~(is_closure:bool) (c_name : string) : string =
-    if is_closure then
-      "struct codegen_closure_args_" ^ c_name
-    else
-      "struct codegen_args_" ^ c_name
-  in
   let pp_struct_args =
     (if CList.is_empty formal_arguments then
       Pp.mt ()
     else
       Pp.hv 0 (
-      Pp.str (args_struct_type ~is_closure:false primary_cfunc) +++
+      Pp.str (topfunc_args_struct_type primary_cfunc) +++
       hovbrace (pr_members formal_arguments) ++ Pp.str ";")) +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
@@ -1715,7 +1718,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
           Pp.mt ()
         else
           Pp.hv 0 (
-          Pp.str (args_struct_type ~is_closure:false fixfunc.fixfunc_c_name) +++
+          Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
           hovbrace (
           pr_members fixfunc.fixfunc_extra_arguments +++
           pr_members (List.filter_map
@@ -1727,7 +1730,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
     pp_sjoinmap_list
       (fun clo ->
         Pp.hv 0 (
-        Pp.str (args_struct_type ~is_closure:true clo.closure_c_name) +++
+        Pp.str (closure_args_struct_type clo.closure_c_name) +++
         hovbrace (
           pr_members clo.closure_args +++
           pr_members [("closure", c_type_pointer_to (closure_struct_type clo))]
@@ -1741,26 +1744,14 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
-    let pr_entry_function ~(is_closure:bool) static c_name func_index formal_arguments return_type =
+    let pr_entry_function ~(static:bool) c_funcname func_index args_struct_type formal_arguments return_type =
       let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
-      let c_funcname =
-        if is_closure then
-          closure_entry_function_prefix ^ c_name
-        else
-          c_name
-      in
-      let formal_arguments =
-        if is_closure then
-          List.append formal_arguments [("closure", pointer_to_void)]
-        else
-          formal_arguments
-      in
       let (pp_vardecl_args, pp_struct_arg) =
         if CList.is_empty formal_arguments then
           (Pp.mt (), null)
         else
           (Pp.hov 2
-            (Pp.str (args_struct_type ~is_closure c_name) +++
+            (Pp.str args_struct_type +++
              Pp.str "codegen_args" +++
              Pp.str "=" +++
              hovbrace (
@@ -1790,18 +1781,20 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
           Pp.str "return codegen_ret;"
       in
       Pp.v 0 (
-        gen_function_header static return_type c_funcname formal_arguments +++
+        gen_function_header ~static return_type c_funcname formal_arguments +++
         vbrace (
           pp_vardecl_args +++
           pp_vardecl_ret +++
           pp_call +++
           pp_return))
     in
-    pr_entry_function ~is_closure:false static primary_cfunc (func_index_prefix ^ primary_cfunc)
+    pr_entry_function ~static primary_cfunc (func_index_prefix ^ primary_cfunc)
+      (topfunc_args_struct_type primary_cfunc)
       formal_arguments return_type +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        pr_entry_function ~is_closure:false static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
+        pr_entry_function ~static:static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
+          (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
           (List.append
             fixfunc.fixfunc_extra_arguments
             (List.filter_map
@@ -1813,8 +1806,10 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       sibling_and_internal_entfuncs +++
     pp_sjoinmap_list
       (fun clo ->
-        pr_entry_function ~is_closure:true true clo.closure_c_name (closure_index_prefix ^ clo.closure_c_name)
-          clo.closure_args clo.closure_c_return_type)
+        pr_entry_function ~static:true (closure_entry_function_prefix ^ clo.closure_c_name) (closure_index_prefix ^ clo.closure_c_name)
+          (closure_args_struct_type clo.closure_c_name)
+          (List.append clo.closure_args [("closure", pointer_to_void)])
+          clo.closure_c_return_type)
       closure_list
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
@@ -1894,13 +1889,13 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
             (List.map
               (fun (c_arg, t) ->
                 (c_arg,
-                 ("((" ^ args_struct_type ~is_closure:false fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+                 ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
               fixfunc.fixfunc_extra_arguments)
             (List.filter_map
               (fun (c_arg, c_ty) ->
                 if c_type_is_void c_ty then None
                 else Some (c_arg,
-                           ("((" ^args_struct_type ~is_closure:false fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+                           ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
               fixfunc.fixfunc_formal_arguments))
           (Some (fixfunc_entry_label fixfunc.fixfunc_c_name)))
       sibling_and_internal_entfuncs +++
@@ -1911,12 +1906,12 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
             (List.map
               (fun (c_arg, c_ty) ->
                 (c_arg,
-                 ("((" ^ args_struct_type ~is_closure:true clo.closure_c_name ^ " *)codegen_args)->" ^ c_arg)))
+                 ("((" ^ closure_args_struct_type clo.closure_c_name ^ " *)codegen_args)->" ^ c_arg)))
               clo.closure_args)
             (List.map
               (fun (c_arg, c_ty) ->
                 (c_arg,
-                 ("((" ^ args_struct_type ~is_closure:true clo.closure_c_name ^ " *)codegen_args)->closure->" ^ c_arg)))
+                 ("((" ^ closure_args_struct_type clo.closure_c_name ^ " *)codegen_args)->closure->" ^ c_arg)))
               clo.closure_vars))
           (Some (closure_entry_label clo.closure_c_name)))
       closure_list
@@ -1926,7 +1921,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       (List.map
         (fun (c_arg, t) ->
             (c_arg,
-             ("((" ^ args_struct_type ~is_closure:false primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
+             ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
         formal_arguments)
       None
   in
@@ -2098,7 +2093,7 @@ let gen_prototype (cfunc_name : string) : Pp.t =
         else Some (c_arg, c_ty))
       formal_arguments
   in
-  gen_function_header static return_type cfunc_name formal_arguments' ++ Pp.str ";"
+  gen_function_header ~static return_type cfunc_name formal_arguments' ++ Pp.str ";"
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lam term in
