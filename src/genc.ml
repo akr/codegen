@@ -1599,7 +1599,7 @@ let collect_closures ~(fixfunc_tbl : fixfunc_table)
           closure_env=closure_env;
           closure_exp=closure_exp;
         } :: !closures);
-  !closures
+  List.rev !closures
 
 let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   let closure_tbl = Hashtbl.create 0 in
