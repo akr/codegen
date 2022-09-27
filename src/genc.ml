@@ -1712,14 +1712,18 @@ let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
       pp_call +++
       pp_return))
 
+let func_index_type_name primary_cfunc = "codegen_func_indextype_" ^ primary_cfunc
+
+let topfunc_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
+let fixfunc_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
+let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
+
 let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
-  let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
-  let func_index_prefix = "codegen_func_index_" in
-  let closure_index_prefix = "codegen_closure_index_" in
+  let func_index_type = func_index_type_name primary_cfunc in
   let body_function_name = body_function_name primary_cfunc in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let closure_tbl = closure_tbl_of_list closure_list in
@@ -1733,13 +1737,13 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       Pp.str func_index_type +++
       hovbrace (
         pp_join_list (Pp.str "," ++ Pp.spc ())
-          (Pp.str (func_index_prefix ^ primary_cfunc) ::
+          (Pp.str (topfunc_index primary_cfunc) ::
            List.append
              (List.map
-               (fun (static1, fixfunc) -> Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name))
+               (fun (static1, fixfunc) -> Pp.str (fixfunc_index fixfunc.fixfunc_c_name))
                sibling_and_internal_entfuncs)
              (List.map
-               (fun clo -> Pp.str (closure_index_prefix ^ clo.closure_c_name))
+               (fun clo -> Pp.str (closure_index clo.closure_c_name))
                closure_list))) ++
       Pp.str ";")
   in
@@ -1794,13 +1798,13 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
-    pr_entry_function ~static primary_cfunc (func_index_prefix ^ primary_cfunc)
+    pr_entry_function ~static primary_cfunc (topfunc_index primary_cfunc)
       (topfunc_args_struct_type primary_cfunc)
       formal_arguments return_type
       body_function_name +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        pr_entry_function ~static:static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
+        pr_entry_function ~static:static1 fixfunc.fixfunc_c_name (fixfunc_index fixfunc.fixfunc_c_name)
           (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
           (List.append
             fixfunc.fixfunc_extra_arguments
@@ -1814,7 +1818,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       sibling_and_internal_entfuncs +++
     pp_sjoinmap_list
       (fun clo ->
-        pr_entry_function ~static:true (closure_entry_function_prefix ^ clo.closure_c_name) (closure_index_prefix ^ clo.closure_c_name)
+        pr_entry_function ~static:true (closure_func_name clo) (closure_index clo.closure_c_name)
           (closure_args_struct_type clo.closure_c_name)
           (List.append clo.closure_args [("closure", pointer_to_void)])
           clo.closure_c_return_type
@@ -1893,7 +1897,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
   let pp_switch_cases =
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        pr_case (Some (func_index_prefix ^ fixfunc.fixfunc_c_name))
+        pr_case (Some (fixfunc_index fixfunc.fixfunc_c_name))
           (List.append
             (List.map
               (fun (c_arg, t) ->
@@ -1910,7 +1914,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
       sibling_and_internal_entfuncs +++
     pp_sjoinmap_list
       (fun clo ->
-        pr_case (Some (closure_index_prefix ^ clo.closure_c_name))
+        pr_case (Some (closure_index clo.closure_c_name))
           (List.append
             (List.map
               (fun (c_arg, c_ty) ->
