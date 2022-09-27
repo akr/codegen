@@ -218,11 +218,11 @@ let rec determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
   let ty = Reductionops.whd_all env sigma ty in
   match EConstr.kind sigma ty with
   | Prod (x,t,b) ->
-      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] t=" ++ Printer.pr_econstr_env env sigma t);
+      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] t=" ++ Printer.pr_econstr_env env sigma t);*)
       let t = Reductionops.nf_all env sigma t in
-      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] normalized_t=" ++ Printer.pr_econstr_env env sigma t);
+      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] normalized_t=" ++ Printer.pr_econstr_env env sigma t);*)
       let is_static_arg = not (is_monomorphic_type_for_determine_static_arguments env sigma t) in
-      msg_debug_hov (Pp.str "[codegen:determine_static_arguments] is_static_arg=" ++ Pp.bool is_static_arg);
+      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] is_static_arg=" ++ Pp.bool is_static_arg);*)
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env = EConstr.push_rel decl env in
       is_static_arg :: determine_static_arguments env sigma b

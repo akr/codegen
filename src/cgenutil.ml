@@ -1393,6 +1393,9 @@ let compose_c_type (c_type : c_typedata) (declarator_left : string) (declarator_
   else
     { c_type_left=c_type.c_type_left^declarator_left; c_type_right=declarator_right^c_type.c_type_right }
 
+let c_type_pointer_to (c_type : c_typedata) : c_typedata =
+  compose_c_type c_type "*" ""
+
 let compose_c_decl (c_type : c_typedata) (declarator : string) : string =
   if str_first_non_white_space_character declarator = Some '*' &&
      (let c_opt = str_first_non_white_space_character c_type.c_type_right in

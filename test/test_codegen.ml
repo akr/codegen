@@ -3880,6 +3880,21 @@ let test_closure_call_at_head_position (ctx : test_ctxt) : unit =
       assert(f(&c.func, 3) == 174);
     |}
 
+let test_closure_generation (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition call (f : nat -> nat -> nat) (x y : nat) : nat := f x y.
+      Definition f a b c d :=
+        let g x y := a * 5 + b * 4 + x * 3 + y * 2 + 1 in
+        call g c d.
+      CodeGen Func call.
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(1,2,3,4) == 31);
+      assert(f(4000,300,20,1) == 21263);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -4043,6 +4058,7 @@ let suite : OUnit2.test =
     "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
     "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
+    "test_closure_generation" >:: test_closure_generation;
   ]
 
 let () =

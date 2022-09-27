@@ -55,6 +55,33 @@ type fixfunc_t = {
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
+type closure_t = {
+  closure_id: Id.t;
+  closure_c_name: string;
+  closure_c_func_type: c_typedata;
+  closure_c_return_type: c_typedata;
+  closure_args: (string * c_typedata) list;
+  closure_vars: (string * c_typedata) list;
+  closure_env: Environ.env;
+  closure_exp: EConstr.t;
+}
+type closure_table = (Id.t, closure_t) Hashtbl.t
+
+let closure_struct_tag clo = "codegen_closure_struct_"^clo.closure_c_name
+let closure_struct_type clo = { c_type_left="struct "^(closure_struct_tag clo); c_type_right="" }
+let closure_entry_function_prefix = "codegen_closre_entry_"
+let closure_func_name clo = closure_entry_function_prefix^clo.closure_c_name
+
+let get_closure_id (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.t =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,b) ->
+      (* Since codegen renames variables uniquely, the name of argument (x) is unique to identify this closure. *)
+      id_of_annotated_name x
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      id_of_annotated_name nary.(j)
+  | _ ->
+      user_err (Pp.str "[codegen:bug] unexpected closure term:" +++ Printer.pr_econstr_env env sigma term)
+
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
     (fun fixfunc_id fixfunc ->
@@ -958,6 +985,20 @@ let add_local_vars_in_fix_body_list (sigma : Evd.evar_map) fix_bodies =
         context)
     fix_bodies
 
+let lam_fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
+    ((*fargs of outermost lambdas*)(Names.Name.t Context.binder_annot * EConstr.types) list *
+     (*environment under the outermost lambdas*)Environ.env *
+     (((*env including fixfunc names but without lambdas of fixfunc*)Environ.env *
+       (*env including fixfunc names and lambdas of fixfunc*)Environ.env *
+       (*fixfunc name*)Names.Name.t Context.binder_annot *
+       (*fixfunc type*)EConstr.types *
+       (*fargs*)(Names.Name.t Context.binder_annot * EConstr.types) list) list *
+      ((*env for body*)Environ.env *
+       (*body*)EConstr.t)) list) =
+  let (fargs, body) = EConstr.decompose_lam sigma term in
+  let env2 = EConstr.push_rel_context (ctx_of_fargs fargs) env in
+  (fargs, env2, fix_body_list env2 sigma body)
+
 type head_cont = {
   head_cont_ret_var: string option; (* None for void type context *)
   head_cont_exit_label: string option;
@@ -971,14 +1012,16 @@ let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (exp : Pp.t
   | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
-let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
-  let pp = gen_head1 ~fixfunc_tbl ~used_vars ~cont env sigma term in
+let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
+
+let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
+  let pp = gen_head1 ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env sigma term in
   (*msg_debug_hov (Pp.str "[codegen] gen_head:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
   pp
-and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
+and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let (term, argsary) = decompose_appvect sigma term in
   let cargs =
     Array.to_list
@@ -1028,7 +1071,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ fixfunc.fixfunc_c_name) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label fixfunc.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
@@ -1048,7 +1091,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
         | None -> gen_switch_with_break
         | Some _ -> gen_switch_without_break
       in
-      gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
+      gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
@@ -1068,13 +1111,20 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
           { head_cont_ret_var = Some c_var;
             head_cont_exit_label = None; })
       in
-      gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e +++
-      gen_head ~fixfunc_tbl ~used_vars ~cont env2 sigma b
-
+      gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont1 env sigma e +++
+      gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma b
   | Lambda (x,t,b) ->
-      user_err (Pp.str "[codegen] gen_head: lambda term without argument (higher-order term not supported yet):" +++
-        Printer.pr_econstr_env env sigma term)
-
+      let cloid = get_closure_id env sigma term in
+      let clo = Hashtbl.find closure_tbl cloid in
+      let clo_struct_ty = closure_struct_type clo in
+      let clo_func = closure_func_name clo in
+      let clo_var = local_gensym () in
+      add_local_var clo_struct_ty clo_var;
+      gen_assignment (Pp.str (clo_var^".closure_func")) (Pp.str clo_func) +++
+      pp_sjoinmap_list
+        (fun (var,ty) -> gen_assignment (Pp.str (clo_var^"."^var)) (Pp.str var))
+        clo.closure_vars +++
+      gen_head_cont cont (Pp.str ("(&"^clo_var^".closure_func)"))
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
@@ -1132,13 +1182,13 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : he
                     let ni_funcname = fixfunc_i.fixfunc_c_name in
                     if fixfunc_i.fixfunc_used_as_goto ||
                        (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
-                      Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ":"
+                      Pp.str (fixfunc_entry_label ni_funcname) ++ Pp.str ":"
                     else
                       Pp.mt ())
                   context_before_noninlinable
               in
               match noninlinable_index with
-              | None -> pp_labels +++ gen_head ~fixfunc_tbl ~used_vars ~cont:cont2 body_env sigma body
+              | None -> pp_labels +++ gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont2 body_env sigma body
               | Some i ->
                   let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = context_ary.(i) in
                   let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
@@ -1167,24 +1217,24 @@ let gen_tail_cont ?(omit_void_exp : bool = false) (cont : tail_cont) (exp : Pp.t
       Pp.hov 0 (exp ++ Pp.str ";") +++ Pp.str "return;"
   else
     if cont.tail_cont_multifunc then
-      let retvar = "(*(" ^ compose_c_abstract_decl (compose_c_type cont.tail_cont_return_type "*" "") ^ ")codegen_ret)" in
+      let retvar = "(*(" ^ compose_c_abstract_decl (c_type_pointer_to cont.tail_cont_return_type) ^ ")codegen_ret)" in
       gen_assignment (Pp.str retvar) exp +++ Pp.str "return;"
     else
       Pp.hov 0 (Pp.str "return" +++ exp ++ Pp.str ";")
 
-let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
+let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   (*msg_debug_hov (Pp.str "[codegen] gen_tail start:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "(" ++
     pp_sjoinmap_list Pp.str cargs ++
     Pp.str ")");*)
-  let pp = gen_tail1 ~fixfunc_tbl ~used_vars ~cont env sigma term in
+  let pp = gen_tail1 ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env sigma term in
   (*msg_debug_hov (Pp.str "[codegen] gen_tail return:" +++
     Printer.pr_econstr_env env sigma term +++
     Pp.str "->" +++
     pp);*)
   pp
-and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
+and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let (term, argsary) = decompose_appvect sigma term in
   let cargs =
     Array.to_list
@@ -1233,7 +1283,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
             in
             let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
             let funcname = fixfunc.fixfunc_c_name in
-            let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str ("entry_" ^ funcname) ++ Pp.str ";") in
+            let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label funcname) ++ Pp.str ";") in
             pp_assignments +++ pp_goto_entry)
   | Const (ctnt,_) ->
       let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)) in
@@ -1246,7 +1296,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
   | Case (ci,u,pms,p,iv,item,bl) ->
       assert (cargs = []);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
+      gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
   | Proj (pr, item) ->
       ((if cargs <> [] then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
@@ -1266,8 +1316,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
           { head_cont_ret_var = Some c_var;
             head_cont_exit_label = None; })
       in
-      gen_head ~fixfunc_tbl ~used_vars ~cont:cont1 env sigma e +++
-      gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma b
+      gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont1 env sigma e +++
+      gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma b
 
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
@@ -1297,12 +1347,12 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(used_vars : Id.Set.t) ~(cont : ta
                   let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
                   let ni_funcname = fixfunc_i.fixfunc_c_name in
                   if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
-                    Pp.str ("entry_" ^ ni_funcname) ++ Pp.str ":"
+                    Pp.str (fixfunc_entry_label ni_funcname) ++ Pp.str ":"
                   else
                     Pp.mt ()) (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
                 context
             in
-            pp_labels +++ gen_tail ~fixfunc_tbl ~used_vars ~cont body_env sigma body)
+            pp_labels +++ gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body_env sigma body)
           fix_bodies
       in
       pp_assignments +++ pp_sjoin_list pp_fixfuncs
@@ -1370,7 +1420,7 @@ let labels_for_stacked_fixfuncs
       (fun fix_name ->
         let fixfunc = Hashtbl.find fixfunc_tbl (Id.of_string fix_name) in
         if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
-          Some ("entry_" ^ fixfunc.fixfunc_c_name)
+          Some (fixfunc_entry_label fixfunc.fixfunc_c_name)
         else
           None)
       stacked_fixfuncs)
@@ -1446,10 +1496,123 @@ let obtain_function_bodies
   in
   List.concat results
 
-let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
+let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
+  match EConstr.kind sigma term with
+  | Cast _ | Var _ | Meta _ | Sort _ | Ind _ | Prod _
+  | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
+  | Lambda (x,t,b) ->
+      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+      let env2 = EConstr.push_rel decl env in
+      find_closures ~found env2 sigma b
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      Array.iter (find_closures ~found env2 sigma) fary
+  | _ -> find_closures_exp ~found env sigma term
+and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
+  match EConstr.kind sigma term with
+  | Cast _ | Var _ | Meta _ | Sort _ | Ind _ | Prod _
+  | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
+  | LetIn (x,e,t,b) ->
+      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+      let env2 = EConstr.push_rel decl env in
+      find_closures_exp ~found env sigma e;
+      find_closures_exp ~found env2 sigma b
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      (Array.iter2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          find_closures_exp ~found env2 sigma body)
+        bl bl0)
+  | Rel _ -> ()
+  | Const _ -> ()
+  | Construct _ -> ()
+  | Proj _ -> ()
+  | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its bodies may have closure generations. *)
+      find_closures ~found env sigma f
+  | Lambda _ -> (* closure generation found *)
+      found env term;
+      find_closures ~found env sigma term
+  | Fix _ -> (* closure generation found *)
+      found env term;
+      find_closures ~found env sigma term
+
+let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
+  let (_, c_fargs) =
+    List.fold_left_map
+      (fun env (annotated_name, ty) ->
+        let env' = Environ.pop_rel_context 1 env in
+        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
+      env fargs
+  in
+  c_fargs
+
+let collect_closures ~(fixfunc_tbl : fixfunc_table)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : closure_t list =
+  let closures = ref [] in
+  find_closures env sigma term
+    ~found:(fun closure_env closure_exp ->
+      (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_exp=" ++ Printer.pr_econstr_env closure_env sigma closure_exp);*)
+      let closure_ty = Reductionops.nf_all closure_env sigma (Retyping.get_type_of closure_env sigma closure_exp) in
+      (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_ty=" ++ Printer.pr_econstr_env closure_env sigma closure_ty);*)
+      let c_closure_function_ty = c_closure_function_type closure_env sigma closure_ty in
+      let c_return_ty = c_typename closure_env sigma (snd (decompose_prod sigma closure_ty)) in
+      let cloid = get_closure_id closure_env sigma closure_exp in
+      let cloname = global_gensym () in
+      let (outermost_fargs, env1, fix_bodies) = lam_fix_body_list closure_env sigma closure_exp in
+      let outermost_fargs = c_fargs_of env1 sigma outermost_fargs in
+      let (fixes, (env4, body)) = List.hd fix_bodies in
+      let fix_fargs_list = List.map
+        (fun (env2, env3, fixfunc_name, fixfunc_type, fix_fargs) ->
+          c_fargs_of env3 sigma fix_fargs)
+        fixes
+      in
+      let c_fargs = List.concat (List.rev outermost_fargs :: List.map List.rev fix_fargs_list) in
+      let fv_index_set = free_variables_index_set closure_env sigma closure_exp in
+      let vars = List.concat_map
+        (fun index ->
+          (*msg_debug_hov (Pp.str "[codegen:collect_closures] index=" ++ Pp.int index);*)
+          let decl = EConstr.lookup_rel index closure_env in
+          let id = id_of_name (Context.Rel.Declaration.get_name decl) in
+          let ty = Context.Rel.Declaration.get_type decl in
+          let env_for_ty = Environ.pop_rel_context index closure_env in
+          (*msg_debug_hov (Pp.str "[codegen:collect_closures] ty=" ++ Printer.pr_econstr_env env_for_ty sigma ty);*)
+          let c_ty = c_typename env_for_ty sigma ty in
+          match Hashtbl.find_opt fixfunc_tbl id with
+          | None ->
+              [(Id.to_string id, c_ty)]
+          | Some fixfunc -> fixfunc.fixfunc_extra_arguments)
+        (IntSet.elements fv_index_set)
+      in
+      let vars = List.sort_uniq (fun (str1,c_ty1) (str2,c_ty2) -> String.compare str1 str2) vars in
+      closures := {
+          closure_id=cloid;
+          closure_c_name=cloname;
+          closure_c_func_type=c_closure_function_ty;
+          closure_c_return_type=c_return_ty;
+          closure_args=c_fargs;
+          closure_vars=vars;
+          closure_env=closure_env;
+          closure_exp=closure_exp;
+        } :: !closures);
+  !closures
+
+let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
+  let closure_tbl = Hashtbl.create 0 in
+  List.iter
+    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
+    closure_list;
+  closure_tbl
+
+let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (return_type : c_typedata)
     (used_vars : Id.Set.t) : Pp.t =
+  let closure_tbl = closure_tbl_of_list closure_list in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
@@ -1460,7 +1623,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
             (List.rev args);
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
           pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-          gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma body)
+          gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma body)
         bodies)
   in
   let c_fargs =
@@ -1484,13 +1647,23 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
     +++
     pp_body))
 
-let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
+let pr_members (args : (string * c_typedata) list) : Pp.t =
+  pp_sjoinmap_list
+    (fun (c_arg, c_ty) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_arg) ++ Pp.str ";"))
+    args
+
+let closure_entry_label (c_name : string) : string = "closure_entry_" ^ c_name
+
+let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
+  let closure_index_prefix = "codegen_closure_index_" in
+  let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
+  let closure_tbl = closure_tbl_of_list closure_list in
   let sibling_and_internal_entfuncs =
     (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) sibling_entfuncs) @
     List.map (fun fixfunc -> (true, fixfunc)) internal_entfuncs
@@ -1502,22 +1675,38 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
       hovbrace (
         pp_join_list (Pp.str "," ++ Pp.spc ())
           (Pp.str (func_index_prefix ^ primary_cfunc) ::
-           List.map
-             (fun (static1, fixfunc) -> Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name))
-             sibling_and_internal_entfuncs)) ++
+           List.append
+             (List.map
+               (fun (static1, fixfunc) -> Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name))
+               sibling_and_internal_entfuncs)
+             (List.map
+               (fun clo -> Pp.str (closure_index_prefix ^ clo.closure_c_name))
+               closure_list))) ++
       Pp.str ";")
   in
+  let pp_struct_closures =
+    pp_sjoinmap_list
+      (fun clo ->
+        Pp.hv 0 (
+        Pp.str ("struct " ^ closure_struct_tag clo) +++
+        hovbrace (
+          pr_members [("closure_func", c_type_pointer_to clo.closure_c_func_type)] +++
+          pr_members clo.closure_vars
+        ) ++ Pp.str ";"))
+      closure_list
+  in
+  let args_struct_type ~(is_closure:bool) (c_name : string) : string =
+    if is_closure then
+      "struct codegen_closure_args_" ^ c_name
+    else
+      "struct codegen_args_" ^ c_name
+  in
   let pp_struct_args =
-    let pr_members args =
-      pp_sjoinmap_list
-        (fun (c_arg, c_ty) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_arg) ++ Pp.str ";"))
-        args
-    in
     (if CList.is_empty formal_arguments then
       Pp.mt ()
     else
       Pp.hv 0 (
-      Pp.str ("struct codegen_args_" ^ primary_cfunc) +++
+      Pp.str (args_struct_type ~is_closure:false primary_cfunc) +++
       hovbrace (pr_members formal_arguments) ++ Pp.str ";")) +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
@@ -1526,7 +1715,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           Pp.mt ()
         else
           Pp.hv 0 (
-          Pp.str ("struct codegen_args_" ^ fixfunc.fixfunc_c_name) +++
+          Pp.str (args_struct_type ~is_closure:false fixfunc.fixfunc_c_name) +++
           hovbrace (
           pr_members fixfunc.fixfunc_extra_arguments +++
           pr_members (List.filter_map
@@ -1534,7 +1723,16 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
                          if c_type_is_void c_ty then None
                          else Some (c_arg, c_ty))
                        fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))
-      sibling_and_internal_entfuncs
+      sibling_and_internal_entfuncs +++
+    pp_sjoinmap_list
+      (fun clo ->
+        Pp.hv 0 (
+        Pp.str (args_struct_type ~is_closure:true clo.closure_c_name) +++
+        hovbrace (
+          pr_members clo.closure_args +++
+          pr_members [("closure", c_type_pointer_to (closure_struct_type clo))]
+        ) ++ Pp.str ";"))
+      closure_list
   in
   let pp_forward_decl =
     Pp.hv 0 (
@@ -1543,14 +1741,26 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
-    let pr_entry_function static c_name func_index formal_arguments return_type =
-      let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h *)
+    let pr_entry_function ~(is_closure:bool) static c_name func_index formal_arguments return_type =
+      let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
+      let c_funcname =
+        if is_closure then
+          closure_entry_function_prefix ^ c_name
+        else
+          c_name
+      in
+      let formal_arguments =
+        if is_closure then
+          List.append formal_arguments [("closure", pointer_to_void)]
+        else
+          formal_arguments
+      in
       let (pp_vardecl_args, pp_struct_arg) =
         if CList.is_empty formal_arguments then
           (Pp.mt (), null)
         else
           (Pp.hov 2
-            (Pp.str ("struct codegen_args_" ^ c_name) +++
+            (Pp.str (args_struct_type ~is_closure c_name) +++
              Pp.str "codegen_args" +++
              Pp.str "=" +++
              hovbrace (
@@ -1580,18 +1790,18 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           Pp.str "return codegen_ret;"
       in
       Pp.v 0 (
-        gen_function_header static return_type c_name formal_arguments +++
+        gen_function_header static return_type c_funcname formal_arguments +++
         vbrace (
           pp_vardecl_args +++
           pp_vardecl_ret +++
           pp_call +++
           pp_return))
     in
-    pr_entry_function static primary_cfunc (func_index_prefix ^ primary_cfunc)
+    pr_entry_function ~is_closure:false static primary_cfunc (func_index_prefix ^ primary_cfunc)
       formal_arguments return_type +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        pr_entry_function static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
+        pr_entry_function ~is_closure:false static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
           (List.append
             fixfunc.fixfunc_extra_arguments
             (List.filter_map
@@ -1600,7 +1810,12 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
                 else Some (c_arg, c_ty))
               fixfunc.fixfunc_formal_arguments))
           fixfunc.fixfunc_return_type)
-      sibling_and_internal_entfuncs
+      sibling_and_internal_entfuncs +++
+    pp_sjoinmap_list
+      (fun clo ->
+        pr_entry_function ~is_closure:true true clo.closure_c_name (closure_index_prefix ^ clo.closure_c_name)
+          clo.closure_args clo.closure_c_return_type)
+      closure_list
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
@@ -1613,75 +1828,110 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
           let cont = { tail_cont_return_type = ret_type; tail_cont_multifunc = true } in
           Pp.v 0 (
             pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-            gen_tail ~fixfunc_tbl ~used_vars ~cont env2 sigma body))
-        bodies)
+            gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma body))
+        bodies +++
+      pp_sjoinmap_list
+        (fun clo ->
+          let cont = { tail_cont_return_type = clo.closure_c_return_type; tail_cont_multifunc = true } in
+          let (outermost_fargs, env1, fix_bodies) = lam_fix_body_list clo.closure_env sigma clo.closure_exp in
+          List.iter
+            (fun (c_var, c_ty) -> add_local_var c_ty c_var)
+            (c_fargs_of env1 sigma outermost_fargs);
+          List.iter
+            (fun (fixes, (env4, body)) ->
+              List.iter
+                (fun (env2, env3, fixfunc_name, fixfunc_type, fix_fargs) ->
+                  List.iter
+                    (fun (c_var, c_ty) -> add_local_var c_ty c_var)
+                    (c_fargs_of env3 sigma fix_fargs))
+                fixes)
+            fix_bodies;
+          Pp.str (closure_entry_label clo.closure_c_name) ++ Pp.str ":" +++
+          pp_sjoinmap_list
+            (fun (fixes, (env4, body)) ->
+              gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env4 sigma body)
+            fix_bodies)
+        closure_list)
   in
   let pp_local_variables_decls =
     pp_sjoinmap_list
       (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
       local_vars
   in
+  let pr_case case_value assigns goto_label =
+    let pp_case =
+      (match case_value with
+      | None -> Pp.str "default:"
+      | Some value -> Pp.hov 0 (Pp.str "case" +++ Pp.str value ++ Pp.str ":"))
+    in
+    let pp_semicolon =
+      if assigns = [] && goto_label = None then
+        (* label (case label and default label here) needs following statement *)
+        Pp.str ";"
+      else
+        Pp.mt ()
+    in
+    let pp_assigns =
+      pp_sjoinmap_list
+        (fun (lhs, rhs) -> gen_assignment (Pp.str lhs) (Pp.str rhs))
+        assigns
+    in
+    let pp_goto =
+      match goto_label with
+      | None -> Pp.mt ()
+      | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
+    in
+    pp_case ++ pp_semicolon ++ Pp.brk (1,2) ++
+    Pp.v 0 (
+      pp_assigns +++
+      pp_goto)
+  in
   let pp_switch_cases =
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
-        let pp_case =
-          Pp.str "case" +++ Pp.str (func_index_prefix ^ fixfunc.fixfunc_c_name) ++ Pp.str ":"
-        in
-        let pp_assign_exargs =
-          pp_sjoinmap_list
-            (fun (c_arg, t) ->
-              Pp.hov 0 (
-                Pp.str c_arg +++
-                Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
-                Pp.str ";"))
-            fixfunc.fixfunc_extra_arguments
-        in
-        let pp_assign_args =
-          pp_sjoinmap_list
-            (fun (c_arg, t) ->
-              Pp.hov 0 (
-                Pp.str c_arg +++
-                Pp.str "=" +++
-                Pp.str ("((struct codegen_args_" ^ fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg) ++
-                Pp.str ";"))
+        pr_case (Some (func_index_prefix ^ fixfunc.fixfunc_c_name))
+          (List.append
+            (List.map
+              (fun (c_arg, t) ->
+                (c_arg,
+                 ("((" ^ args_struct_type ~is_closure:false fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+              fixfunc.fixfunc_extra_arguments)
             (List.filter_map
               (fun (c_arg, c_ty) ->
                 if c_type_is_void c_ty then None
-                else Some (c_arg, c_ty))
-              fixfunc.fixfunc_formal_arguments)
-        in
-        let pp_goto =
-          Pp.str "goto" +++ Pp.str ("entry_" ^ fixfunc.fixfunc_c_name) ++ Pp.str ";"
-        in
-        let pp_result =
-          Pp.hov 0 pp_case ++ Pp.brk (1,2) ++
-          Pp.v 0 (
-            pp_assign_exargs +++
-            pp_assign_args +++
-            Pp.hov 0 pp_goto)
-        in
-        pp_result)
-      sibling_and_internal_entfuncs
+                else Some (c_arg,
+                           ("((" ^args_struct_type ~is_closure:false fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+              fixfunc.fixfunc_formal_arguments))
+          (Some (fixfunc_entry_label fixfunc.fixfunc_c_name)))
+      sibling_and_internal_entfuncs +++
+    pp_sjoinmap_list
+      (fun clo ->
+        pr_case (Some (closure_index_prefix ^ clo.closure_c_name))
+          (List.append
+            (List.map
+              (fun (c_arg, c_ty) ->
+                (c_arg,
+                 ("((" ^ args_struct_type ~is_closure:true clo.closure_c_name ^ " *)codegen_args)->" ^ c_arg)))
+              clo.closure_args)
+            (List.map
+              (fun (c_arg, c_ty) ->
+                (c_arg,
+                 ("((" ^ args_struct_type ~is_closure:true clo.closure_c_name ^ " *)codegen_args)->closure->" ^ c_arg)))
+              clo.closure_vars))
+          (Some (closure_entry_label clo.closure_c_name)))
+      closure_list
   in
-  let pp_switch_default = Pp.str "default:" in
-  let pp_assign_args_default =
-    if formal_arguments = [] then
-      Pp.str ";"
-    else
-      pp_sjoinmap_list
+  let pp_default =
+    pr_case None
+      (List.map
         (fun (c_arg, t) ->
-          Pp.hov 0 (
-            Pp.str c_arg +++
-            Pp.str "=" +++
-            Pp.str ("((struct codegen_args_" ^ primary_cfunc ^ " *)codegen_args)->" ^ c_arg) ++
-            Pp.str ";"))
-        formal_arguments
+            (c_arg,
+             ("((" ^ args_struct_type ~is_closure:false primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
+        formal_arguments)
+      None
   in
   let pp_switch_body =
-    pp_switch_cases +++
-    Pp.hov 0 pp_switch_default ++ Pp.brk (1,2) ++
-    Pp.v 0 pp_assign_args_default
+    pp_switch_cases +++ pp_default
   in
   let pp_switch =
     Pp.hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
@@ -1690,6 +1940,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table)
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   Pp.v 0 (
     pp_enum +++
+    pp_struct_closures +++
     pp_struct_args +++
     pp_forward_decl +++
     pp_entry_functions +++
@@ -1801,7 +2052,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
-  (if internal_entfuncs <> [] || sibling_entfuncs <> [] then
+  let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
+  (if internal_entfuncs <> [] || sibling_entfuncs <> [] || closure_list <> [] then
     let formal_arguments' =
       List.filter_map
         (fun (c_arg, c_ty) ->
@@ -1809,9 +2061,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
           else Some (c_arg, c_ty))
         formal_arguments
     in
-    gen_func_multi ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
   else
-    gen_func_single ~fixterms ~fixfunc_tbl ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
+    gen_func_single ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
   Pp.fnl ()
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =

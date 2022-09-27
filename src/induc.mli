@@ -14,6 +14,7 @@ val register_ind_match :
 val ind_is_void_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val c_type_is_void : State.c_typedata -> bool
 val c_typename : Environ.env -> Evd.evar_map -> EConstr.types -> State.c_typedata
+val c_closure_function_type : Environ.env -> Evd.evar_map -> EConstr.types -> State.c_typedata
 val case_swfunc : Environ.env -> Evd.evar_map -> EConstr.types -> string
 val case_cstrlabel :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> string
