@@ -1663,6 +1663,55 @@ let fixfunc_args_struct_type (c_name : string) : string =
 let topfunc_args_struct_type (c_name : string) : string =
   "struct codegen_topfunc_args_" ^ c_name
 
+let body_function_name (primary_cfunc : string) : string =
+  "codegen_function_body_" ^ primary_cfunc
+
+let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
+    (args_struct_type : string) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
+    (body_function_name : string) : Pp.t =
+  let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
+  let (pp_vardecl_args, pp_struct_arg) =
+    if CList.is_empty formal_arguments then
+      (Pp.mt (), null)
+    else
+      (Pp.hov 2
+        (Pp.str args_struct_type +++
+         Pp.str "codegen_args" +++
+         Pp.str "=" +++
+         hovbrace (
+           (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+             (fun (c_arg, t) -> Pp.str c_arg)
+             formal_arguments)) ++
+         Pp.str ";"),
+       "&codegen_args")
+  in
+  let (pp_vardecl_ret, pp_return_arg) =
+    if c_type_is_void return_type then
+      (Pp.mt (), null)
+    else
+      (Pp.hov 2 (pr_c_decl return_type (Pp.str "codegen_ret") ++ Pp.str ";"), "&codegen_ret")
+  in
+  let pp_call =
+    Pp.hov 2 (Pp.str body_function_name ++
+              Pp.str "(" ++
+              Pp.str func_index ++ Pp.str "," +++
+              Pp.str pp_struct_arg ++ Pp.str "," +++
+              Pp.str pp_return_arg ++ Pp.str ");")
+  in
+  let pp_return =
+    if c_type_is_void return_type then
+      Pp.str "return;"
+    else
+      Pp.str "return codegen_ret;"
+  in
+  Pp.v 0 (
+    gen_function_header ~static return_type c_funcname formal_arguments +++
+    vbrace (
+      pp_vardecl_args +++
+      pp_vardecl_ret +++
+      pp_call +++
+      pp_return))
+
 let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
@@ -1671,6 +1720,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
   let func_index_type = "codegen_func_indextype_" ^ primary_cfunc in
   let func_index_prefix = "codegen_func_index_" in
   let closure_index_prefix = "codegen_closure_index_" in
+  let body_function_name = body_function_name primary_cfunc in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let closure_tbl = closure_tbl_of_list closure_list in
   let sibling_and_internal_entfuncs =
@@ -1740,57 +1790,14 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
   let pp_forward_decl =
     Pp.hv 0 (
       Pp.str "static void" +++
-      Pp.str ("codegen_functions_" ^ primary_cfunc) ++
+      Pp.str body_function_name ++
       Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
-    let pr_entry_function ~(static:bool) c_funcname func_index args_struct_type formal_arguments return_type =
-      let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
-      let (pp_vardecl_args, pp_struct_arg) =
-        if CList.is_empty formal_arguments then
-          (Pp.mt (), null)
-        else
-          (Pp.hov 2
-            (Pp.str args_struct_type +++
-             Pp.str "codegen_args" +++
-             Pp.str "=" +++
-             hovbrace (
-               (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-                 (fun (c_arg, t) -> Pp.str c_arg)
-                 formal_arguments)) ++
-             Pp.str ";"),
-           "&codegen_args")
-      in
-      let (pp_vardecl_ret, pp_return_arg) =
-        if c_type_is_void return_type then
-          (Pp.mt (), null)
-        else
-          (Pp.hov 2 (pr_c_decl return_type (Pp.str "codegen_ret") ++ Pp.str ";"), "&codegen_ret")
-      in
-      let pp_call =
-        Pp.hov 2 (Pp.str ("codegen_functions_" ^ primary_cfunc) ++
-                  Pp.str "(" ++
-                  Pp.str func_index ++ Pp.str "," +++
-                  Pp.str pp_struct_arg ++ Pp.str "," +++
-                  Pp.str pp_return_arg ++ Pp.str ");")
-      in
-      let pp_return =
-        if c_type_is_void return_type then
-          Pp.str "return;"
-        else
-          Pp.str "return codegen_ret;"
-      in
-      Pp.v 0 (
-        gen_function_header ~static return_type c_funcname formal_arguments +++
-        vbrace (
-          pp_vardecl_args +++
-          pp_vardecl_ret +++
-          pp_call +++
-          pp_return))
-    in
     pr_entry_function ~static primary_cfunc (func_index_prefix ^ primary_cfunc)
       (topfunc_args_struct_type primary_cfunc)
-      formal_arguments return_type +++
+      formal_arguments return_type
+      body_function_name +++
     pp_sjoinmap_list
       (fun (static1, fixfunc) ->
         pr_entry_function ~static:static1 fixfunc.fixfunc_c_name (func_index_prefix ^ fixfunc.fixfunc_c_name)
@@ -1802,14 +1809,16 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
                 if c_type_is_void c_ty then None
                 else Some (c_arg, c_ty))
               fixfunc.fixfunc_formal_arguments))
-          fixfunc.fixfunc_return_type)
+          fixfunc.fixfunc_return_type
+          body_function_name)
       sibling_and_internal_entfuncs +++
     pp_sjoinmap_list
       (fun clo ->
         pr_entry_function ~static:true (closure_entry_function_prefix ^ clo.closure_c_name) (closure_index_prefix ^ clo.closure_c_name)
           (closure_args_struct_type clo.closure_c_name)
           (List.append clo.closure_args [("closure", pointer_to_void)])
-          clo.closure_c_return_type)
+          clo.closure_c_return_type
+          body_function_name)
       closure_list
   in
   let bodies = obtain_function_bodies ~fixterms ~fixfunc_tbl ~primary_cfunc env sigma whole_term in
@@ -1940,7 +1949,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
     pp_forward_decl +++
     pp_entry_functions +++
     Pp.str "static void" +++
-    Pp.str ("codegen_functions_" ^ primary_cfunc) ++
+    Pp.str body_function_name ++
     Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
     vbrace (
       pp_local_variables_decls +++
