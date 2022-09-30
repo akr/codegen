@@ -1715,7 +1715,7 @@ let topfunc_args_struct_type (c_name : string) : string =
   "struct codegen_topfunc_args_" ^ c_name
 
 let body_function_name (primary_cfunc : string) : string =
-  "codegen_function_body_" ^ primary_cfunc
+  "codegen_body_function_" ^ primary_cfunc
 
 let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
     (args_struct_type : string) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
