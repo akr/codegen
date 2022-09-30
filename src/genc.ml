@@ -43,6 +43,7 @@ type fixfunc_t = {
   fixfunc_used_as_goto: bool;
   fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
   fixfunc_return_type: c_typedata; (* may be void. *)
+  fixfunc_arguments_contain_function: bool;
 
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
@@ -123,6 +124,25 @@ let disjoint_id_map_union_ary (ms : 'a Id.Map.t array) : 'a Id.Map.t =
     (fun m0 m1 ->
       disjoint_id_map_union m0 m1)
     Id.Map.empty ms
+
+(*
+  Currently only closures are represented as a pointer to stack-allocated data.
+  A pointer to stack-allocated data cannot return (because returning deallocates the stack frame).
+  Also, it cannot pass to argument of tail recursive call if it is translated to goto.
+  It is because the closure can be overwritten after goto.
+  (Conceptually, the stack frame is deallocated at goto.)
+  Thus, codegen disables tail recursion elimination if argments of a fixfunc contains function.
+*)
+let rec argument_types_contain_function (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+  match EConstr.kind sigma ty with
+  | Prod (x,t,b) ->
+      (match Linear.component_types env sigma t with
+      | None -> true (* function found *)
+      | Some _ ->
+          let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+          let env2 = EConstr.push_rel decl env in
+          argument_types_contain_function env2 sigma b)
+  | _ -> false
 
 (*
   detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term] in doc/codegen.tex.
@@ -239,13 +259,16 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let tailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> tailset_f) fixfuncs_result) in
       let nontailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> nontailset_f) fixfuncs_result) in
       let inlinable_fs = disjoint_id_map_union_ary (Array.map (fun (inlineable_f, nontailset_f, tailset_f) -> inlineable_f) fixfuncs_result) in
-      let inlinable_fixterm = not (IntSet.exists ((>=) h) nontailset_fs) in
+      let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
       let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
       let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
+      let args_contain_function = Array.exists (argument_types_contain_function env sigma) tary in
       if numargs < numargs_of_type env sigma tary.(j) || (* closure creation *)
-         not inlinable_fixterm then
+         fixfunc_referenced_at_nontail_position ||
+         args_contain_function then
         (* At least one fix-bounded function is used at
           non-tail position or argument position.
+          Or, at least one fix-bounded function has a function in arguments.
           Assuming fix-bounded functions are strongly-connected,
           there is no tail position in this fix-term. *)
         let nontailset = IntSet.union tailset_fs' nontailset_fs' in
@@ -285,15 +308,17 @@ let rec collect_fix_usage_rec
     (env : Environ.env) (sigma : Evd.evar_map)
     (tail_position : bool) (term : EConstr.t) (numargs : int)
     ~(used_as_call : bool ref list)
-    ~(used_as_goto : bool ref list) :
+    ~(used_as_goto : bool ref list)
+    ~(fixfunc_args_contain_function : bool list) :
     fixterm_t Seq.t * fixfunc_t Seq.t =
-  let result = collect_fix_usage_rec1 ~inlinable_fixterms env sigma tail_position term numargs ~used_as_call ~used_as_goto in
+  let result = collect_fix_usage_rec1 ~inlinable_fixterms env sigma tail_position term numargs ~used_as_call ~used_as_goto ~fixfunc_args_contain_function in
   result
 and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (tail_position : bool) (term : EConstr.t) (numargs : int)
     ~(used_as_call : bool ref list)
-    ~(used_as_goto : bool ref list) :
+    ~(used_as_goto : bool ref list)
+    ~(fixfunc_args_contain_function : bool list) :
     fixterm_t Seq.t * fixfunc_t Seq.t =
   match EConstr.kind sigma term with
   | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
@@ -311,7 +336,9 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         match Id.Map.find_opt id inlinable_fixterms with
         | None -> () (* term is not fix-bounded function *)
         | Some inlinable ->
-            if tail_position then
+            if List.nth fixfunc_args_contain_function (i-1) then
+              List.nth used_as_call (i-1) := true
+            else if tail_position then
               List.nth used_as_goto (i-1) := true
             else
               if inlinable then
@@ -324,14 +351,15 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       (* e must be a Rel which type is inductive (non-function) type *)
       (Seq.empty, Seq.empty)
   | App (f, args) ->
-      collect_fix_usage_rec ~inlinable_fixterms env sigma tail_position f (Array.length args + numargs) ~used_as_call ~used_as_goto
+      collect_fix_usage_rec ~inlinable_fixterms env sigma tail_position f (Array.length args + numargs) ~used_as_call ~used_as_goto ~fixfunc_args_contain_function
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
       let used_as_call2 = ref false :: used_as_call in
       let used_as_goto2 = ref false :: used_as_goto in
-      let (fixterms1, fixfuncs1) = collect_fix_usage_rec ~inlinable_fixterms env sigma false e 0 ~used_as_call ~used_as_goto in
-      let (fixterms2, fixfuncs2) = collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 in
+      let fixfunc_args_contain_function2 = false :: fixfunc_args_contain_function in
+      let (fixterms1, fixfuncs1) = collect_fix_usage_rec ~inlinable_fixterms env sigma false e 0 ~used_as_call ~used_as_goto ~fixfunc_args_contain_function in
+      let (fixterms2, fixfuncs2) = collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 ~fixfunc_args_contain_function:fixfunc_args_contain_function2 in
       (Seq.append fixterms1 fixterms2, Seq.append fixfuncs1 fixfuncs2)
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
@@ -342,8 +370,9 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
           let n = Array.length nas in
           let used_as_call2 = List.append (List.init n (fun _ -> ref false)) used_as_call in
           let used_as_goto2 = List.append (List.init n (fun _ -> ref false)) used_as_goto in
+          let fixfunc_args_contain_function2 = List.append (List.init n (fun _ -> false)) fixfunc_args_contain_function in
           collect_fix_usage_rec ~inlinable_fixterms env2 sigma
-            tail_position body numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2)
+            tail_position body numargs ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 ~fixfunc_args_contain_function:fixfunc_args_contain_function2)
         bl bl0
       in
       (concat_array_seq (Array.map fst results),
@@ -353,11 +382,12 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let env2 = EConstr.push_rel decl env in
       let used_as_call2 = ref false :: used_as_call in
       let used_as_goto2 = ref false :: used_as_goto in
+      let fixfunc_args_contain_function2 = false :: fixfunc_args_contain_function in
       if numargs = 0 then
         (* closure creation *)
-        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma b) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
+        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma b) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 ~fixfunc_args_contain_function:fixfunc_args_contain_function2
       else
-        collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2
+        collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 ~fixfunc_args_contain_function:fixfunc_args_contain_function2
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let fixterm_id = id_of_annotated_name nary.(j) in
       let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
@@ -370,6 +400,13 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
           used_as_call
       in
       let used_as_goto2 = list_rev_map_append (fun () -> ref false) (ncons h () []) used_as_goto in
+      let args_contain_function_ary = Array.map (argument_types_contain_function env sigma) tary in
+      let fixfunc_args_contain_function2 =
+        list_rev_map_append
+          (fun i -> args_contain_function_ary.(i))
+          (iota_list 0 h)
+          fixfunc_args_contain_function
+      in
       let tail_position2 =
         if not tail_position then
           if inlinable then
@@ -382,7 +419,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let results =
         Array.map2
           (fun t f -> collect_fix_usage_rec ~inlinable_fixterms env2 sigma
-            tail_position2 f (numargs_of_type env sigma t) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2)
+            tail_position2 f (numargs_of_type env sigma t) ~used_as_call:used_as_call2 ~used_as_goto:used_as_goto2 ~fixfunc_args_contain_function:fixfunc_args_contain_function2)
           tary fary
       in
       let fixterm = {
@@ -406,6 +443,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                 fixfunc_used_as_goto = !(List.nth used_as_goto2 (h - i - 1));
                 fixfunc_formal_arguments = formal_arguments;
                 fixfunc_return_type = return_type;
+                fixfunc_arguments_contain_function = args_contain_function_ary.(i);
                 fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                 fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                 fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
@@ -425,7 +463,7 @@ let collect_fix_usage
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixterm_t list * fixfunc_table =
-  let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] in
+  let (fixterms, fixfuncs) = collect_fix_usage_rec ~inlinable_fixterms env sigma true term (numargs_of_exp env sigma term) ~used_as_call:[] ~used_as_goto:[] ~fixfunc_args_contain_function:[] in
   (List.of_seq fixterms, make_fixfunc_table (List.of_seq fixfuncs))
 
 let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
@@ -1059,7 +1097,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               | Some top_func_name -> top_func_name
               | None -> fixfunc.fixfunc_c_name
             in
-            if fixfunc.fixfunc_inlinable then
+            if fixfunc.fixfunc_inlinable && not fixfunc.fixfunc_arguments_contain_function then
               let assignments =
                 list_filter_map2
                   (fun (lhs, c_ty) rhs_opt ->
@@ -1079,6 +1117,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
+
   | Const (ctnt,_) ->
       gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)))
   | Construct (cstr,_) ->
@@ -1267,24 +1306,36 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
             let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons (list_filter_none cargs) closure_var)) in
             gen_tail_cont cont pp
         | Some fixfunc ->
+            let fname =
+              match fixfunc.fixfunc_top_call with
+              | Some top_func_name -> top_func_name
+              | None -> fixfunc.fixfunc_c_name
+            in
             let formal_arguments = fixfunc.fixfunc_formal_arguments in
             if List.length cargs < List.length formal_arguments then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
-            let assignments =
-              list_filter_map2
-                (fun (lhs, c_ty) rhs_opt ->
-                  match (c_type_is_void c_ty), rhs_opt with
-                  | true, None -> None
-                  | false, Some rhs -> Some (lhs, rhs, c_ty)
-                  | _, _ -> assert false)
-                formal_arguments
-                cargs
-            in
-            let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-            let funcname = fixfunc.fixfunc_c_name in
-            let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label funcname) ++ Pp.str ";") in
-            pp_assignments +++ pp_goto_entry)
+            if not fixfunc.fixfunc_arguments_contain_function then
+              let assignments =
+                list_filter_map2
+                  (fun (lhs, c_ty) rhs_opt ->
+                    match (c_type_is_void c_ty), rhs_opt with
+                    | true, None -> None
+                    | false, Some rhs -> Some (lhs, rhs, c_ty)
+                    | _, _ -> assert false)
+                  formal_arguments
+                  cargs
+              in
+              let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
+              let funcname = fixfunc.fixfunc_c_name in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label funcname) ++ Pp.str ";") in
+              pp_assignments +++ pp_goto_entry
+            else
+              gen_tail_cont cont
+                (gen_funcall fname
+                  (Array.append
+                    (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
+                    (Array.of_list (list_filter_none cargs)))))
   | Const (ctnt,_) ->
       let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)) in
       gen_tail_cont cont pp

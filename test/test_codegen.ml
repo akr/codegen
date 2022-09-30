@@ -3895,6 +3895,31 @@ let test_closure_generation (ctx : test_ctxt) : unit =
       assert(f(4000,300,20,1) == 21263);
     |}
 
+let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      (* The invocation of g is tail recursion.
+         But it cannot translate to goto because
+         the stack-allocated closure, hh, is overwrtten.  *)
+      Fixpoint g (n : nat) (h : nat -> nat) (acc : nat) :=
+        match n with
+        | O => acc
+        | S m =>
+            let hh x := n + x in
+            g m hh (acc + h n)
+        end.
+      Definition f x :=
+        g x (fun y => y + x) 0.
+      CodeGen Func g.
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(0) == 0);
+      assert(f(1) == 2);
+      assert(f(2) == 7);
+      assert(f(3) == 14);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -4059,6 +4084,7 @@ let suite : OUnit2.test =
     "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
     "test_closure_generation" >:: test_closure_generation;
+    "test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination;
   ]
 
 let () =
