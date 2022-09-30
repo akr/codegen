@@ -35,10 +35,8 @@ type fixterm_t = {
 }
 
 type fixfunc_t = {
+  fixfunc_fixterm: fixterm_t;
   fixfunc_func_id: Id.t;
-  fixfunc_term_id: Id.t;
-  fixfunc_term_env: Environ.env;
-  fixfunc_inlinable: bool;
   fixfunc_used_as_call: bool;
   fixfunc_used_as_goto: bool;
   fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
@@ -87,7 +85,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
   Hashtbl.iter
     (fun fixfunc_id fixfunc ->
       msg_debug_hov (Pp.str (Id.to_string fixfunc_id) ++ Pp.str ":" +++
-        Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_inlinable +++
+        Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_inlinable +++
         Pp.str "used_as_call=" ++ Pp.bool fixfunc.fixfunc_used_as_call +++
         Pp.str "used_as_goto=" ++ Pp.bool fixfunc.fixfunc_used_as_goto +++
         Pp.str "formal_arguments=(" ++
@@ -435,10 +433,8 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
             (fun i name ty ->
               let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
               {
+                fixfunc_fixterm = fixterm;
                 fixfunc_func_id = id_of_annotated_name nary.(i);
-                fixfunc_term_id = id_of_annotated_name nary.(j);
-                fixfunc_term_env = env;
-                fixfunc_inlinable = inlinable;
                 fixfunc_used_as_call = !(List.nth used_as_call2 (h - i - 1));
                 fixfunc_used_as_goto = !(List.nth used_as_goto2 (h - i - 1));
                 fixfunc_formal_arguments = formal_arguments;
@@ -656,7 +652,7 @@ let compute_precise_extra_arguments
           match Hashtbl.find_opt fixfunc_tbl id with
           | None -> ()
           | Some fixfunc2 ->
-            let fixterm2_id = fixfunc2.fixfunc_term_id in
+            let fixterm2_id = fixfunc2.fixfunc_fixterm.fixterm_term_id in
             match Hashtbl.find_opt fixterm_free_variables fixterm2_id with
             | None -> ()
             | Some fv ->
@@ -674,8 +670,8 @@ let fixfunc_initialize_extra_arguments
   let extra_arguments = compute_precise_extra_arguments ~fixfunc_tbl env sigma fixterm_free_variables in
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
-      let fixterm_id = fixfunc.fixfunc_term_id in
-      let ov = compute_naive_extra_arguments ~fixfunc_tbl fixfunc.fixfunc_term_env sigma in
+      let fixterm_id = fixfunc.fixfunc_fixterm.fixterm_term_id in
+      let ov = compute_naive_extra_arguments ~fixfunc_tbl fixfunc.fixfunc_fixterm.fixterm_term_env sigma in
       let ov2 =
         if fixfunc.fixfunc_top_call <> None then
           ov
@@ -1097,7 +1093,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               | Some top_func_name -> top_func_name
               | None -> fixfunc.fixfunc_c_name
             in
-            if fixfunc.fixfunc_inlinable && not fixfunc.fixfunc_arguments_contain_function then
+            if fixfunc.fixfunc_fixterm.fixterm_inlinable && not fixfunc.fixfunc_arguments_contain_function then
               let assignments =
                 list_filter_map2
                   (fun (lhs, c_ty) rhs_opt ->
@@ -1171,7 +1167,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         user_err (Pp.str "[codegen] gen_head: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
       let nj_funcname = fixfunc_j.fixfunc_c_name in
-      if not fixfunc_j.fixfunc_inlinable then
+      if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
           (gen_funcall nj_funcname
             (Array.append
@@ -1206,7 +1202,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               let context_ary = Array.of_list context in
               let noninlinable_pred i (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) =
                 let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                not fixfunc_i.fixfunc_inlinable
+                not fixfunc_i.fixfunc_fixterm.fixterm_inlinable
               in
               let noninlinable_index = CArray.findi noninlinable_pred context_ary in
               let context_before_noninlinable =
