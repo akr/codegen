@@ -1097,7 +1097,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               | Some top_func_name -> top_func_name
               | None -> fixfunc.fixfunc_c_name
             in
-            if fixfunc.fixfunc_fixterm.fixterm_inlinable && not fixfunc.fixfunc_arguments_contain_function then
+            if fixfunc.fixfunc_fixterm.fixterm_inlinable then
               let assignments =
                 list_filter_map2
                   (fun (lhs, c_ty) rhs_opt ->
