@@ -337,10 +337,11 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         | None -> () (* term is not fix-bounded function *)
         | Some inlinable ->
             let fixacc = List.nth fixaccs (i-1) in
-            if fixacc.fixacc_args_contain_function then
-              fixacc.fixacc_used_as_call := true
-            else if tail_position then
-              fixacc.fixacc_used_as_goto := true
+            if tail_position then
+              if fixacc.fixacc_args_contain_function then
+                fixacc.fixacc_used_as_call := true
+              else
+                fixacc.fixacc_used_as_goto := true
             else
               if inlinable then
                 fixacc.fixacc_used_as_goto := true
