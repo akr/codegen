@@ -2176,7 +2176,7 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
       | GenFunc cfunc ->
           let (static, ty, term) = make_simplified_for_cfunc cfunc in
           (match common_key_for_siblings term with
-          | Some (j, key) as v ->
+          | Some (j, key) as jkey ->
               map := ConstrMap.update
                 key
                 (fun njs_opt ->
@@ -2184,7 +2184,7 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
                   | None -> Some [(cfunc, j)]
                   | Some njs -> Some ((cfunc, j) :: njs))
                 !map;
-              v
+              jkey
           | None -> None)
       | _ -> None))
     gen_list
