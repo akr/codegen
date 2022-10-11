@@ -1614,6 +1614,47 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
       assert(sum(s, 0) == 10);
     |}
 
+(* gen_head Fix, single tail recursive loop *)
+(* The fix-term must be translated to a loop.
+  Thus, the address of "a" in the stack will be preserved.
+  If the invocation of fix-term is translated as function call,
+  The address of "a" is changed because the fix-term has
+  individual stack frame.
+ *)
+let test_add_at_non_tail_position1 (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Require Import List.
+      Definition checkaddr (n : nat) : nat := 0.
+      CodeGen Snippet "static nat checkaddr_imp(nat *);".
+      CodeGen Snippet "#define checkaddr(x) checkaddr_imp(&x)".
+      Definition f a b c :=
+        let ab :=
+          (fix add1 x y :=
+            match x with
+            | O => y
+            | S x' => add1 x' (S y + checkaddr a)
+            end) a b
+        in
+        ab + c + checkaddr a.
+      CodeGen Primitive checkaddr => "checkaddr".
+      CodeGen Func f.
+    |})
+    ~main_toplevel_defs:{|
+      static nat *pointer = NULL;
+      static nat checkaddr_imp(nat *p) {
+        if (pointer == NULL)
+          pointer = p;
+        else
+          assert(p == pointer);
+        return 0;
+      }
+    |}
+    {|
+      assert(f(1, 2, 3) == 6);
+    |}
+
 (* gen_head Fix, multiple loops *)
 let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3981,6 +4022,7 @@ let suite : OUnit2.test =
     "test_ackermann_plus1" >:: test_ackermann_plus1;
     "test_uphalf" >:: test_uphalf;
     "test_sum_nested_fix" >:: test_sum_nested_fix;
+    "test_add_at_non_tail_position1" >:: test_add_at_non_tail_position1;
     "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
     "test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name;
     "test_specialized_func_with_presimp_name" >:: test_specialized_func_with_presimp_name;
