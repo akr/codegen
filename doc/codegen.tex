@@ -187,17 +187,20 @@
 \newcommand{\cv}[3]{\cvop\BRA{#1\,/\,#2}_{#3}}
 
 \DeclareMathOperator{\TRop}{TR}
-\newcommand{\TR}[1]{\TRop\BRA{#1}}
+\newcommand{\TR}[2]{\TRop\BRA{#1}_{#2}}
 \newcommand{\tr}{\mathit{TR}}
 
 \DeclareMathOperator{\RNTop}{RNT}
-\newcommand{\RNT}[1]{\RNTop\BRA{#1}}
+\newcommand{\RNT}[2]{\RNTop\BRA{#1}_{#2}}
 
 \DeclareMathOperator{\Nop}{N}
 \DeclareMathOperator{\Top}{T}
 
-\newcommand{\N}[1]{\Nop\BRA{#1}}
-\newcommand{\T}[1]{\Top\BRA{#1}}
+\newcommand{\N}[2]{\Nop\BRA{#1}_{#2}}
+\newcommand{\T}[2]{\Top\BRA{#1}_{#2}}
+
+\newcommand{\true}{\mathrm{T}}
+\newcommand{\false}{\mathrm{F}}
 
 \DeclareMathOperator{\APP}{APP}
 \DeclareMathOperator{\components}{components}
@@ -1416,32 +1419,40 @@ Thus, we can translate the tail positions of $\rep{f}$ to
 (2) assignment to $x$ and $\kwgoto{}\;u$ otherwise.
 This translation is equivalent to inlining a tail-recursive function, which means generating a loop at a non-tail position.
 
-$\RNT{t} = (\TR{t}, \N{t}, \T{t})$ classify variables in $t$.
+$\RNT{t}{d} = (\TR{t}{d}, \N{t}{d}, \T{t}{d})$ classify variables in $t$.
+$d$ is a boolean which means $t$ is located just under \kwfix{} or lambda.
 \begin{align*}
-  \TR{t} &: \text{tail-recursive fixpoint bounded functions that do not need to be real functions in $t$} \\
-  \N{t} &: \text{free variables at non-tail positions of $t$} \\
-  \T{t} &: \text{free variables at tail positions of $t$}
+  \TR{t}{d} &: \text{tail-recursive fixpoint bounded functions that do not need to be real functions in $t$} \\
+  \N{t}{d} &: \text{free variables at non-tail positions of $t$} \\
+  \T{t}{d} &: \text{free variables at tail positions of $t$}
 \end{align*}
 ``tail position'' is extended to the function position of the application at a tail position. \\
 $\TRop$ distinguishes fixpoint bounded functions translatable without actual functions (but with \kwgoto{}) or not.
 \begin{align*}
-  \RNT{x\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \{x\}) \\
-  \RNT{c\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
-  \RNT{C\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
-  \RNT{\letin{x}{t}{u}} &= (\TR{t} \cup \TR{u}, \N{t} \cup \T{t} \cup \N{u} - \{x\}, \T{u} - \{x\}) \\
-  \RNT{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TR{t_i}, \tbigcup_i \N{t_i} - \{\rep{x_i}\}, \tbigcup_i \T{t_i} - \{\rep{x_i}\} \bigr) \\
-  \RNT{\lam{x}{t}} &= (\TR{t}, (\N{t} \cup \T{t}) - \{x\}, \varnothing) \\
-  \RNT{(\ofix{\rep{f:=t}}{f_j})\:\rep{y}} &=
+  \RNT{x\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \{x\}) \\
+  \RNT{c\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
+  \RNT{C\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
+  \RNT{\letin{x}{t}{u}}{d} &= (\TR{t}{\false} \cup \TR{u}{\false}, \N{t}{\false} \cup \T{t}{\false} \cup \N{u}{\false} - \{x\}, \T{u}{\false} - \{x\}) \\
+  \RNT{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}}{d} &= \bigl(\tbigcup_i \TR{t_i}{\false}, \tbigcup_i \N{t_i}{\false} - \{\rep{x_i}\}, \tbigcup_i \T{t_i}{\false} - \{\rep{x_i}\} \bigr) \\
+  \RNT{\lam{x}{t}}{d} &=
+    \begin{cases}
+      (\TR{t}{\true}, \N{t}{\true}-\{x\}, \T{t}{\true} - \{x\}) & d \\
+      (\TR{t}{\true}, (\N{t}{\true} \cup \T{t}{\true}) - \{x\}, \varnothing) & \text{otherwise}
+    \end{cases} \\
+  \RNT{(\ofix{\rep{f:=t}}{f_j})\:\rep{y}}{d} &=
     \begin{cases}
       \begin{aligned}[t]
-        \bigl(& \tbigcup_i \TR{t_i} \cup \{\rep{f}\}, \\
-              & \bigl(\tbigcup_i \N{t_i} - \{\rep{f}\}\bigr) \cup \{\rep{y}\}, \\
-              & \tbigcup_i \T{t_i} - \{\rep{f}\} \bigr)
+        \bigl(& \tbigcup_i \TR{t_i}{\true} \cup \{\rep{f}\}, \\
+              & \bigl(\tbigcup_i \N{t_i}{\true} - \{\rep{f}\}\bigr) \cup \{\rep{y}\}, \\
+              & \tbigcup_i \T{t_i}{\true} - \{\rep{f}\} \bigr)
       \end{aligned}
-        & (0 < |y|) \wedge \bigl(\tbigcup_i \N{t_i} \cap \{\rep{f}\} = \varnothing\bigr) \\
+        & \begin{aligned}[t]
+          & (0 < |y| \vee d) \wedge \\
+          & \bigl(\tbigcup_i \N{t_i}{\true} \cap \{\rep{f}\} = \varnothing\bigr)
+          \end{aligned} \\
       \begin{aligned}[t]
-        \bigl(& \tbigcup_i \TR{t_i}, \\
-              & \bigl(\tbigcup_i (\N{t_i} \cup \T{t_i}) - \{\rep{f}\}\bigr) \cup \{\rep{y}\}, \\
+        \bigl(& \tbigcup_i \TR{t_i}{\true}, \\
+              & \bigl(\tbigcup_i (\N{t_i}{\true} \cup \T{t_i}{\true}) - \{\rep{f}\}\bigr) \cup \{\rep{y}\}, \\
               & \varnothing \bigr)
       \end{aligned}
         & \text{otherwise}
@@ -1622,7 +1633,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
     The latter embeds the value of the expression (with name translation from \gallina{} to C).
   \item \gallina{} types, constants, and constructors have corresponding (user-configurable) C names and they are implicitly translated.
     \gallina{} variables are translated by the mapping defined in \secref{sec:cvaralloc}.
-  \item $\tr = \TR{t}$ where the translating function is defined as \kwDefinition~$c := t$.
+  \item $\tr = \TR{t}{\false}$ where the translating function is defined as \kwDefinition~$c := t$.
   \item $\mathit{swfunc}_T, \mathit{caselabel}_{C_i}$, and $\mathit{get\_member}_{C_i j}$ are defined by a user to translate \kwmatch-expressions for the inductive type $T$.
   \item $\mathit{linear\_dealloc}_{T}(x)$ is the deallocation function for the linear type $T$.  It is empty for unrestricted types.
   \item $\passign(\rep{y}, \rep{x})$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\ldots x_n$ into $y_1\ldots y_n$.  It may require temporary variables.
