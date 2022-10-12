@@ -409,7 +409,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                        fixacc_args_contain_function = false } :: fixaccs in
       if numargs = 0 then
         (* closure creation *)
-        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env sigma b) ~fixaccs:fixaccs2
+        collect_fix_usage_rec ~inlinable_fixterms env2 sigma true b (numargs_of_exp env2 sigma b) ~fixaccs:fixaccs2
       else
         collect_fix_usage_rec ~inlinable_fixterms env2 sigma tail_position b (numargs-1) ~fixaccs:fixaccs2
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
