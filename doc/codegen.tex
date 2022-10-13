@@ -479,7 +479,7 @@ The local definitions represent variables bounded by outer let-in.
   \item The rules shown here are reductions, except the eta expansion.
   \item Variables cannot conflict because \coq{} uses de Bruijn's indexes to represent variables.
   \item If it is unambiguous, we omit type annotations in these definitions for the sake of simplicity.
-  \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:|\:(\mathtt{cons}\:\mathtt{h}\:\mathtt{t} \Rightarrow t_2)\:\kwend$ to $(\lam{\mathtt{h}}{\lam{\mathtt{t}}{t_2}})\:1\:\mathtt{nil}$
+  \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:|\:(\mathtt{cons}\:\mathtt{h}\:\mathtt{t} \Rightarrow t_2)\:\kwend$ to $(\lam{\mathtt{h}}{\lam{\mathtt{t}}{t_2}})\:\mathtt{1\:nil}$
     because \lstinline!list! has one parameter $(\NP_\mathtt{nat}=1)$ and \lstinline!cons! has two members $(\NM_\mathtt{cons}=2)$.
 \end{itemize}}
 
