@@ -3961,6 +3961,23 @@ let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) 
       assert(f(3) == 14);
     |}
 
+let test_closure_generated_from_fixfunc_argument (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition call (f : nat -> nat -> nat) (x y : nat) := f x y.
+      Fixpoint add m n :=
+        match m with
+        | O => n
+        | S m' => call add m' (S n)
+        end.
+      CodeGen Func call.
+      CodeGen Func add.
+    |})
+    {|
+      assert(add(1,2) == 3);
+      assert(add(7,1) == 8);
+    |}
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: [
     "test_command_gen_qualid" >:: test_command_gen_qualid;
@@ -4127,6 +4144,7 @@ let suite : OUnit2.test =
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
     "test_closure_generation" >:: test_closure_generation;
     "test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination;
+    "test_closure_generated_from_fixfunc_argument" >:: test_closure_generated_from_fixfunc_argument;
   ]
 
 let () =

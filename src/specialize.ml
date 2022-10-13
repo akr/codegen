@@ -810,17 +810,17 @@ let map_under_context_with_binders (g : 'a -> 'a) (f : 'a -> EConstr.t -> EConst
 let map_return_predicate_with_binders (g : 'a -> 'a) (f : 'a -> EConstr.t -> EConstr.t) (l : 'a) (p : EConstr.case_return) : EConstr.case_return =
   map_under_context_with_binders g f l p
 
-let rec normalizeV (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) : EConstr.t =
+let rec normalizeV_rec (env : Environ.env) (sigma : Evd.evar_map)
+    (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_normalizeV then
     msg_debug_hov (Pp.str "[codegen] normalizeV arg:" +++ Printer.pr_econstr_env env sigma term));
-  let result = normalizeV1 env sigma term in
+  let result = normalizeV1 env sigma fix_bounded term in
   (if !opt_debug_normalizeV then
     msg_debug_hov (Pp.str "[codegen] normalizeV ret:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "normalizeV" env sigma term result;
   result
 and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) : EConstr.t =
+    (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   let wrap_lets hoisted_exprs lifted_term =
     let hoisted_types = List.map (Retyping.get_type_of env sigma) hoisted_exprs in
     let hoisted_names = List.map (fun ty -> Context.nameR (Id.of_string (Namegen.hdchar env sigma ty))) hoisted_types in
@@ -829,7 +829,7 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       | [], [], [] -> acc_term
       | x :: names', e :: exprs', ty :: types' ->
           let ty' = Vars.lift i ty in
-          let e' = Vars.lift i (normalizeV env sigma e) in
+          let e' = Vars.lift i (normalizeV_rec env sigma fix_bounded e) in
           let acc_term' = aux (i+1) names' exprs' types' acc_term in
           mkLetIn (x, e', ty', acc_term')
       | _, _, _ -> user_err (Pp.str "[codegen] inconsistent list length")
@@ -842,20 +842,24 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
   | Lambda (x,ty,b) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (x, ty, normalizeV env2 sigma b)
+      let fix_bounded2 = false :: fix_bounded in
+      mkLambda (x, ty, normalizeV_rec env2 sigma fix_bounded2 b)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let fary' = Array.map (normalizeV env2 sigma) fary in
+      let fix_bounded2 = CList.addn (Array.length fary) true fix_bounded in
+      let fary' = Array.map (normalizeV_rec env2 sigma fix_bounded2) fary in
       mkFix ((ks, j), (nary, tary, fary'))
   | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let fary' = Array.map (normalizeV env2 sigma) fary in
+      let fix_bounded2 = CList.addn (Array.length fary) false fix_bounded in
+      let fary' = Array.map (normalizeV_rec env2 sigma fix_bounded2) fary in
       mkCoFix (i, (nary, tary, fary'))
   | LetIn (x,e,ty,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
       let env2 = EConstr.push_rel decl env in
-      let e' = normalizeV env sigma e in
-      let b' = normalizeV env2 sigma b in
+      let fix_bounded2 = false :: fix_bounded in
+      let e' = normalizeV_rec env sigma fix_bounded e in
+      let b' = normalizeV_rec env2 sigma fix_bounded2 b in
       mkLetIn (x, e', ty, b')
   | Case (ci, u, pms, p, iv, item, bl) ->
       if isRel sigma item then
@@ -864,7 +868,8 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
           Array.map2
             (fun (nas, body) (ctx, _) ->
               let env2 = EConstr.push_rel_context ctx env in
-              (nas, normalizeV env2 sigma body))
+              let fix_bounded2 = CList.addn (Array.length nas) false fix_bounded in
+              (nas, normalizeV_rec env2 sigma fix_bounded2 body))
             bl bl0
         in
         mkCase (ci, u, pms, p, iv, item, bl')
@@ -879,13 +884,14 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
             Array.map2
               (fun (nas, body) (ctx, _) ->
                 let env2 = EConstr.push_rel_context ctx env in
-                (nas, Vars.liftn 1 (List.length ctx + 1) (normalizeV env2 sigma body)))
+                let fix_bounded2 = CList.addn (Array.length nas) false fix_bounded in
+                (nas, Vars.liftn 1 (List.length ctx + 1) (normalizeV_rec env2 sigma fix_bounded2 body)))
               bl bl0)
         in
         wrap_lets [item] term
   | App (f,args) ->
-      let f = normalizeV env sigma f in
-      let hoist_args = Array.map (fun arg -> not (isRel sigma arg)) args in
+      let f = normalizeV_rec env sigma fix_bounded f in
+      let hoist_args = Array.map (fun arg -> not (isRel sigma arg) || List.nth fix_bounded (destRel sigma arg - 1)) args in
       let nargs = Array.fold_left (fun n b -> n + if b then 1 else 0) 0 hoist_args in
       let hoisted_args = CList.filter_with (Array.to_list hoist_args) (Array.to_list args) in
       let app =
@@ -906,6 +912,9 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
   | Proj (proj, e) ->
       if isRel sigma e then term
       else wrap_lets [e] (mkProj (proj, mkRel 1))
+
+let normalizeV (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  normalizeV_rec env sigma [] term
 
 (* The innermost let binding is appeared first in the result:
   Here, "exp" means AST of exp, not string.
@@ -938,7 +947,7 @@ let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.
   | (x,e,ty) :: rest ->
       compose_lets rest (mkLetIn (x, e, ty, body))
 
-let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+let reduce_var (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
       (match Environ.lookup_rel i env with
@@ -946,6 +955,21 @@ let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           (match Constr.kind e with
           | Rel j -> mkRel (i + j)      (* delta-var *)
+          | _ -> term))
+  | _ -> term
+
+let reduce_arg (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Rel i ->
+      (match Environ.lookup_rel i env with
+      | Context.Rel.Declaration.LocalAssum _ -> term
+      | Context.Rel.Declaration.LocalDef (n,e,t) ->
+          (match Constr.kind e with
+          | Rel j ->
+              if List.nth fix_bounded (i+j-1) then
+                term
+              else
+                mkRel (i + j)      (* delta-var *)
           | _ -> term))
   | _ -> term
 
@@ -1039,21 +1063,21 @@ let rec push_rel_lams (lams : (Name.t Context.binder_annot * EConstr.t) list) (e
       push_rel_lams rest env2
 
 (* invariant: letin-bindings in env is reduced form *)
-let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+let rec reduce_exp (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   let t1 = Unix.times () in
   (if !opt_debug_reduce_exp then (* Set Debug CodeGen ReduceExp. *)
     msg_debug_hov (Pp.str "[codegen] reduce_exp arg:" +++ Printer.pr_econstr_env env sigma term));
-  let result = reduce_exp1 env sigma term in
+  let result = reduce_exp1 env sigma fix_bounded term in
   (if !opt_debug_reduce_exp then
     let t2 = Unix.times () in
     msg_debug_hov (Pp.str "[codegen] reduce_exp ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_exp" env sigma term result;
   result
 
-and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
-      let term2 = reduce_arg env sigma term in
+      let term2 = reduce_var env sigma term in
       if destRel sigma term2 <> i then
         (* reduction: delta-var *)
         (debug_reduction "delta-var" (fun () ->
@@ -1066,13 +1090,14 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         term
   | Var _ | Meta _ | Evar _ | Sort _ | Prod _
   | Const _ | Ind _ | Construct _ | Int _ | Float _ | Array _ -> term
-  | Cast (e,ck,t) -> reduce_exp env sigma e
+  | Cast (e,ck,t) -> reduce_exp env sigma fix_bounded e
   | Lambda _ ->
       let (lams, b) = decompose_lam sigma term in
       let env2 = push_rel_lams lams env in
-      compose_lam lams (reduce_exp env2 sigma b)
+      let fix_bounded2 = CList.addn (List.length lams) false fix_bounded in
+      compose_lam lams (reduce_exp env2 sigma fix_bounded2 b)
   | LetIn (x,e,t,b) ->
-      let e' = reduce_exp env sigma e in (* xxx: we don't want to reduce function? *)
+      let e' = reduce_exp env sigma fix_bounded e in (* xxx: we don't want to reduce function? *)
       if isLetIn sigma e' then
         (* reduction: zeta-flat *)
         let (defs, body) = decompose_lets sigma e' in
@@ -1088,19 +1113,22 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         check_convertible "reduction(zeta-flat)" env sigma term term2;
         let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
         let env2 = EConstr.push_rel_context ctx env in
+        let fix_bounded2 = CList.addn (List.length defs) false fix_bounded in
         let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
         let env3 = EConstr.push_rel decl env2 in
-        compose_lets defs (mkLetIn (x, body, t', reduce_exp env3 sigma b'))
+        let fix_bounded3 = false :: fix_bounded2 in
+        compose_lets defs (mkLetIn (x, body, t', reduce_exp env3 sigma fix_bounded3 b'))
       else
         let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
         let env2 = EConstr.push_rel decl env in
-        mkLetIn (x, e', t, reduce_exp env2 sigma b)
+        let fix_bounded2 = false :: fix_bounded in
+        mkLetIn (x, e', t, reduce_exp env2 sigma fix_bounded2 b)
   | Case _ ->
-      try_iota_match env sigma term
-        (fun term2 -> reduce_exp env sigma term2)
+      try_iota_match env sigma fix_bounded term
+        (fun term2 -> reduce_exp env sigma fix_bounded term2)
         (fun term2 -> term2)
   | Proj (pr,item) ->
-      let item' = reduce_arg env sigma item in
+      let item' = reduce_var env sigma item in
       let default () = mkProj (pr, item') in
       let i = destRel sigma item' in
       (match EConstr.lookup_rel i env with
@@ -1124,34 +1152,36 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
                 Pp.str "->" ++ Pp.fnl () ++
                 Printer.pr_econstr_env env sigma term2);
               check_convertible "reduction(iota-proj)" env sigma term term2;
-              reduce_exp env sigma term2
+              reduce_exp env sigma fix_bounded term2
           | _ -> default ()))
   | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkFix ((ks, j), (nary, tary, Array.map (reduce_exp env2 sigma) fary))
+      let fix_bounded2 = CList.addn (Array.length fary) true fix_bounded in
+      mkFix ((ks, j), (nary, tary, Array.map (reduce_exp env2 sigma fix_bounded2) fary))
   | CoFix (i, ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma) fary))
+      let fix_bounded2 = CList.addn (Array.length fary) false fix_bounded in
+      mkCoFix (i, (nary, tary, Array.map (reduce_exp env2 sigma fix_bounded2) fary))
   | App (f,args) ->
       (*msg_info_hov (Pp.str "[codegen] reduce_exp App f1:" +++ Printer.pr_econstr_env env sigma f);*)
-      let args_nf = Array.map (reduce_arg env sigma) args in
-      reduce_app env sigma f args_nf
-and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
+      let args_nf = Array.map (reduce_arg env sigma fix_bounded) args in
+      reduce_app env sigma fix_bounded f args_nf
+and reduce_app (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
   let t1 = Unix.times () in
   let term = mkApp (f, args_nf) in
   (if !opt_debug_reduce_app then (* Set Debug CodeGen ReduceApp. *)
     msg_debug_hov (Pp.str "[codegen] reduce_app arg:" +++ Printer.pr_econstr_env env sigma term));
-  let result = reduce_app1 env sigma f args_nf in
+  let result = reduce_app1 env sigma fix_bounded f args_nf in
   (if !opt_debug_reduce_app then
     let t2 = Unix.times () in
     msg_debug_hov (Pp.str "[codegen] reduce_app ret (" ++ Pp.real (t2.Unix.tms_utime -. t1.Unix.tms_utime) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "reduce_app" env sigma term result;
   result
-and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
+and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
   if isRel sigma f then
     let m = destRel sigma f in
     match EConstr.lookup_rel m env with
-    | Context.Rel.Declaration.LocalAssum _ -> reduce_app2 env sigma f args_nf
+    | Context.Rel.Declaration.LocalAssum _ -> reduce_app2 env sigma fix_bounded f args_nf
     | Context.Rel.Declaration.LocalDef (x,e,t) ->
         (* We don't inline Case expression at function position because
            it can duplicate computation.
@@ -1169,16 +1199,16 @@ and reduce_app1 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         match EConstr.kind sigma f_f with
         | Rel _ | Const _ | Construct _ | Lambda _ | Fix _ ->
             (* reduction: delta-fun *)
-            reduce_app env sigma
+            reduce_app env sigma fix_bounded
               (Vars.lift m f_f)
               (Array.append (Array.map (Vars.lift m) f_args) args_nf)
         | _ ->
-            reduce_app2 env sigma f args_nf
+            reduce_app2 env sigma fix_bounded f args_nf
   else
-    reduce_app2 env sigma f args_nf
-and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
+    reduce_app2 env sigma fix_bounded f args_nf
+and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (f : EConstr.t) (args_nf : EConstr.t array) : EConstr.t =
   (*msg_info_hov (Pp.str "[codegen] reduce_app f_content:" +++ Printer.pr_econstr_env env sigma f_content);*)
-  let default () = mkApp (reduce_exp env sigma f, args_nf) in
+  let default () = mkApp (reduce_exp env sigma fix_bounded f, args_nf) in
   let term1 = mkApp (f, args_nf) in
   match EConstr.kind sigma f with
   | Lambda (x,t,b) ->
@@ -1190,11 +1220,11 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Pp.str "->" ++ Pp.fnl () ++
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(beta-var)" env sigma term1 term2;
-      reduce_exp env sigma term2)
+      reduce_exp env sigma fix_bounded term2)
   | App (f_f, f_args) ->
       (* reduction: delta-app *)
-      let f_args_nf = Array.map (reduce_arg env sigma) f_args in
-      reduce_app env sigma f_f (Array.append f_args_nf args_nf)
+      let f_args_nf = Array.map (reduce_arg env sigma fix_bounded) f_args in
+      reduce_app env sigma fix_bounded f_f (Array.append f_args_nf args_nf)
   | LetIn _ ->
       (* reduction: zeta-app *)
       let (defs, body) = decompose_lets sigma f in
@@ -1205,10 +1235,10 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         Pp.str "->" ++ Pp.fnl () ++
         Printer.pr_econstr_env env sigma term2);
       check_convertible "reduction(zeta-app)" env sigma term1 term2;
-      reduce_exp env sigma term2
+      reduce_exp env sigma fix_bounded term2
   | Case _ ->
-      try_iota_match env sigma f
-        (fun term2 -> reduce_app env sigma term2 args_nf)
+      try_iota_match env sigma fix_bounded f
+        (fun term2 -> reduce_app env sigma fix_bounded term2 args_nf)
         (fun term2 -> mkApp (term2, args_nf))
   | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       if ks.(j) < Array.length args_nf then
@@ -1238,7 +1268,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
                   check_convertible "reduction(iota-fix-reuse)" env sigma term1 term2;
-                  reduce_app env sigma fj_subst args_nf
+                  reduce_app env sigma fix_bounded fj_subst args_nf
               | None ->
                   (* reduction: iota-fix *)
                   let args_nf_lifted = Array.map (Vars.lift h) args_nf in
@@ -1258,7 +1288,8 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
                   check_convertible "reduction(iota-fix)" env sigma term1 term2;
                   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
                   let env2 = EConstr.push_rel_context ctx env in
-                  let b = reduce_app env2 sigma fj args_nf_lifted in
+                  let fix_bounded2 = CList.addn (Array.length fary) false fix_bounded in
+                  let b = reduce_app env2 sigma fix_bounded2 fj args_nf_lifted in
                   compose_lets defs b
             else
               default ())
@@ -1266,19 +1297,20 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (args
         default ()
   | _ -> default ()
 
-and try_iota_match (env : Environ.env) (sigma : Evd.evar_map)
+and try_iota_match (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list)
     (term1 : EConstr.t)
     (success : EConstr.t -> 'result)
     (failure : EConstr.t -> 'result) =
   let (ci,u,pms,p,iv,item,bl) = destCase sigma term1 in
-  let item' = reduce_arg env sigma item in
+  let item' = reduce_var env sigma item in
   let failure2 () =
     let (_, _, _, p0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
     let term2 = mkCase (ci, u, pms, p, iv, item',
       Array.map2
         (fun (nas,body) (ctx,_) ->
           let env2 = EConstr.push_rel_context ctx env in
-          (nas, reduce_exp env2 sigma body))
+          let fix_bounded2 = CList.addn (Array.length nas) false fix_bounded in
+          (nas, reduce_exp env2 sigma fix_bounded2 body))
         bl bl0)
     in
     failure term2
@@ -1927,26 +1959,28 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
 (*
   complete_args_fun transforms "term" which does not contain partial applications.
 *)
-let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_fun arg:" +++ Printer.pr_econstr_env env sigma term));
-  let result = complete_args_fun1 env sigma term in
+  let result = complete_args_fun1 env sigma fix_bounded term in
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_fun result:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "complete_args_fun" env sigma term result;
   result
-and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
       let decl = Context.Rel.Declaration.LocalAssum (x, t) in
       let env2 = EConstr.push_rel decl env in
-      mkLambda (x, t, complete_args_fun env2 sigma e)
+      let fix_bounded2 = false :: fix_bounded in
+      mkLambda (x, t, complete_args_fun env2 sigma fix_bounded2 e)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
-      let fary2 = Array.map (complete_args_fun env2 sigma) fary in
+      let fix_bounded2 = CList.addn (Array.length fary) true fix_bounded in
+      let fary2 = Array.map (complete_args_fun env2 sigma fix_bounded2) fary in
       mkFix ((ks, j), (nary, tary, fary2))
   | _ ->
-      complete_args_exp env sigma term
+      complete_args_exp env sigma fix_bounded term
 
 (*
   - complete_args_exp transforms closure creation expressions in "term" to
@@ -1958,16 +1992,16 @@ and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   - We don't consider a variable as closure creation.
     (because the closure is already creaated and bounded to the variable.)
 *)
-and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and complete_args_exp (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_exp arg:" +++
     Printer.pr_econstr_env env sigma term));
-  let result = complete_args_exp1 env sigma term in
+  let result = complete_args_exp1 env sigma fix_bounded term in
   (if !opt_debug_complete_arguments then
     msg_debug_hov (Pp.str "[codegen] complete_args_exp result:" +++ Printer.pr_econstr_env env sigma result));
   check_convertible "complete_args_exp" env sigma term result;
   result
-and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   let eta term =
     let fargs =
       let ty = Retyping.get_type_of env sigma term in
@@ -1988,33 +2022,39 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   | App (f,args) ->
       (match EConstr.kind sigma f with
       | Rel _ | Const _ | Construct _ -> eta term
-      | Fix _  -> eta (mkApp (complete_args_fun env sigma f, args))
+      | Fix _  -> eta (mkApp (complete_args_fun env sigma fix_bounded f, args))
       | _ -> user_err (Pp.str "[codegen:complete_args_exp:bug] unexpected function position:" +++ Printer.pr_econstr_env env sigma f))
-  | Cast (e,ck,t) -> complete_args_exp env sigma e
-  | Rel i -> term
+  | Cast (e,ck,t) -> complete_args_exp env sigma fix_bounded e
+  | Rel i ->
+      if List.nth fix_bounded (i-1) then
+        eta term
+      else
+        term
   | Const _ -> eta term
   | Construct _ -> eta term
   | Lambda _ ->
-      complete_args_fun env sigma term
+      complete_args_fun env sigma fix_bounded term
   | LetIn (x,e,t,b) ->
       let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
       let env2 = EConstr.push_rel decl env in
+      let fix_bounded2 = false :: fix_bounded in
       mkLetIn (x,
-        complete_args_exp env sigma e,
+        complete_args_exp env sigma fix_bounded e,
         t,
-        complete_args_exp env2 sigma b)
+        complete_args_exp env2 sigma fix_bounded2 b)
   | Case (ci,u,pms,mpred,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
       mkCase (ci,u,pms,mpred,iv,item,
         Array.map2
           (fun (nas,body) (ctx,_) ->
             let env2 = EConstr.push_rel_context ctx env in
-            (nas, complete_args_exp env2 sigma body))
+            let fix_bounded2 = CList.addn (Array.length nas) false fix_bounded in
+            (nas, complete_args_exp env2 sigma fix_bounded2 body))
           bl bl0)
   | Fix _ ->
-      complete_args_fun env sigma term
+      complete_args_fun env sigma fix_bounded term
   | Proj (proj, e) ->
-      mkProj (proj, complete_args_exp env sigma e)
+      mkProj (proj, complete_args_exp env sigma fix_bounded e)
   | Var _ | Meta _ | Evar _
   | Sort _ | Prod _ | Ind _
   | CoFix _
@@ -2024,7 +2064,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (*msg_debug_hov (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
-  let result = complete_args_fun env sigma term in
+  let result = complete_args_fun env sigma [] term in
   (*msg_debug_hov (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
   result
 
@@ -2258,7 +2298,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "normalizeV" term;
   let rec repeat_reduction sigma term =
     let term1 = term in
-    let term = reduce_exp env sigma term in
+    let term = reduce_exp env sigma [] term in
     debug_simplification env sigma "reduce_exp" term;
     let (sigma, term) = Matchapp.simplify_matchapp env sigma term in
     debug_simplification env sigma "simplify_matchapp" term;
