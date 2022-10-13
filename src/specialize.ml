@@ -190,8 +190,7 @@ let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty 
   | Prod (x,t,b) ->
       let t = Reductionops.whd_all env sigma t in
       let is_type_arg = EConstr.isSort sigma t in
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env = EConstr.push_rel decl env in
+      let env = env_push_assum env x t in
       is_type_arg :: determine_type_arguments env sigma b
   | _ -> []
 
@@ -199,8 +198,7 @@ let is_monomorphic_type_for_determine_static_arguments (env : Environ.env) (sigm
   let rec aux env ty =
     match EConstr.kind sigma ty with
     | Prod (x,t,b) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x t in
         is_monomorphic_type env sigma t &&
         is_monomorphic_type env2 sigma b
     | Ind _ -> true
@@ -223,8 +221,7 @@ let rec determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] normalized_t=" ++ Printer.pr_econstr_env env sigma t);*)
       let is_static_arg = not (is_monomorphic_type_for_determine_static_arguments env sigma t) in
       (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] is_static_arg=" ++ Pp.bool is_static_arg);*)
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env = EConstr.push_rel decl env in
+      let env = env_push_assum env x t in
       is_static_arg :: determine_static_arguments env sigma b
   | _ -> []
 
@@ -288,8 +285,7 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
             | SorD_D ->
                 (let f1 = EConstr.Vars.lift 1 f in
                 let f1app = mkApp (f1, [| mkRel 1 |]) in
-                let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-                let env = EConstr.push_rel decl env in
+                let env = env_push_assum env x t in
                 mkLambda (x, t, aux env f1app c sd_list' static_args)))
         | _ -> user_err (Pp.str "[codegen] needs a function type"))
   in
@@ -637,12 +633,10 @@ and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
   | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
   | Cast (e,ck,t) -> check_letin_in_cstr_type env sigma e
   | Lambda (x, t, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       check_letin_in_cstr_type env2 sigma b
   | LetIn (x, e, t, b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       check_letin_in_cstr_type env sigma e;
       check_letin_in_cstr_type env2 sigma b
   | Case (ci, u, pms, p, iv, item, brs) ->
@@ -674,7 +668,7 @@ and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
       check_letin_in_cstr_type env sigma f;
       Array.iter (check_letin_in_cstr_type env sigma) args
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
+      let env2 = env_push_fix env prec in
       Array.iter (check_letin_in_cstr_type env2 sigma) fary
 
 (* useless ?
@@ -689,8 +683,7 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Prod _ -> term
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       mkLambda (x, t, strip_cast env2 sigma b)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -701,8 +694,7 @@ and strip_cast1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       let fary' = Array.map (strip_cast env2 sigma) fary in
       mkCoFix (i, (nary, tary, fary'))
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let e' = strip_cast env sigma e in
       let b' = strip_cast env2 sigma b in
       mkLetIn (x, e', t, b')
@@ -730,8 +722,7 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
   match EConstr.kind sigma term with
   | Cast (e,ck,t) -> expand_eta_top env sigma e (* strip cast *)
   | Lambda (x,ty,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x ty in
       mkLambda (x, ty, expand_eta_top env2 sigma b)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -766,13 +757,11 @@ and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
   | Cast (e,ck,t) -> search_fixclo_to_expand_eta env sigma e (* strip cast *)
   | Lambda (x, t, b) ->
       (* closure generating lambda found.  Apply eta expansion. *)
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let b' = expand_eta_top env2 sigma b in
       mkLambda (x, t, b')
   | LetIn (x, e, t, b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let e' = search_fixclo_to_expand_eta env sigma e in
       let b' = search_fixclo_to_expand_eta env2 sigma b in
       mkLetIn (x, e', t, b')
@@ -840,8 +829,7 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
   | Rel _ | Var _ | Meta _ | Evar _ | Sort _ | Ind _
   | Const _ | Construct _ | Int _ | Float _ | Array _ | Prod _ -> term
   | Lambda (x,ty,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x ty in
       let fix_bounded2 = false :: fix_bounded in
       mkLambda (x, ty, normalizeV_rec env2 sigma fix_bounded2 b)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
@@ -855,8 +843,7 @@ and normalizeV1 (env : Environ.env) (sigma : Evd.evar_map)
       let fary' = Array.map (normalizeV_rec env2 sigma fix_bounded2) fary in
       mkCoFix (i, (nary, tary, fary'))
   | LetIn (x,e,ty,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e ty in
       let fix_bounded2 = false :: fix_bounded in
       let e' = normalizeV_rec env sigma fix_bounded e in
       let b' = normalizeV_rec env2 sigma fix_bounded2 b in
@@ -1058,8 +1045,7 @@ let rec push_rel_lams (lams : (Name.t Context.binder_annot * EConstr.t) list) (e
   match lams with
   | [] -> env
   | (x, ty) :: rest ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x ty in
       push_rel_lams rest env2
 
 (* invariant: letin-bindings in env is reduced form *)
@@ -1111,16 +1097,13 @@ and reduce_exp1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool l
           Pp.str "->" ++ Pp.fnl () ++
           Printer.pr_econstr_env env sigma term2);
         check_convertible "reduction(zeta-flat)" env sigma term term2;
-        let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
-        let env2 = EConstr.push_rel_context ctx env in
+        let env2 = env_push_defs env defs in
         let fix_bounded2 = CList.addn (List.length defs) false fix_bounded in
-        let decl = Context.Rel.Declaration.LocalDef (x, body, t') in
-        let env3 = EConstr.push_rel decl env2 in
+        let env3 = env_push_def env2 x body t' in
         let fix_bounded3 = false :: fix_bounded2 in
         compose_lets defs (mkLetIn (x, body, t', reduce_exp env3 sigma fix_bounded3 b'))
       else
-        let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_def env x e' t in
         let fix_bounded2 = false :: fix_bounded in
         mkLetIn (x, e', t, reduce_exp env2 sigma fix_bounded2 b)
   | Case _ ->
@@ -1286,8 +1269,7 @@ and reduce_app2 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool l
                     Pp.str "->" ++ Pp.fnl () ++
                     Printer.pr_econstr_env env sigma term2);
                   check_convertible "reduction(iota-fix)" env sigma term1 term2;
-                  let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
-                  let env2 = EConstr.push_rel_context ctx env in
+                  let env2 = env_push_defs env defs in
                   let fix_bounded2 = CList.addn (Array.length fary) false fix_bounded in
                   let b = reduce_app env2 sigma fix_bounded2 fj args_nf_lifted in
                   compose_lets defs b
@@ -1362,8 +1344,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       let args' = Array.map (normalize_types env sigma) args in
       mkApp (f', args')
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let e' = normalize_types env sigma e in
       let t' = Reductionops.nf_all env sigma t in
       let b' = normalize_types env2 sigma b in
@@ -1392,14 +1373,12 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       in
       mkCase (ci,u,pms',p',iv',item',bl')
   | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let t' = Reductionops.nf_all env sigma t in
       let b' = normalize_types env2 sigma b in
       mkProd (x, t', b')
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let t' = Reductionops.nf_all env sigma t in
       let e' = normalize_types env2 sigma e in
       mkLambda (x, t', e')
@@ -1433,8 +1412,7 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
   | CoFix _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected CoFix:" +++ Printer.pr_econstr_env env sigma term)
   | Array _ -> user_err (Pp.str "[codegen:normalize_static_arguments] unexpected Array:" +++ Printer.pr_econstr_env env sigma term)
   | Lambda (x, t, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let b' = normalize_static_arguments env2 sigma b in
       mkLambda (x, t, b')
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
@@ -1443,8 +1421,7 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       mkFix ((ks, j), (nary, tary, fary'))
   | LetIn (x, e, t, b) ->
       let e' = normalize_static_arguments env sigma e in
-      let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e' t in
       let b' = normalize_static_arguments env2 sigma b in
       mkLetIn (x, e', t, b')
   | Case (ci,u,pms,p,iv,item,bl) ->
@@ -1594,8 +1571,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let fvs = Array.fold_left IntSet.union fvs1 (Array.map fst fargs2) in
       (fvs, fun vars_used -> mkApp (ff vars_used, Array.map (fun g -> g vars_used) fargs))
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
       let declared_var_used = IntSet.mem (Environ.nb_rel env) fvsb in
       let (fvse, fe) = delete_unused_let_rec env sigma e in
@@ -1662,15 +1638,13 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
          in
          mkCase (ci, u, pms', p', iv', item', bl'))
   | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let (fvst, ft) = delete_unused_let_rec env sigma t in
       let (fvsb, fb) = delete_unused_let_rec env2 sigma b in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvsb) in
       (fvs, fun vars_used -> mkProd (x, ft vars_used, fb (true :: vars_used)))
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let (fvst, ft) = delete_unused_let_rec env sigma t in
       let (fvse, fe) = delete_unused_let_rec env2 sigma e in
       let fvs = IntSet.union fvst (IntSet.remove (Environ.nb_rel env) fvse) in
@@ -1794,8 +1768,7 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
   | Ind _ | Int _ | Float _ | Array _
   | Proj _ | Cast _ -> (env, term, StringSet.empty)
   | Lambda (x, t, e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let (env2', e', referred_cfuncs) = replace ~cfunc env2 sigma e in
       let env' = Environ.pop_rel_context 1 env2' in
       (env', mkLambda (x, t, e'), referred_cfuncs)
@@ -1813,8 +1786,7 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       user_err (Pp.str "[codegen] codegen doesn't support CoFix.")
   | LetIn (x, e, t, b) ->
       let (env', e', referred_cfuncs1) = replace ~cfunc env sigma e in
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env' in
+      let env2 = env_push_def env' x e t in
       let (env2', b', referred_cfuncs2) = replace ~cfunc env2 sigma b in
       let env'' = Environ.pop_rel_context 1 env2' in
       let referred_cfuncs = StringSet.union referred_cfuncs1 referred_cfuncs2 in
@@ -1935,8 +1907,7 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
         compose_lam lams (reduce_eta env2 sigma b))
   | LetIn (x,e,t,b) ->
       let e' = reduce_eta env sigma e in
-      let decl = Context.Rel.Declaration.LocalDef (x, e', t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e' t in
       mkLetIn (x, e', t, reduce_eta env2 sigma b)
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
@@ -1970,8 +1941,7 @@ let rec complete_args_fun (env : Environ.env) (sigma : Evd.evar_map) (fix_bounde
 and complete_args_fun1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded : bool list) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let fix_bounded2 = false :: fix_bounded in
       mkLambda (x, t, complete_args_fun env2 sigma fix_bounded2 e)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
@@ -2035,8 +2005,7 @@ and complete_args_exp1 (env : Environ.env) (sigma : Evd.evar_map) (fix_bounded :
   | Lambda _ ->
       complete_args_fun env sigma fix_bounded term
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let fix_bounded2 = false :: fix_bounded in
       mkLetIn (x,
         complete_args_exp env sigma fix_bounded e,
@@ -2071,8 +2040,7 @@ let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) 
 let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       x :: formal_argument_names env2 sigma e
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -2098,15 +2066,13 @@ let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     | Lambda (x,t,b) ->
         if not (is_monomorphic_type env sigma t) then
           user_err (Pp.str "[codegen] lambda argument type must be monomorphic:" +++ Printer.pr_econstr_env env sigma t);
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x t in
         aux env2 b
     | LetIn (x,e,t,b) ->
         if not (is_monomorphic_type env sigma t) then
           user_err (Pp.str "[codegen] let-in type must be monomorphic:" +++ Printer.pr_econstr_env env sigma t);
         aux env e;
-        let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_def env x e t in
         aux env2 b;
     | Fix ((ks, j), (nary, tary, fary)) ->
         Array.iter
@@ -2159,13 +2125,11 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
     match EConstr.kind sigma term with
     | Lambda (x,t,e) ->
         let x2 = make_new_var x in
-        let decl = Context.Rel.Declaration.LocalAssum (x2, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x2 t in
         mkLambda (x2, t, r env2 e)
     | LetIn (x,e,t,b) ->
         let x2 = make_new_var x in
-        let decl = Context.Rel.Declaration.LocalDef (x2, e, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_def env x2 e t in
         mkLetIn (x2, r env e, t, r env2 b)
     | Fix ((ks, j), (nary, tary, fary)) ->
         let nary2 = Array.map (fun n -> make_new_fixfunc n) nary in

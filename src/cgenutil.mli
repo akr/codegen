@@ -96,6 +96,11 @@ val msg_debug_hov : Pp.t -> unit
 val user_err_hov : Pp.t -> 'a
 val format_deep : Pp.t -> string
 val pr_deep : Pp.t -> Pp.t
+val env_push_assum : Environ.env  -> Names.Name.t Context.binder_annot -> EConstr.types -> Environ.env
+val env_push_assums : Environ.env -> (Names.Name.t Context.binder_annot * EConstr.types) list -> Environ.env
+val env_push_def : Environ.env -> Names.Name.t Context.binder_annot -> EConstr.t -> EConstr.types -> Environ.env
+val env_push_defs : Environ.env -> (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list -> Environ.env
+val env_push_fix : Environ.env -> (EConstr.t, EConstr.t) Constr.prec_declaration -> Environ.env
 val is_monomorphic_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val new_env_with_rels : Environ.env -> Environ.env
 val decompose_appvect : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array

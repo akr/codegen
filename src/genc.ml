@@ -105,8 +105,7 @@ let _ = ignore show_fixfunc_table
 let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * c_typedata) list) * c_typedata =
   match EConstr.kind sigma term with
   | Prod (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let (rest_args, ret_type) = c_args_and_ret_type env2 sigma b in
       (((str_of_annotated_name x, c_typename env sigma t) :: rest_args), ret_type)
   | _ ->
@@ -137,8 +136,7 @@ let rec argument_types_contain_function (env : Environ.env) (sigma : Evd.evar_ma
       (match Linear.component_types env sigma t with
       | None -> true (* function found *)
       | Some _ ->
-          let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-          let env2 = EConstr.push_rel decl env in
+          let env2 = env_push_assum env x t in
           argument_types_contain_function env2 sigma b)
   | _ -> false
 
@@ -227,8 +225,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       (* e must be a Rel which type is inductive (non-function) type *)
       (Id.Map.empty, IntSet.empty, IntSet.empty)
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let (inlinable_e, nontailset_e, tailset_e) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env sigma e in
       let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env2 sigma b in
       let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
@@ -254,8 +251,7 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let inlinable = disjoint_id_map_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> inlinable_br) branches_result) in
       (inlinable, nontailset, tailset)
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       if numargs = 0 && not under_fix_or_lambda then
         (* closure creation *)
         let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:true env2 sigma b in
@@ -373,8 +369,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
   | App (f, args) ->
       collect_fix_usage_rec ~inlinable_fixterms env sigma tail_position f (Array.length args + numargs) ~fixaccs
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let fixaccs2 = { fixacc_used_as_call = ref false;
                        fixacc_used_as_goto = ref false;
                        fixacc_args_contain_function = false } :: fixaccs in
@@ -402,8 +397,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       (concat_array_seq (Array.map fst results),
        concat_array_seq (Array.map snd results))
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let fixaccs2 = { fixacc_used_as_call = ref false;
                        fixacc_used_as_goto = ref false;
                        fixacc_args_contain_function = false } :: fixaccs in
@@ -491,8 +485,7 @@ let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     ~(fixfunc_tbl : fixfunc_table) : unit =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       fixfunc_initialize_top_calls env2 sigma top_c_func_name e sibling_entfuncs ~fixfunc_tbl
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
@@ -564,8 +557,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       in
       Array.fold_right Id.Set.add ids fv_f
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       let id = id_of_annotated_name x in
       let fv_e = fixterm_free_variables_rec env sigma e ~result in
       let fv_b = fixterm_free_variables_rec env2 sigma b ~result in
@@ -592,8 +584,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       in
       Array.fold_right Id.Set.union fv_branches (Id.Set.singleton item_id)
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       let id = id_of_annotated_name x in
       let fv_b = fixterm_free_variables_rec env2 sigma b ~result in
       Id.Set.remove id fv_b
@@ -994,12 +985,6 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
   loop assign;
   !rpp
 
-let decl_of_farg (x : Names.Name.t Context.binder_annot) (t : EConstr.types) : EConstr.rel_declaration =
-  Context.Rel.Declaration.LocalAssum (x,t)
-
-let ctx_of_fargs (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) : EConstr.rel_context =
-  List.map (fun (x,t) -> decl_of_farg x t) fargs
-
 let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
     (((*env including fixfunc names but without lambdas of fixfunc*)Environ.env *
       (*env including fixfunc names and lambdas of fixfunc*)Environ.env *
@@ -1016,7 +1001,7 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       List.concat_map
         (fun (n,t,f) ->
           let (f_fargs, f_body) = decompose_lam sigma f in
-          let env3 = EConstr.push_rel_context (ctx_of_fargs f_fargs) env2 in
+          let env3 = env_push_assums env2 f_fargs in
           let l = fix_body_list env3 sigma f_body in
           match l with
           | [] -> assert false
@@ -1037,7 +1022,7 @@ let add_local_vars_in_fix_body_list (sigma : Evd.evar_map) fix_bodies =
               (let c_ty = c_typename !env sigma t in
               if not (c_type_is_void c_ty) then
                 add_local_var c_ty (str_of_annotated_name x));
-              env := EConstr.push_rel (decl_of_farg x t) !env)
+              env := env_push_assum !env x t)
             (List.rev fixfunc_fargs))
         context)
     fix_bodies
@@ -1053,7 +1038,7 @@ let lam_fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       ((*env for body*)Environ.env *
        (*body*)EConstr.t)) list) =
   let (fargs, body) = EConstr.decompose_lam sigma term in
-  let env2 = EConstr.push_rel_context (ctx_of_fargs fargs) env in
+  let env2 = env_push_assums env fargs in
   (fargs, env2, fix_body_list env2 sigma body)
 
 type head_cont = {
@@ -1157,8 +1142,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | LetIn (x,e,t,b) ->
       assert (cargs = []);
       let c_var = str_of_annotated_name x in
-      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
       let cont1 =
         let c_ty = c_typename env sigma t in
         if c_type_is_void c_ty then
@@ -1374,8 +1358,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | LetIn (x,e,t,b) ->
       assert (cargs = []);
       let c_var = str_of_annotated_name x in
-      let decl = Context.Rel.Declaration.LocalDef (Context.nameR (Id.of_string c_var), e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
       let cont1 =
         let c_ty = c_typename env sigma t in
         if c_type_is_void c_ty then
@@ -1549,7 +1532,7 @@ let obtain_function_bodies
     List.map
       (fun (extra_arguments, env1, term1) ->
         let (term1_fargs, term1_body) = EConstr.decompose_lam sigma term1 in
-        let env2 = EConstr.push_rel_context (ctx_of_fargs term1_fargs) env1 in
+        let env2 = env_push_assums env1 term1_fargs in
         let fargs =
           List.filter_map
             (fun (x,t) ->
@@ -1573,8 +1556,7 @@ let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
   | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       find_closures ~found env2 sigma b
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -1587,8 +1569,7 @@ and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
   | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       find_closures_exp ~found env sigma e;
       find_closures_exp ~found env2 sigma b
   | Case (ci,u,pms,p,iv,item,bl) ->
@@ -2048,8 +2029,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
       Id.Set.singleton (id_of_name name)
   | Lambda (x,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       used_variables env2 sigma b
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -2058,8 +2038,7 @@ let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
         Id.Set.empty
         fary
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e t in
       Id.Set.union
         (used_variables env sigma e)
         (used_variables env2 sigma b)

@@ -64,16 +64,14 @@ let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
               let q' ma_term = mkApp (q ma_term, rels) in
               Some (q', ma_env, ma_match, ma_args))
   | Lambda (x,t,e) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       (match find_match_app env2 sigma e with
       | None -> None
       | Some (q, ma_env, ma_match, ma_args) ->
           let q' ma_term = mkLambda (x, t, q ma_term) in
           Some (q', ma_env, ma_match, ma_args))
   | LetIn (x,e,t,b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       (match find_match_app env sigma e with
       | Some (q, ma_env, ma_match, ma_args) ->
           let q' ma_term = mkLetIn (x, q ma_term, t, b) in
@@ -213,8 +211,7 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
           match EConstr.kind sigma term with
           | Prod (x,t,e) ->
               let t' = nf_all env sigma t in
-              let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-              let env2 = EConstr.push_rel decl env in
+              let env2 = env_push_assum env x t in
               decompose_prod_n_acc env2 ((x,t')::fargs) (n-1) e
           | _ ->
               user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (prod not exposed):" +++

@@ -134,7 +134,7 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive
             (match !params with
             | param :: rest ->
                 params := rest;
-                env2 := EConstr.push_rel (LocalDef (x, param, ty)) !env2
+                env2 := env_push_def !env2 x param ty
             | [] ->
                 let ty' = nf_all !env2 sigma ty in
                 (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
@@ -246,13 +246,11 @@ let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc
       user_err (Pp.str "[codegen:check_fix_downwardness] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ -> ()
   | Lambda (x, ty, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x ty in
       check_fix_downwardness env2 sigma cfunc b
   | LetIn (x, e, ty, b) ->
       check_fix_downwardness env sigma cfunc e;
-      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e ty in
       check_fix_downwardness env2 sigma cfunc b
   | App (f, argsary) ->
       check_fix_downwardness env sigma cfunc f;
@@ -540,8 +538,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
         let (env3, lvar_env3) =
           List.fold_right
             (fun (x,ty) (env,lvar_env) ->
-              let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-              let env2 = EConstr.push_rel decl env in
+              let env2 = env_push_assum env x ty in
               if is_linear_type env sigma ty then
                 user_err_hov (Pp.str "[codegen] linear argument outside of fix-term:" +++
                   Pp.str (str_of_name (Context.binder_name x)))
@@ -559,8 +556,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
         let (env3, lvar_env3) =
           List.fold_right
             (fun (x,ty) (env,lvar_env) ->
-              let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-              let env2 = EConstr.push_rel decl env in
+              let env2 = env_push_assum env x ty in
               if is_linear_type env sigma ty then
                 (env2, Some (Environ.nb_rel env) :: lvar_env)
               else
@@ -731,8 +727,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
         let (x,argty,retty) = destProd sigma (nf_all env sigma (Retyping.get_type_of env sigma term)) in
-        let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x argty in
         let tys =
           match component_types env2 sigma retty with
           | None -> user_err_hov (Pp.str "[codegen:bug] borrow function's result contains a function:" +++ Constant.print ctnt);
@@ -783,8 +778,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
   | LetIn (x, e, ty, b) ->
       assert (vs = []);
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e ty in
-      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e ty in
       let ty_is_linear = is_linear_type env sigma ty in
       let l = Environ.nb_rel env in
       let lvar_env2 =
@@ -927,8 +921,7 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
       Array.iter (fun f -> borrowcheck_constructor env2 sigma f []) fary
 
   | Lambda (x, ty, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x ty in
       (match vs with
       | [] -> (* closure creation *)
           borrowcheck_constructor env2 sigma b []
@@ -937,8 +930,7 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
 
   | LetIn (x, e, ty, b) ->
       borrowcheck_constructor env sigma e [];
-      let decl = Context.Rel.Declaration.LocalDef (x, e, ty) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_def env x e ty in
       borrowcheck_constructor env2 sigma b vs
 
   | Case (ci,u,pms,p,iv,item,bl) ->
@@ -1011,8 +1003,7 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
             user_err (Pp.str "[codegen] CodeGen BorrowFunc needs a function which argument type is an inductive type:" +++ Printer.pr_constant env ctnt);
           if not (isInd sigma (fst (decompose_appvect sigma retty))) then
             user_err (Pp.str "[codegen] CodeGen BorrowFunc needs a function which result type is an inductive type:" +++ Printer.pr_constant env ctnt);
-          let decl = Context.Rel.Declaration.LocalAssum (x, argty) in
-          let env2 = EConstr.push_rel decl env in
+          let env2 = env_push_assum env x argty in
           let ret_comptypes = component_types env2 sigma retty in
           let arg_comptypes = component_types env2 sigma argty in
           (match ret_comptypes, arg_comptypes with

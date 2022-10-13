@@ -626,12 +626,39 @@ let format_deep (pp : Pp.t) : string =
 let pr_deep (pp : Pp.t) : Pp.t =
   Pp.str (format_deep pp)
 
+let env_push_assum (env : Environ.env) (x : Names.Name.t Context.binder_annot) (t : EConstr.types) : Environ.env =
+  let decl = Context.Rel.Declaration.LocalAssum (x, t) in
+  let env2 = EConstr.push_rel decl env in
+  env2
+
+(* assums is a list of (name,type).
+  The innermost assumption is first.  *)
+let env_push_assums (env : Environ.env) (assums : (Names.Name.t Context.binder_annot * EConstr.types) list) : Environ.env =
+  let ctx = List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) assums in
+  let env2 = EConstr.push_rel_context ctx env in
+  env2
+
+let env_push_def (env : Environ.env) (x : Names.Name.t Context.binder_annot) (e : EConstr.t) (t : EConstr.types) : Environ.env =
+  let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
+  let env2 = EConstr.push_rel decl env in
+  env2
+
+(* defs is a list of (name,exp,type).
+  The innermost definition is first.  *)
+let env_push_defs (env : Environ.env) (defs : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list) : Environ.env =
+  let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
+  let env2 = EConstr.push_rel_context ctx env in
+  env2
+
+let env_push_fix (env : Environ.env) (prec : (EConstr.t, EConstr.t) Constr.prec_declaration) : Environ.env =
+  let env2 = push_rec_types prec env in
+  env2
+
 let is_monomorphic_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
   let rec aux env ty =
     match EConstr.kind sigma ty with
     | Prod (x,t,b) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x t in
         aux env t &&
         aux env2 b
     | Ind _ -> true
@@ -673,8 +700,7 @@ let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int)
   else
     match EConstr.kind sigma term with
     | Lambda (x,t,e) ->
-        let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-        let env2 = EConstr.push_rel decl env in
+        let env2 = env_push_assum env x t in
         decompose_lam_n_env env2 sigma (n-1) e
     | _ ->
       user_err (Pp.str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term:" +++ Printer.pr_econstr_env env sigma term)
@@ -721,8 +747,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
       mangle_term_buf env sigma buf f;
       Array.iter (fun arg -> Buffer.add_char buf '_'; mangle_term_buf env sigma buf arg) argsary
   | Prod (x, t, b) ->
-      let decl = Context.Rel.Declaration.LocalAssum (x, t) in
-      let env2 = EConstr.push_rel decl env in
+      let env2 = env_push_assum env x t in
       mangle_term_buf env sigma buf t;
       Buffer.add_string buf "_to_";
       mangle_term_buf env2 sigma buf b
