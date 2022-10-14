@@ -208,17 +208,10 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
     | _ -> user_err (Pp.str "[codegen] unexpected term in function position:" +++ Printer.pr_econstr_env env sigma term));
   let args_set = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) IntSet.empty args in
   match EConstr.kind sigma term with
-  | App _ -> user_err (Pp.str "[codegen] App unexpected here")
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Int _ | Float _ -> (Id.Map.empty, IntSet.empty, IntSet.empty)
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
+      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i -> (Id.Map.empty, args_set, IntSet.singleton i)
   | Const _ | Construct _ -> (Id.Map.empty, args_set, IntSet.empty)
   | Proj (proj, e) ->
@@ -335,15 +328,10 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
     ~(fixaccs : fixacc_t list) :
     fixterm_t Seq.t * fixfunc_t Seq.t =
   match EConstr.kind sigma term with
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:collect_fix_usage_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:collect_fix_usage_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       ((if 0 < numargs then
         let id = id_of_name (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) in
@@ -362,7 +350,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
               else
                 fixacc.fixacc_used_as_call := true);
       (Seq.empty, Seq.empty))
-  | Int _ | Float _ | Const _ | Construct _ -> (Seq.empty, Seq.empty)
+  | Const _ | Construct _ -> (Seq.empty, Seq.empty)
   | Proj (proj, e) ->
       (* e must be a Rel which type is inductive (non-function) type *)
       (Seq.empty, Seq.empty)
@@ -530,20 +518,15 @@ let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) ~(result : (Id.t, Id.Set.t) Hashtbl.t) : Id.Set.t =
   match EConstr.kind sigma term with
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       let decl = Environ.lookup_rel i env in
       let name = Context.Rel.Declaration.get_name decl in
       Id.Set.singleton (id_of_name name)
-  | Int _ | Float _ | Const _ | Construct _ -> Id.Set.empty
+  | Const _ | Construct _ -> Id.Set.empty
   | Proj (proj, e) -> fixterm_free_variables_rec env sigma e ~result
   | App (f, args) ->
       let fv_f = fixterm_free_variables_rec env sigma f ~result in
@@ -1077,12 +1060,10 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         argsary)
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _
-  | Evar _ | Prod _
-  | Int _ | Float _ | Array _
-  | Cast _ | CoFix _
-  | App _ ->
-      user_err (Pp.str "[codegen:gen_head] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
+      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -1290,12 +1271,10 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         argsary)
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Sort _ | Ind _
-  | Evar _ | Prod _
-  | Int _ | Float _ | Array _
-  | Cast _ | CoFix _
-  | App _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
+      user_err (Pp.str "[codegen:gen_tail] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -1552,9 +1531,10 @@ let obtain_function_bodies
 let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
   match EConstr.kind sigma term with
-  | Cast _ | Var _ | Meta _ | Sort _ | Ind _ | Prod _
-  | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:find_closures] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:find_closures] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Lambda (x,t,b) ->
       let env2 = env_push_assum env x t in
       find_closures ~found env2 sigma b
@@ -1565,9 +1545,10 @@ let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
 and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
   match EConstr.kind sigma term with
-  | Cast _ | Var _ | Meta _ | Sort _ | Ind _ | Prod _
-  | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen] unsupported Gallina term:" +++ Pp.str (constr_name sigma term))
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | LetIn (x,e,t,b) ->
       let env2 = env_push_def env x e t in
       find_closures_exp ~found env sigma e;
@@ -2015,16 +1996,11 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
    useless accessor call and assignment in translation of match-expression *)
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
-  | Cast _ -> user_err (Pp.str "[codegen] Cast is not supported for code generation")
-  | Var _ -> user_err (Pp.str "[codegen] Var is not supported for code generation")
-  | Meta _ -> user_err (Pp.str "[codegen] Meta is not supported for code generation")
-  | Sort _ -> user_err (Pp.str "[codegen] Sort is not supported for code generation")
-  | Ind _ -> user_err (Pp.str "[codegen] Ind is not supported for code generation")
-  | Prod _ -> user_err (Pp.str "[codegen] Prod is not supported for code generation")
-  | Evar _ -> user_err (Pp.str "[codegen] Evar is not supported for code generation")
-  | CoFix _ -> user_err (Pp.str "[codegen] CoFix is not supported for code generation")
-  | Array _ -> user_err (Pp.str "[codegen] Array is not supported for code generation")
-  | Const _ | Construct _ | Int _ | Float _ -> Id.Set.empty
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Const _ | Construct _ -> Id.Set.empty
   | Rel i ->
       let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
       Id.Set.singleton (id_of_name name)

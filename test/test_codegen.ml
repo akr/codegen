@@ -1747,6 +1747,36 @@ let test_letin_in_constructor_type (ctx : test_ctxt) : unit =
       CodeGen Gen f. (* should fail *)
     |} {| |}
 
+let test_arguments_contain_sort (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition zero (T : Type) := 0.
+      Definition f (n : nat) := zero Type.
+      CodeGen Func f.
+    |}) {|
+      assert(f(10) == 0);
+    |}
+
+let test_arguments_contain_prod (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition zero (T : Type) := 0.
+      Definition f (n : nat) := zero (nat -> nat).
+      CodeGen Func f.
+    |}) {|
+      assert(f(10) == 0);
+    |}
+
+let test_arguments_contain_ind (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition zero (T : Type) := 0.
+      Definition f (n : nat) := zero nat.
+      CodeGen Func f.
+    |}) {|
+      assert(f(10) == 0);
+    |}
+
 let test_command_gen_qualid (ctx : test_ctxt) : unit =
   template_coq_success ctx
     (bool_src ^
@@ -2973,7 +3003,7 @@ let test_prototype (ctx : test_ctxt) : unit =
 
 let test_monocheck_failure (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
-    ~coq_output_regexp:(Str.regexp_string "[codegen] let-in type must be monomorphic:") ctx
+    ~coq_output_regexp:(Str.regexp_string "[codegen] monomorphism check failed: let-in type must be monomorphic:") ctx
     ({|
       Definition f (z : Empty_set) (n : nat) : nat :=
         let T : Type := match z with end in
@@ -4045,6 +4075,9 @@ let suite : OUnit2.test =
     "test_specialized_func_with_presimp_name" >:: test_specialized_func_with_presimp_name;
     "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
     "test_letin_in_constructor_type" >:: test_letin_in_constructor_type;
+    "test_arguments_contain_sort" >:: test_arguments_contain_sort;
+    "test_arguments_contain_prod" >:: test_arguments_contain_prod;
+    "test_arguments_contain_ind" >:: test_arguments_contain_ind;
     "test_mftest" >:: test_mftest;
     "test_multifunc_different_return_types" >:: test_multifunc_different_return_types;
     "test_multifunc_noargument" >:: test_multifunc_noargument;

@@ -239,10 +239,8 @@ let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) 
 
 let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _
-  | Sort _ | Prod _ | Ind _
-  | CoFix _ | Array _
-  | Cast _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:check_fix_downwardness] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ -> ()
   | Lambda (x, ty, b) ->
@@ -703,11 +701,8 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
   in
   let filter_result bresult = filter_borrow env sigma term_ty bresult in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _
-  | Sort _ | Prod _ | Ind _
-  | CoFix _ | Array _
-  | Cast _ | Int _ | Float _
-  | App _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _
+  | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
       user_err_hov (Pp.str "[codegen:borrowcheck_expression] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       let bresult = List.nth borrow_env (i-1) in
@@ -896,10 +891,8 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
 let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (vs : int list) : unit =
   let open Declarations in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _
-  | Sort _ | Prod _ | Ind _
-  | CoFix _ | Array _
-  | Cast _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err_hov (Pp.str "[codegen:borrowcheck_constructor] unexpected" +++ Pp.str (constr_name sigma term) ++ Pp.str ":" +++ Printer.pr_econstr_env env sigma term)
   | App (f, argsary) ->
       borrowcheck_constructor env sigma f

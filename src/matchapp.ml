@@ -35,9 +35,10 @@ let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
 *)
 let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((EConstr.t -> EConstr.t) * Environ.env * EConstr.case * EConstr.t array) option =
   match EConstr.kind sigma term with
-  | Var _| Meta _ | Evar _ | Cast _
-  | CoFix _ | Int _ | Float _ | Array _ ->
-      user_err (Pp.str "[codegen:find_match_app] unsupported term:" +++ Printer.pr_econstr_env env sigma term)
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+       user_err (Pp.str "[codegen:find_match_app] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ ->
+      user_err (Pp.str "[codegen:find_match_app] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Sort _ | Prod _ | Ind _
   | Rel _ | Const _ | Construct _ | Proj _ ->
       None
