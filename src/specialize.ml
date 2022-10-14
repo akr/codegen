@@ -1380,10 +1380,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
       in
       mkCase (ci,u,pms',p',iv',item',bl')
   | Prod (x,t,b) ->
-      let env2 = env_push_assum env x t in
-      let t' = Reductionops.nf_all env sigma t in
-      let b' = normalize_types env2 sigma b in
-      mkProd (x, t', b')
+      Reductionops.nf_all env sigma term
   | Lambda (x,t,e) ->
       let env2 = env_push_assum env x t in
       let t' = Reductionops.nf_all env sigma t in
