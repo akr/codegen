@@ -343,11 +343,11 @@ We don't include parenthesis in syntax definition in BNF.
                 \:|\: \ldots
                 \:|\: C_n\: x_{n1}\ldots x_{nm_n} \Rightarrow u_n}$.
   \item Nested overline and underline can be combined. \\
-    $\rep{\letinB{f'}{\ofix{\underline{(\rep{f:=t})}}{f}}}$ means \\
-    $\letinB{f'_1}{\ofix{\rep{f:=t}}{f_1}} ~\ldots~
-     \letinB{f'_h}{\ofix{\rep{f:=t}}{f_h}}$ and \\
-    $\letinB{f'_1}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_1}} ~\ldots~
-     \letinB{f'_h}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_h}}$.
+    $\rep{\letinB{x}{\ofix{\underline{(\rep{f:=t})}}{f}}}$ means \\
+    $\letinB{x_1}{\ofix{\rep{f:=t}}{f_1}} ~\ldots~
+     \letinB{x_h}{\ofix{\rep{f:=t}}{f_h}}$ and \\
+    $\letinB{x_1}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_1}} ~\ldots~
+     \letinB{x_h}{\ofix{(f_1:=t_1)\ldots(f_n:=t_n)}{f_h}}$.
 
     Overlines and underlines must construct a nested structure.
     If an underline and an overline covers same range,
@@ -394,7 +394,8 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 \subsection{\gallina{} Syntax}\label{sec:gallina-syntax}
 
 \begin{align*}
-  t &= x & \text{variable} \\
+  t &= x & \text{v-variable} \\
+    &\bnfor f & \text{f-variable} \\
     &\bnfor c & \text{constant} \\
     &\bnfor C & \text{constructor} \\
     &\bnfor T & \text{type} \\
@@ -407,8 +408,14 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
 {\small Note:
 \begin{itemize}
   \item $u, a, b$ represents a term as $t$. \\
-    $v, w, y, z,$ and $f$ represent a variable as $x$. \\
+    $v, w, y, z$ represent a v-variable as $x$. \\
+    $g$ represent a f-variable as $f$. \\
     $U, V$ represents a type as $T$.
+  \item We distinguish v-variables (such as $x$) and f-variables (such as $f$) in the syntax.
+    V-variables are variables bounded by abstraction, let-in, and conditional.
+    F-variables are variables bounded by fixpoint.
+    They are treated differently in C code generation:
+    V-variables has corresponding C variables but F-variables has no corresponding C variables.
   \item We write $(\cdots((t\:u_1)\:u_2)\cdots\:u_n)$ as $t\:u_1\ldots u_n$ or $t\:\rep{u}$.
   \item We write $\lamT{x_1}{T_1}{(\ldots (\lamT{x_n}{T_n}{u}) \ldots)}$ as $\lamTM{x}{T}{u}$.
   \item We write $\letin{x_1}{t_1{:}T_1}{(\ldots(\letin{x_n}{t_n{:}T_n}{u})\ldots)}$ as $\letinM{x}{t{:}T}{u}$.
@@ -436,9 +443,10 @@ global definitions $\glodef{c}{t}{T}$, and
 inductive definitions ($\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$).
 
 $\Gamma$ is a local context which is a list of
-local assumptions $\lassum{x}{T}$ and
+local assumptions $\lassum{x}{T}$, $\lassum{f}{T}$ and
 local definitions $\ldef{x}{t}{T}$.
-The local assumptions represent variables bounded by outer abstractions, conditionals, and fixpoints.
+The local assumptions $\lassum{x}{T}$ represent v-variables bounded by outer abstractions and conditionals.
+The local assumptions $\lassum{f}{T}$ represent f-variables bounded by outer fixpoints.
 The local definitions represent variables bounded by outer let-in.
 
 \subsection{\gallina{} Conversion Rules}\label{sec:conversion-rules}
@@ -489,6 +497,7 @@ $\FV(t)$ is the free variables of $t$.
 
 \begin{align*}
   \FV(x) &= \{x\} \\
+  \FV(f) &= \{f\} \\
   \FV(c) &= \varnothing \\
   \FV(C) &= \varnothing \\
   \FV(\lamT{x}{T}{t}) &= \FV(t) - \{x\} \\
@@ -539,7 +548,9 @@ $\LC(K)$ is the local context of the hole of $K$.
 
 $\KV(K)$ is the bound variables usable in the hole of the context $K$.
 \[
-  \KV(K) = \{\, x \;|\; (\exists T. \lassum{x}{T} \in \LC(K)) \vee (\exists t,T. \ldef{x}{t}{T} \in \LC(K)) \}
+  \KV(K) = \{\, x \;|\; (\exists T. \lassum{x}{T} \in \LC(K)) \} \cup
+           \{\, f \;|\; (\exists T. \lassum{f}{T} \in \LC(K)) \} \cup
+           \{\, x \;|\; (\exists t,T. \ldef{x}{t}{T} \in \LC(K)) \}
 \]
 
 \section{CodeGen}\label{sec:codegen}
@@ -657,6 +668,7 @@ The entire term is represented as $\tD'$.
   \tD' &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE &= x \\
+    &\bnfor f \\
     &\bnfor c \\
     &\bnfor C \\
     &\bnfor T \\
@@ -677,7 +689,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
     {
       E[\Gamma] \vdash u : U \quad
       \text{$t$ is not an application} \quad
-      \text{$u$ is not a variable} \quad
+      \text{$u$ is not a v-variable} \quad
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
@@ -689,7 +701,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
     \dfrac
     {
       E[\Gamma] \vdash u : U \quad
-      \text{$u$ is not a variable} \quad
+      \text{$u$ is not a v-variable} \quad
       \text{$y$ is a fresh variable}
     }{
       E[\Gamma] \vdash
@@ -702,7 +714,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
 \subsubsection{V-Normal Form}\label{sec:v-normal-form}
 V-normal form restricts \gallina{} terms that (1) application arguments and (2) match items to variables.
 \begin{align*}
-  t &= x \bnfor c \bnfor C \bnfor T \bnfor \lamT{x}{T}{t} \bnfor \letin{x}{t:T}{u} \\
+  t &= x \bnfor f \bnfor c \bnfor C \bnfor T \bnfor \lamT{x}{T}{t} \bnfor \letin{x}{t:T}{u} \\
     &\bnfor \ofix{\rep{f/k{:}T:=t}}{f_j} \\
     &\bnfor t\:x                               & \leftarrow (1) \\
     &\bnfor \omatch{x}{\rep{C\:\rep{x} \Rightarrow t}} & \leftarrow (2)
@@ -717,6 +729,7 @@ the result term can be represented in following syntax.
   \tD' &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE &= x \\
+    &\bnfor f \\
     &\bnfor c \\
     &\bnfor C \\
     &\bnfor T \\
@@ -740,11 +753,11 @@ the result term can be represented in following syntax.
       \begin{gathered}
       0 \leq |x| \quad
       0 < |y| \quad
-      (f := t\:\rep{x}) \in \Gamma \\
-      \text{$t$ is one of variable, constant, constructor, abstraction, or fixpoint}
+      (z := t\:\rep{x}) \in \Gamma \\
+      \text{$t$ is one of v-variable, f-variable, constant, constructor, abstraction, or fixpoint}
       \end{gathered}
     }{
-      E[\Gamma] \vdash f\:\rep{y}
+      E[\Gamma] \vdash z\:\rep{y}
                        \reltri
                        t\:\rep{x}\:\rep{y}
     } \breakrule
@@ -773,7 +786,7 @@ the result term can be represented in following syntax.
     {
       \begin{gathered}
         (x_{k_j} := C\:\rep{y}) \in \Gamma \quad
-        \text{$\rep{f'}$ are fresh variables} \\
+        \text{$\rep{z}$ are fresh variables} \\
         E[\Gamma] \vdash (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
@@ -781,14 +794,14 @@ the result term can be represented in following syntax.
         E[\Gamma] \vdash\;
           (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x}
           \reltri
-          \letinM{f'}{\ofix{\underline{(\rep{f/k:=t})}}{f}}{\substm{t_j}{f}{f'}} \: \rep{x}
+          \letinM{z}{\ofix{\underline{(\rep{f/k:=t})}}{f}}{\substm{t_j}{f}{z}} \: \rep{x}
     } \breakrule
   \text{iota-fix-var':}~
     \dfrac
     {
       \begin{gathered}
         (x_{k_j} := C\:\rep{y}) \in \Gamma \quad
-        \rep{(f' := \ofix{\underline{(\rep{f/k:=t})}}{f}) \in \underline{\Gamma}} \\
+        \rep{(z := \ofix{\underline{(\rep{f/k:=t})}}{f}) \in \underline{\Gamma}} \\
         E[\Gamma] \vdash (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
@@ -796,7 +809,7 @@ the result term can be represented in following syntax.
       E[\Gamma] \vdash
       (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x}
       \reltri
-      \substm{t_j}{f}{f'} \:\rep{x}
+      \substm{t_j}{f}{z} \:\rep{x}
     } \breakrule
   \text{match-app:}~
     \dfrac
@@ -836,7 +849,7 @@ S-reductions transform applications to restrict function positions.
 \end{itemize}
 Also, types cannot be a function.
 We treat multi-arguments application as single application, application is not occur at a function position.
-Thus, function position can be variable, constant, construcor, or fixpoint in the S-normal form.
+Thus, function position can be v-variable, f-variable, constant, construcor, or fixpoint in the S-normal form.
 
 Also, zeta-flat removes a let-in at the binder term of a let-in.
 
@@ -848,10 +861,10 @@ Also, zeta-flat removes a let-in at the binder term of a let-in.
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
-  \tE &= x \bnfor c \bnfor C \bnfor T \\
+  \tE &= x \bnfor f \bnfor c \bnfor C \bnfor T \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$} \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Type Normalization}\label{sec:type-normalization}
@@ -870,10 +883,10 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
   \tL &= \letinM{x}{\tM:\fbox{$T$}}{\tM} & \leftarrow \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
-  \tE &= x \bnfor c \bnfor C \bnfor T \\
+  \tE &= x \bnfor f \bnfor c \bnfor C \bnfor T \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$} \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow
 \end{align*}
 
 We also normalize types in \kwmatch-expressions to make less free variables.
@@ -895,11 +908,11 @@ It makes the syntax as follows.
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
-  \tE &= x \bnfor c \bnfor C \bnfor T \\
+  \tE &= x \bnfor f \bnfor c \bnfor C \bnfor T \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$} \\
     &\bnfor \tC\:\rep{\tA} & \text{$0 < |\tA|$} \\
     &\bnfor \tD \\
-  \tF &= x \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
+  \tF &= x \bnfor f \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tC &= c \bnfor C \\
   \tA &= x \bnfor u & \text{$u$ is a static argument (normal \gallina{} term without FV)}
 \end{align*}
@@ -938,7 +951,7 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
     \dfrac{
       \begin{gathered}
         \text{$t$ is a constant or constructor} \\
-        \text{$a_{|a|}$ is not a variable} \\
+        \text{$a_{|a|}$ is not a v-variable} \\
         \rep{a} = \merg_t(\rep{u}, \rep{x}) \\
         \text{$\rep{y}$ are fresh variables} \quad
         |x| = |y| \\
@@ -970,10 +983,10 @@ Thus the result will be V-normal form again.
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
-  \tE &= x \bnfor c \bnfor C \bnfor T \\
+  \tE &= x \bnfor f \bnfor c \bnfor C \bnfor T \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$} \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Eta Reduction to Expose Fixpoint}\label{sec:eta-reduction}
@@ -1040,10 +1053,10 @@ Argument completion removes partial applications by applying eta expansions.
         \reltri
         \lam{\rep{y{:}T}}{t\:\rep{x}\:\rep{y}}
     } \breakrule
-  \text{argcomp-cnst-cstr:}~
+  \text{argcomp-fvar-cnst-cstr:}~
     \dfrac{
       \begin{gathered}
-        \text{$t$ is a constant or constructor} \\
+        \text{$t$ is a f-variable, constant, or constructor} \\
         E[\Gamma] \vdash t : \forall \rep{y{:}T}, U \\
         \text{$U$ is an inductive type}
       \end{gathered}
@@ -1058,6 +1071,7 @@ $K$ is a non-application context as in \secref{sec:call-site-replacement}.
 
 This transformation makes the result of an application inductive type.
 Also, constants and constructors are always fully applied to arguments.
+F-variables cannot occur in $\tE$ because they cannot be a inductive type.
 
 \begin{align*}
   \tD &= \lamT{x}{T}{\tD'} \\
@@ -1071,7 +1085,7 @@ Also, constants and constructors are always fully applied to arguments.
     &\bnfor c \bnfor C & \text{The type of $c$ and $C$ are inductive type} \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Monomorphism Check}\label{sec:check-monomorphism}
@@ -1099,7 +1113,7 @@ This step checks
     &\bnfor c \bnfor C & \text{The type of $c$ and $C$ are inductive type} \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Borrow Check}\label{sec:borrow-check}
@@ -1107,9 +1121,10 @@ This step checks
 We define two judgements $E[\Gamma] \vdash t:T~|~B$ and $E[\Gamma] \vdash t:T~|~(L, B^\text{used}, B^\text{result})$ for borrow check.
 We extend $\Gamma$ in this section.
 $\Gamma$ is an annotated local context.
-It is a list of $\lassum{x^B}{T}$ and $\ldef{x^B}{t}{T}$.
+It is a list of $\lassum{x^B}{T}$, $\lassum{f}{T}$ and $\ldef{x^B}{t}{T}$.
 They are same as local assumption and local definitions except that
-the variable $x$ is annotated with a borrow information $B$.
+the v-variable $x$ is annotated with a borrow information $B$.
+(The f-variable $f$ is not-annotated.)
 $B$ is a set of pair of borrow type and linear variable, such as $\{\rep{(T,x)}\}$.
 $B^\text{used}$ and $B^\text{result}$ are also borrow information.
 $L$ is a set of linear variables.
@@ -1154,13 +1169,16 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
     }{
       E[\Gamma] \vdash x ~|~ (\{x\}, B, B)
     } \breakrule
-  \text{borrow-var:}~
+  \text{borrow-vvar:}~
     \dfrac
     {
       \lassum{x^B}{T} \in \Gamma \quad \text{$x$ is not linear}
     }{
       E[\Gamma] \vdash x ~|~ (\varnothing, B, B)
     } \breakrule
+  \text{borrow-fvar:}~
+    E[\Gamma] \vdash f ~|~ (\varnothing, \varnothing, \varnothing)
+    \breakrule
   \text{borrow-constant:}~
     \dfrac
     {
@@ -1201,11 +1219,20 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
     }{
       E[\Gamma] \vdash \omatch{y}{\rep{C\: \rep{x{:}T} \Rightarrow t}} ~|~ (L_\text{item} \cup L^\text{branch'}_1, B^\text{used}_\text{item} \cup B^\text{used}_\text{branches}, B^\text{result}_\text{branches})
     } \breakrule
-  \text{borrow-var-app:}~
+  \text{borrow-vvar-app:}~
     \dfrac{
       \begin{gathered}
-        \lassum{f^{B}}{T'} \in \Gamma \quad
+        \lassum{y^{B}}{T'} \in \Gamma \quad
         \APP(E, \Gamma, B, \rep{x}, T, L, B^\text{used}, B^\text{result})
+      \end{gathered}
+    }{
+      E[\Gamma] \vdash y\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
+    } \breakrule
+  \text{borrow-fvar-app:}~
+    \dfrac{
+      \begin{gathered}
+        \lassum{f}{T'} \in \Gamma \quad
+        \APP(E, \Gamma, \varnothing, \rep{x}, T, L, B^\text{used}, B^\text{result})
       \end{gathered}
     }{
       E[\Gamma] \vdash f\:\rep{x} : T ~|~ (L, B^\text{used}, B^\text{result})
@@ -1247,7 +1274,10 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       \end{gathered}
     }{
       E[\Gamma] \vdash c\:x ~|~ (\varnothing, B, B)
-    } \breakrule
+    }
+\end{gather*}
+
+\begin{gather*}
   \text{borrow-fix-clo:}~
     \dfrac{
       E[\Gamma] \vdash \ofix{\rep{f:=t}}{f_j} ~|~ B
@@ -1259,10 +1289,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
       E[\Gamma] \vdash \lam{x}{t} ~|~ B
     }{
       E[\Gamma] \vdash \lam{x}{t} ~|~ (\varnothing, B, B)
-    }
-\end{gather*}
-
-\begin{gather*}
+    } \breakrule
   \text{borrow-abs-fun:}~
     \dfrac{
       \begin{gathered}
@@ -1288,7 +1315,7 @@ Since \texttt{nat} is not a borrow type, \texttt{h} lives even after \texttt{x} 
   \text{borrow-fix-fun:}~
     \dfrac{
       \begin{gathered}
-        \rep{\underline{E[\Gamma;\rep{\lassum{f^\varnothing}{T}}]} \vdash t ~|~ B} \\
+        \rep{\underline{E[\Gamma;\rep{\lassum{f}{T}}]} \vdash t ~|~ B} \\
       \end{gathered}
     }{
       E[\Gamma] \vdash \ofix{\rep{f{:}T:=t}}{f_j} ~|~ {\tbigcup_i B_i}
@@ -1357,7 +1384,7 @@ We also mix borrow information and set of types (including $\top$) in set-operat
 
 {\small Note:
 \begin{itemize}
-  \item borrow-fix-fun annotates $f_1^\varnothing \ldots f_n^\varnothing$.
+  \item We don't annotate f-variables.
     This is not correct because invoking $f_1\ldots f_n$ may refer borrowed values via free variables in
     $\ofix{\rep{f{:}T:=t}}{f_j}$.
     However, it is harmless because corresponding linear value cannot be consumed in the fix-term.
@@ -1386,7 +1413,7 @@ we only need to change variable names in binders:
     &\bnfor c \bnfor C & \text{The type of $c$ and $C$ are inductive type} \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2)
 \end{align*}
 
 \section{C Code Generation}\label{sec:c-code-gen}
@@ -1404,7 +1431,7 @@ we only need to change variable names in binders:
     &\bnfor c \bnfor C & \text{The type of $c$ and $C$ are inductive type} \\
     &\bnfor \tF\:\rep{x} & \text{$0 < |x|$, the type of $\tF\:\rep{x}$ is inductive type}  \\
     &\bnfor \tD \\
-  \tF &= x \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
+  \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
 
 \subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
@@ -1430,6 +1457,7 @@ $d$ is a boolean which means $t$ is located just under \kwfix{} or lambda.
 $\TRop$ distinguishes fixpoint bounded functions translatable without actual functions (but with \kwgoto{}) or not.
 \begin{align*}
   \RNT{x\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \{x\}) \\
+  \RNT{f\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \{f\}) \\
   \RNT{c\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
   \RNT{C\:\rep{y}}{d} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
   \RNT{\letin{x}{t}{u}}{d} &= (\TR{t}{\false} \cup \TR{u}{\false}, \N{t}{\false} \cup \T{t}{\false} \cup \N{u}{\false} - \{x\}, \T{u}{\false} - \{x\}) \\
@@ -1503,41 +1531,34 @@ We define $\FIXFUNCS$, $\FIXFV$, $\EXARGS'$, and $\EXARGS$ for each definition \
 
 $\EXARGS(f)$ is the extra arguments for the fix-bounded function $f$ in the definition.
 
-$\FIXFUNCS$ is the set of fix-bounded functions in $u$.
+$\FIXFUNCS$ is the set of f-variables in $u$.
 
 \[
   \FIXFUNCS = \bigcup_{K\left[\ofix{\rep{f:=t}}{f_j}\right] = u} \{\rep{f}\}
 \]
 
-$\FIXK(x)$ is the context of the fixpoint which bounds $x$.
-It is $\bot$ if $x$ is not a function bounded by a fixpoint.
+$\FIXK(f)$ is the context of the fixpoint which bounds f-variable $f$.
 
 \[
-  \FIXK(x) =
-  \begin{cases}
-    K & u = K[\ofix{\repi{(f_l:=t_l)}{1\leq l < i} (x:=t_i) \repi{(f_l:=t_l)}{i < l \leq h}}{f_j}]  \\
-    \bot & \text{otherwise}
-  \end{cases}
+  \FIXK(f) = K \quad \text{where}~u = K[\ofix{\repi{(g_l:=t_l)}{1\leq l < i} (f:=t_i) \repi{(g_l:=t_l)}{i < l \leq h}}{g_j}]  \\
 \]
 
-$\FIXFV(x)$ is the set of free variables of the fixpoint which bounds $x$.
-If $x$ is not a fix-bounded function, $\FIXFV(x)=\varnothing$.
+$\FIXFV(f)$ is the set of free variables of the fixpoint which bounds f-variable $f$.
+$\FIXFV(x)$ is also defined as empty set for v-variable $x$.
 
-\[
-  \FIXFV(x) =
-  \begin{cases}
-    \FV(t) & u = \FIXK(x)[t]  \\
-    \varnothing & \text{otherwise}
-  \end{cases}
-\]
+\begin{align*}
+  \FIXFV(f) &= \FV(t) \quad \text{where}~u = \FIXK(x)[t] \\
+  \FIXFV(x) &= \varnothing
+\end{align*}
 
-$\EXARGS'(x)$ is a set which satisfy the following conditions.
+$\EXARGS'(f)$ is a set which satisfy the following conditions.
 $\EXARGS'(f)$ is similar to $\FIXFV(f)$.
 But if it contains a function bounded by an outer fixpoint, the free variable of the outer fixpoint are also contained.
 
 \begin{align*}
-  \EXARGS'(x) \supseteq& \FIXFV(x) \cup \bigcup_{y \in \FIXFV(x)} \EXARGS'(y) \\
-  \EXARGS'(x) \subseteq& \KV(\FIXK(x))
+  \EXARGS'(f) &\supseteq \FIXFV(f) \cup \bigcup_{t \in \FIXFV(f)} \EXARGS'(t) \\
+  \EXARGS'(f) &\subseteq \KV(\FIXK(f)) \\
+  \EXARGS'(x) &= \varnothing
 \end{align*}
 
 \codegen{} chooses the minimal set for $\EXARGS'(f)$ if a dedicated internal C function is generated for $f$.
@@ -1552,18 +1573,18 @@ Thus \codegen{} chooses the maximal set (all bound variables) for $\EXARGS'(f)$.
   \kwDefinition~\texttt{c} := \lam{\texttt{x}}{\ofix{\texttt{f}:=\lam{\texttt{y}}{\ldots \texttt{f}\:\texttt{y'} \ldots}}{\texttt{f}}}
 \]
 
-$\EXARGS(x)$ is defined as follows.
-It is $\EXARGS'(x)$ except fix-bounded functions.
+$\EXARGS(f)$ is defined as follows.
+It is $\EXARGS'(f)$ except fix-bounded functions.
 
 \[
-  \EXARGS(x) = \EXARGS'(x) - \FIXFUNCS
+  \EXARGS(f) = \EXARGS'(f) - \FIXFUNCS
 \]
 
-When $\EXARGS(x)$ is used in a context which the order matters,
+When $\EXARGS(f)$ is used in a context which the order matters,
 we consider it is a list of variables from declared ouside to inside.
 (used in \secref{sec:AK})
 
-When $\EXARGS(x)$ is used in a context which require types,
+When $\EXARGS(f)$ is used in a context which require types,
 we consider it is a set of pairs of variable and its type.
 (used in \secref{sec:genfunm})
 
@@ -1575,9 +1596,9 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
   &\A{K}{x} = K(\dq{x}) \\
   &\A{K}{f\:\rep{x}} =
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
-    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \in \tr \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge f \in \tr \end{aligned} \\
   &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
-    && \begin{aligned}[t] & (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \wedge {} \\ & f \not\in \tr \quad \text{where} \quad \rep{y} = \EXARGS(f) \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge f \not\in \tr \quad \text{where} \quad \rep{y} = \EXARGS(f) \end{aligned} \\
       &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
@@ -1648,7 +1669,7 @@ $K(e) = \dq{\kwCreturn\:e\ttsemi}$ in simple situations.
 \begin{align*}
   &\B{K}{x} = K(\dq{x}) \\
   &\B{K}{f\:\rep{x}} = \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
-    && (|x| > 0) \wedge \text{$f$ is bounded by a fixpoint} \\
+    && |x| > 0 \\
   &\B{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\B{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\B{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \B{K}{t_2} \rdq
