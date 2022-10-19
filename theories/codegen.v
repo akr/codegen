@@ -19,4 +19,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 Require Coq.Logic.FunctionalExtensionality.
 Register Coq.Logic.FunctionalExtensionality.functional_extensionality as codegen.functional_extensionality.
 
-Declare ML Module "codegen_plugin".
+Declare ML Module "coq-codegen.plugin".
