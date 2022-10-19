@@ -690,7 +690,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
       E[\Gamma] \vdash u : U \quad
       \text{$t$ is not an application} \quad
       \text{$u$ is not a v-variable} \quad
-      \text{$y$ is a fresh variable}
+      \text{$y$ is a fresh v-variable}
     }{
       E[\Gamma] \vdash
       t\:\rep{x}\:u\:\rep{a}
@@ -702,7 +702,7 @@ the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction a
     {
       E[\Gamma] \vdash u : U \quad
       \text{$u$ is not a v-variable} \quad
-      \text{$y$ is a fresh variable}
+      \text{$y$ is a fresh v-variable}
     }{
       E[\Gamma] \vdash
         \omatch{u}{\rep{C\:\rep{x} \Rightarrow t}}
@@ -786,7 +786,7 @@ the result term can be represented in following syntax.
     {
       \begin{gathered}
         (x_{k_j} := C\:\rep{y}) \in \Gamma \quad
-        \text{$\rep{z}$ are fresh variables} \\
+        \text{$\rep{z}$ are fresh v-variables} \\
         E[\Gamma] \vdash (\ofix{\rep{f/k:=t}}{f_j})\:\rep{x} : T \quad
         \text{$T$ is an inductive type}
       \end{gathered}
@@ -953,7 +953,7 @@ Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-delet
         \text{$t$ is a constant or constructor} \\
         \text{$a_{|a|}$ is not a v-variable} \\
         \rep{a} = \merg_t(\rep{u}, \rep{x}) \\
-        \text{$\rep{y}$ are fresh variables} \quad
+        \text{$\rep{y}$ are fresh v-variables} \quad
         |x| = |y| \\
         \rep{b} = \merg_t(\rep{u}, \rep{y}) \\
         \text{$c$ is a fresh constant} \\
