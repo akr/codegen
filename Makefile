@@ -9,8 +9,13 @@ install : Makefile.coq
 	test ! theories -ef $(COQMF_COQLIB)/user-contrib/codegen || ( echo "$(COQMF_COQLIB)/user-contrib/codegen is linked to theories.  No need to install."; false )
 	$(MAKE) -f Makefile.coq $@
 
+uninstall : Makefile.coq
+	test ! theories -ef $(COQMF_COQLIB)/user-contrib/codegen || ( echo "$(COQMF_COQLIB)/user-contrib/codegen is linked to theories.  Use revert-development-without-install."; false )
+	$(MAKE) -f Makefile.coq $@
+
 ifdef COQMF_COQLIB
 development-without-install : revert-development-without-install
+	ln -s ../src/META.coq-codegen theories
 	ln -s ../src/codegen_plugin.cmi theories
 	ln -s ../src/codegen_plugin.cmxs theories
 	ln -s ../src/codegen_plugin.cmxa theories
@@ -18,6 +23,7 @@ development-without-install : revert-development-without-install
 	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
 
 revert-development-without-install :
+	rm -f theories/META.coq-codegen
 	rm -f theories/codegen_plugin.cmi
 	rm -f theories/codegen_plugin.cmxs
 	rm -f theories/codegen_plugin.cmxa
