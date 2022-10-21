@@ -980,6 +980,10 @@ let reduce_arg (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           (match Constr.kind e with
           | Rel j ->
+              (*msg_debug_hov (Pp.str "[codegen:reduce_arg]" +++
+                             Pp.str "i=" ++ Pp.int i +++
+                             Pp.str "j=" ++ Pp.int j +++
+                             Pp.str "term2_fix_bounded=" ++ Pp.bool (List.nth aenv.aenv_fix_bounded (i+j-1)));*)
               if List.nth aenv.aenv_fix_bounded (i+j-1) then
                 term
               else
