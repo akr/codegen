@@ -961,6 +961,10 @@ let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.
   | (x,e,ty) :: rest ->
       compose_lets rest (mkLetIn (x, e, ty, body))
 
+let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
+  if !opt_debug_reduction then
+    msg_debug_hov (Pp.str ("[codegen] reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
+
 let reduce_var (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Rel i ->
@@ -968,7 +972,15 @@ let reduce_var (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : E
       | Context.Rel.Declaration.LocalAssum _ -> term
       | Context.Rel.Declaration.LocalDef (n,e,t) ->
           (match Constr.kind e with
-          | Rel j -> mkRel (i + j)      (* delta-var *)
+          | Rel j ->
+              (* reduction: delta-vvar or delta-fvar *)
+              (let term2 = mkRel (i + j) in
+              (debug_reduction "delta-vfvar" (fun () ->
+                Printer.pr_econstr_env env sigma term ++ Pp.fnl () ++
+                Pp.str "->" ++ Pp.fnl () ++
+                Printer.pr_econstr_env env sigma term2);
+              check_convertible "reduction(delta-vfvar)" env sigma term term2);
+              term2)
           | _ -> term))
   | _ -> term
 
@@ -987,13 +999,16 @@ let reduce_arg (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
               if List.nth aenv.aenv_fix_bounded (i+j-1) then
                 term
               else
-                mkRel (i + j)      (* delta-var *)
+                (* reduction: delta-vvar *)
+                (let term2 = mkRel (i + j) in
+                (debug_reduction "delta-vvar" (fun () ->
+                  Printer.pr_econstr_env aenv.aenv_env sigma term ++ Pp.fnl () ++
+                  Pp.str "->" ++ Pp.fnl () ++
+                  Printer.pr_econstr_env aenv.aenv_env sigma term2);
+                check_convertible "reduction(delta-vvar)" aenv.aenv_env sigma term term2);
+                term2)
           | _ -> term))
   | _ -> term
-
-let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
-  if !opt_debug_reduction then
-    msg_debug_hov (Pp.str ("[codegen] reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
 
 let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     (lift : int -> EConstr.t -> EConstr.t) (ks : int array)
@@ -1091,17 +1106,7 @@ and reduce_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
       user_err (Pp.str "[codegen:reduce_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
   | Const _ | Construct _ | Sort _ | Prod _ | Ind _ -> term
   | Rel i ->
-      let term2 = reduce_var aenv.aenv_env sigma term in
-      if destRel sigma term2 <> i then
-        (* reduction: delta-var *)
-        (debug_reduction "delta-var" (fun () ->
-          Printer.pr_econstr_env aenv.aenv_env sigma term ++ Pp.fnl () ++
-          Pp.str "->" ++ Pp.fnl () ++
-          Printer.pr_econstr_env aenv.aenv_env sigma term2);
-        check_convertible "reduction(delta-var)" aenv.aenv_env sigma term term2;
-        term2)
-      else
-        term
+      reduce_var aenv.aenv_env sigma term
   | Lambda _ ->
       let (lams, b) = decompose_lam sigma term in
       let aenv2 = aenv_push_assums aenv lams in

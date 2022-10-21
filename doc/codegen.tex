@@ -745,8 +745,13 @@ the result term can be represented in following syntax.
 \begin{gather*}
   \text{beta-var:}~
     E[\Gamma] \vdash (\lam{x}{t})\:y \reltri \subst{t}{x}{y} \breakrule
-  \text{delta-var:}~
+  \text{delta-vvar:}~
     \dfrac{(x:=y) \in \Gamma}{E[\Gamma] \vdash x \reltri y} \breakrule
+  \text{delta-fvar:}~
+    \dfrac{
+      (x:=f) \in \Gamma \quad
+      \text{$x$ occur at non-argument position}
+    }{E[\Gamma] \vdash x \reltri f} \breakrule
   \text{delta-fun:}~
     \dfrac
     {
@@ -838,6 +843,8 @@ the result term can be represented in following syntax.
 {\small Note:
 \begin{itemize}
   \item match-app is not convertible
+  \item delta-fvar does not forbid at a match item position but it does not break V-normalization.
+    It is because f-variable, which is always function type, cannot occur at match item, which must be inductive type.
 \end{itemize}}
 
 \subsubsection{S-Normal Form}\label{sec:s-normal-form}
