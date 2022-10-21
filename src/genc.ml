@@ -1147,7 +1147,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       pp_sjoinmap_list
         (fun (var,ty) -> gen_assignment (Pp.str (clo_var^"."^var)) (Pp.str var))
         clo.closure_vars +++
-      gen_head_cont cont (Pp.str ("(&"^clo_var^".closure_func)"))
+      gen_head_cont cont (Pp.str ("&"^clo_var^".closure_func"))
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
