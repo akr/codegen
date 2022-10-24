@@ -1136,7 +1136,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       in
       gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont1 env sigma e +++
       gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma b
-  | Lambda (x,t,b) ->
+  | Lambda _ | Fix _ when Array.length argsary = 0 ->
       let cloid = get_closure_id env sigma term in
       let clo = Hashtbl.find closure_tbl cloid in
       let clo_struct_ty = closure_struct_type clo in
@@ -1148,12 +1148,10 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         (fun (var,ty) -> gen_assignment (Pp.str (clo_var^"."^var)) (Pp.str var))
         clo.closure_vars +++
       gen_head_cont cont (Pp.str ("&"^clo_var^".closure_func"))
+  | Lambda _ -> assert false
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
-      if List.length cargs < List.length nj_formal_arguments then
-        user_err (Pp.str "[codegen] gen_head: partial application for fix-term (higher-order term not supported yet):" +++
-          Printer.pr_econstr_env env sigma term);
       let nj_funcname = fixfunc_j.fixfunc_c_name in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont

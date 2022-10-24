@@ -3951,7 +3951,7 @@ let test_closure_call_at_head_position (ctx : test_ctxt) : unit =
       assert(f(&c.func, 3) == 174);
     |}
 
-let test_closure_generation (ctx : test_ctxt) : unit =
+let test_closure_generation_by_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
       Definition call (f : nat -> nat -> nat) (x y : nat) : nat := f x y.
@@ -3964,6 +3964,26 @@ let test_closure_generation (ctx : test_ctxt) : unit =
     {|
       assert(f(1,2,3,4) == 31);
       assert(f(4000,300,20,1) == 21263);
+    |}
+
+let test_closure_generation_by_fix (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition call (g : nat -> nat) (n : nat) : nat := g n.
+      Definition f a b :=
+        let g :=
+          fix g n :=
+            match n with
+            | O => b
+            | S m => g m
+            end
+        in
+        call g a.
+      CodeGen Func call.
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(1,2) == 2);
     |}
 
 let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) : unit =
@@ -4175,7 +4195,8 @@ let suite : OUnit2.test =
     "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
     "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
-    "test_closure_generation" >:: test_closure_generation;
+    "test_closure_generation_by_lambda" >:: test_closure_generation_by_lambda;
+    "test_closure_generation_by_fix" >:: test_closure_generation_by_fix;
     "test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination;
     "test_closure_generated_from_fixfunc_argument" >:: test_closure_generated_from_fixfunc_argument;
   ]
