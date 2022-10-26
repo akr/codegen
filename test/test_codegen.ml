@@ -3966,7 +3966,7 @@ let test_closure_generation_by_lambda (ctx : test_ctxt) : unit =
       assert(f(4000,300,20,1) == 21263);
     |}
 
-let test_closure_generation_by_fix (ctx : test_ctxt) : unit =
+let test_closure_generation_by_fix_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ {|
       Definition call (g : nat -> nat) (n : nat) : nat := g n.
@@ -3984,6 +3984,51 @@ let test_closure_generation_by_fix (ctx : test_ctxt) : unit =
     |})
     {|
       assert(f(1,2) == 2);
+    |}
+
+let test_closure_generation_by_fix_nontailrec (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition call (g : nat -> nat) (n : nat) : nat := g n.
+      Definition f a b :=
+        let g :=
+          fix g n :=
+            match n with
+            | O => b
+            | S m => S (g m)
+            end
+        in
+        call g a.
+      CodeGen Func call.
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(1,2) == 3);
+    |}
+
+(*
+  The function body of g was generated twice.
+  One for closure and one for recursion.
+  The label entry_fixfunc2_h was generated twice which cause compilation error.
+*)
+let test_closure_generation_and_non_inlinable_fix_at_head_position (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition call (g : nat -> nat) (n : nat) : nat := g n.
+      Definition f a b :=
+        let g :=
+          fix g n :=
+            match n with
+            | O => (fix h p := match p with O => b | S p' => h p' end) b
+            | S m => S (g m)
+            end
+        in
+        call g a.
+      CodeGen Func call.
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(1,2) == 3);
     |}
 
 let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) : unit =
@@ -4196,7 +4241,9 @@ let suite : OUnit2.test =
     "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
     "test_closure_generation_by_lambda" >:: test_closure_generation_by_lambda;
-    "test_closure_generation_by_fix" >:: test_closure_generation_by_fix;
+    "test_closure_generation_by_fix_tailrec" >:: test_closure_generation_by_fix_tailrec;
+    "test_closure_generation_by_fix_nontailrec" >:: test_closure_generation_by_fix_nontailrec;
+    "test_closure_generation_and_non_inlinable_fix_at_head_position" >:: test_closure_generation_and_non_inlinable_fix_at_head_position;
     "test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination;
     "test_closure_generated_from_fixfunc_argument" >:: test_closure_generated_from_fixfunc_argument;
   ]
