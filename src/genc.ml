@@ -1419,7 +1419,7 @@ let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t lis
 
 type body_t = {
   body_return_type : c_typedata;
-  body_fargs : (string * c_typedata) list;
+  body_fargs : (string * c_typedata) list; (* left to right (outermost to innermost) *)
   body_labels : string list;
   body_env : Environ.env;
   body_exp : EConstr.t;
@@ -1474,7 +1474,7 @@ let obtain_function_bodies
         if individual_body then
           let return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term)) in
           Seq.cons
-            { body_return_type=return_type; body_fargs=fargs; body_labels=labels; body_env=env; body_exp=term }
+            { body_return_type=return_type; body_fargs=(List.rev fargs); body_labels=(List.rev labels); body_env=env; body_exp=term }
             (aux_body ~tail_position env term)
         else
           (aux_body ~tail_position env term)
@@ -1670,7 +1670,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
         (fun body ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (List.rev body.body_fargs);
+            body.body_fargs;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
           pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
           gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body.body_env sigma body.body_exp)
@@ -1678,7 +1678,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
   in
   let c_fargs =
     let first_body = List.hd bodies in
-    List.rev first_body.body_fargs
+    first_body.body_fargs
   in
   let local_vars = List.filter
     (fun (c_ty, c_var) ->
@@ -1880,7 +1880,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
         (fun body ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (List.rev body.body_fargs);
+            body.body_fargs;
           let cont = { tail_cont_return_type = body.body_return_type; tail_cont_multifunc = true } in
           Pp.v 0 (
             pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
