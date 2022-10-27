@@ -1417,23 +1417,22 @@ let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t lis
     fixfunc_tbl
     []
 
+type body_t = {
+  body_return_type : c_typedata;
+  body_fargs : (string * c_typedata) list;
+  body_labels : string list;
+  body_env : Environ.env;
+  body_exp : EConstr.t;
+}
+
 let obtain_function_bodies
     ~(fixfunc_tbl : fixfunc_table)
     ~(closure_tbl : closure_table)
     ~(primary_cfunc : string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
-    ((*return_type*)c_typedata *
-     ((*varname*)string * (*vartype*)c_typedata) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) list =
-  let rec aux_lamfix ~(tail_position : bool) ~(individual_body : bool) (env : Environ.env) (fargs : (string * c_typedata) list) (labels : string list) (term : EConstr.t) :
-    ((*return_type*)c_typedata *
-     ((*varname*)string * (*vartype*)c_typedata) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) Seq.t =
+    body_t list =
+  let rec aux_lamfix ~(tail_position : bool) ~(individual_body : bool) (env : Environ.env) (fargs : (string * c_typedata) list) (labels : string list) (term : EConstr.t) : body_t Seq.t =
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
         user_err (Pp.str "[codegen:obtain_function_bodies:aux_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1475,16 +1474,11 @@ let obtain_function_bodies
         if individual_body then
           let return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term)) in
           Seq.cons
-            (return_type, fargs, labels, env, term)
+            { body_return_type=return_type; body_fargs=fargs; body_labels=labels; body_env=env; body_exp=term }
             (aux_body ~tail_position env term)
         else
           (aux_body ~tail_position env term)
-  and aux_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) :
-    ((*return_type*)c_typedata *
-     ((*varname*)string * (*vartype*)c_typedata) list *
-     (*labels*)string list *
-     Environ.env *
-     EConstr.t) Seq.t =
+  and aux_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) : body_t Seq.t =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -1537,8 +1531,8 @@ let obtain_function_bodies
   in
   let result = List.of_seq (aux_lamfix ~tail_position:true ~individual_body:true env [] [] term) in
   (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
-  let result = List.map (fun (return_type, fargs, labels, env, body) ->
-    (return_type, fargs, unique_string_list labels, env, body)) result in
+  let result = List.map (fun body ->
+    { body with body_labels = unique_string_list body.body_labels }) result in
   (* msg_debug_hov (Pp.str "[codegen:obtain_function_bodies]" +++
     pp_sjoinmap_list
       (fun (return_type, fargs, labels, env, body) ->
@@ -1673,18 +1667,18 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
-        (fun (ret_type, args, labels, env2, body) ->
+        (fun body ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (List.rev args);
+            (List.rev body.body_fargs);
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-          gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma body)
+          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
+          gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body.body_env sigma body.body_exp)
         bodies)
   in
   let c_fargs =
-    let (ret_type, first_args, _, _, _) = List.hd bodies in
-    List.rev first_args
+    let first_body = List.hd bodies in
+    List.rev first_body.body_fargs
   in
   let local_vars = List.filter
     (fun (c_ty, c_var) ->
@@ -1883,14 +1877,14 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
-        (fun (ret_type, args, labels, env2, body) ->
+        (fun body ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (List.rev args);
-          let cont = { tail_cont_return_type = ret_type; tail_cont_multifunc = true } in
+            (List.rev body.body_fargs);
+          let cont = { tail_cont_return_type = body.body_return_type; tail_cont_multifunc = true } in
           Pp.v 0 (
-            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
-            gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env2 sigma body))
+            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
+            gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body.body_env sigma body.body_exp))
         bodies)
   in
   let pp_local_variables_decls =
