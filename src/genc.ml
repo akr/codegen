@@ -1417,13 +1417,29 @@ let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t lis
     fixfunc_tbl
     []
 
+type body_entry_t =
+| BodyEntryTopFunc
+| BodyEntryFixfunc of Id.t
+| BodyEntryClosure of Id.t
+
 type body_t = {
   body_return_type : c_typedata;
   body_fargs : (string * c_typedata) list; (* left to right (outermost to innermost) *)
+  body_entries : body_entry_t list;
   body_labels : string list;
   body_env : Environ.env;
   body_exp : EConstr.t;
+  body_fixfunc_impls : Id.Set.t;
+  body_fixfunc_gotos : Id.Set.t;
+  body_fixfunc_calls : Id.Set.t;
+  body_closure_impls : Id.Set.t;
 }
+
+let _ = fun x -> ignore x.body_entries
+let _ = fun x -> ignore x.body_fixfunc_impls
+let _ = fun x -> ignore x.body_fixfunc_gotos
+let _ = fun x -> ignore x.body_fixfunc_calls
+let _ = fun x -> ignore x.body_closure_impls
 
 let obtain_function_bodies
     ~(fixfunc_tbl : fixfunc_table)
@@ -1432,7 +1448,8 @@ let obtain_function_bodies
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     body_t list =
-  let rec aux_lamfix ~(tail_position : bool) ~(individual_body : bool) (env : Environ.env) (fargs : (string * c_typedata) list) (labels : string list) (term : EConstr.t) : body_t Seq.t =
+  let rec aux_lamfix ~(tail_position : bool) ~(individual_body : bool) ~(bodyentries : body_entry_t list) (env : Environ.env) ~(fargs : (string * c_typedata) list) (term : EConstr.t) :
+      (body_t Seq.t * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
         user_err (Pp.str "[codegen:obtain_function_bodies:aux_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1447,73 +1464,143 @@ let obtain_function_bodies
           else
             (str_of_annotated_name x, c_ty) :: fargs
         in
-        aux_lamfix ~tail_position ~individual_body env2 fargs2 labels b
+        aux_lamfix ~tail_position ~individual_body ~bodyentries ~fargs:fargs2 env2 b
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let env2 = EConstr.push_rec_types prec env in
         let h = Array.length nary in
         let nary' = Array.init h (fun i -> if i = 0 then nary.(j) else if i <= j then nary.(i-1) else nary.(i)) in
         (*let tary' = Array.init h (fun i -> if i = 0 then tary.(j) else if i <= j then tary.(i-1) else tary.(i)) in*)
         let fary' = Array.init h (fun i -> if i = 0 then fary.(j) else if i <= j then fary.(i-1) else fary.(i)) in
-        concat_array_seq
+        let result_ary =
           (CArray.map2_i
             (fun i x f ->
-              let labels2 =
-                let fixfunc = Hashtbl.find fixfunc_tbl (id_of_annotated_name x) in
-                (if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
-                  [fixfunc_entry_label fixfunc.fixfunc_c_name]
-                else
-                  []) @
-                (if i = 0 then
-                  labels
-                else
-                  [])
+              let bodyentries2 =
+                BodyEntryFixfunc (id_of_annotated_name x) ::
+                  if i = 0 then bodyentries else []
               in
-              aux_lamfix ~tail_position ~individual_body env2 fargs labels2 f)
+              aux_lamfix ~tail_position ~individual_body ~bodyentries:bodyentries2 ~fargs env2 f)
             nary' fary')
+        in
+        let bodies = concat_array_seq (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodies) result_ary) in
+        let fixfunc_impls0 = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
+        let fixfunc_gotos = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
+        let fixfunc_calls = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
+        let closure_impls = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
+        let fixfunc_impls = Id.Set.union fixfunc_impls0 (idset_of_array (Array.map id_of_annotated_name nary)) in
+        (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | _ ->
+        let (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_body ~tail_position env term in
         if individual_body then
-          let return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term)) in
-          Seq.cons
-            { body_return_type=return_type; body_fargs=(List.rev fargs); body_labels=(List.rev labels); body_env=env; body_exp=term }
-            (aux_body ~tail_position env term)
+          let fixfunc_ids =
+            List.filter_map
+              (fun bodyent ->
+                match bodyent with
+                | BodyEntryFixfunc fixfunc_id -> Some fixfunc_id
+                | _ -> None)
+              bodyentries
+          in
+          let labels =
+            List.filter_map
+              (fun bodyent ->
+                match bodyent with
+                | BodyEntryTopFunc -> None
+                | BodyEntryFixfunc fixfunc_id ->
+                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+                    if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
+                      Some (fixfunc_entry_label fixfunc.fixfunc_c_name)
+                    else
+                      None
+                | BodyEntryClosure cloid ->
+                    let clo = Hashtbl.find closure_tbl cloid in
+                    let clo_label = closure_entry_label clo.closure_c_name in
+                    Some clo_label)
+              bodyentries
+          in
+          let body = {
+            body_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
+            body_fargs = List.rev fargs;
+            body_entries = List.rev bodyentries;
+            body_labels = List.rev labels;
+            body_env = env;
+            body_exp = term;
+            body_fixfunc_impls = Id.Set.union (Id.Set.of_list fixfunc_ids) fixfunc_impls;
+            body_fixfunc_gotos = fixfunc_gotos;
+            body_fixfunc_calls = fixfunc_calls;
+            body_closure_impls = closure_impls;
+          } in
+          (Seq.cons body bodies, Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
         else
-          (aux_body ~tail_position env term)
-  and aux_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) : body_t Seq.t =
+          (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+  and aux_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) :
+      (body_t Seq.t * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
         user_err (Pp.str "[codegen:obtain_function_bodies:aux_body] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
         user_err (Pp.str "[codegen:obtain_function_bodies:aux_body] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-    | Rel _ -> Seq.empty
-    | Const _ | Construct _ -> Seq.empty
-    | Proj (proj, e) -> Seq.empty
+    | Rel i ->
+        if CArray.is_empty args then
+          (Seq.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
+        else (* application *)
+          let id = id_of_name (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) in
+          let (fixfunc_gotos, fixfunc_calls) =
+            match Hashtbl.find_opt fixfunc_tbl id with
+            | None -> (Id.Set.empty, Id.Set.empty) (* closure call *)
+            | Some fixfunc ->
+                if tail_position then
+                  if fixfunc.fixfunc_arguments_contain_function then
+                    (Id.Set.empty, Id.Set.singleton id) (* used as call *)
+                  else
+                    (Id.Set.singleton id, Id.Set.empty) (* used as goto *)
+                else
+                  if fixfunc.fixfunc_fixterm.fixterm_inlinable then
+                    (Id.Set.singleton id, Id.Set.empty) (* used as goto *)
+                  else
+                    (Id.Set.empty, Id.Set.singleton id) (* used as call *)
+          in
+          (Seq.empty, Id.Set.empty, fixfunc_gotos, fixfunc_calls, Id.Set.empty)
+    | Const _ | Construct _ -> (Seq.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
+    | Proj (proj, e) -> (Seq.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        Seq.append
-          (aux_body ~tail_position:false env e)
-          (aux_body ~tail_position env2 b)
+        let (bodies1, fixfunc_impls1, fixfunc_gotos1, fixfunc_calls1, closure_impls1) = aux_body ~tail_position:false env e in
+        let (bodies2, fixfunc_impls2, fixfunc_gotos2, fixfunc_calls2, closure_impls2) = aux_body ~tail_position env2 b in
+        (Seq.append bodies1 bodies2,
+         Id.Set.union fixfunc_impls1 fixfunc_impls2,
+         Id.Set.union fixfunc_gotos1 fixfunc_gotos2,
+         Id.Set.union fixfunc_calls1 fixfunc_calls2,
+         Id.Set.union closure_impls1 closure_impls2)
     | Case (ci,u,pms,p,iv,item,bl) ->
         let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-        concat_array_seq
+        let result_ary =
           (Array.map2
             (fun (nas,body) (ctx,_) ->
               let env2 = EConstr.push_rel_context ctx env in
               aux_body ~tail_position env2 body)
             bl bl0)
+        in
+        let bodies = concat_array_seq (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodies) result_ary) in
+        let fixfunc_impls = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
+        let fixfunc_gotos = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
+        let fixfunc_calls = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
+        let closure_impls = idset_union_ary (Array.map (fun (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
+        (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | Lambda (x,t,b) ->
         if CArray.is_empty args then (* closure creation *)
-          let clo = Hashtbl.find closure_tbl (get_closure_id env sigma term) in
-          let clo_label = closure_entry_label clo.closure_c_name in
-          aux_lamfix ~tail_position:true ~individual_body:true env [] [clo_label] term
+          let cloid = get_closure_id env sigma term in
+          let (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_lamfix ~tail_position:true ~individual_body:true ~bodyentries:[BodyEntryClosure cloid] ~fargs:[] env term in
+          let closure_impls2 = Id.Set.add cloid closure_impls in
+          (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2)
         else
           assert false
     | Fix ((ks, j), ((nary, tary, fary))) ->
         if CArray.is_empty args then (* closure creation *)
-          (let clo = Hashtbl.find closure_tbl (get_closure_id env sigma term) in
-          let clo_label = closure_entry_label clo.closure_c_name in
+          (let cloid = get_closure_id env sigma term in
           assert (not tail_position);
-          aux_lamfix ~tail_position:true ~individual_body:true env [] [clo_label] term)
+          let (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_lamfix ~tail_position:true ~individual_body:true ~bodyentries:[BodyEntryClosure cloid] ~fargs:[] env term in
+          let closure_impls2 = Id.Set.add cloid closure_impls in
+          (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2))
         else
           let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
           let inlinable = fixfunc_j.fixfunc_fixterm.fixterm_inlinable in
@@ -1527,9 +1614,10 @@ let obtain_function_bodies
             else
               (true, false) (* B_K via GENBODY^{B} *)
           in
-          aux_lamfix ~tail_position:tail_position2 ~individual_body env [] [] term
+          aux_lamfix ~tail_position:tail_position2 ~individual_body ~bodyentries:[] ~fargs:[] env term
   in
-  let result = List.of_seq (aux_lamfix ~tail_position:true ~individual_body:true env [] [] term) in
+  let (bodies, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_lamfix ~tail_position:true ~individual_body:true ~bodyentries:[BodyEntryTopFunc] ~fargs:[] env term in
+  let result = List.of_seq bodies in
   (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
   let result = List.map (fun body ->
     { body with body_labels = unique_string_list body.body_labels }) result in
@@ -1547,6 +1635,30 @@ let obtain_function_bodies
           Pp.str "body=" +++ Printer.pr_econstr_env env sigma body))
       result); *)
   result
+
+let split_function_bodies (bodies : body_t list) : body_t list list =
+  let bodies = Array.of_list bodies in
+  let n = Array.length bodies in
+  let id_int_map =
+    CArray.fold_left_i
+      (fun i id_int_map body ->
+        Id.Set.fold
+          (fun fixfunc_def_id id_int_map -> Id.Map.add fixfunc_def_id i id_int_map)
+          body.body_fixfunc_impls id_int_map)
+      Id.Map.empty bodies
+  in
+  let u = unionfind_make n in
+  Array.iteri
+    (fun i body ->
+      Id.Set.iter
+        (fun fixfunc_id -> unionfind_union u i (Id.Map.find fixfunc_id id_int_map))
+        body.body_fixfunc_gotos)
+    bodies;
+  List.map
+    (List.map (fun i -> bodies.(i)))
+    (unionfind_sets u)
+
+let _ = ignore split_function_bodies
 
 let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
