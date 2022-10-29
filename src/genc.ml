@@ -2117,6 +2117,15 @@ let gen_func_multi
     Pp.hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
     vbrace pp_switch_body
   in
+  let pp_body_function =
+    (Pp.str "static void" +++
+    Pp.str body_function_name ++
+    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
+    vbrace (
+      pp_local_variables_decls +++
+      pp_switch +++
+      pp_body)
+  in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   Pp.v 0 (
     pp_enum +++
@@ -2124,13 +2133,8 @@ let gen_func_multi
     pp_struct_args +++
     pp_forward_decl +++
     pp_entry_functions +++
-    Pp.str "static void" +++
-    Pp.str body_function_name ++
-    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
-    vbrace (
-      pp_local_variables_decls +++
-      pp_switch +++
-      pp_body)
+    pp_body_function)
+
 (* the reslut of used_variables is used to avoid
    useless accessor call and assignment in translation of match-expression *)
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
