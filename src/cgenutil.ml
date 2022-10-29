@@ -502,6 +502,50 @@ let intset_union_ary (sets : IntSet.t array) : IntSet.t =
 let intset_union3 (set1 : IntSet.t) (set2 : IntSet.t) (set3 : IntSet.t) : IntSet.t =
   IntSet.union (IntSet.union set1 set2) set3
 
+let idset_union_ary (ary : Id.Set.t array) =
+  Array.fold_left Id.Set.union Id.Set.empty ary
+
+type unionfind_t = int array
+
+let unionfind_make (n : int) : unionfind_t =
+  Array.init n (fun i -> i)
+
+let rec unionfind_find (u : unionfind_t) (i : int) : int =
+  if u.(i) = i then
+    i
+  else
+    let j = unionfind_find u u.(i) in
+    u.(i) <- j;
+    j
+
+(* We don't consider the rank (depth) here.
+   It may make the algorithm slower but
+   it makes us possible to guarantee that the representative is smallest element. *)
+let unionfind_union (u : unionfind_t) (i : int) (j : int) : unit =
+  let i = unionfind_find u i in
+  let j = unionfind_find u j in
+  if i < j then
+    u.(j) <- i
+  else if j < i then
+    u.(i) <- j
+
+let unionfind_sets (u : unionfind_t) : int list list =
+  let n = Array.length u in
+  let sets = Array.make n [] in
+  for i = n-1 downto 0 do
+    let j = unionfind_find u i in
+    sets.(j) <- i :: sets.(j)
+  done;
+  let result = ref [] in
+  for i = n-1 downto 0 do
+    if sets.(i) <> [] then
+      result := sets.(i) :: !result
+  done;
+  !result
+
+let idset_of_array (ary : Id.t array) : Id.Set.t =
+  Array.fold_right Id.Set.add ary Id.Set.empty
+
 let (++) = Pp.app
 
 let (+++) d1 d2 =

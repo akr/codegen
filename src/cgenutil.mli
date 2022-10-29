@@ -74,6 +74,13 @@ val merge_range3 :
 val merge_range_ary : (int * int) option array -> (int * int) option
 val intset_union_ary : IntSet.t array -> IntSet.t
 val intset_union3 : IntSet.t -> IntSet.t -> IntSet.t -> IntSet.t
+val idset_union_ary : Names.Id.Set.t array -> Names.Id.Set.t
+val idset_of_array : Names.Id.t array -> Names.Id.Set.t
+type unionfind_t
+val unionfind_make : int -> unionfind_t
+val unionfind_find : unionfind_t -> int -> int
+val unionfind_union : unionfind_t -> int -> int -> unit
+val unionfind_sets : unionfind_t -> int list list
 val ( ++ ) : Pp.t -> Pp.t -> Pp.t
 val ( +++ ) : Pp.t -> Pp.t -> Pp.t
 val pp_sjoin_ary : Pp.t array -> Pp.t
