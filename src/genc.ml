@@ -40,7 +40,7 @@ type fixfunc_t = {
   fixfunc_used_as_goto: bool;
   fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
   fixfunc_return_type: c_typedata; (* may be void. *)
-  fixfunc_arguments_contain_function: bool;
+  fixfunc_is_higher_order: bool; (* means that arguments contain function *)
 
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
@@ -129,14 +129,14 @@ let disjoint_id_map_union_ary (ms : 'a Id.Map.t array) : 'a Id.Map.t =
   (Conceptually, the stack frame is deallocated at goto.)
   Thus, codegen disables tail recursion elimination if argments of a fixfunc contains function.
 *)
-let rec argument_types_contain_function (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
+let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   match EConstr.kind sigma ty with
   | Prod (x,t,b) ->
       (match Linear.component_types env sigma t with
       | None -> true (* function found *)
       | Some _ ->
           let env2 = env_push_assum env x t in
-          argument_types_contain_function env2 sigma b)
+          is_higher_order_function env2 sigma b)
   | _ -> false
 
 (*
@@ -266,10 +266,10 @@ and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (te
       let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
       let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
       let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
-      let args_contain_function = Array.exists (argument_types_contain_function env sigma) tary in
+      let is_higher_order = Array.exists (is_higher_order_function env sigma) tary in
       if (numargs = 0 && not under_fix_or_lambda) || (* closure creation *)
          fixfunc_referenced_at_nontail_position ||
-         args_contain_function then
+         is_higher_order then
         (* At least one fix-bounded function is used at
           non-tail position or argument position.
           Or, at least one fix-bounded function has a function in arguments.
@@ -310,7 +310,7 @@ let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : 
 type fixacc_t = {
   fixacc_used_as_call : bool ref;
   fixacc_used_as_goto : bool ref;
-  fixacc_args_contain_function : bool
+  fixacc_is_higher_order : bool
 }
 
 let rec collect_fix_usage_rec
@@ -343,7 +343,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
         | Some inlinable ->
             let fixacc = List.nth fixaccs (i-1) in
             if tail_position then
-              if fixacc.fixacc_args_contain_function then
+              if fixacc.fixacc_is_higher_order then
                 fixacc.fixacc_used_as_call := true
               else
                 fixacc.fixacc_used_as_goto := true
@@ -363,7 +363,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let env2 = env_push_def env x e t in
       let fixaccs2 = { fixacc_used_as_call = ref false;
                        fixacc_used_as_goto = ref false;
-                       fixacc_args_contain_function = false } :: fixaccs in
+                       fixacc_is_higher_order = false } :: fixaccs in
       let (fixterms1, fixfuncs1) = collect_fix_usage_rec ~inlinable_fixterms ~under_fix_or_lambda:false env sigma false e ~fixaccs in
       let (fixterms2, fixfuncs2) = collect_fix_usage_rec ~inlinable_fixterms ~under_fix_or_lambda:false env2 sigma tail_position b ~fixaccs:fixaccs2 in
       (Seq.append fixterms1 fixterms2, Seq.append fixfuncs1 fixfuncs2)
@@ -378,7 +378,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
             List.append
               (List.init n (fun _ -> { fixacc_used_as_call = ref false;
                                        fixacc_used_as_goto = ref false;
-                                       fixacc_args_contain_function = false }))
+                                       fixacc_is_higher_order = false }))
               fixaccs
           in
           collect_fix_usage_rec ~inlinable_fixterms ~under_fix_or_lambda:false env2 sigma
@@ -391,7 +391,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let env2 = env_push_assum env x t in
       let fixaccs2 = { fixacc_used_as_call = ref false;
                        fixacc_used_as_goto = ref false;
-                       fixacc_args_contain_function = false } :: fixaccs in
+                       fixacc_is_higher_order = false } :: fixaccs in
       if numargs = 0 && not under_fix_or_lambda then
         (* closure creation *)
         collect_fix_usage_rec ~inlinable_fixterms ~under_fix_or_lambda:true env2 sigma true b ~fixaccs:fixaccs2
@@ -402,13 +402,13 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
       let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
       let h = Array.length nary in
       let env2 = EConstr.push_rec_types prec env in
-      let args_contain_function_ary = Array.map (argument_types_contain_function env sigma) tary in
+      let is_higher_order_ary = Array.map (is_higher_order_function env sigma) tary in
       let fixaccs2 =
         list_rev_map_append
           (fun i ->
             { fixacc_used_as_call = ref (j = i && not tail_position && not inlinable);
               fixacc_used_as_goto = ref false;
-              fixacc_args_contain_function = args_contain_function_ary.(i) })
+              fixacc_is_higher_order = is_higher_order_ary.(i) })
           (iota_list 0 h)
           fixaccs
       in
@@ -446,7 +446,7 @@ and collect_fix_usage_rec1 ~(inlinable_fixterms : bool Id.Map.t)
                 fixfunc_used_as_goto = !(fixacc.fixacc_used_as_goto);
                 fixfunc_formal_arguments = formal_arguments;
                 fixfunc_return_type = return_type;
-                fixfunc_arguments_contain_function = args_contain_function_ary.(i);
+                fixfunc_is_higher_order = is_higher_order_ary.(i);
                 fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                 fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                 fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
@@ -1297,7 +1297,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
             if List.length cargs < List.length formal_arguments then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
-            if not fixfunc.fixfunc_arguments_contain_function then
+            if not fixfunc.fixfunc_is_higher_order then
               let assignments =
                 list_filter_map2
                   (fun (lhs, c_ty) rhs_opt ->
@@ -1549,7 +1549,7 @@ let obtain_function_bodies
             | None -> (Id.Set.empty, Id.Set.empty) (* closure call *)
             | Some fixfunc ->
                 if tail_position then
-                  if fixfunc.fixfunc_arguments_contain_function then
+                  if fixfunc.fixfunc_is_higher_order then
                     (Id.Set.empty, Id.Set.singleton id) (* used as call *)
                   else
                     (Id.Set.singleton id, Id.Set.empty) (* used as goto *)
