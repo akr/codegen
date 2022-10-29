@@ -308,10 +308,10 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
         let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
         let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
         let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
-        let is_higher_order = Array.exists (fun x -> Id.Map.find (id_of_annotated_name x) higher_order_fixfuncs) nary in
+        let fixterm_is_higher_order = Array.exists (fun x -> Id.Map.find (id_of_annotated_name x) higher_order_fixfuncs) nary in
         if (numargs = 0 && not under_fix_or_lambda) || (* closure creation *)
            fixfunc_referenced_at_nontail_position ||
-           is_higher_order then
+           fixterm_is_higher_order then
           (* At least one fix-bounded function is used at
             non-tail position or argument position.
             Or, at least one fix-bounded function has a function in arguments.
@@ -446,7 +446,7 @@ let collect_fix_usage
         let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
         let h = Array.length nary in
         let env2 = EConstr.push_rec_types prec env in
-        let is_higher_order_ary = Array.map (is_higher_order_function env sigma) tary in
+        let fixfunc_is_higher_order_ary = Array.map (is_higher_order_function env sigma) tary in
         let fixaccs2 =
           list_rev_map_append
             (fun i ->
@@ -489,7 +489,7 @@ let collect_fix_usage
                   fixfunc_used_as_goto = !(fixacc.fixacc_used_as_goto);
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
-                  fixfunc_is_higher_order = is_higher_order_ary.(i);
+                  fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
                   fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
