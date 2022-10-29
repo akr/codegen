@@ -355,6 +355,19 @@ let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_func_id fixfunc) fixfuncs;
   fixfunc_tbl
 
+let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_order : bool) (fixterm_is_inlinable : bool)
+    ~call:(thunk_for_call : unit -> 'a) ~goto:(thunk_for_goto : unit -> 'a) : 'a =
+  if tail_position then
+    if fixfunc_is_higher_order then
+      thunk_for_call ()
+    else
+      thunk_for_goto ()
+  else
+    if fixterm_is_inlinable then
+      thunk_for_goto ()
+    else
+      thunk_for_call ()
+
 let collect_fix_usage
     ~(higher_order_fixfuncs : bool Id.Map.t)
     ~(inlinable_fixterms : bool Id.Map.t)
@@ -387,18 +400,12 @@ let collect_fix_usage
           let id = id_of_name (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) in
           match Id.Map.find_opt id inlinable_fixterms with
           | None -> () (* term is not fix-bounded function *)
-          | Some inlinable ->
+          | Some fixterm_is_inlinable ->
               let fixacc = List.nth fixaccs (i-1) in
-              if tail_position then
-                if Id.Map.find id higher_order_fixfuncs then
-                  fixacc.fixacc_used_as_call := true
-                else
-                  fixacc.fixacc_used_as_goto := true
-              else
-                if inlinable then
-                  fixacc.fixacc_used_as_goto := true
-                else
-                  fixacc.fixacc_used_as_call := true);
+              let fixfunc_is_higher_order = Id.Map.find id higher_order_fixfuncs in
+              determine_fixfunc_call_or_goto tail_position fixfunc_is_higher_order fixterm_is_inlinable
+                ~call:(fun () -> fixacc.fixacc_used_as_call := true)
+                ~goto:(fun () -> fixacc.fixacc_used_as_goto := true));
         (Seq.empty, Seq.empty))
     | Const _ | Construct _ -> (Seq.empty, Seq.empty)
     | Proj (proj, e) ->
@@ -1579,16 +1586,10 @@ let obtain_function_bodies
             match Id.Map.find_opt id higher_order_fixfuncs with
             | None -> (Id.Set.empty, Id.Set.empty) (* closure call *)
             | Some fixfunc_is_higher_order ->
-                if tail_position then
-                  if fixfunc_is_higher_order then
-                    (Id.Set.empty, Id.Set.singleton id) (* used as call *)
-                  else
-                    (Id.Set.singleton id, Id.Set.empty) (* used as goto *)
-                else
-                  if Id.Map.find id inlinable_fixterms then
-                    (Id.Set.singleton id, Id.Set.empty) (* used as goto *)
-                  else
-                    (Id.Set.empty, Id.Set.singleton id) (* used as call *)
+                let fixterm_is_inlinable = Id.Map.find id inlinable_fixterms in
+                determine_fixfunc_call_or_goto tail_position fixfunc_is_higher_order fixterm_is_inlinable
+                  ~call:(fun () -> (Id.Set.empty, Id.Set.singleton id))
+                  ~goto:(fun () -> (Id.Set.singleton id, Id.Set.empty))
           in
           (Seq.empty, [], Id.Set.empty, fixfunc_gotos, fixfunc_calls, Id.Set.empty)
     | Const _ | Construct _ -> (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
