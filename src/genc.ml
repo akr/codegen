@@ -139,6 +139,45 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
           is_higher_order_function env2 sigma b)
   | _ -> false
 
+let rec detect_higher_order_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Rel i -> Id.Map.empty
+  | Const _ | Construct _ -> Id.Map.empty
+  | Proj _ -> Id.Map.empty
+  | App (f, args) ->
+      detect_higher_order_fixterm env sigma f
+  | LetIn (x,e,t,b) ->
+      let env2 = env_push_def env x e t in
+      let m1 = detect_higher_order_fixterm env sigma e in
+      let m2 = detect_higher_order_fixterm env2 sigma b in
+      disjoint_id_map_union m1 m2
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let ms = Array.map2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          detect_higher_order_fixterm env2 sigma body)
+        bl bl0
+      in
+      disjoint_id_map_union_ary ms
+  | Lambda (x,t,b) ->
+      let env2 = env_push_assum env x t in
+      detect_higher_order_fixterm env2 sigma b
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let ms = Array.map (detect_higher_order_fixterm env2 sigma) fary in
+      let m = disjoint_id_map_union_ary ms in
+      let is_higher_order = Array.exists (is_higher_order_function env sigma) tary in
+      let m = Array.fold_left
+        (fun m x -> Id.Map.add (id_of_annotated_name x) is_higher_order m)
+        m nary
+      in
+      m
+
 (*
   detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
 *)
@@ -149,7 +188,7 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
   R[n] = false if n is fix-bounded function not inlinable.
   R can also be usable to determine an ID is fix-bounded function or not.
 *)
-let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
+let detect_inlinable_fixterm ~(higher_order_fixterms : bool Id.Map.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
   let rec detect_inlinable_fixterm_rec (env : Environ.env) (term : EConstr.t)
       ~(under_fix_or_lambda : bool) :
       (* fixterms inlinable or not *) bool Id.Map.t *
@@ -270,7 +309,7 @@ let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : 
         let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
         let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
         let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
-        let is_higher_order = Array.exists (is_higher_order_function env sigma) tary in
+        let is_higher_order = Id.Map.find (id_of_annotated_name nary.(j)) higher_order_fixterms in
         if (numargs = 0 && not under_fix_or_lambda) || (* closure creation *)
            fixfunc_referenced_at_nontail_position ||
            is_higher_order then
@@ -684,9 +723,11 @@ let fixfunc_initialize_extra_arguments
       Some { fixfunc with fixfunc_extra_arguments = ov2 })
     fixfunc_tbl
 
-let collect_fix_info (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
+let collect_fix_info
+    ~(higher_order_fixterms : bool Id.Map.t)
+    (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
     (sibling_entfuncs : (bool * string * int * Id.t) list) : fixterm_t list * fixfunc_table =
-  let inlinable_fixterms = detect_inlinable_fixterm env sigma term in
+  let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixterms env sigma term in
   let (fixterms, fixfunc_tbl) = collect_fix_usage ~inlinable_fixterms env sigma term in
   fixfunc_initialize_top_calls env sigma name term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
@@ -2187,7 +2228,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let (fixterms, fixfunc_tbl) = collect_fix_info env sigma primary_cfunc whole_term sibling_entfuncs in
+  let higher_order_fixterms = detect_higher_order_fixterm env sigma whole_term in
+  let (fixterms, fixfunc_tbl) = collect_fix_info ~higher_order_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
