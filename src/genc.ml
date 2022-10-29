@@ -1800,13 +1800,12 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   closure_tbl
 
 let gen_func_single
-    ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
+    ~(bodies : body_t list)
     ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (return_type : c_typedata)
     (used_vars : Id.Set.t) : Pp.t =
   let closure_tbl = closure_tbl_of_list closure_list in
-  let bodies = obtain_function_bodies ~higher_order_fixfuncs ~inlinable_fixterms env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -1911,7 +1910,7 @@ let fixfunc_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
 let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
 let gen_func_multi
-    ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
+    ~(bodies : body_t list)
     ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
@@ -2019,7 +2018,6 @@ let gen_func_multi
           body_function_name)
       closure_list
   in
-  let bodies = obtain_function_bodies ~higher_order_fixfuncs ~inlinable_fixterms env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -2132,7 +2130,6 @@ let gen_func_multi
       pp_local_variables_decls +++
       pp_switch +++
       pp_body)
-
 (* the reslut of used_variables is used to avoid
    useless accessor call and assignment in translation of match-expression *)
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
@@ -2224,6 +2221,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
+  let bodies = obtain_function_bodies ~higher_order_fixfuncs ~inlinable_fixterms env sigma whole_term in
   let (fixterms, fixfunc_tbl) = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
@@ -2237,9 +2235,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
           else Some (c_arg, c_ty))
         formal_arguments
     in
-    gen_func_multi ~higher_order_fixfuncs ~inlinable_fixterms ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~bodies ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
   else
-    gen_func_single ~higher_order_fixfuncs ~inlinable_fixterms ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
+    gen_func_single ~bodies ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
   Pp.fnl ()
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
