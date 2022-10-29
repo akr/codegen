@@ -140,163 +140,163 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
   | _ -> false
 
 (*
+  detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
+*)
+(*
   detect_inlinable_fixterm_rec implements (R,N,T) = RNT[term] in doc/codegen.tex.
   R is a map from fix-bounded IDs to bool.
   R[n] = true if n is fix-bounded function which is inlinable (only used for goto so do not need to be a real function).
   R[n] = false if n is fix-bounded function not inlinable.
   R can also be usable to determine an ID is fix-bounded function or not.
 *)
-let rec detect_inlinable_fixterm_rec (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    ~(under_fix_or_lambda : bool) :
-    (* fixterms inlinable or not *) bool Id.Map.t *
-    (* variables at non-tail position *) IntSet.t *
-    (* variables at tail position *) IntSet.t =
-  (*msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] start:" +++
-    (Pp.str "under_fix_or_lambda=" ++ Pp.bool under_fix_or_lambda) +++
-    Printer.pr_econstr_env env sigma term); *)
-  let result = detect_inlinable_fixterm_rec1 ~under_fix_or_lambda env sigma term in
-  (*
-  let (tailrec_fixfuncs, nontailset, tailset) = result in
-  msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] end:" +++
-    Printer.pr_econstr_env env sigma term +++
-    Pp.str "inlinable-fixterms={" ++
-    pp_sjoinmap_list
-      (fun (fixfunc_id, inlinable) ->
-        if inlinable then
-          Id.print fixfunc_id
-        else
-          Pp.mt ())
-      (Id.Map.bindings tailrec_fixfuncs) ++
-    Pp.str "}" +++
-    Pp.str "non-inlinable-fixterms={" ++
-    pp_sjoinmap_list
-      (fun (fixfunc_id, inlinable) ->
-        if inlinable then
-          Pp.mt ()
-        else
-          Id.print fixfunc_id)
-      (Id.Map.bindings tailrec_fixfuncs) ++
-    Pp.str "}" +++
-    Pp.str "nontailset={" ++
-    pp_joinmap_list (Pp.str ",")
-      (fun i ->
-        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        Pp.int i ++ Pp.str "=" ++ Name.print name)
-      (IntSet.elements nontailset) ++
-    Pp.str "}" +++
-    Pp.str "tailset={" ++
-    pp_joinmap_list (Pp.str ",")
-      (fun i ->
-        let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
-        Pp.int i ++ Pp.str "=" ++ Name.print name
-        )
-      (IntSet.elements tailset) ++
-    Pp.str "}");
-    *)
-  result
-and detect_inlinable_fixterm_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    ~(under_fix_or_lambda : bool) :
-    (* fixterms inlinable or not *) bool Id.Map.t *
-    (* variables at non-tail position *) IntSet.t *
-    (* variables at tail position *) IntSet.t =
-  let (term, args) = decompose_appvect sigma term in
-  let numargs = Array.length args in
-  (if 0 < numargs then
-    match EConstr.kind sigma term with
-    | Rel _ | Const _ | Construct _ | Fix _ -> ()
-    | _ -> user_err (Pp.str "[codegen] unexpected term in function position:" +++ Printer.pr_econstr_env env sigma term));
-  let args_set = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) IntSet.empty args in
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
-      user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Rel i -> (Id.Map.empty, args_set, IntSet.singleton i)
-  | Const _ | Construct _ -> (Id.Map.empty, args_set, IntSet.empty)
-  | Proj (proj, e) ->
-      (* e must be a Rel which type is inductive (non-function) type *)
-      (Id.Map.empty, IntSet.empty, IntSet.empty)
-  | LetIn (x,e,t,b) ->
-      let env2 = env_push_def env x e t in
-      let (inlinable_e, nontailset_e, tailset_e) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env sigma e in
-      let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env2 sigma b in
-      let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
-      let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
-      let nontailset = intset_union3 tailset_e nontailset_e nontailset_b in
-      let inlinable = disjoint_id_map_union inlinable_e inlinable_b in
-      (inlinable, nontailset, tailset_b)
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
-      let branches_result = Array.map2
-        (fun (nas,body) (ctx,_) ->
-          let env2 = EConstr.push_rel_context ctx env in
-          let n = Array.length nas in
-          let (inlinable_br, nontailset_br, tailset_br) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env2 sigma body in
-          let tailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) tailset_br) in
-          let nontailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) nontailset_br) in
-          (inlinable_br, nontailset_br, tailset_br))
-        bl bl0
-      in
-      let tailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> tailset_br) branches_result) in
-      let nontailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> nontailset_br) branches_result) in
-      let inlinable = disjoint_id_map_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> inlinable_br) branches_result) in
-      (inlinable, nontailset, tailset)
-  | Lambda (x,t,b) ->
-      let env2 = env_push_assum env x t in
-      if numargs = 0 && not under_fix_or_lambda then
-        (* closure creation *)
-        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:true env2 sigma b in
-        let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
-        let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
-        let nontailset = IntSet.union tailset_b nontailset_b in
-        (inlinable_b, nontailset, IntSet.empty)
-      else
-        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:true env2 sigma b in
-        let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
-        let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
-        (inlinable_b, nontailset_b, tailset_b)
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let h = Array.length nary in
-      let env2 = EConstr.push_rec_types prec env in
-      let fixfuncs_result = Array.map (detect_inlinable_fixterm_rec1 env2 sigma ~under_fix_or_lambda:true) fary in
-      let tailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> tailset_f) fixfuncs_result) in
-      let nontailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> nontailset_f) fixfuncs_result) in
-      let inlinable_fs = disjoint_id_map_union_ary (Array.map (fun (inlineable_f, nontailset_f, tailset_f) -> inlineable_f) fixfuncs_result) in
-      let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
-      let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
-      let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
-      let is_higher_order = Array.exists (is_higher_order_function env sigma) tary in
-      if (numargs = 0 && not under_fix_or_lambda) || (* closure creation *)
-         fixfunc_referenced_at_nontail_position ||
-         is_higher_order then
-        (* At least one fix-bounded function is used at
-          non-tail position or argument position.
-          Or, at least one fix-bounded function has a function in arguments.
-          Assuming fix-bounded functions are strongly-connected,
-          there is no tail position in this fix-term. *)
-        let nontailset = IntSet.union tailset_fs' nontailset_fs' in
-        let inlinable_fs' =
-          Array.fold_left
-            (fun fs name -> Id.Map.add (id_of_annotated_name name) false fs)
-            inlinable_fs
-            nary
-        in
-        (inlinable_fs', IntSet.union nontailset args_set, IntSet.empty)
-      else
-        let inlinable_fs' =
-          Array.fold_left
-            (fun fs name -> Id.Map.add (id_of_annotated_name name) true fs)
-            inlinable_fs
-            nary
-        in
-        (inlinable_fs', IntSet.union nontailset_fs' args_set, tailset_fs')
-
-(*
-  detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
-*)
 let detect_inlinable_fixterm (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
-  let (inlinable, nontailset, tailset) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env sigma term in
+  let rec detect_inlinable_fixterm_rec (env : Environ.env) (term : EConstr.t)
+      ~(under_fix_or_lambda : bool) :
+      (* fixterms inlinable or not *) bool Id.Map.t *
+      (* variables at non-tail position *) IntSet.t *
+      (* variables at tail position *) IntSet.t =
+    (*msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] start:" +++
+      (Pp.str "under_fix_or_lambda=" ++ Pp.bool under_fix_or_lambda) +++
+      Printer.pr_econstr_env env sigma term); *)
+    let result = detect_inlinable_fixterm_rec1 ~under_fix_or_lambda env term in
+    (*
+    let (tailrec_fixfuncs, nontailset, tailset) = result in
+    msg_debug_hov (Pp.str "[codegen:detect_inlinable_fixterm_rec] end:" +++
+      Printer.pr_econstr_env env sigma term +++
+      Pp.str "inlinable-fixterms={" ++
+      pp_sjoinmap_list
+        (fun (fixfunc_id, inlinable) ->
+          if inlinable then
+            Id.print fixfunc_id
+          else
+            Pp.mt ())
+        (Id.Map.bindings tailrec_fixfuncs) ++
+      Pp.str "}" +++
+      Pp.str "non-inlinable-fixterms={" ++
+      pp_sjoinmap_list
+        (fun (fixfunc_id, inlinable) ->
+          if inlinable then
+            Pp.mt ()
+          else
+            Id.print fixfunc_id)
+        (Id.Map.bindings tailrec_fixfuncs) ++
+      Pp.str "}" +++
+      Pp.str "nontailset={" ++
+      pp_joinmap_list (Pp.str ",")
+        (fun i ->
+          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+          Pp.int i ++ Pp.str "=" ++ Name.print name)
+        (IntSet.elements nontailset) ++
+      Pp.str "}" +++
+      Pp.str "tailset={" ++
+      pp_joinmap_list (Pp.str ",")
+        (fun i ->
+          let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
+          Pp.int i ++ Pp.str "=" ++ Name.print name
+          )
+        (IntSet.elements tailset) ++
+      Pp.str "}");
+      *)
+    result
+  and detect_inlinable_fixterm_rec1 (env : Environ.env) (term : EConstr.t)
+      ~(under_fix_or_lambda : bool) :
+      (* fixterms inlinable or not *) bool Id.Map.t *
+      (* variables at non-tail position *) IntSet.t *
+      (* variables at tail position *) IntSet.t =
+    let (term, args) = decompose_appvect sigma term in
+    let numargs = Array.length args in
+    (if 0 < numargs then
+      match EConstr.kind sigma term with
+      | Rel _ | Const _ | Construct _ | Fix _ -> ()
+      | _ -> user_err (Pp.str "[codegen] unexpected term in function position:" +++ Printer.pr_econstr_env env sigma term));
+    let args_set = Array.fold_left (fun set arg -> IntSet.add (destRel sigma arg) set) IntSet.empty args in
+    match EConstr.kind sigma term with
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+        user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+    | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
+        user_err (Pp.str "[codegen:detect_inlinable_fixterm_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+    | Rel i -> (Id.Map.empty, args_set, IntSet.singleton i)
+    | Const _ | Construct _ -> (Id.Map.empty, args_set, IntSet.empty)
+    | Proj (proj, e) ->
+        (* e must be a Rel which type is inductive (non-function) type *)
+        (Id.Map.empty, IntSet.empty, IntSet.empty)
+    | LetIn (x,e,t,b) ->
+        let env2 = env_push_def env x e t in
+        let (inlinable_e, nontailset_e, tailset_e) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env e in
+        let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env2 b in
+        let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+        let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+        let nontailset = intset_union3 tailset_e nontailset_e nontailset_b in
+        let inlinable = disjoint_id_map_union inlinable_e inlinable_b in
+        (inlinable, nontailset, tailset_b)
+    | Case (ci,u,pms,p,iv,item,bl) ->
+        let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+        (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
+        let branches_result = Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let env2 = EConstr.push_rel_context ctx env in
+            let n = Array.length nas in
+            let (inlinable_br, nontailset_br, tailset_br) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env2 body in
+            let tailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) tailset_br) in
+            let nontailset_br = IntSet.map (fun i -> i - n) (IntSet.filter ((<) n) nontailset_br) in
+            (inlinable_br, nontailset_br, tailset_br))
+          bl bl0
+        in
+        let tailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> tailset_br) branches_result) in
+        let nontailset = intset_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> nontailset_br) branches_result) in
+        let inlinable = disjoint_id_map_union_ary (Array.map (fun (inlinable_br, nontailset_br, tailset_br) -> inlinable_br) branches_result) in
+        (inlinable, nontailset, tailset)
+    | Lambda (x,t,b) ->
+        let env2 = env_push_assum env x t in
+        if numargs = 0 && not under_fix_or_lambda then
+          (* closure creation *)
+          let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:true env2 b in
+          let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+          let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+          let nontailset = IntSet.union tailset_b nontailset_b in
+          (inlinable_b, nontailset, IntSet.empty)
+        else
+          let (inlinable_b, nontailset_b, tailset_b) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:true env2 b in
+          let tailset_b = IntSet.map pred (IntSet.filter ((<) 1) tailset_b) in
+          let nontailset_b = IntSet.map pred (IntSet.filter ((<) 1) nontailset_b) in
+          (inlinable_b, nontailset_b, tailset_b)
+    | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+        let h = Array.length nary in
+        let env2 = EConstr.push_rec_types prec env in
+        let fixfuncs_result = Array.map (detect_inlinable_fixterm_rec1 env2 ~under_fix_or_lambda:true) fary in
+        let tailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> tailset_f) fixfuncs_result) in
+        let nontailset_fs = intset_union_ary (Array.map (fun (inlinable_f, nontailset_f, tailset_f) -> nontailset_f) fixfuncs_result) in
+        let inlinable_fs = disjoint_id_map_union_ary (Array.map (fun (inlineable_f, nontailset_f, tailset_f) -> inlineable_f) fixfuncs_result) in
+        let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
+        let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
+        let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
+        let is_higher_order = Array.exists (is_higher_order_function env sigma) tary in
+        if (numargs = 0 && not under_fix_or_lambda) || (* closure creation *)
+           fixfunc_referenced_at_nontail_position ||
+           is_higher_order then
+          (* At least one fix-bounded function is used at
+            non-tail position or argument position.
+            Or, at least one fix-bounded function has a function in arguments.
+            Assuming fix-bounded functions are strongly-connected,
+            there is no tail position in this fix-term. *)
+          let nontailset = IntSet.union tailset_fs' nontailset_fs' in
+          let inlinable_fs' =
+            Array.fold_left
+              (fun fs name -> Id.Map.add (id_of_annotated_name name) false fs)
+              inlinable_fs
+              nary
+          in
+          (inlinable_fs', IntSet.union nontailset args_set, IntSet.empty)
+        else
+          let inlinable_fs' =
+            Array.fold_left
+              (fun fs name -> Id.Map.add (id_of_annotated_name name) true fs)
+              inlinable_fs
+              nary
+          in
+          (inlinable_fs', IntSet.union nontailset_fs' args_set, tailset_fs')
+  in
+  let (inlinable, nontailset, tailset) = detect_inlinable_fixterm_rec ~under_fix_or_lambda:false env term in
   inlinable
 
 (*
