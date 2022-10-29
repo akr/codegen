@@ -1459,7 +1459,6 @@ type body_t = {
   body_return_type : c_typedata;
   body_fargs : (string * c_typedata) list; (* left to right (outermost to innermost) *)
   body_entries_list : body_entry_t list list;
-  body_labels : string list;
   body_env : Environ.env;
   body_exp : EConstr.t;
   body_fixfunc_impls : Id.Set.t;
@@ -1474,10 +1473,27 @@ let _ = fun x -> ignore x.body_fixfunc_gotos
 let _ = fun x -> ignore x.body_fixfunc_calls
 let _ = fun x -> ignore x.body_closure_impls
 
+let labels_of_bodyentries ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(primary_cfunc : string) (bodyentries : body_entry_t list) =
+  (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
+  unique_string_list
+    (List.filter_map
+      (fun bodyent ->
+        match bodyent with
+        | BodyEntryTopFunc -> None
+        | BodyEntryFixfunc fixfunc_id ->
+            let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+            if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
+              Some (fixfunc_entry_label fixfunc.fixfunc_c_name)
+            else
+              None
+        | BodyEntryClosure cloid ->
+            let clo = Hashtbl.find closure_tbl cloid in
+            let clo_label = closure_entry_label clo.closure_c_name in
+            Some clo_label)
+      bodyentries)
+
 let obtain_function_bodies
     ~(fixfunc_tbl : fixfunc_table)
-    ~(closure_tbl : closure_table)
-    ~(primary_cfunc : string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     body_t list =
@@ -1533,28 +1549,10 @@ let obtain_function_bodies
                 | _ -> None)
               bodyentries
           in
-          let labels =
-            List.filter_map
-              (fun bodyent ->
-                match bodyent with
-                | BodyEntryTopFunc -> None
-                | BodyEntryFixfunc fixfunc_id ->
-                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                    if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then
-                      Some (fixfunc_entry_label fixfunc.fixfunc_c_name)
-                    else
-                      None
-                | BodyEntryClosure cloid ->
-                    let clo = Hashtbl.find closure_tbl cloid in
-                    let clo_label = closure_entry_label clo.closure_c_name in
-                    Some clo_label)
-              bodyentries
-          in
           let body = {
             body_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
             body_fargs = List.rev fargs;
             body_entries_list = List.rev bodyentries :: body_entries_list;
-            body_labels = List.rev labels;
             body_env = env;
             body_exp = term;
             body_fixfunc_impls = Id.Set.union (Id.Set.of_list fixfunc_ids) fixfunc_impls;
@@ -1654,9 +1652,6 @@ let obtain_function_bodies
   in
   let (bodies, body_entries_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_lamfix ~tail_position:true ~individual_body:true ~bodyentries:[BodyEntryTopFunc] ~fargs:[] env term in
   let result = List.of_seq bodies in
-  (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
-  let result = List.map (fun body ->
-    { body with body_labels = unique_string_list body.body_labels }) result in
   (* msg_debug_hov (Pp.str "[codegen:obtain_function_bodies]" +++
     pp_sjoinmap_list
       (fun (return_type, fargs, labels, env, body) ->
@@ -1811,7 +1806,7 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
     (whole_term : EConstr.t) (return_type : c_typedata)
     (used_vars : Id.Set.t) : Pp.t =
   let closure_tbl = closure_tbl_of_list closure_list in
-  let bodies = obtain_function_bodies ~fixfunc_tbl ~closure_tbl ~primary_cfunc env sigma whole_term in
+  let bodies = obtain_function_bodies ~fixfunc_tbl env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -1820,7 +1815,8 @@ let gen_func_single ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) 
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             body.body_fargs;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
+          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl ~primary_cfunc (List.hd body.body_entries_list) in
+          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
           gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body.body_env sigma body.body_exp)
         bodies)
   in
@@ -2021,7 +2017,7 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
           body_function_name)
       closure_list
   in
-  let bodies = obtain_function_bodies ~fixfunc_tbl ~closure_tbl ~primary_cfunc env sigma whole_term in
+  let bodies = obtain_function_bodies ~fixfunc_tbl env sigma whole_term in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -2030,8 +2026,9 @@ let gen_func_multi ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             body.body_fargs;
           let cont = { tail_cont_return_type = body.body_return_type; tail_cont_multifunc = true } in
+          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl ~primary_cfunc (List.hd body.body_entries_list) in
           Pp.v 0 (
-            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) body.body_labels +++
+            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
             gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body.body_env sigma body.body_exp))
         bodies)
   in
