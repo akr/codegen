@@ -360,7 +360,7 @@ let collect_fix_usage
     ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
-    fixterm_t list * fixfunc_table =
+    fixfunc_table =
   let rec collect_fix_usage_rec
       ~(under_fix_or_lambda : bool)
       (env : Environ.env) (sigma : Evd.evar_map)
@@ -500,7 +500,7 @@ let collect_fix_usage
          Seq.append fixfuncs (concat_array_seq (Array.map snd results)))
   in
   let (fixterms, fixfuncs) = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma true term ~fixaccs:[] in
-  (List.of_seq fixterms, make_fixfunc_table (List.of_seq fixfuncs))
+  make_fixfunc_table (List.of_seq fixfuncs)
 
 let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
@@ -718,13 +718,13 @@ let fixfunc_initialize_extra_arguments
     fixfunc_tbl
 
 let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t) (env : Environ.env) (sigma : Evd.evar_map) (name : string) (term : EConstr.t)
-    (sibling_entfuncs : (bool * string * int * Id.t) list) : fixterm_t list * fixfunc_table =
-  let (fixterms, fixfunc_tbl) = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
+    (sibling_entfuncs : (bool * string * int * Id.t) list) : fixfunc_table =
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
   fixfunc_initialize_top_calls env sigma name term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
   fixfunc_initialize_extra_arguments env sigma term ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
-  (fixterms, fixfunc_tbl)
+  fixfunc_tbl
 
 let local_gensym_id : (int ref) option ref = ref None
 
@@ -1801,7 +1801,7 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
 
 let gen_func_single
     ~(bodies : body_t list)
-    ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
+    ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (return_type : c_typedata)
     (used_vars : Id.Set.t) : Pp.t =
@@ -1911,7 +1911,7 @@ let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
 let gen_func_multi
     ~(bodies : body_t list)
-    ~(fixterms : fixterm_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
+    ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
@@ -2222,7 +2222,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodies = obtain_function_bodies ~higher_order_fixfuncs ~inlinable_fixterms env sigma whole_term in
-  let (fixterms, fixfunc_tbl) = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
+  let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
@@ -2235,9 +2235,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
           else Some (c_arg, c_ty))
         formal_arguments
     in
-    gen_func_multi ~bodies ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~bodies ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
   else
-    gen_func_single ~bodies ~fixterms ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
+    gen_func_single ~bodies ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
   Pp.fnl ()
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
