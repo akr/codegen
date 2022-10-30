@@ -2236,9 +2236,17 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
-  let internal_entfuncs = fixfuncs_for_internal_entfuncs ~bodies ~fixfunc_tbl in
   let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
   let closure_tbl = closure_tbl_of_list closure_list in
+  let internal_entfuncs = fixfuncs_for_internal_entfuncs ~bodies ~fixfunc_tbl in
+  let sibling_entfuncs =
+    List.filter
+      (fun (static1, another_top_cfunc_name, j, fixfunc_id) ->
+        List.exists
+          (fun body -> Id.Set.mem fixfunc_id body.body_fixfunc_impls)
+          bodies)
+      sibling_entfuncs
+  in
   let closure_list =
     List.filter_map
       (fun body ->
