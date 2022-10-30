@@ -1802,11 +1802,10 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
 
 let gen_func_single
     ~(bodies : body_t list)
-    ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
+    ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (return_type : c_typedata)
     (used_vars : Id.Set.t) : Pp.t =
-  let closure_tbl = closure_tbl_of_list closure_list in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -1912,7 +1911,7 @@ let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
 let gen_func_multi
     ~(bodies : body_t list)
-    ~(fixfunc_tbl : fixfunc_table) ~(closure_list : closure_t list)
+    ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
     (whole_term : EConstr.t) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
@@ -1920,7 +1919,15 @@ let gen_func_multi
   let func_index_type = func_index_type_name primary_cfunc in
   let body_function_name = body_function_name primary_cfunc in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
-  let closure_tbl = closure_tbl_of_list closure_list in
+  let closure_list =
+    List.filter_map
+      (fun body ->
+        let body_entries = List.hd body.body_entries_list in
+        match body_entries with
+        | BodyEntryClosure cloid :: _ -> Some (Hashtbl.find closure_tbl cloid)
+        | _ -> None)
+      bodies
+  in
   let sibling_and_internal_entfuncs =
     (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) sibling_entfuncs) @
     List.map (fun fixfunc -> (true, fixfunc)) internal_entfuncs
@@ -2232,6 +2239,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let used_vars = used_variables env sigma whole_term in
   let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
   let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
+  let closure_tbl = closure_tbl_of_list closure_list in
   (if internal_entfuncs <> [] || sibling_entfuncs <> [] || closure_list <> [] then
     let formal_arguments' =
       List.filter_map
@@ -2240,9 +2248,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
           else Some (c_arg, c_ty))
         formal_arguments
     in
-    gen_func_multi ~bodies ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc env sigma whole_term formal_arguments' return_type used_vars internal_entfuncs sibling_entfuncs
   else
-    gen_func_single ~bodies ~fixfunc_tbl ~closure_list ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
+    gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc env sigma whole_term return_type used_vars) ++
   Pp.fnl ()
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
