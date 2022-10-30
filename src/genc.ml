@@ -1919,22 +1919,16 @@ let gen_func_multi
     ~(bodies : body_t list)
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(static : bool) ~(primary_cfunc : string) (env : Environ.env) (sigma : Evd.evar_map)
-    (used_vars : Id.Set.t) (internal_entfuncs : fixfunc_t list)
-    (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
+    (used_vars : Id.Set.t)
+    (internal_entfuncs : fixfunc_t list)
+    (sibling_entfuncs : (bool * string * int * Id.t) list)
+    (closure_list : closure_t list) : Pp.t =
   let func_index_type = func_index_type_name primary_cfunc in
   let body_function_name = body_function_name primary_cfunc in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = (List.hd bodies).body_fargs in
   let return_type = (List.hd bodies).body_return_type in
-  let closure_list =
-    List.filter_map
-      (fun body ->
-        let body_entries = List.hd body.body_entries_list in
-        match body_entries with
-        | BodyEntryClosure cloid :: _ -> Some (Hashtbl.find closure_tbl cloid)
-        | _ -> None)
-      bodies
-  in
+
   let sibling_and_internal_entfuncs =
     (List.map (fun (static1, another_top_cfunc_name, j, fixfunc_id) -> (static1, Hashtbl.find fixfunc_tbl fixfunc_id)) sibling_entfuncs) @
     List.map (fun fixfunc -> (true, fixfunc)) internal_entfuncs
@@ -2245,8 +2239,17 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let internal_entfuncs = fixfuncs_for_internal_entfuncs ~bodies ~fixfunc_tbl in
   let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
   let closure_tbl = closure_tbl_of_list closure_list in
+  let closure_list =
+    List.filter_map
+      (fun body ->
+        let body_entries = List.hd body.body_entries_list in
+        match body_entries with
+        | BodyEntryClosure cloid :: _ -> Some (Hashtbl.find closure_tbl cloid)
+        | _ -> None)
+      bodies
+  in
   (if internal_entfuncs <> [] || sibling_entfuncs <> [] || closure_list <> [] then
-    gen_func_multi ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc env sigma used_vars internal_entfuncs sibling_entfuncs
+    gen_func_multi ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc env sigma used_vars internal_entfuncs sibling_entfuncs closure_list
   else
     gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc env sigma used_vars) ++
   Pp.fnl ()
