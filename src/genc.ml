@@ -142,9 +142,9 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
 let rec detect_higher_order_fixfunc (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:detect_inlinable_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:detect_inlinable_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i -> Id.Map.empty
   | Const _ | Construct _ -> Id.Map.empty
   | Proj _ -> Id.Map.empty
@@ -1102,9 +1102,9 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_head] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
-      user_err (Pp.str "[codegen:fixterm_free_variables_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:gen_head] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
       if List.length cargs = 0 then
         let str = carg_of_garg env i in
@@ -2140,9 +2140,9 @@ let gen_func_multi
 let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:used_variables] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:used_variables] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Const _ | Construct _ -> Id.Set.empty
   | Rel i ->
       let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
