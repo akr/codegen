@@ -1444,18 +1444,6 @@ let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : st
   in
   Pp.hov 0 (pp_static +++ pr_c_decl return_type (Pp.str c_name ++ Pp.hov 0 (pp_parameters)))
 
-(* internal entry functions *)
-let fixfuncs_for_internal_entfuncs (fixfunc_tbl : fixfunc_table) : fixfunc_t list =
-  Hashtbl.fold
-    (fun fixfunc_id fixfunc fixfuncs ->
-      if fixfunc.fixfunc_used_as_call &&
-         fixfunc.fixfunc_top_call = None then
-        fixfunc :: fixfuncs
-      else
-        fixfuncs)
-    fixfunc_tbl
-    []
-
 type body_entry_t =
 | BodyEntryTopFunc
 | BodyEntryFixfunc of Id.t
@@ -1478,6 +1466,24 @@ let _ = fun x -> ignore x.body_fixfunc_impls
 let _ = fun x -> ignore x.body_fixfunc_gotos
 let _ = fun x -> ignore x.body_fixfunc_calls
 let _ = fun x -> ignore x.body_closure_impls
+
+(* internal entry functions *)
+let fixfuncs_for_internal_entfuncs ~(bodies : body_t list) ~(fixfunc_tbl : fixfunc_table) : fixfunc_t list =
+  let fixfunc_ids =
+    idset_union_list
+      (List.map
+        (fun body -> body.body_fixfunc_impls)
+        bodies)
+  in
+  List.filter_map
+    (fun fixfunc_id ->
+      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+      if fixfunc.fixfunc_used_as_call &&
+         fixfunc.fixfunc_top_call = None then
+        Some fixfunc
+      else
+        None)
+    (Id.Set.elements fixfunc_ids)
 
 let labels_of_bodyentries ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(primary_cfunc : string) (bodyentries : body_entry_t list) =
   (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
@@ -2236,7 +2242,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms env sigma primary_cfunc whole_term sibling_entfuncs in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
-  let internal_entfuncs = fixfuncs_for_internal_entfuncs fixfunc_tbl in
+  let internal_entfuncs = fixfuncs_for_internal_entfuncs ~bodies ~fixfunc_tbl in
   let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
   let closure_tbl = closure_tbl_of_list closure_list in
   (if internal_entfuncs <> [] || sibling_entfuncs <> [] || closure_list <> [] then

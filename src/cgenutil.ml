@@ -502,6 +502,9 @@ let intset_union_ary (sets : IntSet.t array) : IntSet.t =
 let intset_union3 (set1 : IntSet.t) (set2 : IntSet.t) (set3 : IntSet.t) : IntSet.t =
   IntSet.union (IntSet.union set1 set2) set3
 
+let idset_union_list (s : Id.Set.t list) =
+  List.fold_left Id.Set.union Id.Set.empty s
+
 let idset_union_ary (ary : Id.Set.t array) =
   Array.fold_left Id.Set.union Id.Set.empty ary
 
