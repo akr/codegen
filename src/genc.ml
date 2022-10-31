@@ -1921,7 +1921,6 @@ let gen_func_single
       | None -> true)
     local_vars
   in
-  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   (pp_struct_closure +++
    gen_function_header ~static return_type primary_cfunc c_fargs ++ Pp.str ";",
    Pp.v 0 (
@@ -2229,7 +2228,6 @@ let gen_func_multi
       pp_switch +++
       pp_body)
   in
-  (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:6");*)
   (Pp.v 0 (
      pp_enum +++
      pp_struct_closures +++
