@@ -995,6 +995,9 @@ let global_gensym ?(prefix : string = "g") () : string =
   gensym_id := n + 1;
   prefix ^ string_of_int n
 
+let global_gensym_with_string (s : string) : string =
+  global_gensym () ^ "_" ^ s
+
 let global_gensym_with_id (id : Id.t) : string =
   global_gensym () ^ "_" ^ (c_id (Id.to_string id))
 

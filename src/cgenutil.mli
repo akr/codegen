@@ -139,6 +139,7 @@ val free_variables_level_set : ?without:int -> Environ.env -> Evd.evar_map -> EC
 val constr_name : Evd.evar_map -> EConstr.t -> string
 val constr_expr_cstr_name : Constrexpr.constr_expr -> string
 val global_gensym : ?prefix:string -> unit -> string
+val global_gensym_with_string : string -> string
 val global_gensym_with_id : Names.Id.t -> string
 val pr_raw_econstr : Evd.evar_map -> EConstr.t -> Pp.t
 val check_convertible : string -> Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t -> unit

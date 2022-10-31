@@ -943,13 +943,13 @@ let test_even_odd_count (ctx : test_ctxt) : unit =
     ~modify_generated_source:
       (fun s ->
         let s = Str.replace_first
-          (regexp {|^bool[ \n]even\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^bool[ \n]even\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("bool tmp_even\\1" ^
            "bool even(nat n) { even_count++; return tmp_even(n); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^bool[ \n]odd\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^bool[ \n]odd\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("bool tmp_odd\\1" ^
            "bool odd(nat n) { odd_count++; return tmp_odd(n); }\n")
           s
@@ -1971,13 +1971,13 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
@@ -2016,13 +2016,13 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}].*\)?\n\)*}\n\)|})
+          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
