@@ -786,7 +786,7 @@ let fixfunc_initialize_c_call
                 | None ->
                     let used_as_call_found = List.find_opt (fun fixfunc -> fixfunc.fixfunc_used_as_call) fixfuncs in
                     match used_as_call_found with
-                    | Some fixfunc -> Some fixfunc.fixfunc_c_name
+                    | Some fixfunc -> Some (global_gensym_with_id fixfunc.fixfunc_func_id)
                     | None -> None
       in
       match cfunc_name with
