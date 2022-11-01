@@ -1043,6 +1043,45 @@ let test_two_even (ctx : test_ctxt) : unit =
       assert(even2(4) == true);
     |}
 
+let test_two_even_two_odd (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Fixpoint even1 (n : nat) : bool :=
+        match n with | O => true | S m => odd1 m end
+      with odd1 (m : nat) : bool :=
+        match m with | O => false | S n => even1 n end.
+      Fixpoint even2 (n : nat) : bool :=
+        match n with | O => true | S m => odd2 m end
+      with odd2 (m : nat) : bool :=
+        match m with | O => false | S n => even2 n end.
+      CodeGen Func even1.
+      CodeGen Func even2.
+      CodeGen Func odd1.
+      CodeGen Func odd2.
+    |}) {|
+      assert(even1(0) == true);
+      assert(even1(1) == false);
+      assert(even1(2) == true);
+      assert(even1(3) == false);
+      assert(even1(4) == true);
+      assert(even2(0) == true);
+      assert(even2(1) == false);
+      assert(even2(2) == true);
+      assert(even2(3) == false);
+      assert(even2(4) == true);
+      assert(odd1(0) == false);
+      assert(odd1(1) == true);
+      assert(odd1(2) == false);
+      assert(odd1(3) == true);
+      assert(odd1(4) == false);
+      assert(odd2(0) == false);
+      assert(odd2(1) == true);
+      assert(odd2(2) == false);
+      assert(odd2(3) == true);
+      assert(odd2(4) == false);
+    |}
+
 let test_app_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -4102,6 +4141,7 @@ let suite : OUnit2.test =
     "test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1;
     "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;
     "test_two_even" >:: test_two_even;
+    "test_two_even_two_odd" >:: test_two_even_two_odd;
     "test_app_let" >:: test_app_let;
     "test_app_match" >:: test_app_match;
     "test_let_app_match" >:: test_let_app_match;
