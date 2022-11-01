@@ -127,6 +127,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
         Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("(Some " ^ top ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
+        Pp.str "fixfunc_cfunc_to_call=" ++ Pp.str fixfunc.fixfunc_cfunc_to_call +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.mt ())
       ))
@@ -1231,9 +1232,8 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label fixfunc.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
-              let fname = fixfunc.fixfunc_cfunc_to_call in
               gen_head_cont cont
-                (gen_funcall fname
+                (gen_funcall fixfunc.fixfunc_cfunc_to_call
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
@@ -1287,10 +1287,9 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
-      let nj_funcname = fixfunc_j.fixfunc_c_name in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
-          (gen_funcall nj_funcname
+          (gen_funcall fixfunc_j.fixfunc_cfunc_to_call
             (Array.append
               (Array.of_list (List.map fst fixfunc_j.fixfunc_extra_arguments))
               (Array.of_list (list_filter_none cargs))))
@@ -1309,7 +1308,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         let (cont2, pp_exit) =
           match cont.head_cont_exit_label with
           | None ->
-              let exit_label = "exit_" ^ nj_funcname in
+              let exit_label = "exit_" ^ fixfunc_j.fixfunc_c_name in
               ({ cont with head_cont_exit_label = Some exit_label },
                Pp.hov 0 (Pp.str exit_label ++ Pp.str ":"))
           | Some _ ->
@@ -1335,10 +1334,9 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                 pp_sjoinmap_ary
                   (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
                     let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                    let ni_funcname = fixfunc_i.fixfunc_c_name in
                     if fixfunc_i.fixfunc_used_as_goto ||
                        (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
-                      Pp.str (fixfunc_entry_label ni_funcname) ++ Pp.str ":"
+                      Pp.str (fixfunc_entry_label fixfunc_i.fixfunc_c_name) ++ Pp.str ":"
                     else
                       Pp.mt ())
                   context_before_noninlinable
@@ -1348,14 +1346,13 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               | Some i ->
                   let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = context_ary.(i) in
                   let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                  let ni_funcname = fixfunc_i.fixfunc_c_name in
                   let cargs = List.map (fun (c_arg, c_ty) -> if c_type_is_void c_ty then None
                                                                                     else Some c_arg)
                                        fixfunc_i.fixfunc_formal_arguments
                   in
                   pp_labels +++
                     gen_head_cont cont2
-                      (gen_funcall ni_funcname
+                      (gen_funcall fixfunc_i.fixfunc_cfunc_to_call
                         (Array.append
                           (Array.of_list (List.map fst fixfunc_i.fixfunc_extra_arguments))
                           (Array.of_list (list_filter_none cargs)))))
@@ -1437,13 +1434,11 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let funcname = fixfunc.fixfunc_c_name in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label funcname) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label fixfunc.fixfunc_c_name) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
-              let fname = fixfunc.fixfunc_cfunc_to_call in
               gen_tail_cont cont
-                (gen_funcall fname
+                (gen_funcall fixfunc.fixfunc_cfunc_to_call
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
@@ -1506,9 +1501,8 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_sjoinmap_list
                 (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
                   let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                  let ni_funcname = fixfunc_i.fixfunc_c_name in
                   if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
-                    Pp.str (fixfunc_entry_label ni_funcname) ++ Pp.str ":"
+                    Pp.str (fixfunc_entry_label fixfunc_i.fixfunc_c_name) ++ Pp.str ":"
                   else
                     Pp.mt ()) (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodies and gen_tail is not used for it. *)
                 context
@@ -2141,7 +2135,7 @@ let gen_func_multi
                 | Some static1 -> static1 (* sibling *)
                 | None -> true (* non-sibling fixfunc *)
               in
-              pr_entry_function ~static:static1 fixfunc.fixfunc_c_name (fixfunc_index fixfunc.fixfunc_c_name)
+              pr_entry_function ~static:static1 fixfunc.fixfunc_cfunc_to_call (fixfunc_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
                   fixfunc.fixfunc_extra_arguments
@@ -2489,7 +2483,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
             | NormalEntryTopFunc ->
                 gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc ~normalentry:normalent env sigma used_vars
             | NormalEntryFixfunc (static, fixfunc) ->
-                gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc:fixfunc.fixfunc_c_name ~normalentry:normalent env sigma used_vars)
+                gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc:fixfunc.fixfunc_cfunc_to_call ~normalentry:normalent env sigma used_vars)
         | [], [clo] ->
             gen_func_single ~bodies ~fixfunc_tbl ~closure_tbl ~static:true ~primary_cfunc:(closure_func_name clo) ~closure:clo env sigma used_vars
         | _, _ ->
