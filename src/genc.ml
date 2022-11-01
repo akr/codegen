@@ -1176,6 +1176,7 @@ let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (exp : Pp.t
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
 let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
+let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
 
 let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let pp = gen_head1 ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env sigma term in
@@ -1306,7 +1307,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         let (cont2, pp_exit) =
           match cont.head_cont_exit_label with
           | None ->
-              let exit_label = "exit_" ^ fixfunc_j.fixfunc_c_name in
+              let exit_label = fixfunc_exit_label fixfunc_j.fixfunc_c_name in
               ({ cont with head_cont_exit_label = Some exit_label },
                Pp.hov 0 (Pp.str exit_label ++ Pp.str ":"))
           | Some _ ->
