@@ -45,6 +45,7 @@ type fixfunc_t = {
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
 
+  fixfunc_cfunc_static : bool; (* by fixfunc_initialize_c_call *)
   fixfunc_cfunc_to_call : string; (* by fixfunc_initialize_c_call *)
 
   fixfunc_label_for_goto : string option;
@@ -573,6 +574,7 @@ let collect_fix_usage
                   fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
                   fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
+                  fixfunc_cfunc_static = false; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_cfunc_to_call = "dummy"; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_label_for_goto = None; (* dummy. updated by fixfunc_initialize_label *)
                   fixfunc_label_to_define = None; (* dummy. updated by fixfunc_initialize_label *)
@@ -813,10 +815,10 @@ let fixfunc_initialize_c_call
             | _ -> None)
           bodientries
       in
-      let cfunc_name =
+      let static_and_cfunc_name =
         match bodientries with
         | [] -> assert false
-        | BodyEntryTopFunc (static, primary_cfunc) :: _ -> Some primary_cfunc
+        | BodyEntryTopFunc (static, primary_cfunc) :: _ -> Some (static, primary_cfunc)
         | BodyEntryFixfunc _ :: _
         | BodyEntryClosure _ :: _ ->
             match fixfuncs with
@@ -824,21 +826,22 @@ let fixfunc_initialize_c_call
             | first_fixfunc :: rest_fixfuncs ->
                 let sibling_found = List.find_opt (fun (static1, sibling_cfunc_name, j, fixfunc_id) -> Id.equal first_fixfunc.fixfunc_func_id fixfunc_id) sibling_entfuncs in
                 match sibling_found with
-                | Some (static1, sibling_cfunc_name, j, fixfunc_id) -> Some sibling_cfunc_name
+                | Some (sibling_static, sibling_cfunc_name, j, fixfunc_id) -> Some (sibling_static, sibling_cfunc_name)
                 | None ->
                     let used_as_call_found = List.find_opt (fun fixfunc -> fixfunc.fixfunc_used_as_call) fixfuncs in
                     match used_as_call_found with
-                    | Some fixfunc -> Some (global_gensym_with_id fixfunc.fixfunc_func_id)
+                    | Some fixfunc -> Some (true, global_gensym_with_id fixfunc.fixfunc_func_id)
                     | None -> None
       in
-      match cfunc_name with
-      | Some cfunc_name ->
+      match static_and_cfunc_name with
+      | Some (static, cfunc_name) ->
           List.iter
             (fun fixfunc ->
               if fixfunc.fixfunc_used_as_call then
               Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
                 { fixfunc with
-                  fixfunc_cfunc_to_call = cfunc_name })
+                  fixfunc_cfunc_static = static;
+                  fixfunc_cfunc_to_call = cfunc_name; })
             fixfuncs
       | None -> ())
     bodientries_list
@@ -1914,7 +1917,7 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
 (* "normal" means "not closure". *)
 type normal_entry_t =
 | NormalEntryTopFunc of bool * string (* (static, primary_cfunc) *)
-| NormalEntryFixfunc of bool * fixfunc_t (* (static, fixfunc) *)
+| NormalEntryFixfunc of fixfunc_t (* fixfunc *)
 
 let pr_members (args : (string * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
@@ -1954,7 +1957,7 @@ let gen_func_single
   let (static, primary_cfunc) =
     match normalentry, closure with
     | (Some (NormalEntryTopFunc (static, primary_cfunc))), None -> (static, primary_cfunc)
-    | (Some (NormalEntryFixfunc (static, fixfunc))), None -> (static, fixfunc.fixfunc_cfunc_to_call)
+    | (Some (NormalEntryFixfunc fixfunc)), None -> (fixfunc.fixfunc_cfunc_static, fixfunc.fixfunc_cfunc_to_call)
     | None, Some clo -> (true, closure_func_name clo)
     | Some _, Some _ -> assert false
     | None, None -> assert false
@@ -1982,7 +1985,7 @@ let gen_func_single
     match normalentry, closure with
     | None, None -> (List.hd bodychunks).bodychunk_fargs
     | Some (NormalEntryTopFunc _), None -> (List.hd bodychunks).bodychunk_fargs
-    | Some (NormalEntryFixfunc (_,fixfunc)), None -> fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
+    | Some (NormalEntryFixfunc fixfunc), None -> fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
     | None, Some clo ->
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
         clo.closure_args @ [("closure", pointer_to_void)]
@@ -2101,7 +2104,7 @@ let gen_func_multi
             (List.map
               (function
                 | NormalEntryTopFunc (_,primary_cfunc) -> topfunc_index primary_cfunc
-                | NormalEntryFixfunc (_,fixfunc) -> fixfunc_index fixfunc.fixfunc_c_name)
+                | NormalEntryFixfunc fixfunc -> fixfunc_index fixfunc.fixfunc_c_name)
               normal_entries)
             (List.map
               (fun clo ->
@@ -2123,7 +2126,7 @@ let gen_func_multi
                   Pp.hv 0 (
                     Pp.str (topfunc_args_struct_type primary_cfunc) +++
                     hovbrace (pr_members formal_arguments) ++ Pp.str ";"))
-          | NormalEntryFixfunc (_,fixfunc) ->
+          | NormalEntryFixfunc fixfunc ->
               if CList.is_empty fixfunc.fixfunc_extra_arguments &&
                  CList.is_empty fixfunc.fixfunc_formal_arguments then
                 None
@@ -2164,8 +2167,8 @@ let gen_func_multi
                 (topfunc_args_struct_type primary_cfunc)
                 formal_arguments return_type
                 body_function_name
-          | NormalEntryFixfunc (static,fixfunc) ->
-              pr_entry_function ~static fixfunc.fixfunc_cfunc_to_call (fixfunc_index fixfunc.fixfunc_c_name)
+          | NormalEntryFixfunc fixfunc ->
+              pr_entry_function ~static:fixfunc.fixfunc_cfunc_static fixfunc.fixfunc_cfunc_to_call (fixfunc_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
                   fixfunc.fixfunc_extra_arguments
@@ -2273,7 +2276,7 @@ let gen_func_multi
                        ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
                   formal_arguments)
                 None (* no need to goto label because NormalEntryTopFunc is always at last *)
-          | NormalEntryFixfunc (_,fixfunc) ->
+          | NormalEntryFixfunc fixfunc ->
               let case_value = if is_last then None else Some (fixfunc_index fixfunc.fixfunc_c_name) in
               pr_case case_value
                 (List.append
@@ -2475,10 +2478,10 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
                                 (fun (sibling_static, sibling_cfunc_name) -> (sibling_static, sibling_cfunc_name, first_sibling_cfunc_name, fixfunc))
                                 rest_siblings
                             in
-                            Some (NormalEntryFixfunc (first_sibling_static, fixfunc), stub_siblings)
+                            Some (NormalEntryFixfunc fixfunc, stub_siblings)
                         | [] ->
                             if fixfunc.fixfunc_used_as_call then
-                              Some (NormalEntryFixfunc (true, fixfunc), [])
+                              Some (NormalEntryFixfunc fixfunc, [])
                             else
                               None)
                     | _ -> None)
@@ -2511,7 +2514,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
             (match normalent with
             | NormalEntryTopFunc (primary_static, primary_cfunc) ->
                 gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~normalentry:normalent env sigma used_vars
-            | NormalEntryFixfunc (fixfunc_static, fixfunc) ->
+            | NormalEntryFixfunc fixfunc ->
                 gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~normalentry:normalent env sigma used_vars)
         | [], [clo] ->
             gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~closure:clo env sigma used_vars
