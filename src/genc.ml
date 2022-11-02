@@ -1913,11 +1913,17 @@ let gen_closure_load_args_assignments (clo : closure_t) (var : string) : (string
 let gen_func_single
     ~(bodychunks : bodychunk_t list)
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
-    ~(static : bool) ~(primary_cfunc : string)
     ?(normalentry : normal_entry_t option) ?(closure : closure_t option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
-  assert ((normalentry = None) <> (closure = None));
+  let (static, primary_cfunc) =
+    match normalentry, closure with
+    | (Some (NormalEntryTopFunc (static, primary_cfunc))), None -> (static, primary_cfunc)
+    | (Some (NormalEntryFixfunc (static, fixfunc))), None -> (static, fixfunc.fixfunc_cfunc_to_call)
+    | None, Some clo -> (true, closure_func_name clo)
+    | Some _, Some _ -> assert false
+    | None, None -> assert false
+  in
   let pp_struct_closure =
     match closure with
     | Some clo -> gen_closure_struct clo
@@ -2481,11 +2487,11 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | [normalent], [] ->
             (match normalent with
             | NormalEntryTopFunc (static, primary_cfunc) ->
-                gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc ~normalentry:normalent env sigma used_vars
+                gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~normalentry:normalent env sigma used_vars
             | NormalEntryFixfunc (static, fixfunc) ->
-                gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc:fixfunc.fixfunc_cfunc_to_call ~normalentry:normalent env sigma used_vars)
+                gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~normalentry:normalent env sigma used_vars)
         | [], [clo] ->
-            gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~static:true ~primary_cfunc:(closure_func_name clo) ~closure:clo env sigma used_vars
+            gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~closure:clo env sigma used_vars
         | _, _ ->
             gen_func_multi ~bodychunks ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc ~bodientries_list ~normal_entries env sigma used_vars sibling_entfuncs closure_list
       in
