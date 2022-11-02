@@ -1917,6 +1917,7 @@ let gen_func_single
     ?(normalentry : normal_entry_t option) ?(closure : closure_t option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
+  assert ((normalentry = None) <> (closure = None));
   let pp_struct_closure =
     match closure with
     | Some clo -> gen_closure_struct clo
