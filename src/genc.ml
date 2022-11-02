@@ -2083,9 +2083,9 @@ let fixfunc_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
 let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
 let gen_func_multi
-    ~(bodychunks : bodychunk_t list)
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
-    ~(bodientries_list : body_entry_t list list) ~(entry_funcs : body_entry_t list)
+    ~(entry_funcs : body_entry_t list)
+    ~(bodychunks : bodychunk_t list)
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let global_prefix = global_gensym () ^ "_" in
@@ -2527,7 +2527,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | [bodyent] ->
             gen_func_single ~fixfunc_tbl ~closure_tbl ~bodyent ~bodychunks sigma used_vars
         | _ ->
-            gen_func_multi ~bodychunks ~fixfunc_tbl ~closure_tbl ~bodientries_list ~entry_funcs env sigma used_vars
+            gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~bodychunks env sigma used_vars
       in
       let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stub_sibling_entries in
       (decl +++ pp_stub_sibling_entfuncs, impl))
