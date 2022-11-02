@@ -47,6 +47,9 @@ type fixfunc_t = {
 
   fixfunc_cfunc_to_call : string; (* by fixfunc_initialize_c_call *)
 
+  fixfunc_label_for_goto : string option;
+  fixfunc_label_to_define : string option;
+
   fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_extra_arguments *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different when some of them have Some X for fixfunc_top_call.
@@ -54,6 +57,9 @@ type fixfunc_t = {
 }
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
+
+let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
+let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
 
 type closure_t = {
   closure_id: Id.t;
@@ -128,12 +134,47 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("(Some " ^ top ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
         Pp.str "fixfunc_cfunc_to_call=" ++ Pp.str fixfunc.fixfunc_cfunc_to_call +++
+        Pp.str "fixfunc_label_for_goto=" ++ Pp.str (match fixfunc.fixfunc_label_for_goto with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
+        Pp.str "fixfunc_label_to_define=" ++ Pp.str (match fixfunc.fixfunc_label_to_define with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.mt ())
       ))
     fixfunc_tbl
 
 let _ = ignore show_fixfunc_table
+
+let show_bodychunks (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : unit =
+  msg_debug_hov (Pp.str "[codegen:show_bodychunks]" +++
+    pp_sjoinmap_list
+      (fun bodychunk ->
+        Pp.hv 2 (
+          Pp.hov 2 (Pp.str "entries_list=[" ++
+            pp_sjoinmap_list
+              (fun body_entries ->
+                Pp.str "[" ++
+                pp_sjoinmap_list
+                  (fun bodyent ->
+                    match bodyent with
+                    | BodyEntryTopFunc -> Pp.str "TopFunc"
+                    | BodyEntryFixfunc fixfunc_id -> Pp.str "FixFunc:" ++ Id.print fixfunc_id
+                    | BodyEntryClosure closure_id -> Pp.str "Closure:" ++ Id.print closure_id)
+                  body_entries ++
+                  Pp.str "]")
+              bodychunk.bodychunk_entries_list
+            ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "fargs=[" ++
+            pp_sjoinmap_list (fun (varname, vartype) -> Pp.str varname ++ Pp.str ":" ++ pr_c_abstract_decl vartype) bodychunk.bodychunk_fargs ++
+            Pp.str "]") +++
+          Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl bodychunk.bodychunk_return_type) +++
+          Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_impls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_gotos) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "fixfunc_calls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_calls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "closure_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_closure_impls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "bodychunk=" +++ Printer.pr_econstr_env bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
+          ))
+      bodychunks)
+
+let _ = ignore show_bodychunks
 
 let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * c_typedata) list) * c_typedata =
   match EConstr.kind sigma term with
@@ -533,6 +574,8 @@ let collect_fix_usage
                   fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_cfunc_to_call = "dummy"; (* dummy. updated by fixfunc_initialize_c_call *)
+                  fixfunc_label_for_goto = None; (* dummy. updated by fixfunc_initialize_label *)
+                  fixfunc_label_to_define = None; (* dummy. updated by fixfunc_initialize_label *)
                   fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
                 })
               nary tary)
@@ -801,6 +844,34 @@ let fixfunc_initialize_c_call
       | None -> ())
     bodientries_list
 
+let fixfunc_initialize_label (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) : unit =
+  let bodientries_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_entries_list) bodychunks in
+  List.iteri
+    (fun i bodientries ->
+      let is_first_bodyentries = (i = 0) in
+      let fixfuncs =
+        List.filter_map
+          (function
+            | BodyEntryFixfunc fixfunc_id -> Some (Hashtbl.find fixfunc_tbl fixfunc_id)
+            | _ -> None)
+          bodientries
+      in
+      if (fixfuncs <> []) && (not is_first_bodyentries || List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs) then
+        (let first_fixfunc = List.hd fixfuncs in
+        let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
+        let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in
+        Hashtbl.replace fixfunc_tbl first_fixfunc_id
+          { first_fixfunc with
+            fixfunc_label_to_define = Some label };
+        List.iter
+          (fun fixfunc ->
+            let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
+            Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
+              { fixfunc with
+                fixfunc_label_for_goto = Some label })
+          fixfuncs))
+    bodientries_list
+
 let unique_sibling_entfuncs (sibling_entfuncs : (bool * string * int * Id.t) list) : (bool * string * int * Id.t) list =
   let h = Hashtbl.create 0 in
   let rec aux s =
@@ -827,6 +898,7 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
   fixfunc_initialize_c_names fixfunc_tbl;
   fixfunc_initialize_extra_arguments env sigma term ~fixfunc_tbl;
   fixfunc_initialize_c_call ~primary_cfunc ~sibling_entfuncs sigma bodychunks ~fixfunc_tbl;
+  fixfunc_initialize_label bodychunks ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
 
@@ -1175,9 +1247,6 @@ let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (exp : Pp.t
   | None -> Pp.mt ()
   | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
 
-let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
-let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
-
 let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let pp = gen_head1 ~fixfunc_tbl ~closure_tbl ~used_vars ~cont env sigma term in
   (*msg_debug_hov (Pp.str "[codegen] gen_head:" +++
@@ -1228,7 +1297,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label fixfunc.fixfunc_c_name) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label_for_goto) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
@@ -1333,11 +1402,9 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                 pp_sjoinmap_ary
                   (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
                     let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                    if fixfunc_i.fixfunc_used_as_goto ||
-                       (fixfunc_i.fixfunc_used_as_call && fixfunc_i.fixfunc_top_call = None) then
-                      Pp.str (fixfunc_entry_label fixfunc_i.fixfunc_c_name) ++ Pp.str ":"
-                    else
-                      Pp.mt ())
+                    match fixfunc_i.fixfunc_label_to_define with
+                    | None -> Pp.mt ()
+                    | Some label -> Pp.str label ++ Pp.str ":")
                   context_before_noninlinable
               in
               match noninlinable_index with
@@ -1433,7 +1500,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (fixfunc_entry_label fixfunc.fixfunc_c_name) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label_for_goto) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_tail_cont cont
@@ -1500,10 +1567,9 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_sjoinmap_list
                 (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
                   let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                  if fixfunc_i.fixfunc_used_as_goto || fixfunc_i.fixfunc_top_call = None then
-                    Pp.str (fixfunc_entry_label fixfunc_i.fixfunc_c_name) ++ Pp.str ":"
-                  else
-                    Pp.mt ()) (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
+                  match fixfunc_i.fixfunc_label_to_define with
+                  | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
+                  | Some label -> Pp.str label ++ Pp.str ":")
                 context
             in
             pp_labels +++ gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body_env sigma body)
@@ -1530,24 +1596,21 @@ let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : st
 let _ = fun x -> ignore x.bodychunk_fixfunc_calls
 let _ = fun x -> ignore x.bodychunk_closure_impls
 
-let labels_of_bodyentries ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(primary_cfunc : string) (bodyentries : body_entry_t list) =
-  (* labels can be duplicated when top_call is nested.  Example: test_merge in test/test/test_codegen.ml *)
-  unique_string_list
-    (List.filter_map
-      (fun bodyent ->
-        match bodyent with
-        | BodyEntryTopFunc -> None
-        | BodyEntryFixfunc fixfunc_id ->
-            let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-            if fixfunc.fixfunc_used_as_goto || fixfunc.fixfunc_top_call <> Some primary_cfunc then (* xxx: depends primary_cfunc *)
-              Some (fixfunc_entry_label fixfunc.fixfunc_c_name)
-            else
-              None
-        | BodyEntryClosure cloid ->
-            let clo = Hashtbl.find closure_tbl cloid in
-            let clo_label = closure_entry_label clo.closure_c_name in
-            Some clo_label)
-      bodyentries)
+let labels_of_bodyentries ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyentries : body_entry_t list) =
+  List.filter_map
+    (fun bodyent ->
+      match bodyent with
+      | BodyEntryTopFunc -> None
+      | BodyEntryFixfunc fixfunc_id ->
+          (let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+          match fixfunc.fixfunc_label_to_define with
+          | None -> None
+          | Some label -> Some label)
+      | BodyEntryClosure cloid ->
+          let clo = Hashtbl.find closure_tbl cloid in
+          let clo_label = closure_entry_label clo.closure_c_name in
+          Some clo_label)
+    bodyentries
 
 let obtain_function_bodychunks
     ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
@@ -1708,35 +1771,7 @@ let obtain_function_bodychunks
   in
   let (bodychunks, bodychunk_entries_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = aux_lamfix ~tail_position:true ~individual_body:true ~bodyentries:[BodyEntryTopFunc] ~fargs:[] env term in
   let result = List.of_seq bodychunks in
-  (*msg_debug_hov (Pp.str "[codegen:obtain_function_bodychunks]" +++
-    pp_sjoinmap_list
-      (fun bodychunk ->
-        Pp.hv 2 (
-          Pp.hov 2 (Pp.str "entries_list=[" ++
-            pp_sjoinmap_list
-              (fun body_entries ->
-                Pp.str "[" ++
-                pp_sjoinmap_list
-                  (fun bodyent ->
-                    match bodyent with
-                    | BodyEntryTopFunc -> Pp.str "TopFunc"
-                    | BodyEntryFixfunc fixfunc_id -> Pp.str "FixFunc:" ++ Id.print fixfunc_id
-                    | BodyEntryClosure closure_id -> Pp.str "Closure:" ++ Id.print closure_id)
-                  body_entries ++
-                  Pp.str "]")
-              bodychunk.bodychunk_entries_list
-            ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fargs=[" ++
-            pp_sjoinmap_list (fun (varname, vartype) -> Pp.str varname ++ Pp.str ":" ++ pr_c_abstract_decl vartype) bodychunk.bodychunk_fargs ++
-            Pp.str "]") +++
-          Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl bodychunk.bodychunk_return_type) +++
-          Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_impls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_gotos) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fixfunc_calls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_calls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "closure_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_closure_impls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "bodychunk=" +++ Printer.pr_econstr_env bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
-          ))
-      result);*)
+  (*show_bodychunks sigma result;*)
   result
 
 let split_function_bodychunks (bodychunks : bodychunk_t list) : bodychunk_t list list =
@@ -1965,7 +2000,7 @@ let gen_func_single
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             closure_vars;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl ~primary_cfunc (List.hd bodychunk.bodychunk_entries_list) in
+          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl (List.hd bodychunk.bodychunk_entries_list) in
           pp_closure_assigns +++
           pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
           gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
@@ -2171,7 +2206,7 @@ let gen_func_multi
               | _ -> ())
             (List.hd bodychunk.bodychunk_entries_list);
           let cont = { tail_cont_return_type = bodychunk.bodychunk_return_type; tail_cont_multifunc = true } in
-          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl ~primary_cfunc (List.hd bodychunk.bodychunk_entries_list) in
+          let labels = labels_of_bodyentries ~fixfunc_tbl ~closure_tbl (List.hd bodychunk.bodychunk_entries_list) in
           Pp.v 0 (
             pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
             gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp))
@@ -2240,7 +2275,6 @@ let gen_func_multi
                 None (* no need to goto label because NormalEntryTopFunc is always at last *)
           | NormalEntryFixfunc (_,fixfunc) ->
               let case_value = if is_last then None else Some (fixfunc_index fixfunc.fixfunc_c_name) in
-              let goto_label = if is_last then None else Some (fixfunc_entry_label fixfunc.fixfunc_c_name) in
               pr_case case_value
                 (List.append
                   (List.map
@@ -2254,7 +2288,7 @@ let gen_func_multi
                       else Some (c_arg,
                                  ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
                     fixfunc.fixfunc_formal_arguments))
-                goto_label)
+                fixfunc.fixfunc_label_for_goto)
         normal_entries')
   in
   let pp_switch =
