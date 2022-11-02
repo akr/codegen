@@ -1878,7 +1878,7 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
 
 (* "normal" means "not closure". *)
 type normal_entry_t =
-| NormalEntryTopFunc
+| NormalEntryTopFunc of bool * string (* (static, primary_cfunc) *)
 | NormalEntryFixfunc of bool * fixfunc_t (* (static, fixfunc) *)
 
 let pr_members (args : (string * c_typedata) list) : Pp.t =
@@ -1940,7 +1940,7 @@ let gen_func_single
   let c_fargs =
     match normalentry, closure with
     | None, None -> (List.hd bodychunks).bodychunk_fargs
-    | Some NormalEntryTopFunc, None -> (List.hd bodychunks).bodychunk_fargs
+    | Some (NormalEntryTopFunc _), None -> (List.hd bodychunks).bodychunk_fargs
     | Some (NormalEntryFixfunc (_,fixfunc)), None -> fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
     | None, Some clo ->
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
@@ -2065,7 +2065,7 @@ let gen_func_multi
           (List.append
             (List.map
               (function
-                | NormalEntryTopFunc -> topfunc_index primary_cfunc
+                | NormalEntryTopFunc (_,primary_cfunc) -> topfunc_index primary_cfunc
                 | NormalEntryFixfunc (_,fixfunc) -> fixfunc_index fixfunc.fixfunc_c_name)
               normal_entries)
             (List.map
@@ -2080,7 +2080,7 @@ let gen_func_multi
     pp_sjoin_list
       (List.filter_map
         (function
-          | NormalEntryTopFunc ->
+          | NormalEntryTopFunc (_, primary_cfunc) ->
               if CList.is_empty formal_arguments then
                 None
               else
@@ -2124,7 +2124,7 @@ let gen_func_multi
     pp_sjoin_list
       (List.map
         (function
-          | NormalEntryTopFunc ->
+          | NormalEntryTopFunc (static, primary_cfunc) ->
               pr_entry_function ~static primary_cfunc (topfunc_index primary_cfunc)
                 (topfunc_args_struct_type primary_cfunc)
                 formal_arguments return_type
@@ -2234,7 +2234,7 @@ let gen_func_multi
         (fun i normalent ->
           let is_last = (i = num_normal_entries - 1) in
           match normalent with
-          | NormalEntryTopFunc ->
+          | NormalEntryTopFunc (static, primary_cfunc) ->
               assert is_last;
               pr_case None
                 (List.map
@@ -2422,7 +2422,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
                         sibling_entfuncs
                   | _ -> []
                 in
-                Some (NormalEntryTopFunc, stub_siblings)
+                Some (NormalEntryTopFunc (static, primary_cfunc), stub_siblings)
             | ((BodyEntryFixfunc _ :: _) as fixfunc_bodyentries)
             | (BodyEntryClosure _ :: fixfunc_bodyentries) ->
                 List.find_map
@@ -2480,7 +2480,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | [], [] -> (Pp.mt (), Pp.mt ())
         | [normalent], [] ->
             (match normalent with
-            | NormalEntryTopFunc ->
+            | NormalEntryTopFunc (static, primary_cfunc) ->
                 gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc ~normalentry:normalent env sigma used_vars
             | NormalEntryFixfunc (static, fixfunc) ->
                 gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~static ~primary_cfunc:fixfunc.fixfunc_cfunc_to_call ~normalentry:normalent env sigma used_vars)
