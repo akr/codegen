@@ -2056,12 +2056,6 @@ let gen_func_multi
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = (List.hd bodychunks).bodychunk_fargs in
   let return_type = (List.hd bodychunks).bodychunk_return_type in
-  let sibling_fixfuncs =
-    List.fold_left
-      (fun m (static1, another_top_cfunc_name, j, fixfunc_id) -> Id.Map.add fixfunc_id static1 m)
-      Id.Map.empty
-      sibling_entfuncs
-  in
   let pp_enum =
     Pp.hov 0 (
       Pp.str "enum" +++
@@ -2135,13 +2129,8 @@ let gen_func_multi
                 (topfunc_args_struct_type primary_cfunc)
                 formal_arguments return_type
                 body_function_name
-          | NormalEntryFixfunc (_,fixfunc) ->
-              let static1 =
-                match Id.Map.find_opt fixfunc.fixfunc_func_id sibling_fixfuncs with
-                | Some static1 -> static1 (* sibling *)
-                | None -> true (* non-sibling fixfunc *)
-              in
-              pr_entry_function ~static:static1 fixfunc.fixfunc_cfunc_to_call (fixfunc_index fixfunc.fixfunc_c_name)
+          | NormalEntryFixfunc (static,fixfunc) ->
+              pr_entry_function ~static fixfunc.fixfunc_cfunc_to_call (fixfunc_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
                   fixfunc.fixfunc_extra_arguments
