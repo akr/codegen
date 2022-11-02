@@ -1944,10 +1944,10 @@ let gen_closure_load_args_assignments (clo : closure_t) (var : string) : (string
     (gen_closure_load_vars_assignments clo ("((" ^ closure_args_struct_type clo.closure_c_name ^ " *)" ^ var ^ ")->closure"))
 
 let gen_func_single
-    ~(bodychunks : bodychunk_t list)
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(bodyent : body_entry_t)
-    (env : Environ.env) (sigma : Evd.evar_map)
+    ~(bodychunks : bodychunk_t list)
+    (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let (static, primary_cfunc) =
     match bodyent with
@@ -2279,7 +2279,7 @@ let gen_func_multi
                       (c_arg,
                        ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
                   formal_arguments)
-                None (* no need to goto label because NormalEntryTopFunc is always at last *)
+                None (* no need to goto label because BodyEntryTopFunc is always at last *)
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let case_value = if is_last then None else Some (fixfunc_index fixfunc.fixfunc_c_name) in
@@ -2518,7 +2518,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         match entry_funcs with
         | [] -> (Pp.mt (), Pp.mt ())
         | [bodyent] ->
-            gen_func_single ~bodychunks ~fixfunc_tbl ~closure_tbl ~bodyent env sigma used_vars
+            gen_func_single ~fixfunc_tbl ~closure_tbl ~bodyent ~bodychunks sigma used_vars
         | _ ->
             gen_func_multi ~bodychunks ~fixfunc_tbl ~closure_tbl ~bodientries_list ~entry_funcs env sigma used_vars closure_list
       in
