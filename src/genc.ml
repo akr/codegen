@@ -2087,8 +2087,7 @@ let gen_func_multi
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(bodientries_list : body_entry_t list list) ~(entry_funcs : body_entry_t list)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (used_vars : Id.Set.t)
-    (closure_list : closure_t list) : Pp.t * Pp.t =
+    (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let global_prefix = global_gensym () ^ "_" in
   let first_c_name =
     match List.hd entry_funcs with
@@ -2124,7 +2123,15 @@ let gen_func_multi
           ) ++
       Pp.str ";")
   in
-  let pp_struct_closures = pp_sjoinmap_list gen_closure_struct closure_list in
+  let pp_struct_closures =
+    pp_sjoinmap_list
+      (function
+        | BodyEntryClosure closure_id ->
+            let clo = Hashtbl.find closure_tbl closure_id in
+            gen_closure_struct clo
+        | _ -> Pp.mt ())
+      entry_funcs
+  in
   let pp_struct_args =
     pp_sjoin_list
       (List.filter_map
@@ -2520,7 +2527,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | [bodyent] ->
             gen_func_single ~fixfunc_tbl ~closure_tbl ~bodyent ~bodychunks sigma used_vars
         | _ ->
-            gen_func_multi ~bodychunks ~fixfunc_tbl ~closure_tbl ~bodientries_list ~entry_funcs env sigma used_vars closure_list
+            gen_func_multi ~bodychunks ~fixfunc_tbl ~closure_tbl ~bodientries_list ~entry_funcs env sigma used_vars
       in
       let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stub_sibling_entries in
       (decl +++ pp_stub_sibling_entfuncs, impl))
