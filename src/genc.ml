@@ -472,7 +472,7 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
           (inlinablemap, nontailset', IntSet.empty)
         else
           let (inlinable_here, inlinablemap, nontailset, tailset) = detect_inlinable_fixterm_lamfix env term in
-          (inlinablemap, nontailset, tailset)
+          (inlinablemap, IntSet.union nontailset args_set, tailset)
   in
   let (inlinable_here, inlinablemap, nontailset, tailset) = detect_inlinable_fixterm_lamfix env term in
   inlinablemap
