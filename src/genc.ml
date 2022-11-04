@@ -2128,7 +2128,6 @@ let gen_func_multi
     ~(bodychunks : bodychunk_t list)
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
-  let global_prefix = global_gensym () ^ "_" in
   let first_c_name =
     match List.hd entry_funcs with
     | BodyEntryTopFunc (_, primary_cfunc) -> primary_cfunc
@@ -2139,8 +2138,8 @@ let gen_func_multi
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
   in
-  let func_index_type = global_prefix ^ func_index_type_name first_c_name in
-  let body_function_name = global_prefix ^ body_function_name first_c_name in
+  let func_index_type = func_index_type_name first_c_name in
+  let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = (List.hd bodychunks).bodychunk_fargs in
   let return_type = (List.hd bodychunks).bodychunk_return_type in
