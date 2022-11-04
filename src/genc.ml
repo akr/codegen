@@ -1256,7 +1256,8 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
       let ntfary = CArray.map3 (fun n t f -> (n,t,f)) nary tary fary in
-      let ntf_j = ntfary.(j) in Array.blit ntfary 0 ntfary 1 j; ntfary.(0) <- ntf_j; (* move ntfary.(j) to the beginning *)
+      let ntf_j = ntfary.(j) in
+      Array.blit ntfary 0 ntfary 1 j; ntfary.(0) <- ntf_j; (* move ntfary.(j) to the beginning *)
       List.concat_map
         (fun (n,t,f) ->
           let (f_fargs, f_body) = decompose_lam sigma f in
@@ -1453,41 +1454,16 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         let pp_fixfuncs =
           List.map
             (fun (context, (body_env, body)) ->
-              let context_ary = Array.of_list context in
-              let noninlinable_pred i (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) =
-                let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                not fixfunc_i.fixfunc_fixterm.fixterm_inlinable
-              in
-              let noninlinable_index = CArray.findi noninlinable_pred context_ary in
-              let context_before_noninlinable =
-                match noninlinable_index with
-                | None -> context_ary
-                | Some i -> Array.sub context_ary 0 i
-              in
               let pp_labels =
-                pp_sjoinmap_ary
+                pp_sjoinmap_list
                   (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
                     let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
                     match fixfunc_i.fixfunc_label_to_define with
                     | None -> Pp.mt ()
                     | Some label -> Pp.str label ++ Pp.str ":")
-                  context_before_noninlinable
+                  context
               in
-              match noninlinable_index with
-              | None -> pp_labels +++ gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont2 body_env sigma body
-              | Some i ->
-                  let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = context_ary.(i) in
-                  let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                  let cargs = List.map (fun (c_arg, c_ty) -> if c_type_is_void c_ty then None
-                                                                                    else Some c_arg)
-                                       fixfunc_i.fixfunc_formal_arguments
-                  in
-                  pp_labels +++
-                    gen_head_cont cont2
-                      (gen_funcall fixfunc_i.fixfunc_cfunc_to_call
-                        (Array.append
-                          (Array.of_list (List.map fst fixfunc_i.fixfunc_extra_arguments))
-                          (Array.of_list (list_filter_none cargs)))))
+              pp_labels +++ gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont2 body_env sigma body)
             fix_bodies
         in
         pp_assignments +++ pp_sjoin_list pp_fixfuncs +++ pp_exit
