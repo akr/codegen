@@ -42,6 +42,7 @@ type fixfunc_t = {
   fixfunc_return_type: c_typedata; (* may be void. *)
   fixfunc_is_higher_order: bool; (* means that arguments contain function *)
 
+  fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_siblings *)
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
 
@@ -132,6 +133,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
             (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty))
             fixfunc.fixfunc_formal_arguments ++ Pp.str ")" +++
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
+        Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("(Some " ^ top ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
         Pp.str "fixfunc_cfunc_to_call=" ++ Pp.str fixfunc.fixfunc_cfunc_to_call +++
@@ -636,6 +638,7 @@ let collect_fix_usage
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
+                  fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_cfunc_static = false; (* dummy. updated by fixfunc_initialize_c_call *)
@@ -650,6 +653,15 @@ let collect_fix_usage
   in
   let fixfuncs = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma true term ~fixaccs:[] in
   make_fixfunc_table (List.of_seq fixfuncs)
+
+let fixfunc_initialize_siblings (sibling_entfuncs : (bool * string * int * Id.t) list) ~(fixfunc_tbl : fixfunc_table) : unit =
+  List.iter
+    (fun (static, sibling_cfunc_name, i, fixfunc_id) ->
+      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+      Hashtbl.replace fixfunc_tbl fixfunc_id
+        { fixfunc with
+          fixfunc_sibling = Some (static, sibling_cfunc_name) })
+    sibling_entfuncs
 
 let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
     (top_c_func_name : string) (term : EConstr.t)
@@ -670,9 +682,7 @@ let rec fixfunc_initialize_top_calls (env : Environ.env) (sigma : Evd.evar_map)
           fixfunc_initialize_top_calls env2 sigma another_top_cfunc_name fary.(i) [] ~fixfunc_tbl;
           let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
           Hashtbl.replace fixfunc_tbl fixfunc_id
-            { fixfunc with
-              fixfunc_top_call = Some another_top_cfunc_name;
-              fixfunc_used_as_call = true })
+            { fixfunc with fixfunc_top_call = Some another_top_cfunc_name })
         sibling_entfuncs)
   (* xxx: consider App *)
   | _ -> ()
@@ -867,7 +877,6 @@ let fixfunc_initialize_extra_arguments
     fixfunc_tbl
 
 let fixfunc_initialize_c_call
-    ~(sibling_entfuncs : (bool * string * int * Id.t) list)
     (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) : unit =
   let bodientries_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_entries_list) bodychunks in
   List.iter
@@ -888,9 +897,8 @@ let fixfunc_initialize_c_call
             match fixfuncs with
             | [] -> None
             | first_fixfunc :: rest_fixfuncs ->
-                let sibling_found = List.find_opt (fun (static1, sibling_cfunc_name, j, fixfunc_id) -> Id.equal first_fixfunc.fixfunc_func_id fixfunc_id) sibling_entfuncs in
-                match sibling_found with
-                | Some (sibling_static, sibling_cfunc_name, j, fixfunc_id) -> Some (sibling_static, sibling_cfunc_name)
+                match first_fixfunc.fixfunc_sibling with
+                | Some (sibling_static, sibling_cfunc_name) -> Some (sibling_static, sibling_cfunc_name)
                 | None ->
                     let used_as_call_found = List.find_opt (fun fixfunc -> fixfunc.fixfunc_used_as_call) fixfuncs in
                     match used_as_call_found with
@@ -901,7 +909,6 @@ let fixfunc_initialize_c_call
       | Some (static, cfunc_name) ->
           List.iter
             (fun fixfunc ->
-              if fixfunc.fixfunc_used_as_call then
               Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
                 { fixfunc with
                   fixfunc_cfunc_static = static;
@@ -960,10 +967,11 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
     ~(bodychunks : bodychunk_t list) : fixfunc_table =
   let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
   let sibling_entfuncs = unique_sibling_entfuncs sibling_entfuncs in
+  fixfunc_initialize_siblings sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_top_calls env sigma primary_cfunc term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
   fixfunc_initialize_extra_arguments env sigma term ~fixfunc_tbl;
-  fixfunc_initialize_c_call ~sibling_entfuncs sigma bodychunks ~fixfunc_tbl;
+  fixfunc_initialize_c_call sigma bodychunks ~fixfunc_tbl;
   fixfunc_initialize_label bodychunks ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
