@@ -42,6 +42,7 @@ type fixfunc_t = {
   fixfunc_return_type: c_typedata; (* may be void. *)
   fixfunc_is_higher_order: bool; (* means that arguments contain function *)
 
+  fixfunc_topfunc: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_topfunc *)
   fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_siblings *)
   fixfunc_top_call: string option; (* by fixfunc_initialize_top_calls *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
@@ -133,6 +134,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
             (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty))
             fixfunc.fixfunc_formal_arguments ++ Pp.str ")" +++
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
+        Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "top_call=" ++ (match fixfunc.fixfunc_top_call with None -> Pp.str "None" | Some top -> Pp.str ("(Some " ^ top ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
@@ -638,6 +640,7 @@ let collect_fix_usage
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
+                  fixfunc_topfunc = None; (* dummy. updated by fixfunc_initialize_topfunc *)
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_top_call = None; (* dummy. updated by fixfunc_initialize_top_calls *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
@@ -653,6 +656,17 @@ let collect_fix_usage
   in
   let fixfuncs = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma true term ~fixaccs:[] in
   make_fixfunc_table (List.of_seq fixfuncs)
+
+let fixfunc_initialize_topfunc (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) ~(fixfunc_tbl : fixfunc_table) : unit =
+  let (fargs, term') = decompose_lam sigma term in
+  match EConstr.kind sigma term' with
+  | Fix ((ks, j), (nary, tary, fary)) ->
+      let fixfunc_id = id_of_annotated_name nary.(j) in
+      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+      Hashtbl.replace fixfunc_tbl fixfunc_id
+        { fixfunc with
+          fixfunc_topfunc = Some static_and_primary_cfunc }
+  | _ -> ()
 
 let fixfunc_initialize_siblings (sibling_entfuncs : (bool * string * int * Id.t) list) ~(fixfunc_tbl : fixfunc_table) : unit =
   List.iter
@@ -691,9 +705,10 @@ let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.filter_map_inplace
     (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
       let c_name =
-        match fixfunc.fixfunc_top_call with
-        | Some cfunc -> cfunc
-        | None ->
+        match fixfunc.fixfunc_topfunc, fixfunc.fixfunc_sibling with
+        | Some (_,cfunc), _ -> cfunc
+        | None, Some (_,cfunc) -> cfunc
+        | None, None ->
             if fixfunc.fixfunc_used_as_call then
               global_gensym_with_id fixfunc_id
             else
@@ -962,11 +977,13 @@ let unique_sibling_entfuncs (sibling_entfuncs : (bool * string * int * Id.t) lis
 
 let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    ~(primary_cfunc : string)
+    ~(static_and_primary_cfunc : bool * string)
     ~(sibling_entfuncs : (bool * string * int * Id.t) list)
     ~(bodychunks : bodychunk_t list) : fixfunc_table =
+  let (static, primary_cfunc) = static_and_primary_cfunc in
   let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
   let sibling_entfuncs = unique_sibling_entfuncs sibling_entfuncs in
+  fixfunc_initialize_topfunc sigma term ~static_and_primary_cfunc ~fixfunc_tbl;
   fixfunc_initialize_siblings sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_top_calls env sigma primary_cfunc term sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
@@ -2490,7 +2507,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
-  let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms ~primary_cfunc ~sibling_entfuncs ~bodychunks env sigma whole_term in
+  let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) ~sibling_entfuncs ~bodychunks env sigma whole_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
