@@ -282,6 +282,14 @@ let list_filter_none (s : 'a option list) : 'a list =
       | Some x -> x :: s)
     s []
 
+let list_find_suffix (f : 'a -> bool) (l : 'a list) : 'a list =
+  let rec aux l =
+    match l with
+    | [] -> raise Not_found
+    | x :: l' -> if f x then l else aux l'
+  in
+  aux l
+
 let seq_map2 (f : 'a -> 'b -> 'c) (xs : 'a Seq.t) (ys : 'b Seq.t) () : 'c Seq.node =
   let rec r xs ys () =
     match xs (), ys () with

@@ -2147,6 +2147,28 @@ let test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable (ctx : test_ctxt
       assert(f(30,2) == 33);
     |}
 
+let test_nested_fix_must_have_consistent_arguments (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f x y :=
+	let g :=
+	  fix g (m : nat) {struct m} :=
+	  fix h (n : nat) {struct n} :=
+	  match n with
+	  | O => O
+	  | S n' => S (h n')
+	  end
+	in
+	S (g x y).
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(10,0) == 1);
+      assert(f(20,1) == 2);
+      assert(f(30,2) == 3);
+    |}
+
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -4214,6 +4236,7 @@ let suite : OUnit2.test =
     "test_mutual_static1" >:: test_mutual_static1;
     "test_mutual_static2" >:: test_mutual_static2;
     "test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable" >:: test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable;
+    "test_nested_fix_must_have_consistent_arguments" >:: test_nested_fix_must_have_consistent_arguments;
     "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
     "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
     "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;

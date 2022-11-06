@@ -37,6 +37,7 @@ val list_map_append : ('a -> 'b) -> 'a list -> 'b list -> 'b list
 val list_find_index : ('a -> bool) -> 'a list -> int
 val list_filter_map2 : ('a -> 'b -> 'c option) -> 'a list -> 'b list -> 'c list
 val list_filter_none : 'a option list -> 'a list
+val list_find_suffix : ('a -> bool) -> 'a list -> 'a list
 val seq_map2 :
   ('a -> 'b -> 'c) -> 'a Seq.t -> 'b Seq.t -> unit -> 'c Seq.node
 val seq_mapi : (int -> 'a -> 'b) -> 'a Seq.t -> unit -> 'b Seq.node
