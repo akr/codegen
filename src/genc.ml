@@ -2511,9 +2511,10 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entries : (bool * string * string * fixfunc_t) list) : Pp.t =
+let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entries : (bool * string * string * Id.t) list) : Pp.t =
   pp_sjoinmap_list
-    (fun (static, cfunc_name_to_define, cfunc_name_to_call, fixfunc) ->
+    (fun (static, cfunc_name_to_define, cfunc_name_to_call, fixfunc_id) ->
+      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
       let args = List.append fixfunc.fixfunc_extra_arguments fixfunc.fixfunc_formal_arguments in
       let return_type = fixfunc.fixfunc_return_type in
       Pp.v 0 (
@@ -2588,13 +2589,6 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
                   fixfunc_ids)
           bodyhead_list
       in
-      let stub_sibling_entries =
-        List.map
-          (fun (static, cfunc, orig_cfunc, orig_fixfunc_id) ->
-            let orig_fixfunc = Hashtbl.find fixfunc_tbl orig_fixfunc_id in
-            (static, cfunc, orig_cfunc, orig_fixfunc))
-          stubs
-      in
       let closure_list =
         List.filter_map
           (fun bodychunk ->
@@ -2617,7 +2611,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | _ ->
             gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~bodychunks env sigma used_vars
       in
-      let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stub_sibling_entries in
+      let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stubs in
       (decl +++ pp_stub_sibling_entfuncs, impl))
     bodychunks_list
   in
