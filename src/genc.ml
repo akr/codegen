@@ -2629,7 +2629,7 @@ let detect_stubs (cfuncs : string list) static_ty_term_list =
     nary
   in
   let h = Hashtbl.create 0 in
-  let result_orig = ref [] in
+  let result_impls = ref [] in
   List.iter2
     (fun cfunc (static, ty, term) ->
       let (args, body) = Term.decompose_lam term in
@@ -2638,7 +2638,7 @@ let detect_stubs (cfuncs : string list) static_ty_term_list =
       | None ->
           let fixfunc_id = id_of_annotated_name primary_nary.(j) in
           let entfunc = (static, cfunc, j, fixfunc_id) in
-          result_orig := entfunc :: !result_orig;
+          result_impls := entfunc :: !result_impls;
           Hashtbl.add h j (cfunc, fixfunc_id, [])
       | Some (orig_cfunc, orig_fixfunc_id, stubs) ->
           let stub = (static, cfunc, orig_cfunc, orig_fixfunc_id) in
@@ -2649,7 +2649,7 @@ let detect_stubs (cfuncs : string list) static_ty_term_list =
       (fun (j, (orig_cfunc, orig_fixfunc_id, stubs)) -> stubs)
       (List.of_seq (Hashtbl.to_seq h))
   in
-  (List.rev !result_orig, result_stubs)
+  (List.rev !result_impls, result_stubs)
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
