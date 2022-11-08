@@ -949,18 +949,10 @@ let fixfunc_initialize_c_call
       | None -> ())
     bodyhead_list
 
-let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
+let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : body_entry_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
   List.iteri
     (fun i (bodyroot, bodyvars) ->
-      msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
-        Pp.str "i=" ++ Pp.int i +++
-        Pp.str "bodyroot=" ++
-          (match bodyroot with
-          | BodyRootTopFunc (static,primary_cfunc) -> Pp.str ("TopFunc:" ^ primary_cfunc)
-          | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
-          | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)));
-      let is_first = (i = 0) in
       let fixfuncs =
         List.filter_map
           (function
@@ -968,18 +960,41 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fi
             | _ -> None)
           bodyvars
       in
+      let fixfunc_is_first =
+        match bodyroot with
+        | BodyRootTopFunc (static,primary_cfunc) -> first_entfunc = BodyEntryTopFunc (static,primary_cfunc)
+        | BodyRootFixfunc _ | BodyRootClosure _ ->
+            match fixfuncs with
+            | [] -> false
+            | first_fixfunc :: _ -> first_entfunc = BodyEntryFixfunc first_fixfunc.fixfunc_func_id
+      in
+      let closure_is_first =
+        match bodyroot with
+        | BodyRootTopFunc _ -> false
+        | BodyRootFixfunc _ -> false
+        | BodyRootClosure closure_id -> first_entfunc = BodyEntryClosure closure_id
+      in
+      msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
+        Pp.str "i=" ++ Pp.int i +++
+        Pp.str "bodyroot=" ++
+          (match bodyroot with
+          | BodyRootTopFunc (static,primary_cfunc) -> Pp.str ("TopFunc:" ^ primary_cfunc)
+          | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
+          | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
+        Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
+        Pp.str "closure_is_first=" ++ Pp.bool closure_is_first);
       (match fixfuncs with
       | [] -> ()
       | first_fixfunc :: _ ->
-          if ((first_fixfunc.fixfunc_cfunc <> None && not is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
+          if ((first_fixfunc.fixfunc_cfunc <> None && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
               List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
           then
           let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
           let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
-          msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
+          (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
             Pp.str "i=" ++ Pp.int i +++
-            Pp.str "is_first=" ++ Pp.bool is_first +++
-            Pp.str "exists_fixfunc_used_as_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs));
+            Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
+            Pp.str "exists_fixfunc_used_as_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs));*)
           List.iter
             (fun fixfunc ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
@@ -990,13 +1005,7 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fi
       (match bodyroot with
       | BodyRootClosure closure_id ->
           let clo = Hashtbl.find closure_tbl closure_id in
-          let needs_label =
-            not is_first ||
-            match fixfuncs with
-            | [] -> false
-            | first_fixfunc :: _ -> first_fixfunc.fixfunc_cfunc <> None (* "fall through" is not usable in the gen_func_multi switch. *)
-          in
-          if needs_label then
+          if not closure_is_first then
             Hashtbl.replace closure_tbl closure_id
               { clo with
                 closure_label = Some (closure_entry_label clo.closure_c_name) }
@@ -1032,12 +1041,6 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
   fixfunc_initialize_c_call sigma bodychunks ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
-
-let collect_fix_info_splitted (env : Environ.env) (sigma : Evd.evar_map)
-    ~(bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
-  fixfunc_initialize_labels bodychunks ~fixfunc_tbl ~closure_tbl;
-  show_fixfunc_table env sigma fixfunc_tbl;
-  ()
 
 let local_gensym_id : (int ref) option ref = ref None
 
@@ -2590,7 +2593,7 @@ let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_
                   (fun fixfunc_id ->
                     let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
                     if fixfunc.fixfunc_used_as_call then
-                      Some (BodyEntryFixfunc fixfunc_id)
+                      Some (BodyEntryFixfunc first_fixfunc_id)
                     else
                       None)
                   fixfunc_ids)
@@ -2621,9 +2624,13 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   List.iter (fun bodychunks -> show_bodychunks sigma bodychunks) bodychunks_list;
   let code_pairs = List.map
     (fun bodychunks ->
-      collect_fix_info_splitted env sigma ~bodychunks ~fixfunc_tbl ~closure_tbl;
       let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
       let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl) bodyhead_list in
+      (match entry_funcs with
+      | [] -> ()
+      | first_entfunc :: _ ->
+          fixfunc_initialize_labels bodychunks ~first_entfunc ~fixfunc_tbl ~closure_tbl);
+      show_fixfunc_table env sigma fixfunc_tbl;
       let (decl, impl) =
         match entry_funcs with
         | [] -> (Pp.mt (), Pp.mt ())
