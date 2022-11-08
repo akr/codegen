@@ -949,10 +949,50 @@ let fixfunc_initialize_c_call
       | None -> ())
     bodyhead_list
 
+let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : entry_func_t list =
+  let (bodyroot, bodyvars) = bodyhead in
+  let normal_ent =
+    match bodyroot with
+    | BodyRootTopfunc (primary_static, primary_cfunc) ->
+        Some (EntryFuncTopfunc (primary_static, primary_cfunc))
+    | BodyRootFixfunc _
+    | BodyRootClosure _ ->
+        (let fixfunc_ids =
+          List.filter_map
+            (function
+              | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
+              | _ -> None)
+            bodyvars
+        in
+        match fixfunc_ids with
+        | [] -> None
+        | first_fixfunc_id :: _ ->
+            let first_fixfunc = Hashtbl.find fixfunc_tbl first_fixfunc_id in
+            match first_fixfunc.fixfunc_sibling with
+            | Some _ ->
+                Some (EntryFuncFixfunc first_fixfunc_id)
+            | None ->
+                List.find_map
+                  (fun fixfunc_id ->
+                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+                    if fixfunc.fixfunc_used_as_call then
+                      Some (EntryFuncFixfunc first_fixfunc_id)
+                    else
+                      None)
+                  fixfunc_ids)
+  in
+  let closure_ent =
+    match bodyroot with
+    | BodyRootClosure cloid -> Some (EntryFuncClosure (Hashtbl.find closure_tbl cloid).closure_id)
+    | _ -> None
+  in
+  (match normal_ent with Some nent -> [nent] | None -> []) @
+  (match closure_ent with Some cent -> [cent] | None -> [])
+
 let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
   List.iter
-    (fun (bodyroot, bodyvars) ->
+    (fun ((bodyroot, bodyvars) as bodyhead) ->
       let fixfuncs =
         List.filter_map
           (function
@@ -960,19 +1000,14 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
             | _ -> None)
           bodyvars
       in
+      let entfuncs = entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
       let fixfunc_is_first =
-        match bodyroot with
-        | BodyRootTopfunc (static,primary_cfunc) -> first_entfunc = EntryFuncTopfunc (static,primary_cfunc)
-        | BodyRootFixfunc _ | BodyRootClosure _ ->
-            match fixfuncs with
-            | [] -> false
-            | first_fixfunc :: _ -> first_entfunc = EntryFuncFixfunc first_fixfunc.fixfunc_func_id
+        (match first_entfunc with EntryFuncTopfunc _ | EntryFuncFixfunc _ -> true | EntryFuncClosure _ -> false) &&
+        List.mem first_entfunc entfuncs
       in
       let closure_is_first =
-        match bodyroot with
-        | BodyRootTopfunc _ -> false
-        | BodyRootFixfunc _ -> false
-        | BodyRootClosure closure_id -> first_entfunc = EntryFuncClosure closure_id
+        (match first_entfunc with EntryFuncTopfunc _ | EntryFuncFixfunc _ -> false | EntryFuncClosure _ -> true) &&
+        List.mem first_entfunc entfuncs
       in
       msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
         Pp.str "bodyroot=" ++
@@ -2563,46 +2598,6 @@ let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entr
               args ++
             Pp.str ");"))))
     stub_sibling_entries
-
-let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : entry_func_t list =
-  let (bodyroot, bodyvars) = bodyhead in
-  let normal_ent =
-    match bodyroot with
-    | BodyRootTopfunc (primary_static, primary_cfunc) ->
-        Some (EntryFuncTopfunc (primary_static, primary_cfunc))
-    | BodyRootFixfunc _
-    | BodyRootClosure _ ->
-        (let fixfunc_ids =
-          List.filter_map
-            (function
-              | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
-              | _ -> None)
-            bodyvars
-        in
-        match fixfunc_ids with
-        | [] -> None
-        | first_fixfunc_id :: _ ->
-            let first_fixfunc = Hashtbl.find fixfunc_tbl first_fixfunc_id in
-            match first_fixfunc.fixfunc_sibling with
-            | Some _ ->
-                Some (EntryFuncFixfunc first_fixfunc_id)
-            | None ->
-                List.find_map
-                  (fun fixfunc_id ->
-                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                    if fixfunc.fixfunc_used_as_call then
-                      Some (EntryFuncFixfunc first_fixfunc_id)
-                    else
-                      None)
-                  fixfunc_ids)
-  in
-  let closure_ent =
-    match bodyroot with
-    | BodyRootClosure cloid -> Some (EntryFuncClosure (Hashtbl.find closure_tbl cloid).closure_id)
-    | _ -> None
-  in
-  (match normal_ent with Some nent -> [nent] | None -> []) @
-  (match closure_ent with Some cent -> [cent] | None -> [])
 
 let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) (stubs : (bool * string * string * Id.t) list) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
