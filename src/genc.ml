@@ -36,8 +36,8 @@ type fixterm_t = {
 type fixfunc_t = {
   fixfunc_fixterm: fixterm_t;
   fixfunc_func_id: Id.t;
-  fixfunc_used_as_call: bool;
-  fixfunc_used_as_goto: bool;
+  fixfunc_used_for_call: bool;
+  fixfunc_used_for_goto: bool;
   fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
   fixfunc_return_type: c_typedata; (* may be void. *)
   fixfunc_is_higher_order: bool; (* means that arguments contain function *)
@@ -140,8 +140,8 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.v 0 (
         Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_inlinable +++
         Pp.str "tail_position=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_tail_position +++
-        Pp.str "used_as_call=" ++ Pp.bool fixfunc.fixfunc_used_as_call +++
-        Pp.str "used_as_goto=" ++ Pp.bool fixfunc.fixfunc_used_as_goto +++
+        Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
+        Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
         Pp.str "formal_arguments=(" ++
           pp_joinmap_list (Pp.str ",")
             (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty))
@@ -508,8 +508,8 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
 *)
 
 type fixacc_t = {
-  fixacc_used_as_call : bool ref;
-  fixacc_used_as_goto : bool ref;
+  fixacc_used_for_call : bool ref;
+  fixacc_used_for_goto : bool ref;
 }
 
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
@@ -566,8 +566,8 @@ let collect_fix_usage
               let fixacc = List.nth fixaccs (i-1) in
               let fixfunc_is_higher_order = Id.Map.find id higher_order_fixfuncs in
               determine_fixfunc_call_or_goto tail_position fixfunc_is_higher_order fixterm_is_inlinable
-                ~call:(fun () -> fixacc.fixacc_used_as_call := true)
-                ~goto:(fun () -> fixacc.fixacc_used_as_goto := true));
+                ~call:(fun () -> fixacc.fixacc_used_for_call := true)
+                ~goto:(fun () -> fixacc.fixacc_used_for_goto := true));
         Seq.empty)
     | Const _ | Construct _ -> Seq.empty
     | Proj (proj, e) ->
@@ -577,8 +577,8 @@ let collect_fix_usage
         collect_fix_usage_rec ~under_fix_or_lambda env sigma tail_position f ~fixaccs
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        let fixaccs2 = { fixacc_used_as_call = ref false;
-                         fixacc_used_as_goto = ref false; } :: fixaccs in
+        let fixaccs2 = { fixacc_used_for_call = ref false;
+                         fixacc_used_for_goto = ref false; } :: fixaccs in
         let fixfuncs1 = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma false e ~fixaccs in
         let fixfuncs2 = collect_fix_usage_rec ~under_fix_or_lambda:false env2 sigma tail_position b ~fixaccs:fixaccs2 in
         Seq.append fixfuncs1 fixfuncs2
@@ -591,8 +591,8 @@ let collect_fix_usage
             let n = Array.length nas in
             let fixaccs2 =
               List.append
-                (List.init n (fun _ -> { fixacc_used_as_call = ref false;
-                                         fixacc_used_as_goto = ref false; }))
+                (List.init n (fun _ -> { fixacc_used_for_call = ref false;
+                                         fixacc_used_for_goto = ref false; }))
                 fixaccs
             in
             collect_fix_usage_rec ~under_fix_or_lambda:false env2 sigma
@@ -602,8 +602,8 @@ let collect_fix_usage
         concat_array_seq results
     | Lambda (x,t,b) ->
         let env2 = env_push_assum env x t in
-        let fixaccs2 = { fixacc_used_as_call = ref false;
-                         fixacc_used_as_goto = ref false; } :: fixaccs in
+        let fixaccs2 = { fixacc_used_for_call = ref false;
+                         fixacc_used_for_goto = ref false; } :: fixaccs in
         if numargs = 0 && not under_fix_or_lambda then
           (* closure creation *)
           collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma true b ~fixaccs:fixaccs2
@@ -618,8 +618,8 @@ let collect_fix_usage
         let fixaccs2 =
           list_rev_map_append
             (fun i ->
-              { fixacc_used_as_call = ref (j = i && not tail_position && not inlinable);
-                fixacc_used_as_goto = ref false; })
+              { fixacc_used_for_call = ref (j = i && not tail_position && not inlinable);
+                fixacc_used_for_goto = ref false; })
             (iota_list 0 h)
             fixaccs
         in
@@ -653,8 +653,8 @@ let collect_fix_usage
                 {
                   fixfunc_fixterm = fixterm;
                   fixfunc_func_id = id_of_annotated_name nary.(i);
-                  fixfunc_used_as_call = !(fixacc.fixacc_used_as_call);
-                  fixfunc_used_as_goto = !(fixacc.fixacc_used_as_goto);
+                  fixfunc_used_for_call = !(fixacc.fixacc_used_for_call);
+                  fixfunc_used_for_goto = !(fixacc.fixacc_used_for_goto);
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
@@ -700,7 +700,7 @@ let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
         | Some (_,cfunc), _ -> cfunc
         | None, Some (_,cfunc) -> cfunc
         | None, None ->
-            if fixfunc.fixfunc_used_as_call then
+            if fixfunc.fixfunc_used_for_call then
               global_gensym_with_id fixfunc_id
             else
               Id.to_string fixfunc_id
@@ -932,8 +932,8 @@ let fixfunc_initialize_c_call
                 match first_fixfunc.fixfunc_sibling with
                 | Some (sibling_static, sibling_cfunc_name) -> Some (sibling_static, sibling_cfunc_name)
                 | None ->
-                    let used_as_call = List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_call) fixfuncs in
-                    if used_as_call then
+                    let used_for_call = List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_call) fixfuncs in
+                    if used_for_call then
                       Some (true, global_gensym_with_id first_fixfunc.fixfunc_func_id)
                     else
                       None
@@ -975,7 +975,7 @@ let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_
                 List.find_map
                   (fun fixfunc_id ->
                     let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                    if fixfunc.fixfunc_used_as_call then
+                    if fixfunc.fixfunc_used_for_call then
                       Some (EntryFuncFixfunc first_fixfunc_id)
                     else
                       None)
@@ -1020,13 +1020,13 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
       | [] -> ()
       | first_fixfunc :: _ ->
           if ((first_fixfunc.fixfunc_cfunc <> None && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
-              List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
+              List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
           then
           let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
           let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
           (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
             Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
-            Pp.str "exists_fixfunc_used_as_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs));*)
+            Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
           List.iter
             (fun fixfunc ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
