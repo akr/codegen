@@ -951,8 +951,8 @@ let fixfunc_initialize_c_call
 
 let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-  List.iteri
-    (fun i (bodyroot, bodyvars) ->
+  List.iter
+    (fun (bodyroot, bodyvars) ->
       let fixfuncs =
         List.filter_map
           (function
@@ -975,7 +975,6 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
         | BodyRootClosure closure_id -> first_entfunc = EntryFuncClosure closure_id
       in
       msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
-        Pp.str "i=" ++ Pp.int i +++
         Pp.str "bodyroot=" ++
           (match bodyroot with
           | BodyRootTopfunc (static,primary_cfunc) -> Pp.str ("Topfunc:" ^ primary_cfunc)
@@ -992,7 +991,6 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
           let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
           let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
           (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
-            Pp.str "i=" ++ Pp.int i +++
             Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
             Pp.str "exists_fixfunc_used_as_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs));*)
           List.iter
