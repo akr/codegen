@@ -1531,16 +1531,14 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         let pp_fixfuncs =
           List.map
             (fun (context, (body_env, body)) ->
-              let pp_labels =
-                pp_sjoinmap_list
-                  (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
-                    let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                    match fixfunc_i.fixfunc_label_to_define with
-                    | None -> Pp.mt ()
-                    | Some label -> Pp.str label ++ Pp.str ":")
-                  context
+              let pp_label =
+                let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = List.hd context in
+                let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
+                match fixfunc_i.fixfunc_label_to_define with
+                | None -> Pp.mt ()
+                | Some label -> Pp.str label ++ Pp.str ":"
               in
-              pp_labels +++ gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont2 body_env sigma body)
+              pp_label +++ gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont:cont2 body_env sigma body)
             fix_bodies
         in
         pp_assignments +++ pp_sjoin_list pp_fixfuncs +++ pp_exit
@@ -1682,16 +1680,14 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       let pp_fixfuncs =
         List.map
           (fun (context, (body_env, body)) ->
-            let pp_labels =
-              pp_sjoinmap_list
-                (fun (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) ->
-                  let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                  match fixfunc_i.fixfunc_label_to_define with
-                  | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
-                  | Some label -> Pp.str label ++ Pp.str ":")
-                context
+            let pp_label =
+              let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = List.hd context in
+              let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
+              match fixfunc_i.fixfunc_label_to_define with
+              | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
+              | Some label -> Pp.str label ++ Pp.str ":"
             in
-            pp_labels +++ gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body_env sigma body)
+            pp_label +++ gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body_env sigma body)
           fix_bodies
       in
       pp_assignments +++ pp_sjoin_list pp_fixfuncs
