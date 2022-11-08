@@ -85,6 +85,11 @@ let cc : string =
   | Some v -> v
   | None -> "gcc"
 
+let cc_opts : string list =
+  match Sys.getenv_opt "CFLAGS" with
+  | Some v -> List.filter (fun s -> s <> "") (String.split_on_char ' ' v)
+  | None -> ["-Werror=unused-label"]
+
 let coqc : string =
   match Sys.getenv_opt "COQC" with
   | Some v -> v
@@ -337,9 +342,9 @@ let codegen_test_template
   match goal with
   | UntilCoq -> ()
   | UntilCC ->
-      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn]);
   | UntilExe ->
-      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc ["-o"; exe_fn; main_fn];
+      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn]);
       assert_command ~ctxt:ctx exe_fn []
 
 let template_coq_success
