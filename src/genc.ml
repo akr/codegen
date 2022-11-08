@@ -46,8 +46,7 @@ type fixfunc_t = {
   fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_siblings *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
 
-  fixfunc_cfunc_static : bool; (* by fixfunc_initialize_c_call *)
-  fixfunc_cfunc_to_call : string option; (* by fixfunc_initialize_c_call *)
+  fixfunc_cfunc_to_call : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
 
   fixfunc_label_for_goto : string option; (* by fixfunc_initialize_labels *)
   fixfunc_label_to_define : string option; (* by fixfunc_initialize_labels *)
@@ -62,6 +61,9 @@ type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
 let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
 let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
+
+let cfunc_of_fixfunc (fixfunc : fixfunc_t) : string =
+  snd (Option.get fixfunc.fixfunc_cfunc_to_call)
 
 type closure_t = {
   closure_id: Id.t;
@@ -149,7 +151,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
-        Pp.str "fixfunc_cfunc_to_call=" ++ (match fixfunc.fixfunc_cfunc_to_call with None -> Pp.str "None" | Some cfunc -> Pp.str cfunc) +++
+        Pp.str "fixfunc_cfunc_to_call=" ++ (match fixfunc.fixfunc_cfunc_to_call with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "fixfunc_label_for_goto=" ++ Pp.str (match fixfunc.fixfunc_label_for_goto with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "fixfunc_label_to_define=" ++ Pp.str (match fixfunc.fixfunc_label_to_define with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
@@ -661,7 +663,6 @@ let collect_fix_usage
                   fixfunc_topfunc = None; (* dummy. updated by fixfunc_initialize_topfunc *)
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
-                  fixfunc_cfunc_static = false; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_cfunc_to_call = None; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_label_for_goto = None; (* dummy. updated by fixfunc_initialize_labels *)
                   fixfunc_label_to_define = None; (* dummy. updated by fixfunc_initialize_labels *)
@@ -946,8 +947,7 @@ let fixfunc_initialize_c_call
             (fun fixfunc ->
               Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
                 { fixfunc with
-                  fixfunc_cfunc_static = static;
-                  fixfunc_cfunc_to_call = Some cfunc_name; })
+                  fixfunc_cfunc_to_call = Some (static, cfunc_name); })
             fixfuncs
       | None -> ())
     bodyhead_list
@@ -1445,7 +1445,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
-                (gen_funcall (Option.get fixfunc.fixfunc_cfunc_to_call)
+                (gen_funcall (cfunc_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
@@ -1501,7 +1501,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
-          (gen_funcall (Option.get fixfunc_j.fixfunc_cfunc_to_call)
+          (gen_funcall (cfunc_of_fixfunc fixfunc_j)
             (Array.append
               (Array.of_list (List.map fst fixfunc_j.fixfunc_extra_arguments))
               (Array.of_list (list_filter_none cargs))))
@@ -1623,7 +1623,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_assignments +++ pp_goto_entry
             else
               gen_tail_cont cont
-                (gen_funcall (Option.get fixfunc.fixfunc_cfunc_to_call)
+                (gen_funcall (cfunc_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list (list_filter_none cargs)))))
@@ -2089,7 +2089,7 @@ let gen_func_single
     | BodyEntryTopFunc (static, primary_cfunc) -> (static, primary_cfunc)
     | BodyEntryFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (fixfunc.fixfunc_cfunc_static, (Option.get fixfunc.fixfunc_cfunc_to_call))
+        (Option.get fixfunc.fixfunc_cfunc_to_call)
     | BodyEntryClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         (true, closure_func_name clo)
@@ -2228,7 +2228,7 @@ let gen_func_multi
     | BodyEntryTopFunc (_, primary_cfunc) -> primary_cfunc
     | BodyEntryFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (Option.get fixfunc.fixfunc_cfunc_to_call)
+        (cfunc_of_fixfunc fixfunc)
     | BodyEntryClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
@@ -2322,7 +2322,8 @@ let gen_func_multi
                 body_function_name
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              pr_entry_function ~static:fixfunc.fixfunc_cfunc_static (Option.get fixfunc.fixfunc_cfunc_to_call) (fixfunc_index fixfunc.fixfunc_c_name)
+              let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc_to_call in
+              pr_entry_function ~static cfunc (fixfunc_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
                   fixfunc.fixfunc_extra_arguments
