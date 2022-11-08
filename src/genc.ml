@@ -48,8 +48,7 @@ type fixfunc_t = {
 
   fixfunc_cfunc_to_call : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
 
-  fixfunc_label_for_goto : string option; (* by fixfunc_initialize_labels *)
-  fixfunc_label_to_define : string option; (* by fixfunc_initialize_labels *)
+  fixfunc_label : string option; (* by fixfunc_initialize_labels *)
 
   fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_extra_arguments *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
@@ -152,8 +151,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
         Pp.str "fixfunc_cfunc_to_call=" ++ (match fixfunc.fixfunc_cfunc_to_call with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
-        Pp.str "fixfunc_label_for_goto=" ++ Pp.str (match fixfunc.fixfunc_label_for_goto with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
-        Pp.str "fixfunc_label_to_define=" ++ Pp.str (match fixfunc.fixfunc_label_to_define with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
+        Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.mt ())
       ))
@@ -664,8 +662,7 @@ let collect_fix_usage
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_cfunc_to_call = None; (* dummy. updated by fixfunc_initialize_c_call *)
-                  fixfunc_label_for_goto = None; (* dummy. updated by fixfunc_initialize_labels *)
-                  fixfunc_label_to_define = None; (* dummy. updated by fixfunc_initialize_labels *)
+                  fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                   fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
                 })
               nary tary)
@@ -983,15 +980,12 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fi
             Pp.str "i=" ++ Pp.int i +++
             Pp.str "is_first=" ++ Pp.bool is_first +++
             Pp.str "exists_fixfunc_used_as_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs));
-          Hashtbl.replace fixfunc_tbl first_fixfunc_id
-            { first_fixfunc with
-              fixfunc_label_to_define = Some label };
           List.iter
             (fun fixfunc ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
               Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
                 { fixfunc with
-                  fixfunc_label_for_goto = Some label })
+                  fixfunc_label = Some label })
             fixfuncs);
       (match bodyroot with
       | BodyRootClosure closure_id ->
@@ -1441,7 +1435,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label_for_goto) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
@@ -1534,7 +1528,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               let pp_label =
                 let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = List.hd context in
                 let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-                match fixfunc_i.fixfunc_label_to_define with
+                match fixfunc_i.fixfunc_label with
                 | None -> Pp.mt ()
                 | Some label -> Pp.str label ++ Pp.str ":"
               in
@@ -1617,7 +1611,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   cargs
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
-              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label_for_goto) ++ Pp.str ";") in
+              let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label) ++ Pp.str ";") in
               pp_assignments +++ pp_goto_entry
             else
               gen_tail_cont cont
@@ -1683,7 +1677,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
             let pp_label =
               let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = List.hd context in
               let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
-              match fixfunc_i.fixfunc_label_to_define with
+              match fixfunc_i.fixfunc_label with
               | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
               | Some label -> Pp.str label ++ Pp.str ":"
             in
@@ -1725,7 +1719,7 @@ let labels_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_ta
     | [] -> []
     | fixfunc_id :: _ ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (match fixfunc.fixfunc_label_to_define with
+        (match fixfunc.fixfunc_label with
         | None -> []
         | Some label -> [label])
   in
@@ -2423,7 +2417,7 @@ let gen_func_multi
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
-              let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label_for_goto) in
+              let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label) in
               pr_case case_value
                 (List.append
                   (List.map
