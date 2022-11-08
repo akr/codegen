@@ -1045,28 +1045,12 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
       | _ -> ()))
     bodyhead_list
 
-let unique_sibling_entfuncs (sibling_entfuncs : (bool * string * int * Id.t) list) : (bool * string * int * Id.t) list =
-  let h = Hashtbl.create 0 in
-  let rec aux s =
-    match s with
-    | [] -> []
-    | (static, cfunc, j, fixfunc_id) as entfunc :: rest ->
-        match Hashtbl.find_opt h j with
-        | Some fixfunc_id1 ->
-            aux rest
-        | None ->
-            (Hashtbl.add h j fixfunc_id;
-             entfunc :: aux rest)
-  in
-  aux sibling_entfuncs
-
 let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     ~(static_and_primary_cfunc : bool * string)
     ~(sibling_entfuncs : (bool * string * int * Id.t) list)
     ~(bodychunks : bodychunk_t list) : fixfunc_table =
   let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
-  let sibling_entfuncs = unique_sibling_entfuncs sibling_entfuncs in
   fixfunc_initialize_topfunc sigma term ~static_and_primary_cfunc ~fixfunc_tbl;
   fixfunc_initialize_siblings sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
