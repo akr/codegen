@@ -1000,14 +1000,13 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
             | _ -> None)
           bodyvars
       in
-      let entfuncs = entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
-      let fixfunc_is_first =
-        (match first_entfunc with EntryFuncTopfunc _ | EntryFuncFixfunc _ -> true | EntryFuncClosure _ -> false) &&
-        List.mem first_entfunc entfuncs
-      in
-      let closure_is_first =
-        (match first_entfunc with EntryFuncTopfunc _ | EntryFuncFixfunc _ -> false | EntryFuncClosure _ -> true) &&
-        List.mem first_entfunc entfuncs
+      let (fixfunc_is_first, closure_is_first) =
+        if List.mem first_entfunc (entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead) then
+          match first_entfunc with
+          | EntryFuncTopfunc _ | EntryFuncFixfunc _ -> (true, false)
+          | EntryFuncClosure _ -> (false, true)
+        else
+          (false, false)
       in
       msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
         Pp.str "bodyroot=" ++
