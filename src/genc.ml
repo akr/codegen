@@ -2165,7 +2165,7 @@ let gen_func_single
      +++
      pp_body)))
 
-let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
+let pr_entry_function ~(static:bool) (c_funcname : string) (func_enum_index : string)
     (args_struct_type : string) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (body_function_name : string) : Pp.t =
   let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
@@ -2193,7 +2193,7 @@ let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
   let pp_call =
     Pp.hov 2 (Pp.str body_function_name ++
               Pp.str "(" ++
-              Pp.str func_index ++ Pp.str "," +++
+              Pp.str func_enum_index ++ Pp.str "," +++
               Pp.str pp_struct_arg ++ Pp.str "," +++
               Pp.str pp_return_arg ++ Pp.str ");")
   in
@@ -2211,11 +2211,11 @@ let pr_entry_function ~(static:bool) (c_funcname : string) (func_index : string)
       pp_call +++
       pp_return))
 
-let func_index_type_name primary_cfunc = "codegen_func_indextype_" ^ primary_cfunc
+let func_index_enum_tag_name primary_cfunc = "codegen_func_indextype_" ^ primary_cfunc
 
-let topfunc_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
-let fixfunc_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
-let closure_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
+let topfunc_enum_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
+let fixfunc_enum_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
+let closure_enum_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
 let gen_func_multi
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
@@ -2233,7 +2233,7 @@ let gen_func_multi
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
   in
-  let func_index_type = func_index_type_name first_c_name in
+  let func_index_enum_tag = func_index_enum_tag_name first_c_name in
   let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = (List.hd bodychunks).bodychunk_fargs in
@@ -2241,18 +2241,18 @@ let gen_func_multi
   let pp_enum =
     Pp.hov 0 (
       Pp.str "enum" +++
-      Pp.str func_index_type +++
+      Pp.str func_index_enum_tag +++
       hovbrace (
         pp_joinmap_list (Pp.str "," ++ Pp.spc ()) Pp.str
           (List.map
             (function
-              | BodyEntryTopFunc (_,primary_cfunc) -> topfunc_index primary_cfunc
+              | BodyEntryTopFunc (_,primary_cfunc) -> topfunc_enum_index primary_cfunc
               | BodyEntryFixfunc fixfunc_id ->
                   let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                  fixfunc_index fixfunc.fixfunc_c_name
+                  fixfunc_enum_index fixfunc.fixfunc_c_name
               | BodyEntryClosure closure_id ->
                   let clo = Hashtbl.find closure_tbl closure_id in
-                  closure_index clo.closure_c_name)
+                  closure_enum_index clo.closure_c_name)
             entry_funcs)
           ) ++
       Pp.str ";")
@@ -2309,21 +2309,21 @@ let gen_func_multi
     Pp.hv 0 (
       Pp.str "static void" +++
       Pp.str body_function_name ++
-      Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
+      Pp.str ("(enum " ^ func_index_enum_tag ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
   let pp_entry_functions =
     pp_sjoin_list
       (List.map
         (function
           | BodyEntryTopFunc (static, primary_cfunc) ->
-              pr_entry_function ~static primary_cfunc (topfunc_index primary_cfunc)
+              pr_entry_function ~static primary_cfunc (topfunc_enum_index primary_cfunc)
                 (topfunc_args_struct_type primary_cfunc)
                 formal_arguments return_type
                 body_function_name
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc_to_call in
-              pr_entry_function ~static cfunc (fixfunc_index fixfunc.fixfunc_c_name)
+              pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
                   fixfunc.fixfunc_extra_arguments
@@ -2336,7 +2336,7 @@ let gen_func_multi
                 body_function_name
           | BodyEntryClosure closure_id ->
               let clo = Hashtbl.find closure_tbl closure_id in
-              pr_entry_function ~static:true (closure_func_name clo) (closure_index clo.closure_c_name)
+              pr_entry_function ~static:true (closure_func_name clo) (closure_enum_index clo.closure_c_name)
                 (closure_args_struct_type clo.closure_c_name)
                 (List.append clo.closure_args [("closure", pointer_to_void)])
                 clo.closure_c_return_type
@@ -2426,7 +2426,7 @@ let gen_func_multi
                 None (* no need to goto label because BodyEntryTopFunc is always at last *)
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              let case_value = if is_last then None else Some (fixfunc_index fixfunc.fixfunc_c_name) in
+              let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
               let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label_for_goto) in
               pr_case case_value
                 (List.append
@@ -2444,7 +2444,7 @@ let gen_func_multi
                 goto
           | BodyEntryClosure closure_id ->
               let clo = Hashtbl.find closure_tbl closure_id in
-              pr_case (Some (closure_index clo.closure_c_name))
+              pr_case (Some (closure_enum_index clo.closure_c_name))
                 (gen_closure_load_args_assignments clo "codegen_args")
                 (Some (closure_entry_label clo.closure_c_name)))
         entry_funcs')
@@ -2456,7 +2456,7 @@ let gen_func_multi
   let pp_body_function =
     (Pp.str "static void" +++
     Pp.str body_function_name ++
-    Pp.str ("(enum " ^ func_index_type ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
+    Pp.str ("(enum " ^ func_index_enum_tag ^ " codegen_func_index, void *codegen_args, void *codegen_ret)")) +++
     vbrace (
       pp_local_variables_decls +++
       pp_switch +++
