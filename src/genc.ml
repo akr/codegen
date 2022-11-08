@@ -46,7 +46,7 @@ type fixfunc_t = {
   fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_siblings *)
   fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
 
-  fixfunc_cfunc_to_call : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
+  fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
 
   fixfunc_label : string option; (* by fixfunc_initialize_labels *)
 
@@ -62,7 +62,7 @@ let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
 let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
 
 let cfunc_of_fixfunc (fixfunc : fixfunc_t) : string =
-  snd (Option.get fixfunc.fixfunc_cfunc_to_call)
+  snd (Option.get fixfunc.fixfunc_cfunc)
 
 type closure_t = {
   closure_id: Id.t;
@@ -150,7 +150,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
-        Pp.str "fixfunc_cfunc_to_call=" ++ (match fixfunc.fixfunc_cfunc_to_call with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
+        Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.mt ())
@@ -661,7 +661,7 @@ let collect_fix_usage
                   fixfunc_topfunc = None; (* dummy. updated by fixfunc_initialize_topfunc *)
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
-                  fixfunc_cfunc_to_call = None; (* dummy. updated by fixfunc_initialize_c_call *)
+                  fixfunc_cfunc = None; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                   fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
                 })
@@ -944,7 +944,7 @@ let fixfunc_initialize_c_call
             (fun fixfunc ->
               Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
                 { fixfunc with
-                  fixfunc_cfunc_to_call = Some (static, cfunc_name); })
+                  fixfunc_cfunc = Some (static, cfunc_name); })
             fixfuncs
       | None -> ())
     bodyhead_list
@@ -971,7 +971,7 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fi
       (match fixfuncs with
       | [] -> ()
       | first_fixfunc :: _ ->
-          if ((first_fixfunc.fixfunc_cfunc_to_call <> None && not is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
+          if ((first_fixfunc.fixfunc_cfunc <> None && not is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
               List.exists (fun fixfunc -> fixfunc.fixfunc_used_as_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
           then
           let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
@@ -994,7 +994,7 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fi
             not is_first ||
             match fixfuncs with
             | [] -> false
-            | first_fixfunc :: _ -> first_fixfunc.fixfunc_cfunc_to_call <> None (* "fall through" is not usable in the gen_func_multi switch. *)
+            | first_fixfunc :: _ -> first_fixfunc.fixfunc_cfunc <> None (* "fall through" is not usable in the gen_func_multi switch. *)
           in
           if needs_label then
             Hashtbl.replace closure_tbl closure_id
@@ -2079,7 +2079,7 @@ let gen_func_single
     | BodyEntryTopFunc (static, primary_cfunc) -> (static, primary_cfunc)
     | BodyEntryFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (Option.get fixfunc.fixfunc_cfunc_to_call)
+        (Option.get fixfunc.fixfunc_cfunc)
     | BodyEntryClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         (true, closure_func_name clo)
@@ -2312,7 +2312,7 @@ let gen_func_multi
                 body_function_name
           | BodyEntryFixfunc fixfunc_id ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc_to_call in
+              let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
               pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
                 (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
                 (List.append
