@@ -2412,9 +2412,9 @@ let gen_func_multi
     in
     pp_sjoin_list
       (List.mapi
-        (fun i normalent ->
+        (fun i entry_func ->
           let is_last = (i = num_entry_funcs - 1) in
-          match normalent with
+          match entry_func with
           | BodyEntryTopFunc (static, primary_cfunc) ->
               assert is_last;
               pr_case None
