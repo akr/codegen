@@ -1016,31 +1016,41 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
           | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
         Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
         Pp.str "closure_is_first=" ++ Pp.bool closure_is_first);
-      (match fixfuncs with
-      | [] -> ()
-      | first_fixfunc :: _ ->
-          if ((first_fixfunc.fixfunc_cfunc <> None && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
-              List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
-          then
-          let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
-          let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
-          (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
-            Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
-            Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
-          List.iter
-            (fun fixfunc ->
-              let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
-              Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
-                { fixfunc with
-                  fixfunc_label = Some label })
-            fixfuncs);
+      let fixfunc_label =
+        match fixfuncs with
+        | [] -> None
+        | first_fixfunc :: _ ->
+            if ((first_fixfunc.fixfunc_cfunc <> None && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
+                List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
+            then
+              (let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
+              let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
+              (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
+                Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
+                Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
+              List.iter
+                (fun fixfunc ->
+                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
+                  Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
+                    { fixfunc with
+                      fixfunc_label = Some label })
+                fixfuncs;
+              Some label)
+            else
+              None
+      in
       (match bodyroot with
       | BodyRootClosure closure_id ->
           let clo = Hashtbl.find closure_tbl closure_id in
           if not closure_is_first then
+            let label =
+              match fixfunc_label with
+              | Some label -> label
+              | None -> closure_entry_label clo.closure_c_name
+            in
             Hashtbl.replace closure_tbl closure_id
               { clo with
-                closure_label = Some (closure_entry_label clo.closure_c_name) }
+                closure_label = Some label }
       | _ -> ()))
     bodyhead_list
 
@@ -1724,7 +1734,7 @@ let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : st
 let _ = fun x -> ignore x.bodychunk_fixfunc_calls
 let _ = fun x -> ignore x.bodychunk_closure_impls
 
-let labels_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : string list =
+let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : string option =
   let (bodyroot, bodyvars) = bodyhead in
   let fixfunc_ids =
     List.filter_map
@@ -1735,23 +1745,26 @@ let labels_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_ta
   in
   let fixfunc_label =
     match fixfunc_ids with
-    | [] -> []
+    | [] -> None
     | fixfunc_id :: _ ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (match fixfunc.fixfunc_label with
-        | None -> []
-        | Some label -> [label])
+        fixfunc.fixfunc_label
   in
   let closure_label =
     match bodyroot with
     | BodyRootClosure cloid ->
         let clo = Hashtbl.find closure_tbl cloid in
         (match clo.closure_label with
-        | Some label -> [label]
-        | None -> [])
-    | _ -> []
+        | Some clolabel ->
+            (match fixfunc_label with
+            | None -> clo.closure_label
+            | Some fixlabel -> (assert (fixlabel = clolabel); None))
+        | None -> None)
+    | _ -> None
   in
-  closure_label @ fixfunc_label
+  match fixfunc_label with
+  | Some _ -> fixfunc_label
+  | None -> closure_label
 
 let obtain_function_bodychunks
     ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
@@ -2150,9 +2163,9 @@ let gen_func_single
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             closure_vars;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          let labels = labels_of_bodyhead ~fixfunc_tbl ~closure_tbl (List.hd bodychunk.bodychunk_bodyhead_list) in
+          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl (List.hd bodychunk.bodychunk_bodyhead_list) in
           pp_closure_assigns +++
-          pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
+          (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
           gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
         bodychunks)
   in
@@ -2373,9 +2386,9 @@ let gen_func_multi
               | _ -> ())
             bodyvars;
           let cont = { tail_cont_return_type = bodychunk.bodychunk_return_type; tail_cont_multifunc = true } in
-          let labels = labels_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
+          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           Pp.v 0 (
-            pp_sjoinmap_list (fun l -> Pp.str (l ^ ":")) labels +++
+            (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
             gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp))
         bodychunks)
   in
@@ -2455,7 +2468,7 @@ let gen_func_multi
               let clo = Hashtbl.find closure_tbl closure_id in
               pr_case (Some (closure_enum_index clo.closure_c_name))
                 (gen_closure_load_args_assignments clo "codegen_args")
-                (Some (closure_entry_label clo.closure_c_name)))
+                (Some (Option.get (clo.closure_label))))
         entry_funcs')
   in
   let pp_switch =
