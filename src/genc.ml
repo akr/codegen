@@ -2608,27 +2608,22 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
                 Some (BodyEntryTopFunc (primary_static, primary_cfunc))
             | BodyRootFixfunc _
             | BodyRootClosure _ ->
-                List.find_map
-                  (fun fixfunc_id ->
-                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                    let siblings =
-                      List.filter_map
-                        (fun (sibling_static, sibling_cfunc_name, j, sibling_fixfunc_id) ->
-                          if Id.equal fixfunc_id sibling_fixfunc_id then
-                            Some (sibling_static, sibling_cfunc_name)
-                          else
-                            None)
-                        sibling_entfuncs
-                    in
-                    (match siblings with
-                    | first_sibling :: rest_siblings ->
-                        Some (BodyEntryFixfunc fixfunc_id)
-                    | [] ->
-                        if fixfunc.fixfunc_used_as_call then
-                          Some (BodyEntryFixfunc fixfunc_id)
-                        else
-                          None))
-                  fixfunc_ids)
+                (match fixfunc_ids with
+                | [] -> None
+                | first_fixfunc_id :: _ ->
+                    let first_fixfunc = Hashtbl.find fixfunc_tbl first_fixfunc_id in
+                    match first_fixfunc.fixfunc_sibling with
+                    | Some _ ->
+                        Some (BodyEntryFixfunc first_fixfunc_id)
+                    | None ->
+                        List.find_map
+                          (fun fixfunc_id ->
+                            let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+                            if fixfunc.fixfunc_used_as_call then
+                              Some (BodyEntryFixfunc fixfunc_id)
+                            else
+                              None)
+                          fixfunc_ids))
           bodyhead_list
       in
       let closure_list =
