@@ -229,9 +229,9 @@ let disjoint_id_map_union_list (ms : 'a Id.Map.t list) : 'a Id.Map.t =
 let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:make_fixterm_tbl] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:make_fixterm_tbl] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ -> Id.Map.empty
   | Const _ | Construct _ -> Id.Map.empty
   | Proj _ -> Id.Map.empty
