@@ -117,7 +117,6 @@ type bodyhead_t = body_root_t * body_var_t list (* 2nd component (body_vars) is 
 
 type bodychunk_t = {
   bodychunk_return_type : c_typedata;
-  bodychunk_fargs : (string * c_typedata) list; (* outermost first (left to right) *)
   bodychunk_bodyhead_list : bodyhead_t list;
   bodychunk_env : Environ.env;
   bodychunk_exp : EConstr.t;
@@ -184,9 +183,6 @@ let show_bodychunks (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : uni
                   Pp.str "]")
               bodychunk.bodychunk_bodyhead_list)
             ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fargs=[" ++
-            pp_sjoinmap_list (fun (varname, vartype) -> Pp.str varname ++ Pp.str ":" ++ pr_c_abstract_decl vartype) bodychunk.bodychunk_fargs ++
-            Pp.str "]") +++
           Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl bodychunk.bodychunk_return_type) +++
           Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_impls) ++ Pp.str "]") +++
           Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_gotos) ++ Pp.str "]") +++
@@ -558,6 +554,10 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
     else
       thunk_for_call ()
 
+let bodychunk_fargs (bodychunk : bodychunk_t) : (string * c_typedata) list =
+  let (bodyroot, bodyvars) = List.hd bodychunk.bodychunk_bodyhead_list in
+  List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
+
 let obtain_function_bodychunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
     ~(static_and_primary_cfunc : bool * string)
@@ -620,10 +620,8 @@ let obtain_function_bodychunks
                 | _ -> None)
               bodyvars
           in
-          let fargs = List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars in
           let bodychunk = {
             bodychunk_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
-            bodychunk_fargs = List.rev fargs;
             bodychunk_bodyhead_list = bodychunk_bodyhead_list2;
             bodychunk_env = env;
             bodychunk_exp = term;
@@ -2103,7 +2101,7 @@ let gen_func_single
   in
   let c_fargs =
     match entfunc with
-    | EntryFuncTopfunc _ -> (List.hd bodychunks).bodychunk_fargs
+    | EntryFuncTopfunc _ -> bodychunk_fargs (List.hd bodychunks)
     | EntryFuncFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
@@ -2119,7 +2117,7 @@ let gen_func_single
         (fun bodychunk ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            bodychunk.bodychunk_fargs;
+            (bodychunk_fargs bodychunk);
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             closure_vars;
@@ -2219,7 +2217,7 @@ let gen_func_multi
   let func_index_enum_tag = func_index_enum_tag_name first_c_name in
   let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
-  let formal_arguments = (List.hd bodychunks).bodychunk_fargs in
+  let formal_arguments = bodychunk_fargs (List.hd bodychunks) in
   let return_type = (List.hd bodychunks).bodychunk_return_type in
   let pp_enum =
     Pp.hov 0 (
@@ -2334,7 +2332,7 @@ let gen_func_multi
             (fun (arg_name, arg_type) ->
               (*msg_debug_hov (Pp.str ("[codegen:gen_func_multi] add_local_var " ^ arg_name));*)
               add_local_var arg_type arg_name)
-            bodychunk.bodychunk_fargs;
+            (bodychunk_fargs bodychunk);
           let bodyhead = List.hd bodychunk.bodychunk_bodyhead_list in
           let (bodyroot, bodyvars) = bodyhead in
           List.iter
