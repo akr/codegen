@@ -207,23 +207,6 @@ let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : E
   | _ ->
       ([], c_typename env sigma term)
 
-let disjoint_id_map_union (m1 : 'a Id.Map.t) (m2 : 'a Id.Map.t) =
-  Id.Map.union
-    (fun id b1 b2 -> user_err (Pp.str "[codegen:bug] unexpected duplicated variable name:" +++ Id.print id))
-    m1 m2
-
-let disjoint_id_map_union_ary (ms : 'a Id.Map.t array) : 'a Id.Map.t =
-  Array.fold_left
-    (fun m0 m1 ->
-      disjoint_id_map_union m0 m1)
-    Id.Map.empty ms
-
-let disjoint_id_map_union_list (ms : 'a Id.Map.t list) : 'a Id.Map.t =
-  List.fold_left
-    (fun m0 m1 ->
-      disjoint_id_map_union m0 m1)
-    Id.Map.empty ms
-
 let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->

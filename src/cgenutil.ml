@@ -687,6 +687,23 @@ let format_deep (pp : Pp.t) : string =
 let pr_deep (pp : Pp.t) : Pp.t =
   Pp.str (format_deep pp)
 
+let disjoint_id_map_union (m1 : 'a Id.Map.t) (m2 : 'a Id.Map.t) : 'a Id.Map.t =
+  Id.Map.union
+    (fun id b1 b2 -> user_err (Pp.str "[codegen:bug] unexpected duplicated variable name:" +++ Id.print id))
+    m1 m2
+
+let disjoint_id_map_union_ary (ms : 'a Id.Map.t array) : 'a Id.Map.t =
+  Array.fold_left
+    (fun m0 m1 ->
+      disjoint_id_map_union m0 m1)
+    Id.Map.empty ms
+
+let disjoint_id_map_union_list (ms : 'a Id.Map.t list) : 'a Id.Map.t =
+  List.fold_left
+    (fun m0 m1 ->
+      disjoint_id_map_union m0 m1)
+    Id.Map.empty ms
+
 let env_push_assum (env : Environ.env) (x : Names.Name.t Context.binder_annot) (t : EConstr.types) : Environ.env =
   let decl = Context.Rel.Declaration.LocalAssum (x, t) in
   let env2 = EConstr.push_rel decl env in
