@@ -2075,29 +2075,18 @@ let gen_func_single
         let clo = Hashtbl.find closure_tbl closure_id in
         (true, closure_func_name clo)
   in
-  let pp_struct_closure =
-    match entfunc with
-    | EntryFuncClosure closure_id ->
-        let clo = Hashtbl.find closure_tbl closure_id in
-        gen_closure_struct clo
-    | _ -> Pp.mt ()
-  in
-  let pp_closure_assigns =
+  let (pp_struct_closure, pp_closure_assigns, closure_vars) =
     match entfunc with
     | EntryFuncClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         let casted_var = "((struct " ^ closure_struct_tag clo ^ " *)closure)" in
-        pp_sjoinmap_list
-          (fun (lhs, rhs) -> gen_assignment (Pp.str lhs) (Pp.str rhs))
-          (gen_closure_load_vars_assignments clo casted_var)
-    | _ -> Pp.mt ()
-  in
-  let closure_vars =
-    match entfunc with
-    | EntryFuncClosure closure_id ->
-        let clo = Hashtbl.find closure_tbl closure_id in
-        clo.closure_vars
-    | _ -> []
+        (gen_closure_struct clo,
+         pp_sjoinmap_list
+           (fun (lhs, rhs) -> gen_assignment (Pp.str lhs) (Pp.str rhs))
+           (gen_closure_load_vars_assignments clo casted_var),
+         clo.closure_vars)
+    | _ ->
+        (Pp.mt (), Pp.mt (), [])
   in
   let c_fargs =
     match entfunc with
