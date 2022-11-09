@@ -591,7 +591,6 @@ let collect_fix_usage
         let fixterm_id = id_of_annotated_name nary.(j) in
         let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
         let env2 = EConstr.push_rec_types prec env in
-        let fixfunc_is_higher_order_ary = Array.map (is_higher_order_function env sigma) tary in
         let tail_position2 =
           if not tail_position then
             if inlinable then
@@ -625,7 +624,7 @@ let collect_fix_usage
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
-                  fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
+                  fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
                   fixfunc_topfunc = None; (* dummy. updated by fixfunc_initialize_topfunc *)
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
