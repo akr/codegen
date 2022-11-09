@@ -541,12 +541,6 @@ let collect_fix_usage
       (env : Environ.env) (sigma : Evd.evar_map)
       (term : EConstr.t) :
       fixfunc_t Seq.t =
-    let result = collect_fix_usage_rec1 env sigma term in
-    result
-  and collect_fix_usage_rec1
-      (env : Environ.env) (sigma : Evd.evar_map)
-      (term : EConstr.t) :
-      fixfunc_t Seq.t =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -580,25 +574,19 @@ let collect_fix_usage
         let env2 = env_push_assum env x t in
         collect_fix_usage_rec env2 sigma b
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-        let fixterm_id = id_of_annotated_name nary.(j) in
-        let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
         let env2 = EConstr.push_rec_types prec env in
-        let results =
-          Array.map2
-            (fun t f -> collect_fix_usage_rec env2 sigma f)
-            tary fary
-        in
+        let fixterm_id = id_of_annotated_name nary.(j) in
         let fixterm = {
           fixterm_term_id = fixterm_id;
           fixterm_term_env = env;
-          fixterm_inlinable = inlinable;
+          fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
         } in
         let fixfuncs =
           Array.to_seq
-            (CArray.map2_i
-              (fun i name ty ->
+            (Array.map2
+              (fun name ty ->
+                let fixfunc_id = id_of_annotated_name name in
                 let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
-                let fixfunc_id = id_of_annotated_name nary.(i) in
                 {
                   fixfunc_fixterm = fixterm;
                   fixfunc_func_id = fixfunc_id;
@@ -616,6 +604,7 @@ let collect_fix_usage
                 })
               nary tary)
         in
+        let results = Array.map (fun f -> collect_fix_usage_rec env2 sigma f) fary in
         Seq.append fixfuncs (concat_array_seq results)
   in
   let fixfuncs = collect_fix_usage_rec env sigma term in
