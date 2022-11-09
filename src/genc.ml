@@ -995,6 +995,7 @@ let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   fixfunc_tbl
 
 let collect_fixpoints
+    ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
     ~(higher_order_fixfuncs : bool Id.Map.t)
     ~(inlinable_fixterms : bool Id.Map.t)
     ~(used_for_call_set : Id.Set.t)
@@ -1005,45 +1006,11 @@ let collect_fixpoints
     ~(c_names_tbl : string Id.Map.t)
     ~(cfunc_tbl : (bool * string) Id.Map.t)
     ~(fixfunc_label_tbl : string Id.Map.t)
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (term : EConstr.t) :
-    fixfunc_table =
-  let rec collect_fixpoints_rec (env : Environ.env) (term : EConstr.t) : fixfunc_t Seq.t =
-    let (term, args) = decompose_appvect sigma term in
-    match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-        user_err (Pp.str "[codegen:collect_fixpoints_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-    | Cast _ | Sort _ | Prod _ | Ind _ ->
-        user_err (Pp.str "[codegen:collect_fixpoints_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-    | Rel i ->
-        Seq.empty
-    | Const _ | Construct _ -> Seq.empty
-    | Proj (proj, e) ->
-        (* e must be a Rel which type is inductive (non-function) type *)
-        Seq.empty
-    | App (f, args) ->
-        collect_fixpoints_rec env f
-    | LetIn (x,e,t,b) ->
-        let env2 = env_push_def env x e t in
-        let fixfuncs1 = collect_fixpoints_rec env e in
-        let fixfuncs2 = collect_fixpoints_rec env2 b in
-        Seq.append fixfuncs1 fixfuncs2
-    | Case (ci,u,pms,p,iv,item,bl) ->
-        let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-        (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
-        let results = Array.map2
-          (fun (nas,body) (ctx,_) ->
-            let env2 = EConstr.push_rel_context ctx env in
-            collect_fixpoints_rec env2 body)
-          bl bl0
-        in
-        concat_array_seq results
-    | Lambda (x,t,b) ->
-        let env2 = env_push_assum env x t in
-        collect_fixpoints_rec env2 b
-    | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-        let env2 = EConstr.push_rec_types prec env in
-        let fixterm_id = id_of_annotated_name nary.(j) in
+     (sigma : Evd.evar_map) : fixfunc_table =
+  let fixfuncs =
+    Id.Map.fold
+      (fun fixterm_id (env,term) seq ->
+        let ((ks, j), ((nary, tary, fary) as prec)) = destFix sigma term in
         let fixterm = {
           fixterm_id = fixterm_id;
           fixterm_term_env = env;
@@ -1072,10 +1039,10 @@ let collect_fixpoints
                 })
               nary tary)
         in
-        let results = Array.map (fun f -> collect_fixpoints_rec env2 f) fary in
-        Seq.append fixfuncs (concat_array_seq results)
+        Seq.append fixfuncs seq)
+      fixterm_tbl
+      Seq.empty
   in
-  let fixfuncs = collect_fixpoints_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
 let entfuncs_of_bodyhead
@@ -2609,7 +2576,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   in
   let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
   let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
-  let fixfunc_tbl = collect_fixpoints ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl env sigma whole_term in
+  let fixfunc_tbl = collect_fixpoints ~fixterm_tbl ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl sigma in
   let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_label_tbl sigma closure_terms in
   show_fixfunc_table env sigma fixfunc_tbl;
   let used_vars = used_variables env sigma whole_term in
