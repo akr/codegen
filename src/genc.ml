@@ -265,7 +265,7 @@ let rec make_fixfunc_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (ter
       in
       m
 
-let rec make_fixterm_env_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env Id.Map.t =
+let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -275,30 +275,30 @@ let rec make_fixterm_env_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : 
   | Const _ | Construct _ -> Id.Map.empty
   | Proj _ -> Id.Map.empty
   | App (f, args) ->
-      make_fixterm_env_tbl env sigma f
+      make_fixterm_tbl env sigma f
   | LetIn (x,e,t,b) ->
       let env2 = env_push_def env x e t in
-      let m1 = make_fixterm_env_tbl env sigma e in
-      let m2 = make_fixterm_env_tbl env2 sigma b in
+      let m1 = make_fixterm_tbl env sigma e in
+      let m2 = make_fixterm_tbl env2 sigma b in
       disjoint_id_map_union m1 m2
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let ms = Array.map2
         (fun (nas,body) (ctx,_) ->
           let env2 = EConstr.push_rel_context ctx env in
-          make_fixterm_env_tbl env2 sigma body)
+          make_fixterm_tbl env2 sigma body)
         bl bl0
       in
       disjoint_id_map_union_ary ms
   | Lambda (x,t,b) ->
       let env2 = env_push_assum env x t in
-      make_fixterm_env_tbl env2 sigma b
+      make_fixterm_tbl env2 sigma b
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let ms = Array.map (make_fixterm_env_tbl env2 sigma) fary in
+      let ms = Array.map (make_fixterm_tbl env2 sigma) fary in
       let m = disjoint_id_map_union_ary ms in
       let m = CArray.fold_left2
-        (fun m x t -> Id.Map.add (id_of_annotated_name x) env m)
+        (fun m x t -> Id.Map.add (id_of_annotated_name x) (env, term) m)
         m nary tary
       in
       m
@@ -958,7 +958,7 @@ let compute_precise_extra_arguments
 
 let make_extra_arguments_tbl
     ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
-    ~(fixterm_env_tbl : Environ.env Id.Map.t)
+    ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
@@ -980,7 +980,7 @@ let make_extra_arguments_tbl
       | [] -> ()
       | fixfunc_id :: inner_fixfunc_ids ->
           let fixterm_id = Id.Map.find fixfunc_id fixfunc_fixterm_tbl in
-          let fixterm_env = Id.Map.find fixfunc_id fixterm_env_tbl in
+          let (fixterm_env, _) = Id.Map.find fixfunc_id fixterm_tbl in
           let naive_extra_arguments = compute_naive_extra_arguments ~fixfunc_fixterm_tbl fixterm_env sigma in
           let extra_arguments =
             match (Id.Map.mem fixfunc_id topfunc_tbl), (Id.Map.mem fixfunc_id sibling_tbl) with
@@ -2638,12 +2638,12 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma whole_term in
-  let fixterm_env_tbl = make_fixterm_env_tbl env sigma whole_term in
+  let fixterm_tbl = make_fixterm_tbl env sigma whole_term in
   let used_for_call_set = make_used_for_call_set bodychunks in
   let used_for_goto_set = make_used_for_goto_set bodychunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
-  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
+  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
   let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma bodychunks in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
