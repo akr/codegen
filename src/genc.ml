@@ -1183,6 +1183,8 @@ let fixfunc_initialize_labels
     ~(cfunc_tbl : (bool * string) Id.Map.t)
     (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+  let fixfunc_labels_tbl = ref Id.Map.empty in
+  let closure_labels_tbl = ref Id.Map.empty in
   List.iter
     (fun ((bodyroot, bodyvars) as bodyhead) ->
       let fixfunc_ids =
@@ -1221,10 +1223,7 @@ let fixfunc_initialize_labels
                 Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
               List.iter
                 (fun fixfunc_id ->
-                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                  Hashtbl.replace fixfunc_tbl fixfunc_id
-                    { fixfunc with
-                      fixfunc_label = Some label })
+                  fixfunc_labels_tbl := Id.Map.add fixfunc_id label !fixfunc_labels_tbl)
                 fixfunc_ids;
               Some label)
             else
@@ -1239,11 +1238,23 @@ let fixfunc_initialize_labels
               | Some label -> label
               | None -> closure_entry_label clo.closure_c_name
             in
-            Hashtbl.replace closure_tbl closure_id
-              { clo with
-                closure_label = Some label }
+            closure_labels_tbl := Id.Map.add closure_id label !closure_labels_tbl
       | _ -> ()))
-    bodyhead_list
+    bodyhead_list;
+  Id.Map.iter
+    (fun fixfunc_id label ->
+      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+      Hashtbl.replace fixfunc_tbl fixfunc_id
+        { fixfunc with
+          fixfunc_label = Some label })
+    !fixfunc_labels_tbl;
+  Id.Map.iter
+    (fun closure_id label ->
+      let closure = Hashtbl.find closure_tbl closure_id in
+      Hashtbl.replace closure_tbl closure_id
+        { closure with
+          closure_label = Some label })
+    !closure_labels_tbl
 
 let local_gensym_id : (int ref) option ref = ref None
 
