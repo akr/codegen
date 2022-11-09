@@ -226,45 +226,6 @@ let disjoint_id_map_union_list (ms : 'a Id.Map.t list) : 'a Id.Map.t =
       disjoint_id_map_union m0 m1)
     Id.Map.empty ms
 
-let rec make_fixfunc_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.t Id.Map.t =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Rel i -> Id.Map.empty
-  | Const _ | Construct _ -> Id.Map.empty
-  | Proj _ -> Id.Map.empty
-  | App (f, args) ->
-      make_fixfunc_fixterm_tbl env sigma f
-  | LetIn (x,e,t,b) ->
-      let env2 = env_push_def env x e t in
-      let m1 = make_fixfunc_fixterm_tbl env sigma e in
-      let m2 = make_fixfunc_fixterm_tbl env2 sigma b in
-      disjoint_id_map_union m1 m2
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      let ms = Array.map2
-        (fun (nas,body) (ctx,_) ->
-          let env2 = EConstr.push_rel_context ctx env in
-          make_fixfunc_fixterm_tbl env2 sigma body)
-        bl bl0
-      in
-      disjoint_id_map_union_ary ms
-  | Lambda (x,t,b) ->
-      let env2 = env_push_assum env x t in
-      make_fixfunc_fixterm_tbl env2 sigma b
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let fixterm_id = id_of_annotated_name nary.(j) in
-      let ms = Array.map (make_fixfunc_fixterm_tbl env2 sigma) fary in
-      let m = disjoint_id_map_union_ary ms in
-      let m = CArray.fold_left2
-        (fun m x t -> Id.Map.add (id_of_annotated_name x) fixterm_id m)
-        m nary tary
-      in
-      m
-
 let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -302,6 +263,19 @@ let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : ECon
         m nary tary
       in
       m
+
+let make_fixfunc_fixterm_tbl (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : Id.t Id.Map.t =
+  Id.Map.fold
+    (fun fixfunc_id (env,term) tbl ->
+      let ((ks, j), (nary, tary, fary)) = destFix sigma term in
+      if Id.equal (id_of_annotated_name nary.(j)) fixfunc_id then
+        CArray.fold_left2
+          (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixfunc_id tbl)
+          tbl nary tary
+      else
+        tbl)
+    fixterm_tbl
+    Id.Map.empty
 
 (*
   Currently only closures are represented as a pointer to stack-allocated data.
@@ -2637,8 +2611,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
-  let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma whole_term in
   let fixterm_tbl = make_fixterm_tbl env sigma whole_term in
+  let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
   let used_for_call_set = make_used_for_call_set bodychunks in
   let used_for_goto_set = make_used_for_goto_set bodychunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
