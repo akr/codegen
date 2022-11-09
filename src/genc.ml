@@ -58,7 +58,9 @@ type fixfunc_t = {
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
-let fixfunc_entry_label (c_name : string) : string = "entry_" ^ c_name
+let primary_entry_label (c_name : string) : string = "entry_" ^ c_name
+let sibling_entry_label (c_name : string) : string = "entry_" ^ c_name
+let fixfunc_entry_label (c_name : string) : string = c_name (* fixfuncs has already unique prefix, "fixfuncN_" *)
 let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
 
 let cfunc_of_fixfunc (fixfunc : fixfunc_t) : string =
@@ -1182,10 +1184,10 @@ let make_labels_tbl
             then
               (let label =
                 match bodyroot with
-                | BodyRootTopfunc (static,primary_cfunc) -> fixfunc_entry_label primary_cfunc
+                | BodyRootTopfunc (static,primary_cfunc) -> primary_entry_label primary_cfunc
                 | BodyRootFixfunc fixfunc_id ->
                     (match Id.Map.find_opt fixfunc_id sibling_tbl with
-                    | Some (static,sibling_cfunc) -> fixfunc_entry_label sibling_cfunc
+                    | Some (static,sibling_cfunc) -> sibling_entry_label sibling_cfunc
                     | None -> fixfunc_entry_label (Id.to_string first_fixfunc_id))
                 | BodyRootClosure closure_id ->
                     fixfunc_entry_label (Id.to_string first_fixfunc_id)
