@@ -2624,21 +2624,29 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
   let cfunc_tbl = make_cfunc_tbl ~used_for_call ~sibling_tbl sigma bodychunks in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma whole_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let closure_tbl = collect_closures ~extra_arguments_tbl env sigma whole_term in
   let bodychunks_list = split_function_bodychunks bodychunks in
   List.iter (fun bodychunks -> show_bodychunks sigma bodychunks) bodychunks_list;
-  let code_pairs = List.map
-    (fun bodychunks ->
-      let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-      let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl) bodyhead_list in
-      (match entry_funcs with
+  let entry_funcs_list =
+    List.map
+      (fun bodychunks ->
+        let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+        List.concat_map (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl) bodyhead_list)
+      bodychunks_list
+  in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma whole_term in
+  List.iter2
+    (fun bodychunks entry_funcs ->
+      match entry_funcs with
       | [] -> ()
       | first_entfunc :: _ ->
-          fixfunc_initialize_labels bodychunks ~used_for_call ~sibling_tbl ~first_entfunc ~fixfunc_tbl ~closure_tbl);
-      show_fixfunc_table env sigma fixfunc_tbl;
+          fixfunc_initialize_labels bodychunks ~used_for_call ~sibling_tbl ~first_entfunc ~fixfunc_tbl ~closure_tbl)
+    bodychunks_list entry_funcs_list;
+  show_fixfunc_table env sigma fixfunc_tbl;
+  let code_pairs = List.map2
+    (fun bodychunks entry_funcs ->
       let (decl, impl) =
         match entry_funcs with
         | [] -> (Pp.mt (), Pp.mt ())
@@ -2649,7 +2657,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
       in
       let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stubs in
       (decl +++ pp_stub_sibling_entfuncs, impl))
-    bodychunks_list
+    bodychunks_list entry_funcs_list
   in
   List.fold_left (fun c (decl, impl) -> c +++ decl ++ Pp.fnl ()) (Pp.mt ()) code_pairs +++
   List.fold_left (fun c (decl, impl) -> c +++ impl ++ Pp.fnl ()) (Pp.mt ()) code_pairs
