@@ -27,28 +27,28 @@ open Induc
 open Specialize
 
 type fixterm_t = {
-  fixterm_id: Id.t;
-  fixterm_inlinable: bool;
+  fixterm_id : Id.t;
+  fixterm_inlinable : bool;
 }
 
 let _ = ignore (fun x -> x.fixterm_id)
 
 type fixfunc_t = {
-  fixfunc_fixterm: fixterm_t;
-  fixfunc_id: Id.t;
-  fixfunc_used_for_call: bool;
-  fixfunc_used_for_goto: bool;
-  fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
-  fixfunc_return_type: c_typedata; (* may be void. *)
-  fixfunc_is_higher_order: bool; (* means that arguments contain function *)
+  fixfunc_fixterm : fixterm_t;
+  fixfunc_id : Id.t;
+  fixfunc_used_for_call : bool;
+  fixfunc_used_for_goto : bool;
+  fixfunc_formal_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
+  fixfunc_return_type : c_typedata; (* may be void. *)
+  fixfunc_is_higher_order : bool; (* means that arguments contain function *)
 
-  fixfunc_topfunc: (bool * string) option; (* (static, cfunc_name) *)
-  fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *)
-  fixfunc_c_name: string;
+  fixfunc_topfunc : (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_sibling : (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_c_name : string;
 
   fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *)
 
-  fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *)
+  fixfunc_extra_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different for primary function and siblings.
     In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
@@ -65,12 +65,12 @@ let cfunc_of_fixfunc (fixfunc : fixfunc_t) : string =
   snd (Option.get fixfunc.fixfunc_cfunc)
 
 type closure_t = {
-  closure_id: Id.t;
-  closure_c_name: string;
-  closure_c_func_type: c_typedata;
-  closure_c_return_type: c_typedata;
-  closure_args: (string * c_typedata) list;
-  closure_vars: (string * c_typedata) list;
+  closure_id : Id.t;
+  closure_c_name : string;
+  closure_c_func_type : c_typedata;
+  closure_c_return_type : c_typedata;
+  closure_args : (string * c_typedata) list;
+  closure_vars : (string * c_typedata) list;
   closure_label : string option; (* by fixfunc_initialize_labels *)
 }
 type closure_table = (Id.t, closure_t) Hashtbl.t
@@ -1485,8 +1485,8 @@ let lam_fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   (fargs, env2, fix_body_list env2 sigma body)
 
 type head_cont = {
-  head_cont_ret_var: string option; (* None for void type context *)
-  head_cont_exit_label: string option;
+  head_cont_ret_var : string option; (* None for void type context *)
+  head_cont_exit_label : string option;
 }
 
 let gen_head_cont ?(omit_void_exp : bool = false) (cont : head_cont) (exp : Pp.t) : Pp.t =
