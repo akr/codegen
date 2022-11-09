@@ -505,10 +505,6 @@ let merge_used_for_goto (bodychunks : bodychunk_t list) : Id.Set.t =
 
 (*
   collect_fix_usage collects information for each fix-terms and fix-bounded functions.
-
-  collect_fix_usage tracks the term will be translated by gen_head or gen_tail.
-  tail_position=false means that term will be translated by gen_head.
-  tail_position=true means that term will be translated by gen_tail.
 *)
 
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
