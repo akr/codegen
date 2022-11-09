@@ -600,17 +600,17 @@ let obtain_function_genchunks
                 obtain_function_genchunks_lamfix ~tail_position ~individual_body ~bodyroot:bodyroot2 ~bodyvars:bodyvars2 env2 f)
             nary' fary')
         in
-        let genchunks = concat_array_seq (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunks) result_ary) in
-        let genchunk_bodyhead_list = List.concat (CArray.map_to_list (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunk_bodyhead_list) result_ary) in
-        let fixfunc_impls0 = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
-        let fixfunc_gotos = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
-        let fixfunc_calls = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
-        let closure_impls = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
+        let genchunks = concat_array_seq (Array.map (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunks) result_ary) in
+        let bodyhead_list = List.concat (CArray.map_to_list (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodyhead_list) result_ary) in
+        let fixfunc_impls0 = idset_union_ary (Array.map (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
+        let fixfunc_gotos = idset_union_ary (Array.map (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
+        let fixfunc_calls = idset_union_ary (Array.map (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
+        let closure_impls = idset_union_ary (Array.map (fun (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
         let fixfunc_impls = Id.Set.union fixfunc_impls0 (idset_of_array (Array.map id_of_annotated_name nary)) in
-        (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+        (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | _ ->
-        let (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_body ~tail_position env term in
-        let genchunk_bodyhead_list2 = (bodyroot, List.rev bodyvars) :: genchunk_bodyhead_list in
+        let (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_body ~tail_position env term in
+        let bodyhead_list2 = (bodyroot, List.rev bodyvars) :: bodyhead_list in
         if individual_body then
           let fixfunc_ids =
             List.filter_map
@@ -622,7 +622,7 @@ let obtain_function_genchunks
           in
           let genchunk = {
             genchunk_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
-            genchunk_bodyhead_list = genchunk_bodyhead_list2;
+            genchunk_bodyhead_list = bodyhead_list2;
             genchunk_env = env;
             genchunk_exp = term;
             genchunk_fixfunc_impls = Id.Set.union (Id.Set.of_list fixfunc_ids) fixfunc_impls;
@@ -632,9 +632,9 @@ let obtain_function_genchunks
           } in
           (Seq.cons genchunk genchunks, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
         else
-          (genchunks, genchunk_bodyhead_list2, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+          (genchunks, bodyhead_list2, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
   and obtain_function_genchunks_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) :
-      (genchunk_t Seq.t * (*genchunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
+      (genchunk_t Seq.t * (*bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
