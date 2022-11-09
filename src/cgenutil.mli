@@ -78,6 +78,7 @@ val intset_union3 : IntSet.t -> IntSet.t -> IntSet.t -> IntSet.t
 val idset_union_list : Names.Id.Set.t list -> Names.Id.Set.t
 val idset_union_ary : Names.Id.Set.t array -> Names.Id.Set.t
 val idset_of_array : Names.Id.t array -> Names.Id.Set.t
+val idmap_of_list : (Names.Id.t * 'a) list -> 'a Names.Id.Map.t
 type unionfind_t
 val unionfind_make : int -> unionfind_t
 val unionfind_find : unionfind_t -> int -> int

@@ -557,6 +557,12 @@ let unionfind_sets (u : unionfind_t) : int list list =
 let idset_of_array (ary : Id.t array) : Id.Set.t =
   Array.fold_right Id.Set.add ary Id.Set.empty
 
+let idmap_of_list (bindings : (Id.t * 'a) list) : 'a Id.Map.t =
+  List.fold_left
+    (fun m (id, v) -> Id.Map.add id v m)
+    Id.Map.empty
+    bindings
+
 let (++) = Pp.app
 
 let (+++) d1 d2 =

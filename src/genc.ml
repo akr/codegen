@@ -613,6 +613,7 @@ let collect_fix_usage
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
+    ~(c_names_tbl : string Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
@@ -673,7 +674,7 @@ let collect_fix_usage
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
                   fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
                   fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
-                  fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
+                  fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
                   fixfunc_cfunc = None; (* dummy. updated by fixfunc_initialize_c_call *)
                   fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
                   fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
@@ -701,21 +702,26 @@ let make_sibling_tbl (sibling_entfuncs : (bool * string * int * Id.t) list) : (b
     Id.Map.empty
     sibling_entfuncs
 
-let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
-  Hashtbl.filter_map_inplace
-    (fun (fixfunc_id : Id.t) (fixfunc : fixfunc_t) ->
-      let c_name =
-        match fixfunc.fixfunc_topfunc, fixfunc.fixfunc_sibling with
-        | Some (_,cfunc), _ -> cfunc
-        | None, Some (_,cfunc) -> cfunc
-        | None, None ->
-            if fixfunc.fixfunc_used_for_call then
-              global_gensym_with_id fixfunc_id
-            else
-              Id.to_string fixfunc_id
-      in
-      Some { fixfunc with fixfunc_c_name = c_name })
-    fixfunc_tbl
+let make_c_names_tbl
+    ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
+    ~(used_for_call : Id.Set.t)
+    ~(topfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t) : string Id.Map.t =
+  idmap_of_list
+    (List.map
+      (fun (fixfunc_id, _) ->
+        let c_name =
+          match (Id.Map.find_opt fixfunc_id topfunc_tbl), (Id.Map.find_opt fixfunc_id sibling_tbl) with
+          | Some (_,cfunc), _ -> cfunc
+          | None, Some (_,cfunc) -> cfunc
+          | None, None ->
+              if Id.Set.mem fixfunc_id used_for_call then
+                global_gensym_with_id fixfunc_id
+              else
+                Id.to_string fixfunc_id
+        in
+        (fixfunc_id, c_name))
+      (Id.Map.bindings fixfunc_fixterm_tbl))
 
 (*
   fixterm_free_variables computes variables which may be references at run time,
@@ -1076,8 +1082,8 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
   let topfunc_tbl = make_topfunc_tbl sigma term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma term bodychunks in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl env sigma term in
-  fixfunc_initialize_c_names fixfunc_tbl;
+  let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl env sigma term in
   fixfunc_initialize_c_call sigma bodychunks ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
