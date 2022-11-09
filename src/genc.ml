@@ -2020,9 +2020,16 @@ let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t
   in
   c_fargs
 
+let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
+  let closure_tbl = Hashtbl.create 0 in
+  List.iter
+    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
+    closure_list;
+  closure_tbl
+
 let collect_closures
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
-    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : closure_t list =
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : closure_table =
   let closures = ref [] in
   find_closures env sigma term
     ~found:(fun closure_env closure_exp ->
@@ -2068,14 +2075,7 @@ let collect_closures
           closure_vars=vars;
           closure_label = None; (* dummy. updated by fixfunc_initialize_labels *)
         } :: !closures);
-  List.rev !closures
-
-let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
-  let closure_tbl = Hashtbl.create 0 in
-  List.iter
-    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
-    closure_list;
-  closure_tbl
+  closure_tbl_of_list (List.rev !closures)
 
 let pr_members (args : (string * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
@@ -2623,8 +2623,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma whole_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
-  let closure_list = collect_closures ~extra_arguments_tbl env sigma whole_term in
-  let closure_tbl = closure_tbl_of_list closure_list in
+  let closure_tbl = collect_closures ~extra_arguments_tbl env sigma whole_term in
   let bodychunks_list = split_function_bodychunks bodychunks in
   List.iter (fun bodychunks -> show_bodychunks sigma bodychunks) bodychunks_list;
   let code_pairs = List.map
