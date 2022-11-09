@@ -256,24 +256,17 @@ let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : ECon
       make_fixterm_tbl env2 sigma b
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = EConstr.push_rec_types prec env in
-      let ms = Array.map (make_fixterm_tbl env2 sigma) fary in
-      let m = disjoint_id_map_union_ary ms in
-      let m = CArray.fold_left2
-        (fun m x t -> Id.Map.add (id_of_annotated_name x) (env, term) m)
-        m nary tary
-      in
-      m
+      let tbls = Array.map (make_fixterm_tbl env2 sigma) fary in
+      let tbl = disjoint_id_map_union_ary tbls in
+      Id.Map.add (id_of_annotated_name nary.(j)) (env, term) tbl
 
 let make_fixfunc_fixterm_tbl (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : Id.t Id.Map.t =
   Id.Map.fold
     (fun fixfunc_id (env,term) tbl ->
       let ((ks, j), (nary, tary, fary)) = destFix sigma term in
-      if Id.equal (id_of_annotated_name nary.(j)) fixfunc_id then
-        CArray.fold_left2
-          (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixfunc_id tbl)
-          tbl nary tary
-      else
-        tbl)
+      CArray.fold_left2
+        (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixfunc_id tbl)
+        tbl nary tary)
     fixterm_tbl
     Id.Map.empty
 
@@ -954,7 +947,7 @@ let make_extra_arguments_tbl
       | [] -> ()
       | fixfunc_id :: inner_fixfunc_ids ->
           let fixterm_id = Id.Map.find fixfunc_id fixfunc_fixterm_tbl in
-          let (fixterm_env, _) = Id.Map.find fixfunc_id fixterm_tbl in
+          let (fixterm_env, _) = Id.Map.find fixterm_id fixterm_tbl in
           let naive_extra_arguments = compute_naive_extra_arguments ~fixfunc_fixterm_tbl fixterm_env sigma in
           let extra_arguments =
             match (Id.Map.mem fixfunc_id topfunc_tbl), (Id.Map.mem fixfunc_id sibling_tbl) with
