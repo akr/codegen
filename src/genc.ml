@@ -1054,23 +1054,6 @@ and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
       found env term;
       find_closures ~found env sigma term
 
-let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
-  let (_, c_fargs) =
-    List.fold_left_map
-      (fun env (annotated_name, ty) ->
-        let env' = Environ.pop_rel_context 1 env in
-        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
-      env fargs
-  in
-  c_fargs
-
-let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
-  let closure_tbl = Hashtbl.create 0 in
-  List.iter
-    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
-    closure_list;
-  closure_tbl
-
 let collect_closure_terms (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) list =
   let result = ref [] in
   find_closures env sigma term
@@ -1309,6 +1292,23 @@ let collect_fixpoints
       Seq.empty
   in
   make_fixfunc_table (List.of_seq fixfuncs)
+
+let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
+  let (_, c_fargs) =
+    List.fold_left_map
+      (fun env (annotated_name, ty) ->
+        let env' = Environ.pop_rel_context 1 env in
+        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
+      env fargs
+  in
+  c_fargs
+
+let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
+  let closure_tbl = Hashtbl.create 0 in
+  List.iter
+    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
+    closure_list;
+  closure_tbl
 
 let collect_closures
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
