@@ -614,6 +614,7 @@ let collect_fix_usage
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(c_names_tbl : string Id.Map.t)
+    ~(cfunc_tbl : (bool * string) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
@@ -675,7 +676,7 @@ let collect_fix_usage
                   fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
                   fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
                   fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
-                  fixfunc_cfunc = None; (* dummy. updated by fixfunc_initialize_c_call *)
+                  fixfunc_cfunc = Id.Map.find_opt fixfunc_id cfunc_tbl;
                   fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
                   fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                 })
@@ -925,15 +926,18 @@ let make_extra_arguments_tbl
     bodyhead_list;
   !result
 
-let fixfunc_initialize_c_call
-    (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) : unit =
+let make_cfunc_tbl
+    ~(used_for_call : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : (bool * string) Id.Map.t =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+  let result = ref Id.Map.empty in
   List.iter
     (fun (bodyroot, bodyvars) ->
-      let fixfuncs =
+      let fixfunc_ids =
         List.filter_map
           (function
-            | BodyVarFixfunc fixfunc_id -> Some (Hashtbl.find fixfunc_tbl fixfunc_id)
+            | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
             | _ -> None)
           bodyvars
       in
@@ -942,28 +946,27 @@ let fixfunc_initialize_c_call
         | BodyRootTopfunc (static, primary_cfunc)  -> Some (static, primary_cfunc)
         | BodyRootClosure _
         | BodyRootFixfunc _ ->
-            match fixfuncs with
+            match fixfunc_ids with
             | [] -> None
-            | first_fixfunc :: rest_fixfuncs ->
-                match first_fixfunc.fixfunc_sibling with
+            | first_fixfunc_id :: _ ->
+                match Id.Map.find_opt first_fixfunc_id sibling_tbl with
                 | Some (sibling_static, sibling_cfunc_name) -> Some (sibling_static, sibling_cfunc_name)
                 | None ->
-                    let used_for_call = List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_call) fixfuncs in
+                    let used_for_call = List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_call) fixfunc_ids in
                     if used_for_call then
-                      Some (true, global_gensym_with_id first_fixfunc.fixfunc_func_id)
+                      Some (true, global_gensym_with_id first_fixfunc_id)
                     else
                       None
       in
       match static_and_cfunc_name with
       | Some (static, cfunc_name) ->
           List.iter
-            (fun fixfunc ->
-              Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
-                { fixfunc with
-                  fixfunc_cfunc = Some (static, cfunc_name); })
-            fixfuncs
+            (fun fixfunc_id ->
+              result := Id.Map.add fixfunc_id (static, cfunc_name) !result)
+            fixfunc_ids
       | None -> ())
-    bodyhead_list
+    bodyhead_list;
+  !result
 
 let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : entry_func_t list =
   let (bodyroot, bodyvars) = bodyhead in
@@ -1083,8 +1086,8 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma term bodychunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl env sigma term in
-  fixfunc_initialize_c_call sigma bodychunks ~fixfunc_tbl;
+  let cfunc_tbl = make_cfunc_tbl ~used_for_call ~sibling_tbl sigma bodychunks in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma term in
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
 
