@@ -763,10 +763,10 @@ let obtain_function_bodychunks
   (*show_bodychunks sigma result;*)
   result
 
-let merge_used_for_call (bodychunks : bodychunk_t list) : Id.Set.t =
+let make_used_for_call_set (bodychunks : bodychunk_t list) : Id.Set.t =
   idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_calls) bodychunks)
 
-let merge_used_for_goto (bodychunks : bodychunk_t list) : Id.Set.t =
+let make_used_for_goto_set (bodychunks : bodychunk_t list) : Id.Set.t =
   idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_gotos) bodychunks)
 
 (*
@@ -795,7 +795,7 @@ let make_sibling_tbl (sibling_entfuncs : (bool * string * int * Id.t) list) : (b
 
 let make_c_names_tbl
     ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
-    ~(used_for_call : Id.Set.t)
+    ~(used_for_call_set : Id.Set.t)
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t) : string Id.Map.t =
   idmap_of_list
@@ -806,7 +806,7 @@ let make_c_names_tbl
           | Some (_,cfunc), _ -> cfunc
           | None, Some (_,cfunc) -> cfunc
           | None, None ->
-              if Id.Set.mem fixfunc_id used_for_call then
+              if Id.Set.mem fixfunc_id used_for_call_set then
                 global_gensym_with_id fixfunc_id
               else
                 Id.to_string fixfunc_id
@@ -1017,7 +1017,7 @@ let make_extra_arguments_tbl
   !result
 
 let make_cfunc_tbl
-    ~(used_for_call : Id.Set.t)
+    ~(used_for_call_set : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : (bool * string) Id.Map.t =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
@@ -1042,7 +1042,7 @@ let make_cfunc_tbl
                 match Id.Map.find_opt first_fixfunc_id sibling_tbl with
                 | Some (sibling_static, sibling_cfunc_name) -> Some (sibling_static, sibling_cfunc_name)
                 | None ->
-                    let used_for_call = List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_call) fixfunc_ids in
+                    let used_for_call = List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_call_set) fixfunc_ids in
                     if used_for_call then
                       Some (true, global_gensym_with_id first_fixfunc_id)
                     else
@@ -1061,8 +1061,8 @@ let make_cfunc_tbl
 let collect_fix_usage
     ~(higher_order_fixfuncs : bool Id.Map.t)
     ~(inlinable_fixterms : bool Id.Map.t)
-    ~(used_for_call : Id.Set.t)
-    ~(used_for_goto : Id.Set.t)
+    ~(used_for_call_set : Id.Set.t)
+    ~(used_for_goto_set : Id.Set.t)
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
@@ -1122,8 +1122,8 @@ let collect_fix_usage
                 {
                   fixfunc_fixterm = fixterm;
                   fixfunc_func_id = fixfunc_id;
-                  fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call;
-                  fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto;
+                  fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
+                  fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
@@ -1143,7 +1143,7 @@ let collect_fix_usage
   make_fixfunc_table (List.of_seq fixfuncs)
 
 let entfuncs_of_bodyhead
-    ~(used_for_call : Id.Set.t)
+    ~(used_for_call_set : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     (bodyhead : bodyhead_t) : entry_func_t list =
   let (bodyroot, bodyvars) = bodyhead in
@@ -1169,7 +1169,7 @@ let entfuncs_of_bodyhead
             | None ->
                 List.find_map
                   (fun fixfunc_id ->
-                    if Id.Set.mem fixfunc_id used_for_call then
+                    if Id.Set.mem fixfunc_id used_for_call_set then
                       Some (EntryFuncFixfunc first_fixfunc_id)
                     else
                       None)
@@ -1184,8 +1184,8 @@ let entfuncs_of_bodyhead
   (match closure_ent with Some cent -> [cent] | None -> [])
 
 let make_labels_tbl
-    ~(used_for_call : Id.Set.t)
-    ~(used_for_goto : Id.Set.t)
+    ~(used_for_call_set : Id.Set.t)
+    ~(used_for_goto_set : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(cfunc_tbl : (bool * string) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
@@ -1203,7 +1203,7 @@ let make_labels_tbl
           bodyvars
       in
       let (fixfunc_is_first, closure_is_first) =
-        if List.mem first_entfunc (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl bodyhead) then
+        if List.mem first_entfunc (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl bodyhead) then
           match first_entfunc with
           | EntryFuncTopfunc _ | EntryFuncFixfunc _ -> (true, false)
           | EntryFuncClosure _ -> (false, true)
@@ -1223,7 +1223,7 @@ let make_labels_tbl
         | [] -> None
         | first_fixfunc_id :: _ ->
             if ((Id.Map.mem first_fixfunc_id cfunc_tbl && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
-                List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_goto) fixfunc_ids) (* Anyway, labels are required if internal goto use them *)
+                List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_goto_set) fixfunc_ids) (* Anyway, labels are required if internal goto use them *)
             then
               (let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
               (*msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
@@ -2643,13 +2643,13 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let static_and_primary_cfunc = (static, primary_cfunc) in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma whole_term in
   let fixterm_env_tbl = make_fixterm_env_tbl env sigma whole_term in
-  let used_for_call = merge_used_for_call bodychunks in
-  let used_for_goto = merge_used_for_goto bodychunks in
+  let used_for_call_set = make_used_for_call_set bodychunks in
+  let used_for_goto_set = make_used_for_goto_set bodychunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
-  let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
-  let cfunc_tbl = make_cfunc_tbl ~used_for_call ~sibling_tbl sigma bodychunks in
+  let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
+  let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma bodychunks in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
   let closure_terms = collect_closure_terms env sigma whole_term in
@@ -2660,7 +2660,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
     List.map
       (fun bodychunks ->
         let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-        List.concat_map (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl) bodyhead_list)
+        List.concat_map (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl) bodyhead_list)
       bodychunks_list
   in
   let label_tbls =
@@ -2669,12 +2669,12 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         match entry_funcs with
         | [] -> (Id.Map.empty, Id.Map.empty)
         | first_entfunc :: _ ->
-            make_labels_tbl bodychunks ~used_for_call ~used_for_goto ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
+            make_labels_tbl bodychunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
       bodychunks_list entry_funcs_list
   in
   let fixfunc_labels_tbl = disjoint_id_map_union_list (List.map fst label_tbls) in
   let closure_labels_tbl = disjoint_id_map_union_list (List.map snd label_tbls) in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_labels_tbl env sigma whole_term in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_labels_tbl env sigma whole_term in
   let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_labels_tbl sigma closure_terms in
   show_fixfunc_table env sigma fixfunc_tbl;
   let code_pairs = List.map2
