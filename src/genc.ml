@@ -1178,15 +1178,17 @@ let entfuncs_of_bodyhead
 
 let fixfunc_initialize_labels
     ~(used_for_call : Id.Set.t)
+    ~(used_for_goto : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(cfunc_tbl : (bool * string) Id.Map.t)
     (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
   List.iter
     (fun ((bodyroot, bodyvars) as bodyhead) ->
-      let fixfuncs =
+      let fixfunc_ids =
         List.filter_map
           (function
-            | BodyVarFixfunc fixfunc_id -> Some (Hashtbl.find fixfunc_tbl fixfunc_id)
+            | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
             | _ -> None)
           bodyvars
       in
@@ -1207,24 +1209,23 @@ let fixfunc_initialize_labels
         Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
         Pp.str "closure_is_first=" ++ Pp.bool closure_is_first);
       let fixfunc_label =
-        match fixfuncs with
+        match fixfunc_ids with
         | [] -> None
-        | first_fixfunc :: _ ->
-            if ((first_fixfunc.fixfunc_cfunc <> None && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
-                List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs) (* Anyway, labels are required if internal goto use them *)
+        | first_fixfunc_id :: _ ->
+            if ((Id.Map.mem first_fixfunc_id cfunc_tbl && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
+                List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_goto) fixfunc_ids) (* Anyway, labels are required if internal goto use them *)
             then
-              (let first_fixfunc_id = first_fixfunc.fixfunc_func_id in
-              let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
+              (let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
               (*msg_debug_hov (Pp.str "[codegen:fixfunc_initialize_labels]" +++
                 Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
                 Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
               List.iter
-                (fun fixfunc ->
-                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc.fixfunc_func_id in
-                  Hashtbl.replace fixfunc_tbl fixfunc.fixfunc_func_id
+                (fun fixfunc_id ->
+                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+                  Hashtbl.replace fixfunc_tbl fixfunc_id
                     { fixfunc with
                       fixfunc_label = Some label })
-                fixfuncs;
+                fixfunc_ids;
               Some label)
             else
               None
@@ -2642,7 +2643,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
       match entry_funcs with
       | [] -> ()
       | first_entfunc :: _ ->
-          fixfunc_initialize_labels bodychunks ~used_for_call ~sibling_tbl ~first_entfunc ~fixfunc_tbl ~closure_tbl)
+          fixfunc_initialize_labels bodychunks ~used_for_call ~used_for_goto ~sibling_tbl ~cfunc_tbl ~first_entfunc ~fixfunc_tbl ~closure_tbl)
     bodychunks_list entry_funcs_list;
   show_fixfunc_table env sigma fixfunc_tbl;
   let code_pairs = List.map2
