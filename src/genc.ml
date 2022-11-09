@@ -44,13 +44,13 @@ type fixfunc_t = {
   fixfunc_return_type: c_typedata; (* may be void. *)
   fixfunc_is_higher_order: bool; (* means that arguments contain function *)
 
-  fixfunc_topfunc: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_topfunc *)
-  fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_siblings *)
-  fixfunc_c_name: string; (* by fixfunc_initialize_c_names *)
+  fixfunc_topfunc: (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_sibling: (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_c_name: string;
 
-  fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
+  fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *)
 
-  fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_extra_arguments *)
+  fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different for primary function and siblings.
     In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
