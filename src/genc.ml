@@ -47,12 +47,12 @@ type fixfunc_t = {
 
   fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *) (* by fixfunc_initialize_c_call *)
 
-  fixfunc_label : string option; (* by fixfunc_initialize_labels *)
-
   fixfunc_extra_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* by fixfunc_initialize_extra_arguments *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different for primary function and siblings.
     In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
+
+  fixfunc_label : string option; (* by fixfunc_initialize_labels *)
 }
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
@@ -68,9 +68,9 @@ type closure_t = {
   closure_c_name: string;
   closure_c_func_type: c_typedata;
   closure_c_return_type: c_typedata;
-  closure_label : string option; (* by fixfunc_initialize_labels *)
   closure_args: (string * c_typedata) list;
   closure_vars: (string * c_typedata) list;
+  closure_label : string option; (* by fixfunc_initialize_labels *)
 }
 type closure_table = (Id.t, closure_t) Hashtbl.t
 
@@ -149,8 +149,8 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
         Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
-        Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
+        Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.mt ())
       ))
     fixfunc_tbl
@@ -599,8 +599,8 @@ let collect_fix_usage
                   fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_cfunc = None; (* dummy. updated by fixfunc_initialize_c_call *)
-                  fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                   fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
+                  fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                 })
               nary tary)
         in
@@ -1998,9 +1998,9 @@ let collect_closures ~(fixfunc_tbl : fixfunc_table)
           closure_c_name=cloname;
           closure_c_func_type=c_closure_function_ty;
           closure_c_return_type=c_return_ty;
-          closure_label = None; (* dummy. updated by fixfunc_initialize_labels *)
           closure_args=c_fargs;
           closure_vars=vars;
+          closure_label = None; (* dummy. updated by fixfunc_initialize_labels *)
         } :: !closures);
   List.rev !closures
 
