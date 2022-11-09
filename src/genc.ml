@@ -769,15 +769,6 @@ let make_used_for_call_set (bodychunks : bodychunk_t list) : Id.Set.t =
 let make_used_for_goto_set (bodychunks : bodychunk_t list) : Id.Set.t =
   idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_gotos) bodychunks)
 
-(*
-  collect_fixpoints collects information for each fix-terms and fix-bounded functions.
-*)
-
-let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
-  let fixfunc_tbl = Hashtbl.create 0 in
-  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
-  fixfunc_tbl
-
 let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
   match EConstr.kind sigma term' with
@@ -1057,6 +1048,11 @@ let make_cfunc_tbl
       | None -> ())
     bodyhead_list;
   !result
+
+let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
+  let fixfunc_tbl = Hashtbl.create 0 in
+  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
+  fixfunc_tbl
 
 let collect_fixpoints
     ~(higher_order_fixfuncs : bool Id.Map.t)
