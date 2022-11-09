@@ -1008,7 +1008,7 @@ let collect_fixpoints
   let fixfuncs =
     Id.Map.fold
       (fun fixterm_id (env,term) seq ->
-        let ((ks, j), ((nary, tary, fary) as prec)) = destFix sigma term in
+        let ((ks, j), (nary, tary, fary)) = destFix sigma term in
         let fixterm = {
           fixterm_id = fixterm_id;
           fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
