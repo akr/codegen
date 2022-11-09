@@ -258,14 +258,15 @@ let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : ECon
       let env2 = EConstr.push_rec_types prec env in
       let tbls = Array.map (make_fixterm_tbl env2 sigma) fary in
       let tbl = disjoint_id_map_union_ary tbls in
-      Id.Map.add (id_of_annotated_name nary.(j)) (env, term) tbl
+      let fixterm_id = id_of_annotated_name nary.(j) in
+      Id.Map.add fixterm_id (env, term) tbl
 
 let make_fixfunc_fixterm_tbl (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : Id.t Id.Map.t =
   Id.Map.fold
-    (fun fixfunc_id (env,term) tbl ->
+    (fun fixterm_id (env,term) tbl ->
       let ((ks, j), (nary, tary, fary)) = destFix sigma term in
       CArray.fold_left2
-        (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixfunc_id tbl)
+        (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixterm_id tbl)
         tbl nary tary)
     fixterm_tbl
     Id.Map.empty
