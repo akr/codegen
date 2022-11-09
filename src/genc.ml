@@ -2662,7 +2662,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         List.concat_map (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl) bodyhead_list)
       bodychunks_list
   in
-  let label_tbls =
+  let label_tbl_pairs =
     List.map2
       (fun bodychunks entry_funcs ->
         match entry_funcs with
@@ -2671,8 +2671,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
             make_labels_tbl bodychunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
       bodychunks_list entry_funcs_list
   in
-  let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbls) in
-  let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbls) in
+  let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
+  let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
   let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl env sigma whole_term in
   let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_label_tbl sigma closure_terms in
   show_fixfunc_table env sigma fixfunc_tbl;
