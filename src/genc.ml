@@ -28,7 +28,6 @@ open Specialize
 
 type fixterm_t = {
   fixterm_term_id: Id.t;
-  fixterm_tail_position: bool;
   fixterm_term_env: Environ.env;
   fixterm_inlinable: bool;
 }
@@ -139,7 +138,6 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str (Id.to_string fixfunc_id) ++ Pp.str ":" +++
         Pp.v 0 (
         Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_inlinable +++
-        Pp.str "tail_position=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_tail_position +++
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
         Pp.str "formal_arguments=(" ++
@@ -640,7 +638,6 @@ let collect_fix_usage
         in
         let fixterm = {
           fixterm_term_id = fixterm_id;
-          fixterm_tail_position = tail_position;
           fixterm_term_env = env;
           fixterm_inlinable = inlinable;
         } in
