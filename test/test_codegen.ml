@@ -924,6 +924,54 @@ let test_even_odd (ctx : test_ctxt) : unit =
       assert(even3() == false);
     |}
 
+let test_even_odd_label_primary (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    ~generated_code_regexp:(Str.regexp "entry_even:")
+    (bool_src ^ nat_src ^
+    {|
+      Fixpoint even (n : nat) : bool :=
+        match n with
+        | O => true
+        | S n' => odd n'
+        end
+      with odd (n : nat) : bool :=
+        match n with
+        | O => false
+        | S n' => even n'
+        end.
+      CodeGen Func even.
+      CodeGen Func odd.
+    |}) {|
+      assert(even(0) == true);
+      assert(even(1) == false);
+      assert(odd(0) == false);
+      assert(odd(1) == true);
+    |}
+
+let test_even_odd_label_sibling (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    ~generated_code_regexp:(Str.regexp "entry_odd:")
+    (bool_src ^ nat_src ^
+    {|
+      Fixpoint even (n : nat) : bool :=
+        match n with
+        | O => true
+        | S n' => odd n'
+        end
+      with odd (n : nat) : bool :=
+        match n with
+        | O => false
+        | S n' => even n'
+        end.
+      CodeGen Func even.
+      CodeGen Func odd.
+    |}) {|
+      assert(even(0) == true);
+      assert(even(1) == false);
+      assert(odd(0) == false);
+      assert(odd(1) == true);
+    |}
+
 let test_even_odd_count (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -4238,6 +4286,8 @@ let suite : OUnit2.test =
     "test_add3" >:: test_add3;
     "test_mul3" >:: test_mul3;
     "test_even_odd" >:: test_even_odd;
+    "test_even_odd_label_primary" >:: test_even_odd_label_primary;
+    "test_even_odd_label_sibling" >:: test_even_odd_label_sibling;
     "test_even_odd_count" >:: test_even_odd_count;
     "test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1;
     "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;

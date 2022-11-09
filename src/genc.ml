@@ -1180,7 +1180,16 @@ let make_labels_tbl
             if ((Id.Map.mem first_fixfunc_id cfunc_tbl && not fixfunc_is_first) || (* gen_func_multi requires labels to jump for each entry functions except first one *)
                 List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_goto_set) fixfunc_ids) (* Anyway, labels are required if internal goto use them *)
             then
-              (let label = fixfunc_entry_label (Id.to_string first_fixfunc_id) in (* xxx: use shorter name for primary function and siblings *)
+              (let label =
+                match bodyroot with
+                | BodyRootTopfunc (static,primary_cfunc) -> fixfunc_entry_label primary_cfunc
+                | BodyRootFixfunc fixfunc_id ->
+                    (match Id.Map.find_opt fixfunc_id sibling_tbl with
+                    | Some (static,sibling_cfunc) -> fixfunc_entry_label sibling_cfunc
+                    | None -> fixfunc_entry_label (Id.to_string first_fixfunc_id))
+                | BodyRootClosure closure_id ->
+                    fixfunc_entry_label (Id.to_string first_fixfunc_id)
+              in
               (*msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
                 Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
                 Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
