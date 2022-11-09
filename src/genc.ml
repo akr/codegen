@@ -289,43 +289,15 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
           is_higher_order_function env2 sigma b)
   | _ -> false
 
-let rec detect_higher_order_fixfunc (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Rel i -> Id.Map.empty
-  | Const _ | Construct _ -> Id.Map.empty
-  | Proj _ -> Id.Map.empty
-  | App (f, args) ->
-      detect_higher_order_fixfunc env sigma f
-  | LetIn (x,e,t,b) ->
-      let env2 = env_push_def env x e t in
-      let m1 = detect_higher_order_fixfunc env sigma e in
-      let m2 = detect_higher_order_fixfunc env2 sigma b in
-      disjoint_id_map_union m1 m2
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      let ms = Array.map2
-        (fun (nas,body) (ctx,_) ->
-          let env2 = EConstr.push_rel_context ctx env in
-          detect_higher_order_fixfunc env2 sigma body)
-        bl bl0
-      in
-      disjoint_id_map_union_ary ms
-  | Lambda (x,t,b) ->
-      let env2 = env_push_assum env x t in
-      detect_higher_order_fixfunc env2 sigma b
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = EConstr.push_rec_types prec env in
-      let ms = Array.map (detect_higher_order_fixfunc env2 sigma) fary in
-      let m = disjoint_id_map_union_ary ms in
-      let m = CArray.fold_left2
-        (fun m x t -> Id.Map.add (id_of_annotated_name x) (is_higher_order_function env sigma t) m)
-        m nary tary
-      in
-      m
+let detect_higher_order_fixfunc (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : bool Id.Map.t =
+  Id.Map.fold
+    (fun fixterm_id (env,term) tbl ->
+      let ((ks, j), (nary, tary, fary)) = destFix sigma term in
+      CArray.fold_left2
+        (fun tbl x t -> Id.Map.add (id_of_annotated_name x) (is_higher_order_function env sigma t) tbl)
+        tbl nary tary)
+    fixterm_tbl
+    Id.Map.empty
 
 (*
   detect_inlinable_fixterm implementes TR[term]_numargs in doc/codegen.tex.
@@ -2602,11 +2574,11 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let sigma = Evd.from_env env in
   let whole_term = EConstr.of_constr whole_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
-  let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
-  let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
   let fixterm_tbl = make_fixterm_tbl env sigma whole_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
+  let higher_order_fixfuncs = detect_higher_order_fixfunc sigma ~fixterm_tbl in
+  let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
+  let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
   let used_for_call_set = make_used_for_call_set bodychunks in
   let used_for_goto_set = make_used_for_goto_set bodychunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
