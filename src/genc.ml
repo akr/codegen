@@ -33,6 +33,7 @@ type fixterm_t = {
 }
 
 let _ = ignore (fun x -> x.fixterm_term_id)
+let _ = ignore (fun x -> x.fixterm_term_env)
 
 type fixfunc_t = {
   fixfunc_fixterm: fixterm_t;
@@ -254,6 +255,44 @@ let rec make_fixfunc_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (ter
       let m = disjoint_id_map_union_ary ms in
       let m = CArray.fold_left2
         (fun m x t -> Id.Map.add (id_of_annotated_name x) fixterm_id m)
+        m nary tary
+      in
+      m
+
+let rec make_fixterm_env_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env Id.Map.t =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:detect_higher_order_fixfunc] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Rel _ -> Id.Map.empty
+  | Const _ | Construct _ -> Id.Map.empty
+  | Proj _ -> Id.Map.empty
+  | App (f, args) ->
+      make_fixterm_env_tbl env sigma f
+  | LetIn (x,e,t,b) ->
+      let env2 = env_push_def env x e t in
+      let m1 = make_fixterm_env_tbl env sigma e in
+      let m2 = make_fixterm_env_tbl env2 sigma b in
+      disjoint_id_map_union m1 m2
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      let ms = Array.map2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          make_fixterm_env_tbl env2 sigma body)
+        bl bl0
+      in
+      disjoint_id_map_union_ary ms
+  | Lambda (x,t,b) ->
+      let env2 = env_push_assum env x t in
+      make_fixterm_env_tbl env2 sigma b
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = EConstr.push_rec_types prec env in
+      let ms = Array.map (make_fixterm_env_tbl env2 sigma) fary in
+      let m = disjoint_id_map_union_ary ms in
+      let m = CArray.fold_left2
+        (fun m x t -> Id.Map.add (id_of_annotated_name x) env m)
         m nary tary
       in
       m
@@ -571,6 +610,9 @@ let collect_fix_usage
     ~(inlinable_fixterms : bool Id.Map.t)
     ~(used_for_call : Id.Set.t)
     ~(used_for_goto : Id.Set.t)
+    ~(topfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
@@ -629,11 +671,11 @@ let collect_fix_usage
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
-                  fixfunc_topfunc = None; (* dummy. updated by fixfunc_initialize_topfunc *)
-                  fixfunc_sibling = None; (* dummy. updated by fixfunc_initialize_siblings *)
+                  fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
+                  fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
                   fixfunc_c_name = "dummy"; (* dummy. updated by fixfunc_initialize_c_names *)
                   fixfunc_cfunc = None; (* dummy. updated by fixfunc_initialize_c_call *)
-                  fixfunc_extra_arguments = []; (* dummy. updated by fixfunc_initialize_extra_arguments *)
+                  fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
                   fixfunc_label = None; (* dummy. updated by fixfunc_initialize_labels *)
                 })
               nary tary)
@@ -644,24 +686,19 @@ let collect_fix_usage
   let fixfuncs = collect_fix_usage_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
-let fixfunc_initialize_topfunc (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) ~(fixfunc_tbl : fixfunc_table) : unit =
+let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
   match EConstr.kind sigma term' with
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_id = id_of_annotated_name nary.(j) in
-      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-      Hashtbl.replace fixfunc_tbl fixfunc_id
-        { fixfunc with
-          fixfunc_topfunc = Some static_and_primary_cfunc }
-  | _ -> ()
+      Id.Map.add fixfunc_id static_and_primary_cfunc Id.Map.empty
+  | _ -> Id.Map.empty
 
-let fixfunc_initialize_siblings (sibling_entfuncs : (bool * string * int * Id.t) list) ~(fixfunc_tbl : fixfunc_table) : unit =
-  List.iter
-    (fun (static, sibling_cfunc_name, i, fixfunc_id) ->
-      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-      Hashtbl.replace fixfunc_tbl fixfunc_id
-        { fixfunc with
-          fixfunc_sibling = Some (static, sibling_cfunc_name) })
+let make_sibling_tbl (sibling_entfuncs : (bool * string * int * Id.t) list) : (bool * string) Id.Map.t =
+  List.fold_left
+    (fun sibling_tbl (static, sibling_cfunc_name, i, fixfunc_id) ->
+      Id.Map.add fixfunc_id (static, sibling_cfunc_name) sibling_tbl)
+    Id.Map.empty
     sibling_entfuncs
 
 let fixfunc_initialize_c_names (fixfunc_tbl : fixfunc_table) : unit =
@@ -831,14 +868,17 @@ let compute_precise_extra_arguments
     fixterm_free_variables;
   fixterm_extra_arguments
 
-let fixfunc_initialize_extra_arguments
+let make_extra_arguments_tbl
     ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
+    ~(fixterm_env_tbl : Environ.env Id.Map.t)
+    ~(topfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    (bodychunks : bodychunk_t list)
-    ~(fixfunc_tbl : fixfunc_table) : unit =
+    (bodychunks : bodychunk_t list) : ((string * c_typedata) list) Id.Map.t =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
   let precise_extra_arguments_sets = compute_precise_extra_arguments ~fixfunc_fixterm_tbl env sigma fixterm_free_variables in
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+  let result = ref Id.Map.empty in
   List.iter
     (fun (bodyroot, bodyvars) ->
       let fixfunc_ids =
@@ -851,12 +891,12 @@ let fixfunc_initialize_extra_arguments
       match fixfunc_ids with
       | [] -> ()
       | fixfunc_id :: inner_fixfunc_ids ->
-          let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
           let fixterm_id = Id.Map.find fixfunc_id fixfunc_fixterm_tbl in
-          let naive_extra_arguments = compute_naive_extra_arguments ~fixfunc_fixterm_tbl fixfunc.fixfunc_fixterm.fixterm_term_env sigma in
+          let fixterm_env = Id.Map.find fixfunc_id fixterm_env_tbl in
+          let naive_extra_arguments = compute_naive_extra_arguments ~fixfunc_fixterm_tbl fixterm_env sigma in
           let extra_arguments =
-            match fixfunc.fixfunc_topfunc, fixfunc.fixfunc_sibling with
-            | None, None ->
+            match (Id.Map.mem fixfunc_id topfunc_tbl), (Id.Map.mem fixfunc_id sibling_tbl) with
+            | false, false ->
                 let precise_set = Hashtbl.find precise_extra_arguments_sets fixterm_id in
                 List.filter
                   (fun (varname, vartype) ->
@@ -865,9 +905,7 @@ let fixfunc_initialize_extra_arguments
             | _, _ ->
                 naive_extra_arguments
           in
-          Hashtbl.replace fixfunc_tbl fixfunc_id
-            { fixfunc with
-              fixfunc_extra_arguments = extra_arguments };
+          result := Id.Map.add fixfunc_id extra_arguments !result;
           let bodyvars1 = List.tl (list_find_suffix (function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false) bodyvars) in
           let rev_exargs = ref (List.rev extra_arguments) in
           List.iter
@@ -876,12 +914,10 @@ let fixfunc_initialize_extra_arguments
                   rev_exargs := (var, c_ty) :: !rev_exargs
               | BodyVarVoidArg _ -> ()
               | BodyVarFixfunc fixfunc_id ->
-                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                  Hashtbl.replace fixfunc_tbl fixfunc_id
-                    { fixfunc with
-                      fixfunc_extra_arguments = List.rev !rev_exargs })
+                  result := Id.Map.add fixfunc_id (List.rev !rev_exargs) !result)
             bodyvars1)
-  bodyhead_list
+    bodyhead_list;
+  !result
 
 let fixfunc_initialize_c_call
     (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) ~(fixfunc_tbl : fixfunc_table) : unit =
@@ -1034,13 +1070,14 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
     ~(sibling_entfuncs : (bool * string * int * Id.t) list)
     ~(bodychunks : bodychunk_t list) : fixfunc_table =
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma term in
+  let fixterm_env_tbl = make_fixterm_env_tbl env sigma term in
   let used_for_call = merge_used_for_call bodychunks in
   let used_for_goto = merge_used_for_goto bodychunks in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto env sigma term in
-  fixfunc_initialize_topfunc sigma term ~static_and_primary_cfunc ~fixfunc_tbl;
-  fixfunc_initialize_siblings sibling_entfuncs ~fixfunc_tbl;
+  let topfunc_tbl = make_topfunc_tbl sigma term ~static_and_primary_cfunc in
+  let sibling_tbl = make_sibling_tbl sibling_entfuncs in
+  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma term bodychunks in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl env sigma term in
   fixfunc_initialize_c_names fixfunc_tbl;
-  fixfunc_initialize_extra_arguments ~fixfunc_fixterm_tbl env sigma term bodychunks ~fixfunc_tbl;
   fixfunc_initialize_c_call sigma bodychunks ~fixfunc_tbl;
   (*show_fixfunc_table env sigma fixfunc_tbl;*)
   fixfunc_tbl
