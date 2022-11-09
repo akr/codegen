@@ -1135,7 +1135,10 @@ let collect_fix_usage
   let fixfuncs = collect_fix_usage_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
-let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) (bodyhead : bodyhead_t) : entry_func_t list =
+let entfuncs_of_bodyhead
+    ~(used_for_call : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    (bodyhead : bodyhead_t) : entry_func_t list =
   let (bodyroot, bodyvars) = bodyhead in
   let normal_ent =
     match bodyroot with
@@ -1153,15 +1156,13 @@ let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) (bodyhead : bodyhead_t) 
         match fixfunc_ids with
         | [] -> None
         | first_fixfunc_id :: _ ->
-            let first_fixfunc = Hashtbl.find fixfunc_tbl first_fixfunc_id in
-            match first_fixfunc.fixfunc_sibling with
+            match Id.Map.find_opt first_fixfunc_id sibling_tbl with
             | Some _ ->
                 Some (EntryFuncFixfunc first_fixfunc_id)
             | None ->
                 List.find_map
                   (fun fixfunc_id ->
-                    let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                    if fixfunc.fixfunc_used_for_call then
+                    if Id.Set.mem fixfunc_id used_for_call then
                       Some (EntryFuncFixfunc first_fixfunc_id)
                     else
                       None)
@@ -1175,7 +1176,10 @@ let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) (bodyhead : bodyhead_t) 
   (match normal_ent with Some nent -> [nent] | None -> []) @
   (match closure_ent with Some cent -> [cent] | None -> [])
 
-let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
+let fixfunc_initialize_labels
+    ~(used_for_call : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) : unit =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
   List.iter
     (fun ((bodyroot, bodyvars) as bodyhead) ->
@@ -1187,7 +1191,7 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
           bodyvars
       in
       let (fixfunc_is_first, closure_is_first) =
-        if List.mem first_entfunc (entfuncs_of_bodyhead ~fixfunc_tbl bodyhead) then
+        if List.mem first_entfunc (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl bodyhead) then
           match first_entfunc with
           | EntryFuncTopfunc _ | EntryFuncFixfunc _ -> (true, false)
           | EntryFuncClosure _ -> (false, true)
@@ -2629,11 +2633,11 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let code_pairs = List.map
     (fun bodychunks ->
       let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-      let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~fixfunc_tbl) bodyhead_list in
+      let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~used_for_call ~sibling_tbl) bodyhead_list in
       (match entry_funcs with
       | [] -> ()
       | first_entfunc :: _ ->
-          fixfunc_initialize_labels bodychunks ~first_entfunc ~fixfunc_tbl ~closure_tbl);
+          fixfunc_initialize_labels bodychunks ~used_for_call ~sibling_tbl ~first_entfunc ~fixfunc_tbl ~closure_tbl);
       show_fixfunc_table env sigma fixfunc_tbl;
       let (decl, impl) =
         match entry_funcs with
