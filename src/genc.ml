@@ -28,12 +28,10 @@ open Specialize
 
 type fixterm_t = {
   fixterm_id: Id.t;
-  fixterm_term_env: Environ.env;
   fixterm_inlinable: bool;
 }
 
 let _ = ignore (fun x -> x.fixterm_id)
-let _ = ignore (fun x -> x.fixterm_term_env)
 
 type fixfunc_t = {
   fixfunc_fixterm: fixterm_t;
@@ -1013,7 +1011,6 @@ let collect_fixpoints
         let ((ks, j), ((nary, tary, fary) as prec)) = destFix sigma term in
         let fixterm = {
           fixterm_id = fixterm_id;
-          fixterm_term_env = env;
           fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
         } in
         let fixfuncs =
