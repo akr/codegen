@@ -263,9 +263,9 @@ let make_fixfunc_fixterm_tbl (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env
   Id.Map.fold
     (fun fixterm_id (env,term) tbl ->
       let ((ks, j), (nary, tary, fary)) = destFix sigma term in
-      CArray.fold_left2
-        (fun tbl x t -> Id.Map.add (id_of_annotated_name x) fixterm_id tbl)
-        tbl nary tary)
+      Array.fold_left
+        (fun tbl x -> Id.Map.add (id_of_annotated_name x) fixterm_id tbl)
+        tbl nary)
     fixterm_tbl
     Id.Map.empty
 
