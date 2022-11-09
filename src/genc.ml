@@ -2691,8 +2691,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
       (decl +++ pp_stub_sibling_entfuncs, impl))
     bodychunks_list entry_funcs_list
   in
-  List.fold_left (fun c (decl, impl) -> c +++ decl ++ Pp.fnl ()) (Pp.mt ()) code_pairs +++
-  List.fold_left (fun c (decl, impl) -> c +++ impl ++ Pp.fnl ()) (Pp.mt ()) code_pairs
+  pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
+  pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) ?(stubs : (bool * string * string * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs stubs)
