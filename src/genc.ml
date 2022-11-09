@@ -1135,24 +1135,6 @@ let collect_fix_usage
   let fixfuncs = collect_fix_usage_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
-let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
-    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    ~(static_and_primary_cfunc : bool * string)
-    ~(sibling_entfuncs : (bool * string * int * Id.t) list)
-    ~(bodychunks : bodychunk_t list) : fixfunc_table =
-  let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma term in
-  let fixterm_env_tbl = make_fixterm_env_tbl env sigma term in
-  let used_for_call = merge_used_for_call bodychunks in
-  let used_for_goto = merge_used_for_goto bodychunks in
-  let topfunc_tbl = make_topfunc_tbl sigma term ~static_and_primary_cfunc in
-  let sibling_tbl = make_sibling_tbl sibling_entfuncs in
-  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma term bodychunks in
-  let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
-  let cfunc_tbl = make_cfunc_tbl ~used_for_call ~sibling_tbl sigma bodychunks in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma term in
-  (*show_fixfunc_table env sigma fixfunc_tbl;*)
-  fixfunc_tbl
-
 let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : entry_func_t list =
   let (bodyroot, bodyvars) = bodyhead in
   let normal_ent =
@@ -2038,7 +2020,8 @@ let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t
   in
   c_fargs
 
-let collect_closures ~(fixfunc_tbl : fixfunc_table)
+let collect_closures
+    ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : closure_t list =
   let closures = ref [] in
   find_closures env sigma term
@@ -2069,10 +2052,10 @@ let collect_closures ~(fixfunc_tbl : fixfunc_table)
           let env_for_ty = Environ.pop_rel_context index closure_env in
           (*msg_debug_hov (Pp.str "[codegen:collect_closures] ty=" ++ Printer.pr_econstr_env env_for_ty sigma ty);*)
           let c_ty = c_typename env_for_ty sigma ty in
-          match Hashtbl.find_opt fixfunc_tbl id with
+          match Id.Map.find_opt id extra_arguments_tbl with
           | None ->
               [(Id.to_string id, c_ty)]
-          | Some fixfunc -> fixfunc.fixfunc_extra_arguments)
+          | Some extra_arguments -> extra_arguments)
         (IntSet.elements fv_index_set)
       in
       let vars = List.sort_uniq (fun (str1,c_ty1) (str2,c_ty2) -> String.compare str1 str2) vars in
@@ -2627,10 +2610,20 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
-  let fixfunc_tbl = collect_fix_info ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) ~sibling_entfuncs ~bodychunks env sigma whole_term in
+  let static_and_primary_cfunc = (static, primary_cfunc) in
+  let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma whole_term in
+  let fixterm_env_tbl = make_fixterm_env_tbl env sigma whole_term in
+  let used_for_call = merge_used_for_call bodychunks in
+  let used_for_goto = merge_used_for_goto bodychunks in
+  let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
+  let sibling_tbl = make_sibling_tbl sibling_entfuncs in
+  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_env_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
+  let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call ~topfunc_tbl ~sibling_tbl in
+  let cfunc_tbl = make_cfunc_tbl ~used_for_call ~sibling_tbl sigma bodychunks in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl env sigma whole_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let used_vars = used_variables env sigma whole_term in
-  let closure_list = collect_closures ~fixfunc_tbl env sigma whole_term in
+  let closure_list = collect_closures ~extra_arguments_tbl env sigma whole_term in
   let closure_tbl = closure_tbl_of_list closure_list in
   let bodychunks_list = split_function_bodychunks bodychunks in
   List.iter (fun bodychunks -> show_bodychunks sigma bodychunks) bodychunks_list;
