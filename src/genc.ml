@@ -1068,7 +1068,7 @@ let collect_fix_usage
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(c_names_tbl : string Id.Map.t)
     ~(cfunc_tbl : (bool * string) Id.Map.t)
-    ~(fixfunc_labels_tbl : string Id.Map.t)
+    ~(fixfunc_label_tbl : string Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
@@ -1132,7 +1132,7 @@ let collect_fix_usage
                   fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
                   fixfunc_cfunc = Id.Map.find_opt fixfunc_id cfunc_tbl;
                   fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
-                  fixfunc_label = Id.Map.find_opt fixfunc_id fixfunc_labels_tbl;
+                  fixfunc_label = Id.Map.find_opt fixfunc_id fixfunc_label_tbl;
                 })
               nary tary)
         in
@@ -1191,8 +1191,8 @@ let make_labels_tbl
     ~(closure_c_name_tbl : string Id.Map.t)
     (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) : string Id.Map.t * string Id.Map.t =
   let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-  let fixfunc_labels_tbl = ref Id.Map.empty in
-  let closure_labels_tbl = ref Id.Map.empty in
+  let fixfunc_label_tbl = ref Id.Map.empty in
+  let closure_label_tbl = ref Id.Map.empty in
   List.iter
     (fun ((bodyroot, bodyvars) as bodyhead) ->
       let fixfunc_ids =
@@ -1231,7 +1231,7 @@ let make_labels_tbl
                 Pp.str "exists_fixfunc_used_for_goto=" ++ Pp.bool (List.exists (fun fixfunc -> fixfunc.fixfunc_used_for_goto) fixfuncs));*)
               List.iter
                 (fun fixfunc_id ->
-                  fixfunc_labels_tbl := Id.Map.add fixfunc_id label !fixfunc_labels_tbl)
+                  fixfunc_label_tbl := Id.Map.add fixfunc_id label !fixfunc_label_tbl)
                 fixfunc_ids;
               Some label)
             else
@@ -1246,10 +1246,10 @@ let make_labels_tbl
               | Some label -> label
               | None -> closure_entry_label closure_c_name
             in
-            closure_labels_tbl := Id.Map.add closure_id label !closure_labels_tbl
+            closure_label_tbl := Id.Map.add closure_id label !closure_label_tbl
       | _ -> ()))
     bodyhead_list;
-  (!fixfunc_labels_tbl, !closure_labels_tbl)
+  (!fixfunc_label_tbl, !closure_label_tbl)
 
 let local_gensym_id : (int ref) option ref = ref None
 
@@ -2057,7 +2057,7 @@ let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env
 let collect_closures
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
-    ~(closure_labels_tbl : string Id.Map.t)
+    ~(closure_label_tbl : string Id.Map.t)
     (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t) list) : closure_table =
   let closures = ref [] in
   List.iter
@@ -2102,7 +2102,7 @@ let collect_closures
           closure_c_return_type=c_return_ty;
           closure_args=c_fargs;
           closure_vars=vars;
-          closure_label = Id.Map.find_opt cloid closure_labels_tbl;
+          closure_label = Id.Map.find_opt cloid closure_label_tbl;
         } :: !closures)
     closure_terms;
   closure_tbl_of_list !closures
@@ -2633,6 +2633,7 @@ let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entr
 
 let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) (stubs : (bool * string * string * Id.t) list) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
+  let static_and_primary_cfunc = (static, primary_cfunc) in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_term = EConstr.of_constr whole_term in
@@ -2640,7 +2641,6 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let higher_order_fixfuncs = detect_higher_order_fixfunc env sigma whole_term in
   let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
   let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
-  let static_and_primary_cfunc = (static, primary_cfunc) in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl env sigma whole_term in
   let fixterm_env_tbl = make_fixterm_env_tbl env sigma whole_term in
   let used_for_call_set = make_used_for_call_set bodychunks in
@@ -2651,7 +2651,6 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
   let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma bodychunks in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
-  let used_vars = used_variables env sigma whole_term in
   let closure_terms = collect_closure_terms env sigma whole_term in
   let closure_c_name_tbl = make_closure_c_name_tbl sigma closure_terms in
   let bodychunks_list = split_function_bodychunks bodychunks in
@@ -2672,11 +2671,12 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
             make_labels_tbl bodychunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
       bodychunks_list entry_funcs_list
   in
-  let fixfunc_labels_tbl = disjoint_id_map_union_list (List.map fst label_tbls) in
-  let closure_labels_tbl = disjoint_id_map_union_list (List.map snd label_tbls) in
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_labels_tbl env sigma whole_term in
-  let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_labels_tbl sigma closure_terms in
+  let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbls) in
+  let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbls) in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl env sigma whole_term in
+  let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_label_tbl sigma closure_terms in
   show_fixfunc_table env sigma fixfunc_tbl;
+  let used_vars = used_variables env sigma whole_term in
   let code_pairs = List.map2
     (fun bodychunks entry_funcs ->
       let (decl, impl) =
