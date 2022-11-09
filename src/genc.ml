@@ -533,10 +533,7 @@ let collect_fix_usage
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
-  let rec collect_fix_usage_rec
-      (env : Environ.env) (sigma : Evd.evar_map)
-      (term : EConstr.t) :
-      fixfunc_t Seq.t =
+  let rec collect_fix_usage_rec (env : Environ.env) (term : EConstr.t) : fixfunc_t Seq.t =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -550,11 +547,11 @@ let collect_fix_usage
         (* e must be a Rel which type is inductive (non-function) type *)
         Seq.empty
     | App (f, args) ->
-        collect_fix_usage_rec env sigma f
+        collect_fix_usage_rec env f
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        let fixfuncs1 = collect_fix_usage_rec env sigma e in
-        let fixfuncs2 = collect_fix_usage_rec env2 sigma b in
+        let fixfuncs1 = collect_fix_usage_rec env e in
+        let fixfuncs2 = collect_fix_usage_rec env2 b in
         Seq.append fixfuncs1 fixfuncs2
     | Case (ci,u,pms,p,iv,item,bl) ->
         let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
@@ -562,13 +559,13 @@ let collect_fix_usage
         let results = Array.map2
           (fun (nas,body) (ctx,_) ->
             let env2 = EConstr.push_rel_context ctx env in
-            collect_fix_usage_rec env2 sigma body)
+            collect_fix_usage_rec env2 body)
           bl bl0
         in
         concat_array_seq results
     | Lambda (x,t,b) ->
         let env2 = env_push_assum env x t in
-        collect_fix_usage_rec env2 sigma b
+        collect_fix_usage_rec env2 b
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let env2 = EConstr.push_rec_types prec env in
         let fixterm_id = id_of_annotated_name nary.(j) in
@@ -600,10 +597,10 @@ let collect_fix_usage
                 })
               nary tary)
         in
-        let results = Array.map (fun f -> collect_fix_usage_rec env2 sigma f) fary in
+        let results = Array.map (fun f -> collect_fix_usage_rec env2 f) fary in
         Seq.append fixfuncs (concat_array_seq results)
   in
-  let fixfuncs = collect_fix_usage_rec env sigma term in
+  let fixfuncs = collect_fix_usage_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
 let fixfunc_initialize_topfunc (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) ~(fixfunc_tbl : fixfunc_table) : unit =
