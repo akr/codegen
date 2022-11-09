@@ -1011,60 +1011,110 @@ let make_cfunc_tbl
     bodyhead_list;
   !result
 
-let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
-  let fixfunc_tbl = Hashtbl.create 0 in
-  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
-  fixfunc_tbl
+let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:find_closures] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:find_closures] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Lambda (x,t,b) ->
+      let env2 = env_push_assum env x t in
+      find_closures ~found env2 sigma b
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      Array.iter (find_closures ~found env2 sigma) fary
+  | _ -> find_closures_exp ~found env sigma term
+and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
+    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ | Sort _ | Prod _ | Ind _ ->
+      user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | LetIn (x,e,t,b) ->
+      let env2 = env_push_def env x e t in
+      find_closures_exp ~found env sigma e;
+      find_closures_exp ~found env2 sigma b
+  | Case (ci,u,pms,p,iv,item,bl) ->
+      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+      (Array.iter2
+        (fun (nas,body) (ctx,_) ->
+          let env2 = EConstr.push_rel_context ctx env in
+          find_closures_exp ~found env2 sigma body)
+        bl bl0)
+  | Rel _ -> ()
+  | Const _ -> ()
+  | Construct _ -> ()
+  | Proj _ -> ()
+  | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its bodychunks may have closure generations. *)
+      find_closures ~found env sigma f
+  | Lambda _ -> (* closure generation found *)
+      found env term;
+      find_closures ~found env sigma term
+  | Fix _ -> (* closure generation found *)
+      found env term;
+      find_closures ~found env sigma term
 
-let collect_fixpoints
-    ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
-    ~(higher_order_fixfuncs : bool Id.Map.t)
-    ~(inlinable_fixterms : bool Id.Map.t)
-    ~(used_for_call_set : Id.Set.t)
-    ~(used_for_goto_set : Id.Set.t)
-    ~(topfunc_tbl : (bool * string) Id.Map.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
-    ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
-    ~(c_names_tbl : string Id.Map.t)
-    ~(cfunc_tbl : (bool * string) Id.Map.t)
-    ~(fixfunc_label_tbl : string Id.Map.t)
-    (sigma : Evd.evar_map) : fixfunc_table =
-  let fixfuncs =
-    Id.Map.fold
-      (fun fixterm_id (env,term) seq ->
-        let ((ks, j), (nary, tary, fary)) = destFix sigma term in
-        let fixterm = {
-          fixterm_id = fixterm_id;
-          fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
-        } in
-        let fixfuncs =
-          Array.to_seq
-            (Array.map2
-              (fun name ty ->
-                let fixfunc_id = id_of_annotated_name name in
-                let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
-                {
-                  fixfunc_fixterm = fixterm;
-                  fixfunc_id = fixfunc_id;
-                  fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
-                  fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
-                  fixfunc_formal_arguments = formal_arguments;
-                  fixfunc_return_type = return_type;
-                  fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
-                  fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
-                  fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
-                  fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
-                  fixfunc_cfunc = Id.Map.find_opt fixfunc_id cfunc_tbl;
-                  fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
-                  fixfunc_label = Id.Map.find_opt fixfunc_id fixfunc_label_tbl;
-                })
-              nary tary)
-        in
-        Seq.append fixfuncs seq)
-      fixterm_tbl
-      Seq.empty
+let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
+  let (_, c_fargs) =
+    List.fold_left_map
+      (fun env (annotated_name, ty) ->
+        let env' = Environ.pop_rel_context 1 env in
+        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
+      env fargs
   in
-  make_fixfunc_table (List.of_seq fixfuncs)
+  c_fargs
+
+let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
+  let closure_tbl = Hashtbl.create 0 in
+  List.iter
+    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
+    closure_list;
+  closure_tbl
+
+let collect_closure_terms (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) list =
+  let result = ref [] in
+  find_closures env sigma term
+    ~found:(fun closure_env closure_exp ->
+      result := (closure_env, closure_exp) :: !result);
+  List.rev !result
+
+let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t) list) : string Id.Map.t =
+  idmap_of_list
+    (List.map
+      (fun (closure_env, closure_exp) ->
+        let closure_id = get_closure_id closure_env sigma closure_exp in
+        let cloname = global_gensym () in
+        (closure_id, cloname))
+      closure_terms)
+
+let split_function_bodychunks (bodychunks : bodychunk_t list) : bodychunk_t list list =
+  let bodychunks = Array.of_list bodychunks in
+  let n = Array.length bodychunks in
+  (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks] num_bodychunks=" ++ Pp.int n);*)
+  let id_int_map =
+    CArray.fold_left_i
+      (fun i id_int_map bodychunk ->
+        Id.Set.fold
+          (fun fixfunc_def_id id_int_map ->
+            (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks]" +++
+              Pp.str "i=" ++ Pp.int i +++
+              Pp.str "body_fixfunc_impl=" ++ Id.print fixfunc_def_id);*)
+            Id.Map.add fixfunc_def_id i id_int_map)
+          bodychunk.bodychunk_fixfunc_impls id_int_map)
+      Id.Map.empty bodychunks
+  in
+  let u = unionfind_make n in
+  Array.iteri
+    (fun i bodychunk ->
+      Id.Set.iter
+        (fun fixfunc_id -> unionfind_union u i (Id.Map.find fixfunc_id id_int_map))
+        bodychunk.bodychunk_fixfunc_gotos)
+    bodychunks;
+  List.map
+    (List.map (fun i -> bodychunks.(i)))
+    (unionfind_sets u)
 
 let entfuncs_of_bodyhead
     ~(used_for_call_set : Id.Set.t)
@@ -1207,110 +1257,60 @@ let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_tab
   | Some _ -> fixfunc_label
   | None -> closure_label
 
-let split_function_bodychunks (bodychunks : bodychunk_t list) : bodychunk_t list list =
-  let bodychunks = Array.of_list bodychunks in
-  let n = Array.length bodychunks in
-  (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks] num_bodychunks=" ++ Pp.int n);*)
-  let id_int_map =
-    CArray.fold_left_i
-      (fun i id_int_map bodychunk ->
-        Id.Set.fold
-          (fun fixfunc_def_id id_int_map ->
-            (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks]" +++
-              Pp.str "i=" ++ Pp.int i +++
-              Pp.str "body_fixfunc_impl=" ++ Id.print fixfunc_def_id);*)
-            Id.Map.add fixfunc_def_id i id_int_map)
-          bodychunk.bodychunk_fixfunc_impls id_int_map)
-      Id.Map.empty bodychunks
+let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
+  let fixfunc_tbl = Hashtbl.create 0 in
+  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
+  fixfunc_tbl
+
+let collect_fixpoints
+    ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
+    ~(higher_order_fixfuncs : bool Id.Map.t)
+    ~(inlinable_fixterms : bool Id.Map.t)
+    ~(used_for_call_set : Id.Set.t)
+    ~(used_for_goto_set : Id.Set.t)
+    ~(topfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
+    ~(c_names_tbl : string Id.Map.t)
+    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(fixfunc_label_tbl : string Id.Map.t)
+    (sigma : Evd.evar_map) : fixfunc_table =
+  let fixfuncs =
+    Id.Map.fold
+      (fun fixterm_id (env,term) seq ->
+        let ((ks, j), (nary, tary, fary)) = destFix sigma term in
+        let fixterm = {
+          fixterm_id = fixterm_id;
+          fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
+        } in
+        let fixfuncs =
+          Array.to_seq
+            (Array.map2
+              (fun name ty ->
+                let fixfunc_id = id_of_annotated_name name in
+                let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
+                {
+                  fixfunc_fixterm = fixterm;
+                  fixfunc_id = fixfunc_id;
+                  fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
+                  fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
+                  fixfunc_formal_arguments = formal_arguments;
+                  fixfunc_return_type = return_type;
+                  fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
+                  fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
+                  fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
+                  fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
+                  fixfunc_cfunc = Id.Map.find_opt fixfunc_id cfunc_tbl;
+                  fixfunc_extra_arguments = Stdlib.Option.value (Id.Map.find_opt fixfunc_id extra_arguments_tbl) ~default:[];
+                  fixfunc_label = Id.Map.find_opt fixfunc_id fixfunc_label_tbl;
+                })
+              nary tary)
+        in
+        Seq.append fixfuncs seq)
+      fixterm_tbl
+      Seq.empty
   in
-  let u = unionfind_make n in
-  Array.iteri
-    (fun i bodychunk ->
-      Id.Set.iter
-        (fun fixfunc_id -> unionfind_union u i (Id.Map.find fixfunc_id id_int_map))
-        bodychunk.bodychunk_fixfunc_gotos)
-    bodychunks;
-  List.map
-    (List.map (fun i -> bodychunks.(i)))
-    (unionfind_sets u)
-
-let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
-    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:find_closures] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:find_closures] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Lambda (x,t,b) ->
-      let env2 = env_push_assum env x t in
-      find_closures ~found env2 sigma b
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      Array.iter (find_closures ~found env2 sigma) fary
-  | _ -> find_closures_exp ~found env sigma term
-and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
-    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
-  match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
-  | LetIn (x,e,t,b) ->
-      let env2 = env_push_def env x e t in
-      find_closures_exp ~found env sigma e;
-      find_closures_exp ~found env2 sigma b
-  | Case (ci,u,pms,p,iv,item,bl) ->
-      let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-      (Array.iter2
-        (fun (nas,body) (ctx,_) ->
-          let env2 = EConstr.push_rel_context ctx env in
-          find_closures_exp ~found env2 sigma body)
-        bl bl0)
-  | Rel _ -> ()
-  | Const _ -> ()
-  | Construct _ -> ()
-  | Proj _ -> ()
-  | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its bodychunks may have closure generations. *)
-      find_closures ~found env sigma f
-  | Lambda _ -> (* closure generation found *)
-      found env term;
-      find_closures ~found env sigma term
-  | Fix _ -> (* closure generation found *)
-      found env term;
-      find_closures ~found env sigma term
-
-let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
-  let (_, c_fargs) =
-    List.fold_left_map
-      (fun env (annotated_name, ty) ->
-        let env' = Environ.pop_rel_context 1 env in
-        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
-      env fargs
-  in
-  c_fargs
-
-let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
-  let closure_tbl = Hashtbl.create 0 in
-  List.iter
-    (fun clo -> Hashtbl.add closure_tbl clo.closure_id clo)
-    closure_list;
-  closure_tbl
-
-let collect_closure_terms (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) list =
-  let result = ref [] in
-  find_closures env sigma term
-    ~found:(fun closure_env closure_exp ->
-      result := (closure_env, closure_exp) :: !result);
-  List.rev !result
-
-let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t) list) : string Id.Map.t =
-  idmap_of_list
-    (List.map
-      (fun (closure_env, closure_exp) ->
-        let closure_id = get_closure_id closure_env sigma closure_exp in
-        let cloname = global_gensym () in
-        (closure_id, cloname))
-      closure_terms)
+  make_fixfunc_table (List.of_seq fixfuncs)
 
 let collect_closures
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
