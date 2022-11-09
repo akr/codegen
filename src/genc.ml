@@ -27,17 +27,17 @@ open Induc
 open Specialize
 
 type fixterm_t = {
-  fixterm_term_id: Id.t;
+  fixterm_id: Id.t;
   fixterm_term_env: Environ.env;
   fixterm_inlinable: bool;
 }
 
-let _ = ignore (fun x -> x.fixterm_term_id)
+let _ = ignore (fun x -> x.fixterm_id)
 let _ = ignore (fun x -> x.fixterm_term_env)
 
 type fixfunc_t = {
   fixfunc_fixterm: fixterm_t;
-  fixfunc_func_id: Id.t;
+  fixfunc_id: Id.t;
   fixfunc_used_for_call: bool;
   fixfunc_used_for_goto: bool;
   fixfunc_formal_arguments: (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
@@ -775,7 +775,7 @@ let make_used_for_goto_set (bodychunks : bodychunk_t list) : Id.Set.t =
 
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   let fixfunc_tbl = Hashtbl.create 0 in
-  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_func_id fixfunc) fixfuncs;
+  List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
   fixfunc_tbl
 
 let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
@@ -1109,7 +1109,7 @@ let collect_fixpoints
         let env2 = EConstr.push_rec_types prec env in
         let fixterm_id = id_of_annotated_name nary.(j) in
         let fixterm = {
-          fixterm_term_id = fixterm_id;
+          fixterm_id = fixterm_id;
           fixterm_term_env = env;
           fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterms;
         } in
@@ -1121,7 +1121,7 @@ let collect_fixpoints
                 let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
                 {
                   fixfunc_fixterm = fixterm;
-                  fixfunc_func_id = fixfunc_id;
+                  fixfunc_id = fixfunc_id;
                   fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
                   fixfunc_formal_arguments = formal_arguments;
