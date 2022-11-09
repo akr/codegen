@@ -1006,7 +1006,7 @@ let collect_fixpoints
     ~(c_names_tbl : string Id.Map.t)
     ~(cfunc_tbl : (bool * string) Id.Map.t)
     ~(fixfunc_label_tbl : string Id.Map.t)
-     (sigma : Evd.evar_map) : fixfunc_table =
+    (sigma : Evd.evar_map) : fixfunc_table =
   let fixfuncs =
     Id.Map.fold
       (fun fixterm_id (env,term) seq ->
