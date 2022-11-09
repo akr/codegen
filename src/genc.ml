@@ -497,6 +497,12 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
   let (inlinable_here, inlinablemap, nontailset, tailset) = detect_inlinable_fixterm_lamfix env term in
   inlinablemap
 
+let merge_used_for_call (bodychunks : bodychunk_t list) : Id.Set.t =
+  idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_calls) bodychunks)
+
+let merge_used_for_goto (bodychunks : bodychunk_t list) : Id.Set.t =
+  idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_gotos) bodychunks)
+
 (*
   collect_fix_usage collects information for each fix-terms and fix-bounded functions.
 
@@ -504,11 +510,6 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
   tail_position=false means that term will be translated by gen_head.
   tail_position=true means that term will be translated by gen_tail.
 *)
-
-type fixacc_t = {
-  fixacc_used_for_call : bool ref;
-  fixacc_used_for_goto : bool ref;
-}
 
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   let fixfunc_tbl = Hashtbl.create 0 in
@@ -531,22 +532,22 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
 let collect_fix_usage
     ~(higher_order_fixfuncs : bool Id.Map.t)
     ~(inlinable_fixterms : bool Id.Map.t)
+    ~(used_for_call : Id.Set.t)
+    ~(used_for_goto : Id.Set.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     fixfunc_table =
   let rec collect_fix_usage_rec
       ~(under_fix_or_lambda : bool)
       (env : Environ.env) (sigma : Evd.evar_map)
-      (tail_position : bool) (term : EConstr.t)
-      ~(fixaccs : fixacc_t list) :
+      (tail_position : bool) (term : EConstr.t) :
       fixfunc_t Seq.t =
-    let result = collect_fix_usage_rec1 ~under_fix_or_lambda env sigma tail_position term ~fixaccs in
+    let result = collect_fix_usage_rec1 ~under_fix_or_lambda env sigma tail_position term in
     result
   and collect_fix_usage_rec1
       ~(under_fix_or_lambda : bool)
       (env : Environ.env) (sigma : Evd.evar_map)
-      (tail_position : bool) (term : EConstr.t)
-      ~(fixaccs : fixacc_t list) :
+      (tail_position : bool) (term : EConstr.t) :
       fixfunc_t Seq.t =
     let (term, args) = decompose_appvect sigma term in
     let numargs = Array.length args in
@@ -556,29 +557,17 @@ let collect_fix_usage
     | Cast _ | Sort _ | Prod _ | Ind _ ->
         user_err (Pp.str "[codegen:collect_fix_usage_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Rel i ->
-        ((if 0 < numargs then
-          let id = id_of_name (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) in
-          match Id.Map.find_opt id inlinable_fixterms with
-          | None -> () (* term is not fix-bounded function *)
-          | Some fixterm_is_inlinable ->
-              let fixacc = List.nth fixaccs (i-1) in
-              let fixfunc_is_higher_order = Id.Map.find id higher_order_fixfuncs in
-              determine_fixfunc_call_or_goto tail_position fixfunc_is_higher_order fixterm_is_inlinable
-                ~call:(fun () -> fixacc.fixacc_used_for_call := true)
-                ~goto:(fun () -> fixacc.fixacc_used_for_goto := true));
-        Seq.empty)
+        Seq.empty
     | Const _ | Construct _ -> Seq.empty
     | Proj (proj, e) ->
         (* e must be a Rel which type is inductive (non-function) type *)
         Seq.empty
     | App (f, args) ->
-        collect_fix_usage_rec ~under_fix_or_lambda env sigma tail_position f ~fixaccs
+        collect_fix_usage_rec ~under_fix_or_lambda env sigma tail_position f
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        let fixaccs2 = { fixacc_used_for_call = ref false;
-                         fixacc_used_for_goto = ref false; } :: fixaccs in
-        let fixfuncs1 = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma false e ~fixaccs in
-        let fixfuncs2 = collect_fix_usage_rec ~under_fix_or_lambda:false env2 sigma tail_position b ~fixaccs:fixaccs2 in
+        let fixfuncs1 = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma false e in
+        let fixfuncs2 = collect_fix_usage_rec ~under_fix_or_lambda:false env2 sigma tail_position b in
         Seq.append fixfuncs1 fixfuncs2
     | Case (ci,u,pms,p,iv,item,bl) ->
         let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
@@ -586,41 +575,23 @@ let collect_fix_usage
         let results = Array.map2
           (fun (nas,body) (ctx,_) ->
             let env2 = EConstr.push_rel_context ctx env in
-            let n = Array.length nas in
-            let fixaccs2 =
-              List.append
-                (List.init n (fun _ -> { fixacc_used_for_call = ref false;
-                                         fixacc_used_for_goto = ref false; }))
-                fixaccs
-            in
             collect_fix_usage_rec ~under_fix_or_lambda:false env2 sigma
-              tail_position body ~fixaccs:fixaccs2)
+              tail_position body)
           bl bl0
         in
         concat_array_seq results
     | Lambda (x,t,b) ->
         let env2 = env_push_assum env x t in
-        let fixaccs2 = { fixacc_used_for_call = ref false;
-                         fixacc_used_for_goto = ref false; } :: fixaccs in
         if numargs = 0 && not under_fix_or_lambda then
           (* closure creation *)
-          collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma true b ~fixaccs:fixaccs2
+          collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma true b
         else
-          collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma tail_position b ~fixaccs:fixaccs2
+          collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma tail_position b
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let fixterm_id = id_of_annotated_name nary.(j) in
         let inlinable = Id.Map.find (id_of_annotated_name nary.(j)) inlinable_fixterms in
-        let h = Array.length nary in
         let env2 = EConstr.push_rec_types prec env in
         let fixfunc_is_higher_order_ary = Array.map (is_higher_order_function env sigma) tary in
-        let fixaccs2 =
-          list_rev_map_append
-            (fun i ->
-              { fixacc_used_for_call = ref (j = i && not tail_position && not inlinable);
-                fixacc_used_for_goto = ref false; })
-            (iota_list 0 h)
-            fixaccs
-        in
         let tail_position2 =
           if not tail_position then
             if inlinable then
@@ -633,7 +604,7 @@ let collect_fix_usage
         let results =
           Array.map2
             (fun t f -> collect_fix_usage_rec ~under_fix_or_lambda:true env2 sigma
-              tail_position2 f ~fixaccs:fixaccs2)
+              tail_position2 f)
             tary fary
         in
         let fixterm = {
@@ -645,13 +616,13 @@ let collect_fix_usage
           Array.to_seq
             (CArray.map2_i
               (fun i name ty ->
-                let fixacc = List.nth fixaccs2 (h - i - 1) in
                 let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
+                let fixfunc_id = id_of_annotated_name nary.(i) in
                 {
                   fixfunc_fixterm = fixterm;
-                  fixfunc_func_id = id_of_annotated_name nary.(i);
-                  fixfunc_used_for_call = !(fixacc.fixacc_used_for_call);
-                  fixfunc_used_for_goto = !(fixacc.fixacc_used_for_goto);
+                  fixfunc_func_id = fixfunc_id;
+                  fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call;
+                  fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = fixfunc_is_higher_order_ary.(i);
@@ -666,7 +637,7 @@ let collect_fix_usage
         in
         Seq.append fixfuncs (concat_array_seq results)
   in
-  let fixfuncs = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma true term ~fixaccs:[] in
+  let fixfuncs = collect_fix_usage_rec ~under_fix_or_lambda:false env sigma true term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
 let fixfunc_initialize_topfunc (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) ~(fixfunc_tbl : fixfunc_table) : unit =
@@ -1056,7 +1027,9 @@ let collect_fix_info ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixter
     ~(static_and_primary_cfunc : bool * string)
     ~(sibling_entfuncs : (bool * string * int * Id.t) list)
     ~(bodychunks : bodychunk_t list) : fixfunc_table =
-  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms env sigma term in
+  let used_for_call = merge_used_for_call bodychunks in
+  let used_for_goto = merge_used_for_goto bodychunks in
+  let fixfunc_tbl = collect_fix_usage ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call ~used_for_goto env sigma term in
   fixfunc_initialize_topfunc sigma term ~static_and_primary_cfunc ~fixfunc_tbl;
   fixfunc_initialize_siblings sibling_entfuncs ~fixfunc_tbl;
   fixfunc_initialize_c_names fixfunc_tbl;
