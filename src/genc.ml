@@ -1135,7 +1135,7 @@ let collect_fix_usage
   let fixfuncs = collect_fix_usage_rec env term in
   make_fixfunc_table (List.of_seq fixfuncs)
 
-let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : entry_func_t list =
+let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) (bodyhead : bodyhead_t) : entry_func_t list =
   let (bodyroot, bodyvars) = bodyhead in
   let normal_ent =
     match bodyroot with
@@ -1169,7 +1169,7 @@ let entfuncs_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_
   in
   let closure_ent =
     match bodyroot with
-    | BodyRootClosure cloid -> Some (EntryFuncClosure (Hashtbl.find closure_tbl cloid).closure_id)
+    | BodyRootClosure cloid -> Some (EntryFuncClosure cloid)
     | _ -> None
   in
   (match normal_ent with Some nent -> [nent] | None -> []) @
@@ -1187,7 +1187,7 @@ let fixfunc_initialize_labels (bodychunks : bodychunk_t list) ~(first_entfunc : 
           bodyvars
       in
       let (fixfunc_is_first, closure_is_first) =
-        if List.mem first_entfunc (entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead) then
+        if List.mem first_entfunc (entfuncs_of_bodyhead ~fixfunc_tbl bodyhead) then
           match first_entfunc with
           | EntryFuncTopfunc _ | EntryFuncFixfunc _ -> (true, false)
           | EntryFuncClosure _ -> (false, true)
@@ -2629,7 +2629,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let code_pairs = List.map
     (fun bodychunks ->
       let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
-      let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~fixfunc_tbl ~closure_tbl) bodyhead_list in
+      let entry_funcs = List.concat_map (entfuncs_of_bodyhead ~fixfunc_tbl) bodyhead_list in
       (match entry_funcs with
       | [] -> ()
       | first_entfunc :: _ ->
