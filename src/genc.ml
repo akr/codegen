@@ -115,15 +115,15 @@ type body_var_t =
 
 type bodyhead_t = body_root_t * body_var_t list (* 2nd component (body_vars) is outermost first (left to right) *)
 
-type bodychunk_t = {
-  bodychunk_return_type : c_typedata;
-  bodychunk_bodyhead_list : bodyhead_t list;
-  bodychunk_env : Environ.env;
-  bodychunk_exp : EConstr.t;
-  bodychunk_fixfunc_impls : Id.Set.t;
-  bodychunk_fixfunc_gotos : Id.Set.t;
-  bodychunk_fixfunc_calls : Id.Set.t;
-  bodychunk_closure_impls : Id.Set.t;
+type genchunk_t = {
+  genchunk_return_type : c_typedata;
+  genchunk_bodyhead_list : bodyhead_t list;
+  genchunk_env : Environ.env;
+  genchunk_exp : EConstr.t;
+  genchunk_fixfunc_impls : Id.Set.t;
+  genchunk_fixfunc_gotos : Id.Set.t;
+  genchunk_fixfunc_calls : Id.Set.t;
+  genchunk_closure_impls : Id.Set.t;
 }
 
 type entry_func_t =
@@ -157,10 +157,10 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
 
 let _ = ignore show_fixfunc_table
 
-let show_bodychunks (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : unit =
-  msg_debug_hov (Pp.str "[codegen:show_bodychunks]" +++
+let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
+  msg_debug_hov (Pp.str "[codegen:show_genchunks]" +++
     pp_sjoinmap_list
-      (fun bodychunk ->
+      (fun genchunk ->
         Pp.hv 2 (
           Pp.hov 2 (Pp.str "bodyhead_list=[" ++
             Pp.hov 0 (
@@ -181,18 +181,18 @@ let show_bodychunks (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : uni
                     | BodyVarVoidArg (var, c_ty) -> Pp.str "VoidArg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty)
                   bodyvars) ++
                   Pp.str "]")
-              bodychunk.bodychunk_bodyhead_list)
+              genchunk.genchunk_bodyhead_list)
             ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl bodychunk.bodychunk_return_type) +++
-          Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_impls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_gotos) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "fixfunc_calls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_fixfunc_calls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "closure_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements bodychunk.bodychunk_closure_impls) ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "bodychunk=" +++ Printer.pr_econstr_env bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
+          Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl genchunk.genchunk_return_type) +++
+          Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_impls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_gotos) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "fixfunc_calls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_calls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "closure_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_closure_impls) ++ Pp.str "]") +++
+          Pp.hov 2 (Pp.str "genchunk=" +++ Printer.pr_econstr_env genchunk.genchunk_env sigma genchunk.genchunk_exp)
           ))
-      bodychunks)
+      genchunks)
 
-let _ = ignore show_bodychunks
+let _ = ignore show_genchunks
 
 let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
     (((*env including fixfunc names but without lambdas of fixfunc*)Environ.env *
@@ -554,23 +554,23 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
     else
       thunk_for_call ()
 
-let bodychunk_fargs (bodychunk : bodychunk_t) : (string * c_typedata) list =
-  let (bodyroot, bodyvars) = List.hd bodychunk.bodychunk_bodyhead_list in
+let genchunk_fargs (genchunk : genchunk_t) : (string * c_typedata) list =
+  let (bodyroot, bodyvars) = List.hd genchunk.genchunk_bodyhead_list in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
 
-let obtain_function_bodychunks
+let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
     ~(static_and_primary_cfunc : bool * string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
-    bodychunk_t list =
-  let rec obtain_function_bodychunks_lamfix ~(tail_position : bool) ~(individual_body : bool) ~(bodyroot : body_root_t) ~(bodyvars : body_var_t list) (env : Environ.env) (term : EConstr.t) :
-      (bodychunk_t Seq.t * (*bodychunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
+    genchunk_t list =
+  let rec obtain_function_genchunks_lamfix ~(tail_position : bool) ~(individual_body : bool) ~(bodyroot : body_root_t) ~(bodyvars : body_var_t list) (env : Environ.env) (term : EConstr.t) :
+      (genchunk_t Seq.t * (*genchunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-        user_err (Pp.str "[codegen:obtain_function_bodychunks_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+        user_err (Pp.str "[codegen:obtain_function_genchunks_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ ->
-        user_err (Pp.str "[codegen:obtain_function_bodychunks_lamfix] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+        user_err (Pp.str "[codegen:obtain_function_genchunks_lamfix] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Lambda (x,t,b) ->
         let env2 = env_push_assum env x t in
         let bodyvars2 =
@@ -580,7 +580,7 @@ let obtain_function_bodychunks
           else
             BodyVarArg (str_of_annotated_name x, c_ty) :: bodyvars
         in
-        obtain_function_bodychunks_lamfix ~tail_position ~individual_body ~bodyroot ~bodyvars:bodyvars2 env2 b
+        obtain_function_genchunks_lamfix ~tail_position ~individual_body ~bodyroot ~bodyvars:bodyvars2 env2 b
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let env2 = EConstr.push_rec_types prec env in
         let h = Array.length nary in
@@ -593,24 +593,24 @@ let obtain_function_bodychunks
               let fixfunc_id = id_of_annotated_name x in
               if i = 0 then
                 let bodyvars2 = BodyVarFixfunc fixfunc_id :: bodyvars in
-                obtain_function_bodychunks_lamfix ~tail_position ~individual_body ~bodyroot ~bodyvars:bodyvars2 env2 f
+                obtain_function_genchunks_lamfix ~tail_position ~individual_body ~bodyroot ~bodyvars:bodyvars2 env2 f
               else
                 let bodyroot2 = BodyRootFixfunc fixfunc_id in
                 let bodyvars2 = [BodyVarFixfunc fixfunc_id] in
-                obtain_function_bodychunks_lamfix ~tail_position ~individual_body ~bodyroot:bodyroot2 ~bodyvars:bodyvars2 env2 f)
+                obtain_function_genchunks_lamfix ~tail_position ~individual_body ~bodyroot:bodyroot2 ~bodyvars:bodyvars2 env2 f)
             nary' fary')
         in
-        let bodychunks = concat_array_seq (Array.map (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodychunks) result_ary) in
-        let bodychunk_bodyhead_list = List.concat (CArray.map_to_list (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodychunk_bodyhead_list) result_ary) in
-        let fixfunc_impls0 = idset_union_ary (Array.map (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
-        let fixfunc_gotos = idset_union_ary (Array.map (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
-        let fixfunc_calls = idset_union_ary (Array.map (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
-        let closure_impls = idset_union_ary (Array.map (fun (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
+        let genchunks = concat_array_seq (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunks) result_ary) in
+        let genchunk_bodyhead_list = List.concat (CArray.map_to_list (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunk_bodyhead_list) result_ary) in
+        let fixfunc_impls0 = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
+        let fixfunc_gotos = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
+        let fixfunc_calls = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
+        let closure_impls = idset_union_ary (Array.map (fun (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
         let fixfunc_impls = Id.Set.union fixfunc_impls0 (idset_of_array (Array.map id_of_annotated_name nary)) in
-        (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+        (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | _ ->
-        let (bodychunks, bodychunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_bodychunks_body ~tail_position env term in
-        let bodychunk_bodyhead_list2 = (bodyroot, List.rev bodyvars) :: bodychunk_bodyhead_list in
+        let (genchunks, genchunk_bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_body ~tail_position env term in
+        let genchunk_bodyhead_list2 = (bodyroot, List.rev bodyvars) :: genchunk_bodyhead_list in
         if individual_body then
           let fixfunc_ids =
             List.filter_map
@@ -620,27 +620,27 @@ let obtain_function_bodychunks
                 | _ -> None)
               bodyvars
           in
-          let bodychunk = {
-            bodychunk_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
-            bodychunk_bodyhead_list = bodychunk_bodyhead_list2;
-            bodychunk_env = env;
-            bodychunk_exp = term;
-            bodychunk_fixfunc_impls = Id.Set.union (Id.Set.of_list fixfunc_ids) fixfunc_impls;
-            bodychunk_fixfunc_gotos = fixfunc_gotos;
-            bodychunk_fixfunc_calls = fixfunc_calls;
-            bodychunk_closure_impls = closure_impls;
+          let genchunk = {
+            genchunk_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
+            genchunk_bodyhead_list = genchunk_bodyhead_list2;
+            genchunk_env = env;
+            genchunk_exp = term;
+            genchunk_fixfunc_impls = Id.Set.union (Id.Set.of_list fixfunc_ids) fixfunc_impls;
+            genchunk_fixfunc_gotos = fixfunc_gotos;
+            genchunk_fixfunc_calls = fixfunc_calls;
+            genchunk_closure_impls = closure_impls;
           } in
-          (Seq.cons bodychunk bodychunks, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
+          (Seq.cons genchunk genchunks, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
         else
-          (bodychunks, bodychunk_bodyhead_list2, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
-  and obtain_function_bodychunks_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) :
-      (bodychunk_t Seq.t * (*bodychunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
+          (genchunks, genchunk_bodyhead_list2, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+  and obtain_function_genchunks_body ~(tail_position : bool) (env : Environ.env) (term : EConstr.t) :
+      (genchunk_t Seq.t * (*genchunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-        user_err (Pp.str "[codegen:obtain_function_bodychunks_body] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+        user_err (Pp.str "[codegen:obtain_function_genchunks_body] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
-        user_err (Pp.str "[codegen:obtain_function_bodychunks_body] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+        user_err (Pp.str "[codegen:obtain_function_genchunks_body] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Rel i ->
         if CArray.is_empty args then
           (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
@@ -660,9 +660,9 @@ let obtain_function_bodychunks
     | Proj (proj, e) -> (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        let (bodychunks1, body_entries1, fixfunc_impls1, fixfunc_gotos1, fixfunc_calls1, closure_impls1) = obtain_function_bodychunks_body ~tail_position:false env e in
-        let (bodychunks2, body_entries2, fixfunc_impls2, fixfunc_gotos2, fixfunc_calls2, closure_impls2) = obtain_function_bodychunks_body ~tail_position env2 b in
-        (Seq.append bodychunks1 bodychunks2,
+        let (genchunks1, body_entries1, fixfunc_impls1, fixfunc_gotos1, fixfunc_calls1, closure_impls1) = obtain_function_genchunks_body ~tail_position:false env e in
+        let (genchunks2, body_entries2, fixfunc_impls2, fixfunc_gotos2, fixfunc_calls2, closure_impls2) = obtain_function_genchunks_body ~tail_position env2 b in
+        (Seq.append genchunks1 genchunks2,
          List.append body_entries1 body_entries2,
          Id.Set.union fixfunc_impls1 fixfunc_impls2,
          Id.Set.union fixfunc_gotos1 fixfunc_gotos2,
@@ -674,31 +674,31 @@ let obtain_function_bodychunks
           (Array.map2
             (fun (nas,body) (ctx,_) ->
               let env2 = EConstr.push_rel_context ctx env in
-              obtain_function_bodychunks_body ~tail_position env2 body)
+              obtain_function_genchunks_body ~tail_position env2 body)
             bl bl0)
         in
-        let bodychunks = concat_array_seq (Array.map (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodychunks) result_ary) in
-        let bodychunk_body_list = List.concat (CArray.map_to_list (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> bodychunk_body_list) result_ary) in
-        let fixfunc_impls = idset_union_ary (Array.map (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
-        let fixfunc_gotos = idset_union_ary (Array.map (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
-        let fixfunc_calls = idset_union_ary (Array.map (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
-        let closure_impls = idset_union_ary (Array.map (fun (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
-        (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+        let genchunks = concat_array_seq (Array.map (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunks) result_ary) in
+        let genchunk_body_list = List.concat (CArray.map_to_list (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> genchunk_body_list) result_ary) in
+        let fixfunc_impls = idset_union_ary (Array.map (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_impls) result_ary) in
+        let fixfunc_gotos = idset_union_ary (Array.map (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_gotos) result_ary) in
+        let fixfunc_calls = idset_union_ary (Array.map (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> fixfunc_calls) result_ary) in
+        let closure_impls = idset_union_ary (Array.map (fun (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) -> closure_impls) result_ary) in
+        (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | Lambda (x,t,b) ->
         if CArray.is_empty args then (* closure creation *)
           let cloid = get_closure_id env sigma term in
-          let (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_bodychunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootClosure cloid) ~bodyvars:[] env term in
+          let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootClosure cloid) ~bodyvars:[] env term in
           let closure_impls2 = Id.Set.add cloid closure_impls in
-          (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2)
+          (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2)
         else
           assert false
     | Fix ((ks, j), ((nary, tary, fary))) ->
         if CArray.is_empty args then (* closure creation *)
           (let cloid = get_closure_id env sigma term in
           assert (not tail_position);
-          let (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_bodychunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootClosure cloid) ~bodyvars:[] env term in
+          let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootClosure cloid) ~bodyvars:[] env term in
           let closure_impls2 = Id.Set.add cloid closure_impls in
-          (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2))
+          (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls2))
         else
           let fixterm_id = id_of_annotated_name nary.(j) in
           let inlinable = Id.Map.find fixterm_id inlinable_fixterm_tbl in
@@ -712,22 +712,22 @@ let obtain_function_bodychunks
             else
               (true, false) (* B_K via GENBODY^{B} *)
           in
-          let (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_bodychunks_lamfix ~tail_position:tail_position2 ~individual_body ~bodyroot:(BodyRootFixfunc fixterm_id) ~bodyvars:[] env term in
+          let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:tail_position2 ~individual_body ~bodyroot:(BodyRootFixfunc fixterm_id) ~bodyvars:[] env term in
           if individual_body then
-            (bodychunks, bodychunk_body_list, Id.Set.empty, Id.Set.empty, Id.Set.singleton fixterm_id, Id.Set.empty)
+            (genchunks, genchunk_body_list, Id.Set.empty, Id.Set.empty, Id.Set.singleton fixterm_id, Id.Set.empty)
           else
-            (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
+            (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
   in
-  let (bodychunks, bodychunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_bodychunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc static_and_primary_cfunc) ~bodyvars:[] env term in
-  let result = List.of_seq bodychunks in
-  (*show_bodychunks sigma result;*)
+  let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc static_and_primary_cfunc) ~bodyvars:[] env term in
+  let result = List.of_seq genchunks in
+  (*show_genchunks sigma result;*)
   result
 
-let make_used_for_call_set (bodychunks : bodychunk_t list) : Id.Set.t =
-  idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_calls) bodychunks)
+let make_used_for_call_set (genchunks : genchunk_t list) : Id.Set.t =
+  idset_union_list (List.map (fun genchunk -> genchunk.genchunk_fixfunc_calls) genchunks)
 
-let make_used_for_goto_set (bodychunks : bodychunk_t list) : Id.Set.t =
-  idset_union_list (List.map (fun bodychunk -> bodychunk.bodychunk_fixfunc_gotos) bodychunks)
+let make_used_for_goto_set (genchunks : genchunk_t list) : Id.Set.t =
+  idset_union_list (List.map (fun genchunk -> genchunk.genchunk_fixfunc_gotos) genchunks)
 
 let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
@@ -922,10 +922,10 @@ let make_extra_arguments_tbl
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
-    (bodychunks : bodychunk_t list) : ((string * c_typedata) list) Id.Map.t =
+    (genchunks : genchunk_t list) : ((string * c_typedata) list) Id.Map.t =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
   let precise_extra_arguments_sets = compute_precise_extra_arguments ~fixfunc_fixterm_tbl env sigma fixterm_free_variables in
-  let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+  let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let result = ref Id.Map.empty in
   List.iter
     (fun (bodyroot, bodyvars) ->
@@ -970,8 +970,8 @@ let make_extra_arguments_tbl
 let make_cfunc_tbl
     ~(used_for_call_set : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
-    (sigma : Evd.evar_map) (bodychunks : bodychunk_t list) : (bool * string) Id.Map.t =
-  let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+    (sigma : Evd.evar_map) (genchunks : genchunk_t list) : (bool * string) Id.Map.t =
+  let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let result = ref Id.Map.empty in
   List.iter
     (fun (bodyroot, bodyvars) ->
@@ -1045,7 +1045,7 @@ and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
   | Const _ -> ()
   | Construct _ -> ()
   | Proj _ -> ()
-  | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its bodychunks may have closure generations. *)
+  | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its genchunks may have closure generations. *)
       find_closures ~found env sigma f
   | Lambda _ -> (* closure generation found *)
       found env term;
@@ -1070,31 +1070,31 @@ let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env
         (closure_id, cloname))
       closure_terms)
 
-let split_function_bodychunks (bodychunks : bodychunk_t list) : bodychunk_t list list =
-  let bodychunks = Array.of_list bodychunks in
-  let n = Array.length bodychunks in
-  (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks] num_bodychunks=" ++ Pp.int n);*)
+let split_function_genchunks (genchunks : genchunk_t list) : genchunk_t list list =
+  let genchunks = Array.of_list genchunks in
+  let n = Array.length genchunks in
+  (*msg_debug_hov (Pp.str "[codegen:split_function_genchunks] num_genchunks=" ++ Pp.int n);*)
   let id_int_map =
     CArray.fold_left_i
-      (fun i id_int_map bodychunk ->
+      (fun i id_int_map genchunk ->
         Id.Set.fold
           (fun fixfunc_def_id id_int_map ->
-            (*msg_debug_hov (Pp.str "[codegen:split_function_bodychunks]" +++
+            (*msg_debug_hov (Pp.str "[codegen:split_function_genchunks]" +++
               Pp.str "i=" ++ Pp.int i +++
               Pp.str "body_fixfunc_impl=" ++ Id.print fixfunc_def_id);*)
             Id.Map.add fixfunc_def_id i id_int_map)
-          bodychunk.bodychunk_fixfunc_impls id_int_map)
-      Id.Map.empty bodychunks
+          genchunk.genchunk_fixfunc_impls id_int_map)
+      Id.Map.empty genchunks
   in
   let u = unionfind_make n in
   Array.iteri
-    (fun i bodychunk ->
+    (fun i genchunk ->
       Id.Set.iter
         (fun fixfunc_id -> unionfind_union u i (Id.Map.find fixfunc_id id_int_map))
-        bodychunk.bodychunk_fixfunc_gotos)
-    bodychunks;
+        genchunk.genchunk_fixfunc_gotos)
+    genchunks;
   List.map
-    (List.map (fun i -> bodychunks.(i)))
+    (List.map (fun i -> genchunks.(i)))
     (unionfind_sets u)
 
 let entfuncs_of_bodyhead
@@ -1144,8 +1144,8 @@ let make_labels_tbl
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(cfunc_tbl : (bool * string) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
-    (bodychunks : bodychunk_t list) ~(first_entfunc : entry_func_t) : string Id.Map.t * string Id.Map.t =
-  let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+    (genchunks : genchunk_t list) ~(first_entfunc : entry_func_t) : string Id.Map.t * string Id.Map.t =
+  let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let fixfunc_label_tbl = ref Id.Map.empty in
   let closure_label_tbl = ref Id.Map.empty in
   List.iter
@@ -2015,7 +2015,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               let (fixfunc_env2, fixfunc_env3, fixfunc_name, fixfunc_type, fixfunc_fargs) = List.hd context in
               let fixfunc_i = Hashtbl.find fixfunc_tbl (id_of_annotated_name fixfunc_name) in
               match fixfunc_i.fixfunc_label with
-              | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_bodychunks and gen_tail is not used for it. *)
+              | None -> Pp.mt () (* Not reached.  Currently, fix-term in top-call are decomposed by obtain_function_genchunks and gen_tail is not used for it. *)
               | Some label -> Pp.str label ++ Pp.str ":"
             in
             pp_label +++ gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont body_env sigma body)
@@ -2071,7 +2071,7 @@ let gen_closure_load_args_assignments (clo : closure_t) (var : string) : (string
 let gen_func_single
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entfunc : entry_func_t)
-    ~(bodychunks : bodychunk_t list)
+    ~(genchunks : genchunk_t list)
     (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let (static, primary_cfunc) =
@@ -2099,7 +2099,7 @@ let gen_func_single
   in
   let c_fargs =
     match entfunc with
-    | EntryFuncTopfunc _ -> bodychunk_fargs (List.hd bodychunks)
+    | EntryFuncTopfunc _ -> genchunk_fargs (List.hd genchunks)
     | EntryFuncFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
@@ -2108,23 +2108,23 @@ let gen_func_single
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
         clo.closure_args @ [("closure", pointer_to_void)]
   in
-  let return_type = (List.hd bodychunks).bodychunk_return_type in
+  let return_type = (List.hd genchunks).genchunk_return_type in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
-        (fun bodychunk ->
+        (fun genchunk ->
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (bodychunk_fargs bodychunk);
+            (genchunk_fargs genchunk);
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             closure_vars;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl (List.hd bodychunk.bodychunk_bodyhead_list) in
+          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl (List.hd genchunk.genchunk_bodyhead_list) in
           pp_closure_assigns +++
           (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
-          gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp)
-        bodychunks)
+          gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont genchunk.genchunk_env sigma genchunk.genchunk_exp)
+        genchunks)
   in
   let local_vars = List.filter
     (fun (c_ty, c_var) ->
@@ -2199,7 +2199,7 @@ let closure_enum_index closure_c_name = "codegen_closure_index_" ^ closure_c_nam
 let gen_func_multi
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entry_funcs : entry_func_t list)
-    ~(bodychunks : bodychunk_t list)
+    ~(genchunks : genchunk_t list)
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let first_c_name =
@@ -2215,8 +2215,8 @@ let gen_func_multi
   let func_index_enum_tag = func_index_enum_tag_name first_c_name in
   let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
-  let formal_arguments = bodychunk_fargs (List.hd bodychunks) in
-  let return_type = (List.hd bodychunks).bodychunk_return_type in
+  let formal_arguments = genchunk_fargs (List.hd genchunks) in
+  let return_type = (List.hd genchunks).genchunk_return_type in
   let pp_enum =
     Pp.hov 0 (
       Pp.str "enum" +++
@@ -2325,13 +2325,13 @@ let gen_func_multi
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
-        (fun bodychunk ->
+        (fun genchunk ->
           List.iter
             (fun (arg_name, arg_type) ->
               (*msg_debug_hov (Pp.str ("[codegen:gen_func_multi] add_local_var " ^ arg_name));*)
               add_local_var arg_type arg_name)
-            (bodychunk_fargs bodychunk);
-          let bodyhead = List.hd bodychunk.bodychunk_bodyhead_list in
+            (genchunk_fargs genchunk);
+          let bodyhead = List.hd genchunk.genchunk_bodyhead_list in
           let (bodyroot, bodyvars) = bodyhead in
           List.iter
             (function
@@ -2342,12 +2342,12 @@ let gen_func_multi
                     fixfunc.fixfunc_extra_arguments
               | _ -> ())
             bodyvars;
-          let cont = { tail_cont_return_type = bodychunk.bodychunk_return_type; tail_cont_multifunc = true } in
+          let cont = { tail_cont_return_type = genchunk.genchunk_return_type; tail_cont_multifunc = true } in
           let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           Pp.v 0 (
             (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
-            gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont bodychunk.bodychunk_env sigma bodychunk.bodychunk_exp))
-        bodychunks)
+            gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont genchunk.genchunk_env sigma genchunk.genchunk_exp))
+        genchunks)
   in
   let pp_local_variables_decls =
     pp_sjoinmap_list
@@ -2518,34 +2518,34 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
   let higher_order_fixfunc_tbl = make_higher_order_fixfunc_tbl sigma ~fixterm_tbl in
   let inlinable_fixterm_tbl = make_inlinable_fixterm_tbl ~higher_order_fixfunc_tbl env sigma whole_term in
-  let bodychunks = obtain_function_bodychunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
-  let used_for_call_set = make_used_for_call_set bodychunks in
-  let used_for_goto_set = make_used_for_goto_set bodychunks in
+  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
+  let used_for_call_set = make_used_for_call_set genchunks in
+  let used_for_goto_set = make_used_for_goto_set genchunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
-  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term bodychunks in
+  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term genchunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
-  let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma bodychunks in
+  let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma genchunks in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
   let closure_terms = collect_closure_terms env sigma whole_term in
   let closure_c_name_tbl = make_closure_c_name_tbl sigma closure_terms in
-  let bodychunks_list = split_function_bodychunks bodychunks in
-  List.iter (fun bodychunks -> show_bodychunks sigma bodychunks) bodychunks_list;
+  let genchunks_list = split_function_genchunks genchunks in
+  List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;
   let entry_funcs_list =
     List.map
-      (fun bodychunks ->
-        let bodyhead_list = List.concat_map (fun bodychunk -> bodychunk.bodychunk_bodyhead_list) bodychunks in
+      (fun genchunks ->
+        let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
         List.concat_map (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl) bodyhead_list)
-      bodychunks_list
+      genchunks_list
   in
   let label_tbl_pairs =
     List.map2
-      (fun bodychunks entry_funcs ->
+      (fun genchunks entry_funcs ->
         match entry_funcs with
         | [] -> (Id.Map.empty, Id.Map.empty)
         | first_entfunc :: _ ->
-            make_labels_tbl bodychunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
-      bodychunks_list entry_funcs_list
+            make_labels_tbl genchunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
+      genchunks_list entry_funcs_list
   in
   let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
   let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
@@ -2554,18 +2554,18 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   show_fixfunc_table env sigma fixfunc_tbl;
   let used_vars = used_variables env sigma whole_term in
   let code_pairs = List.map2
-    (fun bodychunks entry_funcs ->
+    (fun genchunks entry_funcs ->
       let (decl, impl) =
         match entry_funcs with
         | [] -> (Pp.mt (), Pp.mt ())
         | [entfunc] ->
-            gen_func_single ~fixfunc_tbl ~closure_tbl ~entfunc ~bodychunks sigma used_vars
+            gen_func_single ~fixfunc_tbl ~closure_tbl ~entfunc ~genchunks sigma used_vars
         | _ ->
-            gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~bodychunks env sigma used_vars
+            gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~genchunks env sigma used_vars
       in
       let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stubs in
       (decl +++ pp_stub_sibling_entfuncs, impl))
-    bodychunks_list entry_funcs_list
+    genchunks_list entry_funcs_list
   in
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
