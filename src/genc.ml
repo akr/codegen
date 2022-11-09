@@ -53,7 +53,7 @@ type fixfunc_t = {
     However, they can be different for primary function and siblings.
     In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
 
-  fixfunc_label : string option; (* by fixfunc_initialize_labels *)
+  fixfunc_label : string option;
 }
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
@@ -71,7 +71,7 @@ type closure_t = {
   closure_c_return_type : c_typedata;
   closure_args : (string * c_typedata) list;
   closure_vars : (string * c_typedata) list;
-  closure_label : string option; (* by fixfunc_initialize_labels *)
+  closure_label : string option;
 }
 type closure_table = (Id.t, closure_t) Hashtbl.t
 
@@ -311,7 +311,7 @@ let rec is_higher_order_function (env : Environ.env) (sigma : Evd.evar_map) (ty 
           is_higher_order_function env2 sigma b)
   | _ -> false
 
-let detect_higher_order_fixfunc (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : bool Id.Map.t =
+let make_higher_order_fixfunc_tbl (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t) : bool Id.Map.t =
   Id.Map.fold
     (fun fixterm_id (env,term) tbl ->
       let ((ks, j), (nary, tary, fary)) = destFix sigma term in
@@ -331,7 +331,7 @@ let detect_higher_order_fixfunc (sigma : Evd.evar_map) ~(fixterm_tbl : (Environ.
   R[n] = false if n is fix-bounded function not inlinable.
   R can also be usable to determine an ID is fix-bounded function or not.
 *)
-let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
+let detect_inlinable_fixterm ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : bool Id.Map.t =
   let rec detect_inlinable_fixterm_lamfix (env : Environ.env) (term : EConstr.t) :
       (* this lambda/fix is inlinable or not *) bool *
       (* fixterms inlinable or not *) bool Id.Map.t *
@@ -406,7 +406,7 @@ let detect_inlinable_fixterm ~(higher_order_fixfuncs : bool Id.Map.t) (env : Env
         let fixfunc_referenced_at_nontail_position = IntSet.exists ((>=) h) nontailset_fs in
         let tailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) tailset_fs) in
         let nontailset_fs' = IntSet.map (fun k -> k - h) (IntSet.filter ((<) h) nontailset_fs) in
-        let fixterm_is_higher_order = Array.exists (fun x -> Id.Map.find (id_of_annotated_name x) higher_order_fixfuncs) nary in
+        let fixterm_is_higher_order = Array.exists (fun x -> Id.Map.find (id_of_annotated_name x) higher_order_fixfunc_tbl) nary in
         if not inlinable_here_fs ||
            fixfunc_referenced_at_nontail_position ||
            fixterm_is_higher_order then
@@ -559,7 +559,7 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
       thunk_for_call ()
 
 let obtain_function_bodychunks
-    ~(higher_order_fixfuncs : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
+    ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterms : bool Id.Map.t)
     ~(static_and_primary_cfunc : bool * string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
@@ -649,7 +649,7 @@ let obtain_function_bodychunks
         else (* application *)
           let id = id_of_name (Context.Rel.Declaration.get_name (Environ.lookup_rel i env)) in
           let (fixfunc_gotos, fixfunc_calls) =
-            match Id.Map.find_opt id higher_order_fixfuncs with
+            match Id.Map.find_opt id higher_order_fixfunc_tbl with
             | None -> (Id.Set.empty, Id.Set.empty) (* closure call *)
             | Some fixfunc_is_higher_order ->
                 let fixterm_is_inlinable = Id.Map.find id inlinable_fixterms in
@@ -1264,7 +1264,7 @@ let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
 
 let collect_fixpoints
     ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
-    ~(higher_order_fixfuncs : bool Id.Map.t)
+    ~(higher_order_fixfunc_tbl : bool Id.Map.t)
     ~(inlinable_fixterms : bool Id.Map.t)
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
@@ -1296,7 +1296,7 @@ let collect_fixpoints
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
-                  fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfuncs;
+                  fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfunc_tbl;
                   fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
                   fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
                   fixfunc_c_name = Id.Map.find fixfunc_id c_names_tbl;
@@ -2520,9 +2520,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma whole_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
-  let higher_order_fixfuncs = detect_higher_order_fixfunc sigma ~fixterm_tbl in
-  let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfuncs env sigma whole_term in
-  let bodychunks = obtain_function_bodychunks ~higher_order_fixfuncs ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
+  let higher_order_fixfunc_tbl = make_higher_order_fixfunc_tbl sigma ~fixterm_tbl in
+  let inlinable_fixterms = detect_inlinable_fixterm ~higher_order_fixfunc_tbl env sigma whole_term in
+  let bodychunks = obtain_function_bodychunks ~higher_order_fixfunc_tbl ~inlinable_fixterms ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
   let used_for_call_set = make_used_for_call_set bodychunks in
   let used_for_goto_set = make_used_for_goto_set bodychunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
@@ -2553,7 +2553,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   in
   let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
   let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
-  let fixfunc_tbl = collect_fixpoints ~fixterm_tbl ~higher_order_fixfuncs ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl sigma in
+  let fixfunc_tbl = collect_fixpoints ~fixterm_tbl ~higher_order_fixfunc_tbl ~inlinable_fixterms ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl sigma in
   let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_label_tbl sigma closure_terms in
   show_fixfunc_table env sigma fixfunc_tbl;
   let used_vars = used_variables env sigma whole_term in
