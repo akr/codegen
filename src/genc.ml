@@ -1011,7 +1011,7 @@ let make_cfunc_tbl
     bodyhead_list;
   !result
 
-let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
+let rec find_closures ~(found : Environ.env -> EConstr.t -> Id.t option -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -1024,9 +1024,9 @@ let rec find_closures ~(found : Environ.env -> EConstr.t -> unit)
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       Array.iter (find_closures ~found env2 sigma) fary
-  | _ -> find_closures_exp ~found env sigma term
-and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
-    (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
+  | _ -> find_closures_exp ~found env sigma None term
+and find_closures_exp ~(found : Environ.env -> EConstr.t -> Id.t option -> unit)
+    (env : Environ.env) (sigma : Evd.evar_map) (var_to_bind : Id.t option) (term : EConstr.t) =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
       user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1034,14 +1034,15 @@ and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
       user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | LetIn (x,e,t,b) ->
       let env2 = env_push_def env x e t in
-      find_closures_exp ~found env sigma e;
-      find_closures_exp ~found env2 sigma b
+      let let_var = id_of_annotated_name x in
+      find_closures_exp ~found env sigma (Some let_var) e;
+      find_closures_exp ~found env2 sigma var_to_bind b
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       (Array.iter2
         (fun (nas,body) (ctx,_) ->
           let env2 = EConstr.push_rel_context ctx env in
-          find_closures_exp ~found env2 sigma body)
+          find_closures_exp ~found env2 sigma var_to_bind body)
         bl bl0)
   | Rel _ -> ()
   | Const _ -> ()
@@ -1050,25 +1051,29 @@ and find_closures_exp ~(found : Environ.env -> EConstr.t -> unit)
   | App (f,args) -> (* The function position can be a fixpoint.  The fixpoint itself is not a closure generation but its genchunks may have closure generations. *)
       find_closures ~found env sigma f
   | Lambda _ -> (* closure generation found *)
-      found env term;
+      found env term var_to_bind;
       find_closures ~found env sigma term
   | Fix _ -> (* closure generation found *)
-      found env term;
+      found env term var_to_bind;
       find_closures ~found env sigma term
 
-let collect_closure_terms (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) list =
+let collect_closure_terms (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t * Id.t option) list =
   let result = ref [] in
   find_closures env sigma term
-    ~found:(fun closure_env closure_exp ->
-      result := (closure_env, closure_exp) :: !result);
+    ~found:(fun closure_env closure_exp var_to_bind ->
+      result := (closure_env, closure_exp, var_to_bind) :: !result);
   List.rev !result
 
-let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t) list) : string Id.Map.t =
+let make_closure_c_name_tbl (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t * Id.t option) list) : string Id.Map.t =
   idmap_of_list
     (List.map
-      (fun (closure_env, closure_exp) ->
+      (fun (closure_env, closure_exp, var_to_bind) ->
         let closure_id = get_closure_id closure_env sigma closure_exp in
-        let cloname = global_gensym () in
+        let cloname =
+          match var_to_bind with
+          | None -> global_gensym ()
+          | Some id -> global_gensym_with_id id
+        in
         (closure_id, cloname))
       closure_terms)
 
@@ -1325,10 +1330,10 @@ let collect_closures
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
     ~(closure_label_tbl : string Id.Map.t)
-    (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t) list) : closure_table =
+    (sigma : Evd.evar_map) (closure_terms : (Environ.env * EConstr.t * Id.t option) list) : closure_table =
   let closures = ref [] in
   List.iter
-    (fun (closure_env, closure_exp) ->
+    (fun (closure_env, closure_exp, var_to_bind) ->
       (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_exp=" ++ Printer.pr_econstr_env closure_env sigma closure_exp);*)
       let closure_ty = Reductionops.nf_all closure_env sigma (Retyping.get_type_of closure_env sigma closure_exp) in
       (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_ty=" ++ Printer.pr_econstr_env closure_env sigma closure_ty);*)
