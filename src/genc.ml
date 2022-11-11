@@ -2216,7 +2216,7 @@ let topfunc_enum_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
 let fixfunc_enum_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
 let closure_enum_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
-let pr_case case_value assigns goto_label =
+let pr_case (case_value : string option) (assigns : (string * string) list) (goto_label : string option) : Pp.t =
   let pp_case =
     (match case_value with
     | None -> Pp.str "default:"
@@ -2244,7 +2244,7 @@ let pr_case case_value assigns goto_label =
     pp_assigns +++
     pp_goto)
 
-let pr_multi_topfunc_defs static return_type primary_cfunc formal_arguments body_function_name =
+let pr_multi_topfunc_defs (static : bool) (return_type : c_typedata) (primary_cfunc : string) (formal_arguments : (string * c_typedata) list) (body_function_name : string) : Pp.t =
   (if CList.is_empty formal_arguments then
     Pp.mt ()
   else
@@ -2256,7 +2256,7 @@ let pr_multi_topfunc_defs static return_type primary_cfunc formal_arguments body
     formal_arguments return_type
     body_function_name
 
-let pr_multi_topfunc_case primary_cfunc formal_arguments =
+let pr_multi_topfunc_case (primary_cfunc : string) (formal_arguments : (string * c_typedata) list) : Pp.t =
   pr_case None
     (List.map
       (fun (c_arg, t) ->
@@ -2265,7 +2265,7 @@ let pr_multi_topfunc_case primary_cfunc formal_arguments =
       formal_arguments)
     None (* no need to goto label because EntryTypeTopfunc is always at last *)
 
-let pr_multi_fixfunc_defs fixfunc static return_type cfunc body_function_name =
+let pr_multi_fixfunc_defs (fixfunc : fixfunc_t) (static : bool) (return_type : c_typedata) (cfunc : string) (body_function_name : string) : Pp.t =
   (if CList.is_empty fixfunc.fixfunc_extra_arguments &&
      CList.is_empty fixfunc.fixfunc_formal_arguments then
     Pp.mt ()
@@ -2291,7 +2291,7 @@ let pr_multi_fixfunc_defs fixfunc static return_type cfunc body_function_name =
     return_type
     body_function_name
 
-let pr_multi_fixfunc_case is_last fixfunc =
+let pr_multi_fixfunc_case (is_last : bool) (fixfunc : fixfunc_t) : Pp.t =
   let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
   let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label) in
   pr_case case_value
@@ -2309,7 +2309,7 @@ let pr_multi_fixfunc_case is_last fixfunc =
         fixfunc.fixfunc_formal_arguments))
     goto
 
-let pr_multi_closure_defs clo bodyhead body_function_name =
+let pr_multi_closure_defs (clo : closure_t) (bodyhead : bodyhead_t) (body_function_name : string) : Pp.t =
   gen_closure_struct clo +++
   (Pp.hv 0 (
     Pp.str (closure_args_struct_type clo.closure_c_name) +++
@@ -2323,7 +2323,7 @@ let pr_multi_closure_defs clo bodyhead body_function_name =
     bodyhead.bodyhead_return_type
     body_function_name
 
-let pr_multi_closure_case clo =
+let pr_multi_closure_case (clo : closure_t) : Pp.t =
   pr_case (Some (closure_enum_index clo.closure_c_name))
     (gen_closure_load_args_assignments clo "codegen_args")
     (Some (Option.get (clo.closure_label)))
