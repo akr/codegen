@@ -115,7 +115,10 @@ type body_var_t =
 | BodyVarArg of (string * c_typedata)
 | BodyVarVoidArg of (string * c_typedata)
 
-type bodyhead_t = body_root_t * body_var_t list (* 2nd component (body_vars) is outermost first (left to right) *)
+type bodyhead_t = {
+  bodyhead_root : body_root_t;
+  bodyhead_vars : body_var_t list (* outermost first (left to right) *)
+}
 
 type genchunk_t = {
   genchunk_return_type : c_typedata;
@@ -167,8 +170,8 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
           Pp.hov 2 (Pp.str "bodyhead_list=[" ++
             Pp.hov 0 (
             pp_sjoinmap_list
-              (fun (bodyroot, bodyvars) ->
-                (match bodyroot with
+              (fun bodyhead ->
+                (match bodyhead.bodyhead_root with
                 | BodyRootTopfunc (static,primary_cfunc) -> Pp.str ("Topfunc:" ^ primary_cfunc ^ if static then "(static)" else "")
                 | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
                 | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)
@@ -181,7 +184,7 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
                     | BodyVarFixfunc fixfunc_id -> Pp.str "Fixfunc:" ++ Id.print fixfunc_id
                     | BodyVarArg (var, c_ty) -> Pp.str "Arg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty
                     | BodyVarVoidArg (var, c_ty) -> Pp.str "VoidArg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty)
-                  bodyvars) ++
+                  bodyhead.bodyhead_vars) ++
                   Pp.str "]")
               genchunk.genchunk_bodyhead_list)
             ++ Pp.str "]") +++
@@ -557,7 +560,7 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
       thunk_for_call ()
 
 let genchunk_fargs (genchunk : genchunk_t) : (string * c_typedata) list =
-  let (bodyroot, bodyvars) = List.hd genchunk.genchunk_bodyhead_list in
+  let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = List.hd genchunk.genchunk_bodyhead_list in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
 
 let obtain_function_genchunks
@@ -612,7 +615,7 @@ let obtain_function_genchunks
         (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | _ ->
         let (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_body ~tail_position env term in
-        let bodyhead_list2 = (bodyroot, List.rev bodyvars) :: bodyhead_list in
+        let bodyhead_list2 = { bodyhead_root=bodyroot; bodyhead_vars=(List.rev bodyvars) } :: bodyhead_list in
         if individual_body then
           let fixfunc_ids =
             List.filter_map
@@ -930,13 +933,13 @@ let make_extra_arguments_tbl
   let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let result = ref Id.Map.empty in
   List.iter
-    (fun (bodyroot, bodyvars) ->
+    (fun bodyhead ->
       let fixfunc_ids =
         List.filter_map
           (function
             | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
             | _ -> None)
-          bodyvars
+          bodyhead.bodyhead_vars
       in
       match fixfunc_ids with
       | [] -> ()
@@ -956,7 +959,7 @@ let make_extra_arguments_tbl
                 naive_extra_arguments
           in
           result := Id.Map.add fixfunc_id extra_arguments !result;
-          let bodyvars1 = List.tl (list_find_suffix (function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false) bodyvars) in
+          let bodyvars1 = List.tl (list_find_suffix (function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false) bodyhead.bodyhead_vars) in
           let rev_exargs = ref (List.rev extra_arguments) in
           List.iter
             (function
@@ -976,16 +979,16 @@ let make_cfunc_tbl
   let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let result = ref Id.Map.empty in
   List.iter
-    (fun (bodyroot, bodyvars) ->
+    (fun bodyhead ->
       let fixfunc_ids =
         List.filter_map
           (function
             | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
             | _ -> None)
-          bodyvars
+          bodyhead.bodyhead_vars
       in
       let static_and_cfunc_name =
-        match bodyroot with
+        match bodyhead.bodyhead_root with
         | BodyRootTopfunc (static, primary_cfunc)  -> Some (static, primary_cfunc)
         | BodyRootClosure _
         | BodyRootFixfunc _ ->
@@ -1108,7 +1111,7 @@ let entfuncs_of_bodyhead
     ~(used_for_call_set : Id.Set.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     (bodyhead : bodyhead_t) : entry_func_t list =
-  let (bodyroot, bodyvars) = bodyhead in
+  let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   let normal_ent =
     match bodyroot with
     | BodyRootTopfunc (primary_static, primary_cfunc) ->
@@ -1156,13 +1159,13 @@ let make_labels_tbl
   let fixfunc_label_tbl = ref Id.Map.empty in
   let closure_label_tbl = ref Id.Map.empty in
   List.iter
-    (fun ((bodyroot, bodyvars) as bodyhead) ->
+    (fun bodyhead ->
       let fixfunc_ids =
         List.filter_map
           (function
             | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
             | _ -> None)
-          bodyvars
+          bodyhead.bodyhead_vars
       in
       let (fixfunc_is_first, closure_is_first) =
         if List.mem first_entfunc (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl bodyhead) then
@@ -1174,7 +1177,7 @@ let make_labels_tbl
       in
       msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
         Pp.str "bodyroot=" ++
-          (match bodyroot with
+          (match bodyhead.bodyhead_root with
           | BodyRootTopfunc (static,primary_cfunc) -> Pp.str ("Topfunc:" ^ primary_cfunc)
           | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
           | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
@@ -1188,7 +1191,7 @@ let make_labels_tbl
                 List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_goto_set) fixfunc_ids) (* Anyway, labels are required if internal goto use them *)
             then
               (let label =
-                match bodyroot with
+                match bodyhead.bodyhead_root with
                 | BodyRootTopfunc (static,primary_cfunc) -> primary_entry_label primary_cfunc
                 | BodyRootFixfunc fixfunc_id ->
                     (match Id.Map.find_opt fixfunc_id sibling_tbl with
@@ -1208,7 +1211,7 @@ let make_labels_tbl
             else
               None
       in
-      (match bodyroot with
+      (match bodyhead.bodyhead_root with
       | BodyRootClosure closure_id ->
           let closure_c_name = Id.Map.find closure_id closure_c_name_tbl in
           if not closure_is_first then
@@ -1223,13 +1226,12 @@ let make_labels_tbl
   (!fixfunc_label_tbl, !closure_label_tbl)
 
 let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) (bodyhead : bodyhead_t) : string option =
-  let (bodyroot, bodyvars) = bodyhead in
   let fixfunc_ids =
     List.filter_map
       (function
         | BodyVarFixfunc fixfunc_id -> Some fixfunc_id
         | _ -> None)
-      bodyvars
+      bodyhead.bodyhead_vars
   in
   let fixfunc_label =
     match fixfunc_ids with
@@ -1239,7 +1241,7 @@ let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_tab
         fixfunc.fixfunc_label
   in
   let closure_label =
-    match bodyroot with
+    match bodyhead.bodyhead_root with
     | BodyRootClosure cloid ->
         let clo = Hashtbl.find closure_tbl cloid in
         (match clo.closure_label with
@@ -2339,7 +2341,6 @@ let gen_func_multi
               add_local_var arg_type arg_name)
             (genchunk_fargs genchunk);
           let bodyhead = List.hd genchunk.genchunk_bodyhead_list in
-          let (bodyroot, bodyvars) = bodyhead in
           List.iter
             (function
               | BodyVarFixfunc fixfunc_id ->
@@ -2348,7 +2349,7 @@ let gen_func_multi
                     (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
                     fixfunc.fixfunc_extra_arguments
               | _ -> ())
-            bodyvars;
+            bodyhead.bodyhead_vars;
           let cont = { tail_cont_return_type = genchunk.genchunk_return_type; tail_cont_multifunc = true } in
           let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           Pp.v 0 (
