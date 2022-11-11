@@ -2403,12 +2403,12 @@ let gen_func_multi
     (fun () ->
       pp_sjoinmap_list
         (fun genchunk ->
+          let bodyhead = List.hd genchunk.genchunk_bodyhead_list in
           List.iter
             (fun (arg_name, arg_type) ->
               (*msg_debug_hov (Pp.str ("[codegen:gen_func_multi] add_local_var " ^ arg_name));*)
               add_local_var arg_type arg_name)
-            (genchunk_fargs genchunk);
-          let bodyhead = List.hd genchunk.genchunk_bodyhead_list in
+            (bodyhead_fargs bodyhead);
           List.iter
             (function
               | BodyVarFixfunc fixfunc_id ->
@@ -2418,7 +2418,7 @@ let gen_func_multi
                     fixfunc.fixfunc_extra_arguments
               | _ -> ())
             bodyhead.bodyhead_vars;
-          let cont = { tail_cont_return_type = (List.hd genchunk.genchunk_bodyhead_list).bodyhead_return_type; tail_cont_multifunc = true } in
+          let cont = { tail_cont_return_type = bodyhead.bodyhead_return_type; tail_cont_multifunc = true } in
           let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           Pp.v 0 (
             (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
