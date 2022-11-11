@@ -565,9 +565,12 @@ let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_ord
     else
       thunk_for_call ()
 
-let genchunk_fargs (genchunk : genchunk_t) : (string * c_typedata) list =
-  let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = List.hd genchunk.genchunk_bodyhead_list in
+let bodyhead_fargs (bodyhead : bodyhead_t) : (string * c_typedata) list =
+  let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
+
+let genchunk_fargs (genchunk : genchunk_t) : (string * c_typedata) list =
+  bodyhead_fargs (List.hd genchunk.genchunk_bodyhead_list)
 
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
@@ -2116,14 +2119,13 @@ let gen_func_single
   in
   let c_fargs =
     match entfunc.entryfunc_type with
-    | EntryTypeTopfunc _ -> genchunk_fargs (List.hd genchunks)
+    | EntryTypeTopfunc _ -> bodyhead_fargs entfunc.entryfunc_body
     | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
+        fixfunc.fixfunc_extra_arguments @ (bodyhead_fargs entfunc.entryfunc_body)
     | EntryTypeClosure closure_id ->
-        let clo = Hashtbl.find closure_tbl closure_id in
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
-        clo.closure_args @ [("closure", pointer_to_void)]
+        (bodyhead_fargs entfunc.entryfunc_body) @ [("closure", pointer_to_void)]
   in
   let return_type = bodyhead.bodyhead_return_type in
   let (local_vars, pp_body) = local_vars_with
