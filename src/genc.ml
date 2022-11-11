@@ -569,9 +569,6 @@ let bodyhead_fargs (bodyhead : bodyhead_t) : (string * c_typedata) list =
   let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
 
-let genchunk_fargs (genchunk : genchunk_t) : (string * c_typedata) list =
-  bodyhead_fargs (List.hd genchunk.genchunk_bodyhead_list)
-
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
     ~(static_and_primary_cfunc : bool * string)
@@ -2133,14 +2130,15 @@ let gen_func_single
     (fun () ->
       pp_sjoinmap_list
         (fun genchunk ->
+          let bodyhead = List.hd genchunk.genchunk_bodyhead_list in
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
-            (genchunk_fargs genchunk);
+            (bodyhead_fargs bodyhead);
           List.iter
             (fun (arg_name, arg_type) -> add_local_var arg_type arg_name)
             closure_vars;
           let cont = { tail_cont_return_type = return_type; tail_cont_multifunc = false } in
-          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl (List.hd genchunk.genchunk_bodyhead_list) in
+          let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           pp_closure_assigns +++
           (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
           gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont genchunk.genchunk_env sigma genchunk.genchunk_exp)
