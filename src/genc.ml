@@ -70,7 +70,6 @@ type closure_t = {
   closure_id : Id.t;
   closure_c_name : string;
   closure_c_func_type : c_typedata;
-  closure_c_return_type : c_typedata;
   closure_args : (string * c_typedata) list;
   closure_vars : (string * c_typedata) list;
   closure_label : string option;
@@ -131,10 +130,15 @@ type genchunk_t = {
   genchunk_closure_impls : Id.Set.t;
 }
 
-type entry_func_t =
-| EntryFuncTopfunc of (bool * string) (* (static, primary_cfunc) *)
-| EntryFuncFixfunc of Id.t (* fixfunc_id *)
-| EntryFuncClosure of Id.t (* closure_id *)
+type entry_type_t =
+| EntryTypeTopfunc of (bool * string) (* (static, primary_cfunc) *)
+| EntryTypeFixfunc of Id.t (* fixfunc_id *)
+| EntryTypeClosure of Id.t (* closure_id *)
+
+type entry_func_t = {
+  entryfunc_type : entry_type_t;
+  entryfunc_body : bodyhead_t;
+}
 
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
@@ -1120,7 +1124,7 @@ let entfuncs_of_bodyhead
   let normal_ent =
     match bodyroot with
     | BodyRootTopfunc (primary_static, primary_cfunc) ->
-        Some (EntryFuncTopfunc (primary_static, primary_cfunc))
+        Some (EntryTypeTopfunc (primary_static, primary_cfunc))
     | BodyRootFixfunc _
     | BodyRootClosure _ ->
         (let fixfunc_ids =
@@ -1135,23 +1139,23 @@ let entfuncs_of_bodyhead
         | first_fixfunc_id :: _ ->
             match Id.Map.find_opt first_fixfunc_id sibling_tbl with
             | Some _ ->
-                Some (EntryFuncFixfunc first_fixfunc_id)
+                Some (EntryTypeFixfunc first_fixfunc_id)
             | None ->
                 List.find_map
                   (fun fixfunc_id ->
                     if Id.Set.mem fixfunc_id used_for_call_set then
-                      Some (EntryFuncFixfunc first_fixfunc_id)
+                      Some (EntryTypeFixfunc first_fixfunc_id)
                     else
                       None)
                   fixfunc_ids)
   in
   let closure_ent =
     match bodyroot with
-    | BodyRootClosure cloid -> Some (EntryFuncClosure cloid)
+    | BodyRootClosure cloid -> Some (EntryTypeClosure cloid)
     | _ -> None
   in
-  (match normal_ent with Some nent -> [nent] | None -> []) @
-  (match closure_ent with Some cent -> [cent] | None -> [])
+  (match normal_ent with Some nent -> [{entryfunc_type=nent; entryfunc_body=bodyhead}] | None -> []) @
+  (match closure_ent with Some cent -> [{entryfunc_type=cent; entryfunc_body=bodyhead}] | None -> [])
 
 let make_labels_tbl
     ~(used_for_call_set : Id.Set.t)
@@ -1174,9 +1178,9 @@ let make_labels_tbl
       in
       let (fixfunc_is_first, closure_is_first) =
         if List.mem first_entfunc (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl bodyhead) then
-          match first_entfunc with
-          | EntryFuncTopfunc _ | EntryFuncFixfunc _ -> (true, false)
-          | EntryFuncClosure _ -> (false, true)
+          match first_entfunc.entryfunc_type with
+          | EntryTypeTopfunc _ | EntryTypeFixfunc _ -> (true, false)
+          | EntryTypeClosure _ -> (false, true)
         else
           (false, false)
       in
@@ -1345,7 +1349,6 @@ let collect_closures
       let closure_ty = Reductionops.nf_all closure_env sigma (Retyping.get_type_of closure_env sigma closure_exp) in
       (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_ty=" ++ Printer.pr_econstr_env closure_env sigma closure_ty);*)
       let c_closure_function_ty = c_closure_function_type closure_env sigma closure_ty in
-      let c_return_ty = c_typename closure_env sigma (snd (decompose_prod sigma closure_ty)) in
       let cloid = get_closure_id closure_env sigma closure_exp in
       let cloname = Id.Map.find cloid closure_c_name_tbl in
       let (outermost_fargs, env1, fix_bodies) = lam_fix_body_list closure_env sigma closure_exp in
@@ -1378,7 +1381,6 @@ let collect_closures
           closure_id=cloid;
           closure_c_name=cloname;
           closure_c_func_type=c_closure_function_ty;
-          closure_c_return_type=c_return_ty;
           closure_args=c_fargs;
           closure_vars=vars;
           closure_label = Id.Map.find_opt cloid closure_label_tbl;
@@ -2088,19 +2090,20 @@ let gen_func_single
     ~(genchunks : genchunk_t list)
     (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
+  let bodyhead = entfunc.entryfunc_body in
   let (static, primary_cfunc) =
-    match entfunc with
-    | EntryFuncTopfunc (static, primary_cfunc) -> (static, primary_cfunc)
-    | EntryFuncFixfunc fixfunc_id ->
+    match entfunc.entryfunc_type with
+    | EntryTypeTopfunc (static, primary_cfunc) -> (static, primary_cfunc)
+    | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         (Option.get fixfunc.fixfunc_cfunc)
-    | EntryFuncClosure closure_id ->
+    | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         (true, closure_func_name clo)
   in
   let (pp_struct_closure, pp_closure_assigns, closure_vars) =
-    match entfunc with
-    | EntryFuncClosure closure_id ->
+    match entfunc.entryfunc_type with
+    | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         let casted_var = "((struct " ^ closure_struct_tag clo ^ " *)closure)" in
         (gen_closure_struct clo,
@@ -2112,17 +2115,17 @@ let gen_func_single
         (Pp.mt (), Pp.mt (), [])
   in
   let c_fargs =
-    match entfunc with
-    | EntryFuncTopfunc _ -> genchunk_fargs (List.hd genchunks)
-    | EntryFuncFixfunc fixfunc_id ->
+    match entfunc.entryfunc_type with
+    | EntryTypeTopfunc _ -> genchunk_fargs (List.hd genchunks)
+    | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments
-    | EntryFuncClosure closure_id ->
+    | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
         clo.closure_args @ [("closure", pointer_to_void)]
   in
-  let return_type = (List.hd (List.hd genchunks).genchunk_bodyhead_list).bodyhead_return_type in
+  let return_type = bodyhead.bodyhead_return_type in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -2217,12 +2220,12 @@ let gen_func_multi
     (env : Environ.env) (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let first_c_name =
-    match List.hd entry_funcs with
-    | EntryFuncTopfunc (_, primary_cfunc) -> primary_cfunc
-    | EntryFuncFixfunc fixfunc_id ->
+    match (List.hd entry_funcs).entryfunc_type with
+    | EntryTypeTopfunc (_, primary_cfunc) -> primary_cfunc
+    | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         (cfunc_of_fixfunc fixfunc)
-    | EntryFuncClosure closure_id ->
+    | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
   in
@@ -2230,7 +2233,6 @@ let gen_func_multi
   let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = genchunk_fargs (List.hd genchunks) in
-  let return_type = (List.hd (List.hd genchunks).genchunk_bodyhead_list).bodyhead_return_type in
   let pp_enum =
     Pp.hov 0 (
       Pp.str "enum" +++
@@ -2239,11 +2241,11 @@ let gen_func_multi
         pp_joinmap_list (Pp.str "," ++ Pp.spc ()) Pp.str
           (List.map
             (function
-              | EntryFuncTopfunc (_,primary_cfunc) -> topfunc_enum_index primary_cfunc
-              | EntryFuncFixfunc fixfunc_id ->
+              | {entryfunc_type=(EntryTypeTopfunc (_,primary_cfunc))} -> topfunc_enum_index primary_cfunc
+              | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
                   let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
                   fixfunc_enum_index fixfunc.fixfunc_c_name
-              | EntryFuncClosure closure_id ->
+              | {entryfunc_type=(EntryTypeClosure closure_id)} ->
                   let clo = Hashtbl.find closure_tbl closure_id in
                   closure_enum_index clo.closure_c_name)
             entry_funcs)
@@ -2253,7 +2255,7 @@ let gen_func_multi
   let pp_struct_closures =
     pp_sjoinmap_list
       (function
-        | EntryFuncClosure closure_id ->
+        | {entryfunc_type=(EntryTypeClosure closure_id)} ->
             let clo = Hashtbl.find closure_tbl closure_id in
             gen_closure_struct clo
         | _ -> Pp.mt ())
@@ -2263,7 +2265,7 @@ let gen_func_multi
     pp_sjoin_list
       (List.filter_map
         (function
-          | EntryFuncTopfunc (_, primary_cfunc) ->
+          | {entryfunc_type=(EntryTypeTopfunc (_, primary_cfunc))} ->
               if CList.is_empty formal_arguments then
                 None
               else
@@ -2271,7 +2273,7 @@ let gen_func_multi
                   Pp.hv 0 (
                     Pp.str (topfunc_args_struct_type primary_cfunc) +++
                     hovbrace (pr_members formal_arguments) ++ Pp.str ";"))
-          | EntryFuncFixfunc fixfunc_id ->
+          | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               if CList.is_empty fixfunc.fixfunc_extra_arguments &&
                  CList.is_empty fixfunc.fixfunc_formal_arguments then
@@ -2287,7 +2289,7 @@ let gen_func_multi
                                  if c_type_is_void c_ty then None
                                  else Some (c_arg, c_ty))
                                fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))
-          | EntryFuncClosure closure_id ->
+          | {entryfunc_type=(EntryTypeClosure closure_id)} ->
               let clo = Hashtbl.find closure_tbl closure_id in
               Some (
                 Pp.hv 0 (
@@ -2308,12 +2310,13 @@ let gen_func_multi
     pp_sjoin_list
       (List.map
         (function
-          | EntryFuncTopfunc (static, primary_cfunc) ->
+          | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc)); entryfunc_body=bodyhead} ->
+              let return_type = bodyhead.bodyhead_return_type in
               pr_entry_function ~static primary_cfunc (topfunc_enum_index primary_cfunc)
                 (topfunc_args_struct_type primary_cfunc)
                 formal_arguments return_type
                 body_function_name
-          | EntryFuncFixfunc fixfunc_id ->
+          | {entryfunc_type=(EntryTypeFixfunc fixfunc_id); entryfunc_body=bodyhead} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
               pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
@@ -2325,14 +2328,14 @@ let gen_func_multi
                       if c_type_is_void c_ty then None
                       else Some (c_arg, c_ty))
                     fixfunc.fixfunc_formal_arguments))
-                fixfunc.fixfunc_return_type
+                bodyhead.bodyhead_return_type
                 body_function_name
-          | EntryFuncClosure closure_id ->
+          | {entryfunc_type=(EntryTypeClosure closure_id); entryfunc_body=bodyhead} ->
               let clo = Hashtbl.find closure_tbl closure_id in
               pr_entry_function ~static:true (closure_func_name clo) (closure_enum_index clo.closure_c_name)
                 (closure_args_struct_type clo.closure_c_name)
                 (List.append clo.closure_args [("closure", pointer_to_void)])
-                clo.closure_c_return_type
+                bodyhead.bodyhead_return_type
                 body_function_name)
         entry_funcs)
   in
@@ -2407,7 +2410,7 @@ let gen_func_multi
         (fun i entry_func ->
           let is_last = (i = num_entry_funcs - 1) in
           match entry_func with
-          | EntryFuncTopfunc (static, primary_cfunc) ->
+          | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc))} ->
               assert is_last;
               pr_case None
                 (List.map
@@ -2415,8 +2418,8 @@ let gen_func_multi
                       (c_arg,
                        ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
                   formal_arguments)
-                None (* no need to goto label because EntryFuncTopfunc is always at last *)
-          | EntryFuncFixfunc fixfunc_id ->
+                None (* no need to goto label because EntryTypeTopfunc is always at last *)
+          | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
               let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label) in
@@ -2434,7 +2437,7 @@ let gen_func_multi
                                  ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
                     fixfunc.fixfunc_formal_arguments))
                 goto
-          | EntryFuncClosure closure_id ->
+          | {entryfunc_type=(EntryTypeClosure closure_id)} ->
               let clo = Hashtbl.find closure_tbl closure_id in
               pr_case (Some (closure_enum_index clo.closure_c_name))
                 (gen_closure_load_args_assignments clo "codegen_args")
