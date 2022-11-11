@@ -2087,6 +2087,8 @@ let gen_closure_load_args_assignments (clo : closure_t) (var : string) : (string
       clo.closure_args)
     (gen_closure_load_vars_assignments clo ("((" ^ closure_args_struct_type clo.closure_c_name ^ " *)" ^ var ^ ")->closure"))
 
+let pointer_to_void = { c_type_left="void *"; c_type_right="" }
+
 let gen_func_single
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entfunc : entry_func_t)
@@ -2124,7 +2126,6 @@ let gen_func_single
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         fixfunc.fixfunc_extra_arguments @ (bodyhead_fargs entfunc.entryfunc_body)
     | EntryTypeClosure closure_id ->
-        let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
         (bodyhead_fargs entfunc.entryfunc_body) @ [("closure", pointer_to_void)]
   in
   let return_type = bodyhead.bodyhead_return_type in
@@ -2215,6 +2216,118 @@ let topfunc_enum_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
 let fixfunc_enum_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
 let closure_enum_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
+let pr_case case_value assigns goto_label =
+  let pp_case =
+    (match case_value with
+    | None -> Pp.str "default:"
+    | Some value -> Pp.hov 0 (Pp.str "case" +++ Pp.str value ++ Pp.str ":"))
+  in
+  let pp_semicolon =
+    if assigns = [] && goto_label = None then
+      (* label (case label and default label here) needs following statement *)
+      Pp.str ";"
+    else
+      Pp.mt ()
+  in
+  let pp_assigns =
+    pp_sjoinmap_list
+      (fun (lhs, rhs) -> gen_assignment (Pp.str lhs) (Pp.str rhs))
+      assigns
+  in
+  let pp_goto =
+    match goto_label with
+    | None -> Pp.mt ()
+    | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
+  in
+  pp_case ++ pp_semicolon ++ Pp.brk (1,2) ++
+  Pp.v 0 (
+    pp_assigns +++
+    pp_goto)
+
+let pr_multi_topfunc_defs static return_type primary_cfunc formal_arguments body_function_name =
+  (if CList.is_empty formal_arguments then
+    Pp.mt ()
+  else
+    (Pp.hv 0 (
+      Pp.str (topfunc_args_struct_type primary_cfunc) +++
+      hovbrace (pr_members formal_arguments) ++ Pp.str ";"))) +++
+  pr_entry_function ~static primary_cfunc (topfunc_enum_index primary_cfunc)
+    (topfunc_args_struct_type primary_cfunc)
+    formal_arguments return_type
+    body_function_name
+
+let pr_multi_topfunc_case primary_cfunc formal_arguments =
+  pr_case None
+    (List.map
+      (fun (c_arg, t) ->
+          (c_arg,
+           ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
+      formal_arguments)
+    None (* no need to goto label because EntryTypeTopfunc is always at last *)
+
+let pr_multi_fixfunc_defs fixfunc static return_type cfunc body_function_name =
+  (if CList.is_empty fixfunc.fixfunc_extra_arguments &&
+     CList.is_empty fixfunc.fixfunc_formal_arguments then
+    Pp.mt ()
+  else
+    (Pp.hv 0 (
+    Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
+    hovbrace (
+    pr_members fixfunc.fixfunc_extra_arguments +++
+    pr_members (List.filter_map
+                 (fun (c_arg, c_ty) ->
+                   if c_type_is_void c_ty then None
+                   else Some (c_arg, c_ty))
+                 fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))) +++
+  pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
+    (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
+    (List.append
+      fixfunc.fixfunc_extra_arguments
+      (List.filter_map
+        (fun (c_arg, c_ty) ->
+          if c_type_is_void c_ty then None
+          else Some (c_arg, c_ty))
+        fixfunc.fixfunc_formal_arguments))
+    return_type
+    body_function_name
+
+let pr_multi_fixfunc_case is_last fixfunc =
+  let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
+  let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label) in
+  pr_case case_value
+    (List.append
+      (List.map
+        (fun (c_arg, t) ->
+          (c_arg,
+           ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+        fixfunc.fixfunc_extra_arguments)
+      (List.filter_map
+        (fun (c_arg, c_ty) ->
+          if c_type_is_void c_ty then None
+          else Some (c_arg,
+                     ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+        fixfunc.fixfunc_formal_arguments))
+    goto
+
+let pr_multi_closure_defs clo bodyhead body_function_name =
+  gen_closure_struct clo +++
+  (Pp.hv 0 (
+    Pp.str (closure_args_struct_type clo.closure_c_name) +++
+    hovbrace (
+      pr_members clo.closure_args +++
+      pr_members [("closure", c_type_pointer_to (closure_struct_type clo))]
+    ) ++ Pp.str ";")) +++
+  pr_entry_function ~static:true (closure_func_name clo) (closure_enum_index clo.closure_c_name)
+    (closure_args_struct_type clo.closure_c_name)
+    (List.append clo.closure_args [("closure", pointer_to_void)])
+    bodyhead.bodyhead_return_type
+    body_function_name
+
+let pr_multi_closure_case clo =
+  pr_case (Some (closure_enum_index clo.closure_c_name))
+    (gen_closure_load_args_assignments clo "codegen_args")
+    (Some (Option.get (clo.closure_label)))
+
 let gen_func_multi
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entry_funcs : entry_func_t list)
@@ -2231,116 +2344,60 @@ let gen_func_multi
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
   in
+  let num_entry_funcs = List.length entry_funcs in
+  let entry_funcs = (* make the first entry function, possibly EntryTypeTopfunc, at last *)
+    match entry_funcs with
+    | [] -> []
+    | hd :: tl -> rcons tl hd
+  in
   let func_index_enum_tag = func_index_enum_tag_name first_c_name in
   let body_function_name = body_function_name first_c_name in
-  let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
-  let formal_arguments = genchunk_fargs (List.hd genchunks) in
-  let pp_enum =
-    Pp.hov 0 (
-      Pp.str "enum" +++
-      Pp.str func_index_enum_tag +++
-      hovbrace (
-        pp_joinmap_list (Pp.str "," ++ Pp.spc ()) Pp.str
-          (List.map
-            (function
-              | {entryfunc_type=(EntryTypeTopfunc (_,primary_cfunc))} -> topfunc_enum_index primary_cfunc
-              | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
-                  let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-                  fixfunc_enum_index fixfunc.fixfunc_c_name
-              | {entryfunc_type=(EntryTypeClosure closure_id)} ->
-                  let clo = Hashtbl.find closure_tbl closure_id in
-                  closure_enum_index clo.closure_c_name)
-            entry_funcs)
-          ) ++
-      Pp.str ";")
-  in
-  let pp_struct_closures =
-    pp_sjoinmap_list
-      (function
-        | {entryfunc_type=(EntryTypeClosure closure_id)} ->
-            let clo = Hashtbl.find closure_tbl closure_id in
-            gen_closure_struct clo
-        | _ -> Pp.mt ())
-      entry_funcs
-  in
-  let pp_struct_args =
-    pp_sjoin_list
-      (List.filter_map
-        (function
-          | {entryfunc_type=(EntryTypeTopfunc (_, primary_cfunc))} ->
-              if CList.is_empty formal_arguments then
-                None
-              else
-                Some (
-                  Pp.hv 0 (
-                    Pp.str (topfunc_args_struct_type primary_cfunc) +++
-                    hovbrace (pr_members formal_arguments) ++ Pp.str ";"))
-          | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
-              let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              if CList.is_empty fixfunc.fixfunc_extra_arguments &&
-                 CList.is_empty fixfunc.fixfunc_formal_arguments then
-                None
-              else
-                Some (
-                  Pp.hv 0 (
-                  Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
-                  hovbrace (
-                  pr_members fixfunc.fixfunc_extra_arguments +++
-                  pr_members (List.filter_map
-                               (fun (c_arg, c_ty) ->
-                                 if c_type_is_void c_ty then None
-                                 else Some (c_arg, c_ty))
-                               fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))
-          | {entryfunc_type=(EntryTypeClosure closure_id)} ->
-              let clo = Hashtbl.find closure_tbl closure_id in
-              Some (
-                Pp.hv 0 (
-                Pp.str (closure_args_struct_type clo.closure_c_name) +++
-                hovbrace (
-                  pr_members clo.closure_args +++
-                  pr_members [("closure", c_type_pointer_to (closure_struct_type clo))]
-                ) ++ Pp.str ";")))
-        entry_funcs)
-  in
   let pp_forward_decl =
     Pp.hv 0 (
       Pp.str "static void" +++
       Pp.str body_function_name ++
       Pp.str ("(enum " ^ func_index_enum_tag ^ " codegen_func_index, void *codegen_args, void *codegen_ret);"))
   in
-  let pp_entry_functions =
-    pp_sjoin_list
-      (List.map
-        (function
+  let entries =
+      List.mapi
+        (fun i entry_func ->
+          let is_last = (i = num_entry_funcs - 1) in
+          (match entry_func with
           | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc)); entryfunc_body=bodyhead} ->
+              assert is_last;
+              let formal_arguments = bodyhead_fargs bodyhead in
               let return_type = bodyhead.bodyhead_return_type in
-              pr_entry_function ~static primary_cfunc (topfunc_enum_index primary_cfunc)
-                (topfunc_args_struct_type primary_cfunc)
-                formal_arguments return_type
-                body_function_name
+              let enumindex = topfunc_enum_index primary_cfunc in
+              let defs = pr_multi_topfunc_defs static return_type primary_cfunc formal_arguments body_function_name in
+              let case = pr_multi_topfunc_case primary_cfunc formal_arguments in
+              (enumindex, defs, case)
           | {entryfunc_type=(EntryTypeFixfunc fixfunc_id); entryfunc_body=bodyhead} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
               let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
-              pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
-                (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
-                (List.append
-                  fixfunc.fixfunc_extra_arguments
-                  (List.filter_map
-                    (fun (c_arg, c_ty) ->
-                      if c_type_is_void c_ty then None
-                      else Some (c_arg, c_ty))
-                    fixfunc.fixfunc_formal_arguments))
-                bodyhead.bodyhead_return_type
-                body_function_name
+              let return_type = bodyhead.bodyhead_return_type in
+              let enumindex = fixfunc_enum_index fixfunc.fixfunc_c_name in
+              let defs = pr_multi_fixfunc_defs fixfunc static return_type cfunc body_function_name in
+              let case = pr_multi_fixfunc_case is_last fixfunc in
+              (enumindex, defs, case)
           | {entryfunc_type=(EntryTypeClosure closure_id); entryfunc_body=bodyhead} ->
               let clo = Hashtbl.find closure_tbl closure_id in
-              pr_entry_function ~static:true (closure_func_name clo) (closure_enum_index clo.closure_c_name)
-                (closure_args_struct_type clo.closure_c_name)
-                (List.append clo.closure_args [("closure", pointer_to_void)])
-                bodyhead.bodyhead_return_type
-                body_function_name)
-        entry_funcs)
+              let enumindex = closure_enum_index clo.closure_c_name in
+              let defs = pr_multi_closure_defs clo bodyhead body_function_name in
+              let case = pr_multi_closure_case clo in
+              (enumindex, defs, case)))
+        entry_funcs
   in
+  let pp_enum =
+    Pp.hov 0 (
+      Pp.str "enum" +++
+      Pp.str func_index_enum_tag +++
+      hovbrace (
+        pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+          (fun (enumindex, defs, case) -> Pp.str enumindex)
+          entries) ++
+      Pp.str ";")
+  in
+  let pp_entry_defs = pp_sjoin_list (List.map (fun (enumindex, defs, case) -> defs) entries) in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -2372,83 +2429,9 @@ let gen_func_multi
       (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
       local_vars
   in
-  let pr_case case_value assigns goto_label =
-    let pp_case =
-      (match case_value with
-      | None -> Pp.str "default:"
-      | Some value -> Pp.hov 0 (Pp.str "case" +++ Pp.str value ++ Pp.str ":"))
-    in
-    let pp_semicolon =
-      if assigns = [] && goto_label = None then
-        (* label (case label and default label here) needs following statement *)
-        Pp.str ";"
-      else
-        Pp.mt ()
-    in
-    let pp_assigns =
-      pp_sjoinmap_list
-        (fun (lhs, rhs) -> gen_assignment (Pp.str lhs) (Pp.str rhs))
-        assigns
-    in
-    let pp_goto =
-      match goto_label with
-      | None -> Pp.mt ()
-      | Some label -> Pp.hov 0 (Pp.str "goto" +++ Pp.str label ++ Pp.str ";")
-    in
-    pp_case ++ pp_semicolon ++ Pp.brk (1,2) ++
-    Pp.v 0 (
-      pp_assigns +++
-      pp_goto)
-  in
-  let pp_switch_cases =
-    let num_entry_funcs = List.length entry_funcs in
-    let entry_funcs' =
-      match entry_funcs with
-      | [] -> []
-      | hd :: tl -> rcons tl hd
-    in
-    pp_sjoin_list
-      (List.mapi
-        (fun i entry_func ->
-          let is_last = (i = num_entry_funcs - 1) in
-          match entry_func with
-          | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc))} ->
-              assert is_last;
-              pr_case None
-                (List.map
-                  (fun (c_arg, t) ->
-                      (c_arg,
-                       ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
-                  formal_arguments)
-                None (* no need to goto label because EntryTypeTopfunc is always at last *)
-          | {entryfunc_type=(EntryTypeFixfunc fixfunc_id)} ->
-              let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              let case_value = if is_last then None else Some (fixfunc_enum_index fixfunc.fixfunc_c_name) in
-              let goto = if is_last then None else Some (Option.get fixfunc.fixfunc_label) in
-              pr_case case_value
-                (List.append
-                  (List.map
-                    (fun (c_arg, t) ->
-                      (c_arg,
-                       ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
-                    fixfunc.fixfunc_extra_arguments)
-                  (List.filter_map
-                    (fun (c_arg, c_ty) ->
-                      if c_type_is_void c_ty then None
-                      else Some (c_arg,
-                                 ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
-                    fixfunc.fixfunc_formal_arguments))
-                goto
-          | {entryfunc_type=(EntryTypeClosure closure_id)} ->
-              let clo = Hashtbl.find closure_tbl closure_id in
-              pr_case (Some (closure_enum_index clo.closure_c_name))
-                (gen_closure_load_args_assignments clo "codegen_args")
-                (Some (Option.get (clo.closure_label))))
-        entry_funcs')
-  in
   let pp_switch =
     Pp.hov 0 (Pp.str "switch" +++ Pp.str "(codegen_func_index)") +++
-    vbrace pp_switch_cases
+    vbrace (pp_sjoin_list (List.map (fun (enumindex, defs, case) -> case) entries))
   in
   let pp_body_function =
     (Pp.str "static void" +++
@@ -2461,10 +2444,8 @@ let gen_func_multi
   in
   (Pp.v 0 (
      pp_enum +++
-     pp_struct_closures +++
-     pp_struct_args +++
      pp_forward_decl +++
-     pp_entry_functions),
+     pp_entry_defs),
    Pp.v 0 (pp_body_function))
 
 let is_static_function_icommand (icommand : instance_command) : bool =
