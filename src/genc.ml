@@ -117,11 +117,11 @@ type body_var_t =
 
 type bodyhead_t = {
   bodyhead_root : body_root_t;
-  bodyhead_vars : body_var_t list (* outermost first (left to right) *)
+  bodyhead_vars : body_var_t list; (* outermost first (left to right) *)
+  bodyhead_return_type : c_typedata;
 }
 
 type genchunk_t = {
-  genchunk_return_type : c_typedata;
   genchunk_bodyhead_list : bodyhead_t list;
   genchunk_env : Environ.env;
   genchunk_exp : EConstr.t;
@@ -185,10 +185,12 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
                     | BodyVarArg (var, c_ty) -> Pp.str "Arg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty
                     | BodyVarVoidArg (var, c_ty) -> Pp.str "VoidArg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty)
                   bodyhead.bodyhead_vars) ++
-                  Pp.str "]")
+                Pp.str "]" ++
+                Pp.str "[" ++
+                pr_c_abstract_decl bodyhead.bodyhead_return_type ++
+                Pp.str "]")
               genchunk.genchunk_bodyhead_list)
             ++ Pp.str "]") +++
-          Pp.hov 2 (Pp.str "return_type=" ++ pr_c_abstract_decl genchunk.genchunk_return_type) +++
           Pp.hov 2 (Pp.str "fixfunc_impls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_impls) ++ Pp.str "]") +++
           Pp.hov 2 (Pp.str "fixfunc_gotos=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_gotos) ++ Pp.str "]") +++
           Pp.hov 2 (Pp.str "fixfunc_calls=[" ++ pp_sjoinmap_list Id.print (Id.Set.elements genchunk.genchunk_fixfunc_calls) ++ Pp.str "]") +++
@@ -615,7 +617,11 @@ let obtain_function_genchunks
         (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
     | _ ->
         let (genchunks, bodyhead_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_body ~tail_position env term in
-        let bodyhead_list2 = { bodyhead_root=bodyroot; bodyhead_vars=(List.rev bodyvars) } :: bodyhead_list in
+        let bodyhead_list2 = {
+            bodyhead_root = bodyroot;
+            bodyhead_vars = (List.rev bodyvars);
+            bodyhead_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
+          } :: bodyhead_list in
         if individual_body then
           let fixfunc_ids =
             List.filter_map
@@ -626,7 +632,6 @@ let obtain_function_genchunks
               bodyvars
           in
           let genchunk = {
-            genchunk_return_type = c_typename env sigma (Reductionops.nf_all env sigma (Retyping.get_type_of env sigma term));
             genchunk_bodyhead_list = bodyhead_list2;
             genchunk_env = env;
             genchunk_exp = term;
@@ -2117,7 +2122,7 @@ let gen_func_single
         let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
         clo.closure_args @ [("closure", pointer_to_void)]
   in
-  let return_type = (List.hd genchunks).genchunk_return_type in
+  let return_type = (List.hd (List.hd genchunks).genchunk_bodyhead_list).bodyhead_return_type in
   let (local_vars, pp_body) = local_vars_with
     (fun () ->
       pp_sjoinmap_list
@@ -2225,7 +2230,7 @@ let gen_func_multi
   let body_function_name = body_function_name first_c_name in
   let pointer_to_void = { c_type_left="void *"; c_type_right="" } in
   let formal_arguments = genchunk_fargs (List.hd genchunks) in
-  let return_type = (List.hd genchunks).genchunk_return_type in
+  let return_type = (List.hd (List.hd genchunks).genchunk_bodyhead_list).bodyhead_return_type in
   let pp_enum =
     Pp.hov 0 (
       Pp.str "enum" +++
@@ -2350,7 +2355,7 @@ let gen_func_multi
                     fixfunc.fixfunc_extra_arguments
               | _ -> ())
             bodyhead.bodyhead_vars;
-          let cont = { tail_cont_return_type = genchunk.genchunk_return_type; tail_cont_multifunc = true } in
+          let cont = { tail_cont_return_type = (List.hd genchunk.genchunk_bodyhead_list).bodyhead_return_type; tail_cont_multifunc = true } in
           let label_opt = label_of_bodyhead ~fixfunc_tbl ~closure_tbl bodyhead in
           Pp.v 0 (
             (match label_opt with None -> Pp.mt () | Some l -> Pp.str (l ^ ":")) +++
