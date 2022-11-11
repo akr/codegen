@@ -2244,7 +2244,9 @@ let pr_case (case_value : string option) (assigns : (string * string) list) (got
     pp_assigns +++
     pp_goto)
 
-let pr_multi_topfunc_defs (static : bool) (return_type : c_typedata) (primary_cfunc : string) (formal_arguments : (string * c_typedata) list) (body_function_name : string) : Pp.t =
+let pr_multi_topfunc_defs (bodyhead : bodyhead_t) (static : bool) (primary_cfunc : string) (body_function_name : string) : Pp.t =
+  let formal_arguments = bodyhead_fargs bodyhead in
+  let return_type = bodyhead.bodyhead_return_type in
   (if CList.is_empty formal_arguments then
     Pp.mt ()
   else
@@ -2256,7 +2258,8 @@ let pr_multi_topfunc_defs (static : bool) (return_type : c_typedata) (primary_cf
     formal_arguments return_type
     body_function_name
 
-let pr_multi_topfunc_case (primary_cfunc : string) (formal_arguments : (string * c_typedata) list) : Pp.t =
+let pr_multi_topfunc_case (bodyhead : bodyhead_t) (primary_cfunc : string) : Pp.t =
+  let formal_arguments = bodyhead_fargs bodyhead in
   pr_case None
     (List.map
       (fun (c_arg, t) ->
@@ -2265,7 +2268,9 @@ let pr_multi_topfunc_case (primary_cfunc : string) (formal_arguments : (string *
       formal_arguments)
     None (* no need to goto label because EntryTypeTopfunc is always at last *)
 
-let pr_multi_fixfunc_defs (fixfunc : fixfunc_t) (static : bool) (return_type : c_typedata) (cfunc : string) (body_function_name : string) : Pp.t =
+let pr_multi_fixfunc_defs (bodyhead : bodyhead_t) (fixfunc : fixfunc_t) (body_function_name : string) : Pp.t =
+  let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
+  let return_type = bodyhead.bodyhead_return_type in
   (if CList.is_empty fixfunc.fixfunc_extra_arguments &&
      CList.is_empty fixfunc.fixfunc_formal_arguments then
     Pp.mt ()
@@ -2309,7 +2314,7 @@ let pr_multi_fixfunc_case (is_last : bool) (fixfunc : fixfunc_t) : Pp.t =
         fixfunc.fixfunc_formal_arguments))
     goto
 
-let pr_multi_closure_defs (clo : closure_t) (bodyhead : bodyhead_t) (body_function_name : string) : Pp.t =
+let pr_multi_closure_defs (bodyhead : bodyhead_t) (clo : closure_t) (body_function_name : string) : Pp.t =
   gen_closure_struct clo +++
   (Pp.hv 0 (
     Pp.str (closure_args_struct_type clo.closure_c_name) +++
@@ -2365,24 +2370,20 @@ let gen_func_multi
           (match entry_func with
           | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc)); entryfunc_body=bodyhead} ->
               assert is_last;
-              let formal_arguments = bodyhead_fargs bodyhead in
-              let return_type = bodyhead.bodyhead_return_type in
               let enumindex = topfunc_enum_index primary_cfunc in
-              let defs = pr_multi_topfunc_defs static return_type primary_cfunc formal_arguments body_function_name in
-              let case = pr_multi_topfunc_case primary_cfunc formal_arguments in
+              let defs = pr_multi_topfunc_defs bodyhead static primary_cfunc body_function_name in
+              let case = pr_multi_topfunc_case bodyhead primary_cfunc in
               (enumindex, defs, case)
           | {entryfunc_type=(EntryTypeFixfunc fixfunc_id); entryfunc_body=bodyhead} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-              let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
-              let return_type = bodyhead.bodyhead_return_type in
               let enumindex = fixfunc_enum_index fixfunc.fixfunc_c_name in
-              let defs = pr_multi_fixfunc_defs fixfunc static return_type cfunc body_function_name in
+              let defs = pr_multi_fixfunc_defs bodyhead fixfunc body_function_name in
               let case = pr_multi_fixfunc_case is_last fixfunc in
               (enumindex, defs, case)
           | {entryfunc_type=(EntryTypeClosure closure_id); entryfunc_body=bodyhead} ->
               let clo = Hashtbl.find closure_tbl closure_id in
               let enumindex = closure_enum_index clo.closure_c_name in
-              let defs = pr_multi_closure_defs clo bodyhead body_function_name in
+              let defs = pr_multi_closure_defs bodyhead clo body_function_name in
               let case = pr_multi_closure_case clo in
               (enumindex, defs, case)))
         entry_funcs
