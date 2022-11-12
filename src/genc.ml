@@ -572,6 +572,28 @@ let bodyhead_fargs (bodyhead : bodyhead_t) : (string * c_typedata) list =
   let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
 
+let bodyhead_fixfunc_fargs_with_void (bodyhead : bodyhead_t) (fixfunc_id : Id.t) : (string * c_typedata) list =
+  let pred = function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false in
+  let vars = List.tl (list_find_suffix pred bodyhead.bodyhead_vars) in
+  List.filter_map
+    (function
+      | BodyVarArg (var, c_ty) -> Some (var, c_ty)
+      | BodyVarVoidArg (var, c_ty) -> Some (var, c_ty)
+      | BodyVarFixfunc fixfunc_id -> None)
+    vars
+
+let bodyhead_fixfunc_fargs_without_void (bodyhead : bodyhead_t) (fixfunc_id : Id.t) : (string * c_typedata) list =
+  let pred = function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false in
+  let vars = List.tl (list_find_suffix pred bodyhead.bodyhead_vars) in
+  List.filter_map
+    (function
+      | BodyVarArg (var, c_ty) -> Some (var, c_ty)
+      | BodyVarVoidArg (var, c_ty) -> None
+      | BodyVarFixfunc fixfunc_id -> None)
+    vars
+
+let _ = ignore bodyhead_fixfunc_fargs_without_void
+
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
     ~(static_and_primary_cfunc : bool * string)
@@ -1315,13 +1337,15 @@ let collect_fixpoints
             (Array.map2
               (fun name ty ->
                 let fixfunc_id = id_of_annotated_name name in
-                let (formal_arguments, return_type) = c_args_and_ret_type env sigma ty in
+                let bodyhead = Id.Map.find fixfunc_id fixfunc_bodyhead_tbl in
+                let formal_arguments = bodyhead_fixfunc_fargs_with_void bodyhead fixfunc_id in
+                let return_type = bodyhead.bodyhead_return_type in
                 {
                   fixfunc_fixterm = fixterm;
                   fixfunc_id = fixfunc_id;
                   fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
-                  fixfunc_bodyhead = Id.Map.find fixfunc_id fixfunc_bodyhead_tbl;
+                  fixfunc_bodyhead = bodyhead;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfunc_tbl;
