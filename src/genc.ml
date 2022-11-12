@@ -75,7 +75,7 @@ type fixfunc_t = {
   fixfunc_used_for_call : bool;
   fixfunc_used_for_goto : bool;
   fixfunc_bodyhead : bodyhead_t;
-  fixfunc_formal_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
+  fixfunc_formal_arguments_without_void : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype is not void *)
   fixfunc_return_type : c_typedata; (* may be void. *)
   fixfunc_is_higher_order : bool; (* means that arguments contain function *)
 
@@ -159,7 +159,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_inlinable +++
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
-        Pp.str "formal_arguments=" ++ pr_args fixfunc.fixfunc_formal_arguments +++
+        Pp.str "formal_arguments_without_void=" ++ pr_args fixfunc.fixfunc_formal_arguments_without_void +++
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
         Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
@@ -170,7 +170,6 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.mt ())
       ))
     fixfunc_tbl
-
 
 let _ = ignore show_fixfunc_table
 
@@ -597,7 +596,7 @@ let bodyhead_fixfunc_fargs_without_void (bodyhead : bodyhead_t) (fixfunc_id : Id
       | BodyVarFixfunc fixfunc_id -> None)
     vars
 
-let _ = ignore bodyhead_fixfunc_fargs_without_void
+let _ = ignore bodyhead_fixfunc_fargs_with_void
 
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
@@ -1336,7 +1335,7 @@ let collect_fixpoints
               (fun name ty ->
                 let fixfunc_id = id_of_annotated_name name in
                 let bodyhead = Id.Map.find fixfunc_id fixfunc_bodyhead_tbl in
-                let formal_arguments = bodyhead_fixfunc_fargs_with_void bodyhead fixfunc_id in
+                let formal_arguments_without_void = bodyhead_fixfunc_fargs_without_void bodyhead fixfunc_id in
                 let return_type = bodyhead.bodyhead_return_type in
                 {
                   fixfunc_fixterm = fixterm;
@@ -1344,7 +1343,7 @@ let collect_fixpoints
                   fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
                   fixfunc_bodyhead = bodyhead;
-                  fixfunc_formal_arguments = formal_arguments;
+                  fixfunc_formal_arguments_without_void = formal_arguments_without_void;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfunc_tbl;
                   fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
@@ -1789,16 +1788,15 @@ let rec gen_head ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~
   pp
 and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : head_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let (term, argsary) = decompose_appvect sigma term in
-  let cargs =
-    Array.to_list
-      (Array.map
-        (fun arg ->
-          let arg_ty = Retyping.get_type_of env sigma arg in
-          if ind_is_void_type env sigma arg_ty then
-            None
-          else
-            Some (carg_of_garg env (destRel sigma arg)))
-        argsary)
+  let cargs_without_void =
+    (List.filter_map
+      (fun arg ->
+        let arg_ty = Retyping.get_type_of env sigma arg in
+        if ind_is_void_type env sigma arg_ty then
+          None
+        else
+          Some (carg_of_garg env (destRel sigma arg)))
+      (Array.to_list argsary))
   in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -1806,7 +1804,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
       user_err (Pp.str "[codegen:gen_head] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
-      if List.length cargs = 0 then
+      if CArray.is_empty argsary then
         let str = carg_of_garg env i in
         gen_head_cont ~omit_void_exp:true cont (Pp.str str)
       else
@@ -1815,19 +1813,15 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         (match Hashtbl.find_opt fixfunc_tbl (id_of_name name) with
         | None -> (* closure invocation *)
             let closure_var = carg_of_garg env i in
-            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons (list_filter_none cargs) closure_var)) in
+            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons cargs_without_void closure_var)) in
             gen_head_cont cont pp
         | Some fixfunc ->
             if fixfunc.fixfunc_fixterm.fixterm_inlinable then
               let assignments =
-                list_filter_map2
-                  (fun (lhs, c_ty) rhs_opt ->
-                    match (c_type_is_void c_ty), rhs_opt with
-                    | true, None -> None
-                    | false, Some rhs -> Some (lhs, rhs, c_ty)
-                    | _, _ -> assert false)
-                  fixfunc.fixfunc_formal_arguments
-                  cargs
+                List.map2
+                  (fun (lhs, c_ty) rhs -> (lhs, rhs, c_ty))
+                  fixfunc.fixfunc_formal_arguments_without_void
+                  cargs_without_void
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
               let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label) ++ Pp.str ";") in
@@ -1837,14 +1831,14 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                 (gen_funcall (cfunc_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
-                    (Array.of_list (list_filter_none cargs)))))
+                    (Array.of_list cargs_without_void))))
 
   | Const (ctnt,_) ->
-      gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)))
+      gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs_without_void))
   | Construct (cstr,_) ->
-      gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
+      gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs_without_void))
   | Case (ci,u,pms,p,iv,item,bl) ->
-      assert (cargs = []);
+      assert (CArray.is_empty argsary);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let gen_switch =
         match cont.head_cont_exit_label with
@@ -1853,11 +1847,11 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       in
       gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
   | Proj (pr, item) ->
-      ((if cargs <> [] then
+      ((if not (CArray.is_empty argsary) then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_head_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
-      assert (cargs = []);
+      assert (CArray.is_empty argsary);
       let c_var = str_of_annotated_name x in
       let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
       let cont1 =
@@ -1887,23 +1881,19 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | Lambda _ -> assert false
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
+      let nj_formal_arguments_without_void = fixfunc_j.fixfunc_formal_arguments_without_void in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
           (gen_funcall (cfunc_of_fixfunc fixfunc_j)
             (Array.append
               (Array.of_list (List.map fst fixfunc_j.fixfunc_extra_arguments))
-              (Array.of_list (list_filter_none cargs))))
+              (Array.of_list cargs_without_void)))
       else
         let assignments =
-          list_filter_map2
-            (fun (lhs, c_ty) rhs_opt ->
-              match (c_type_is_void c_ty), rhs_opt with
-              | true, None -> None
-              | false, Some rhs -> Some (lhs, rhs, c_ty)
-              | _, _ -> assert false)
-            nj_formal_arguments
-            cargs
+          List.map2
+            (fun (lhs, c_ty) rhs -> (lhs, rhs, c_ty))
+            nj_formal_arguments_without_void
+            cargs_without_void
         in
         let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
         let (cont2, pp_exit) =
@@ -1961,16 +1951,15 @@ let rec gen_tail ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~
   pp
 and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(used_vars : Id.Set.t) ~(cont : tail_cont) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
   let (term, argsary) = decompose_appvect sigma term in
-  let cargs =
-    Array.to_list
-      (Array.map
-        (fun arg ->
-          let arg_ty = Retyping.get_type_of env sigma arg in
-          if ind_is_void_type env sigma arg_ty then
-            None
-          else
-            Some (carg_of_garg env (destRel sigma arg)))
-        argsary)
+  let cargs_without_void =
+    (List.filter_map
+      (fun arg ->
+        let arg_ty = Retyping.get_type_of env sigma arg in
+        if ind_is_void_type env sigma arg_ty then
+          None
+        else
+          Some (carg_of_garg env (destRel sigma arg)))
+      (Array.to_list argsary))
   in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -1978,7 +1967,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
       user_err (Pp.str "[codegen:gen_tail] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel i ->
-      if List.length cargs = 0 then
+      if CArray.is_empty argsary then
         let str = carg_of_garg env i in
         gen_tail_cont ~omit_void_exp:true cont (Pp.str str)
       else
@@ -1987,23 +1976,19 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         (match fixfunc_opt with
         | None -> (* closure invocation *)
             let closure_var = carg_of_garg env i in
-            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons (list_filter_none cargs) closure_var)) in
+            let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons cargs_without_void closure_var)) in
             gen_tail_cont cont pp
         | Some fixfunc ->
-            let formal_arguments = fixfunc.fixfunc_formal_arguments in
-            if List.length cargs < List.length formal_arguments then
+            let formal_arguments_without_void = fixfunc.fixfunc_formal_arguments_without_void in
+            if List.length cargs_without_void < List.length formal_arguments_without_void then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
             if not fixfunc.fixfunc_is_higher_order then
               let assignments =
-                list_filter_map2
-                  (fun (lhs, c_ty) rhs_opt ->
-                    match (c_type_is_void c_ty), rhs_opt with
-                    | true, None -> None
-                    | false, Some rhs -> Some (lhs, rhs, c_ty)
-                    | _, _ -> assert false)
-                  formal_arguments
-                  cargs
+                List.map2
+                  (fun (lhs, c_ty) rhs -> (lhs, rhs, c_ty))
+                  formal_arguments_without_void
+                  cargs_without_void
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
               let pp_goto_entry = Pp.hov 0 (Pp.str "goto" +++ Pp.str (Option.get fixfunc.fixfunc_label) ++ Pp.str ";") in
@@ -2013,25 +1998,25 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                 (gen_funcall (cfunc_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
-                    (Array.of_list (list_filter_none cargs)))))
+                    (Array.of_list cargs_without_void))))
   | Const (ctnt,_) ->
-      let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list (list_filter_none cargs)) in
+      let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs_without_void) in
       gen_tail_cont cont pp
   | Construct (cstr,univ) ->
-      gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list (list_filter_none cargs)))
+      gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs_without_void))
   | Lambda (x,t,b) ->
       user_err (Pp.str "[codegen] gen_tail: lambda term without argument (higher-order term not supported yet):" +++
         Printer.pr_econstr_env env sigma term)
   | Case (ci,u,pms,p,iv,item,bl) ->
-      assert (cargs = []);
+      assert (CArray.is_empty argsary);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
   | Proj (pr, item) ->
-      ((if cargs <> [] then
+      ((if not (CArray.is_empty argsary) then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_tail_cont ~omit_void_exp:true cont))
   | LetIn (x,e,t,b) ->
-      assert (cargs = []);
+      assert (CArray.is_empty argsary);
       let c_var = str_of_annotated_name x in
       let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
       let cont1 =
@@ -2049,19 +2034,15 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
 
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments = fixfunc_j.fixfunc_formal_arguments in
-      if List.length cargs < List.length nj_formal_arguments then
+      let nj_formal_arguments_without_void = fixfunc_j.fixfunc_formal_arguments_without_void in
+      if List.length cargs_without_void < List.length nj_formal_arguments_without_void then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
       let assignments =
-        list_filter_map2
-          (fun (lhs, c_ty) rhs_opt ->
-            match (c_type_is_void c_ty), rhs_opt with
-            | true, None -> None
-            | false, Some rhs -> Some (lhs, rhs, c_ty)
-            | _, _ -> assert false)
-          nj_formal_arguments
-          cargs
+        List.map2
+          (fun (lhs, c_ty) rhs ->  (lhs, rhs, c_ty))
+          nj_formal_arguments_without_void
+          cargs_without_void
       in
       let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
       let fix_bodies = fix_body_list env sigma term in
@@ -2314,27 +2295,19 @@ let pr_multi_fixfunc_defs (bodyhead : bodyhead_t) (fixfunc : fixfunc_t) (body_fu
   let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
   let return_type = bodyhead.bodyhead_return_type in
   (if CList.is_empty fixfunc.fixfunc_extra_arguments &&
-     CList.is_empty fixfunc.fixfunc_formal_arguments then
+     CList.is_empty fixfunc.fixfunc_formal_arguments_without_void then
     Pp.mt ()
   else
     (Pp.hv 0 (
     Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
     hovbrace (
     pr_members fixfunc.fixfunc_extra_arguments +++
-    pr_members (List.filter_map
-                 (fun (c_arg, c_ty) ->
-                   if c_type_is_void c_ty then None
-                   else Some (c_arg, c_ty))
-                 fixfunc.fixfunc_formal_arguments)) ++ Pp.str ";"))) +++
+    pr_members fixfunc.fixfunc_formal_arguments_without_void) ++ Pp.str ";"))) +++
   pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
     (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
     (List.append
       fixfunc.fixfunc_extra_arguments
-      (List.filter_map
-        (fun (c_arg, c_ty) ->
-          if c_type_is_void c_ty then None
-          else Some (c_arg, c_ty))
-        fixfunc.fixfunc_formal_arguments))
+      fixfunc.fixfunc_formal_arguments_without_void)
     return_type
     body_function_name
 
@@ -2348,12 +2321,11 @@ let pr_multi_fixfunc_case (is_last : bool) (fixfunc : fixfunc_t) : Pp.t =
           (c_arg,
            ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
         fixfunc.fixfunc_extra_arguments)
-      (List.filter_map
+      (List.map
         (fun (c_arg, c_ty) ->
-          if c_type_is_void c_ty then None
-          else Some (c_arg,
-                     ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
-        fixfunc.fixfunc_formal_arguments))
+          (c_arg,
+           ("((" ^ fixfunc_args_struct_type fixfunc.fixfunc_c_name ^ " *)codegen_args)->" ^ c_arg)))
+        fixfunc.fixfunc_formal_arguments_without_void))
     goto
 
 let pr_multi_closure_defs (bodyhead : bodyhead_t) (clo : closure_t) (body_function_name : string) : Pp.t =
@@ -2531,7 +2503,7 @@ let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entr
   pp_sjoinmap_list
     (fun (static, cfunc_name_to_define, cfunc_name_to_call, fixfunc_id) ->
       let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-      let args = List.append fixfunc.fixfunc_extra_arguments fixfunc.fixfunc_formal_arguments in
+      let args = List.append fixfunc.fixfunc_extra_arguments fixfunc.fixfunc_formal_arguments_without_void in
       let return_type = fixfunc.fixfunc_return_type in
       Pp.v 0 (
         gen_function_header ~static return_type cfunc_name_to_define args +++
