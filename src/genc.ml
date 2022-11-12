@@ -26,6 +26,42 @@ open State
 open Induc
 open Specialize
 
+type body_root_t =
+| BodyRootTopfunc of (bool * string) (* (static, primary_cfunc) *)
+| BodyRootClosure of Id.t (* closure_id *)
+| BodyRootFixfunc of Id.t (* fixfunc_id *)
+
+type body_var_t =
+| BodyVarFixfunc of Id.t (* fixfunc_id *)
+| BodyVarArg of (string * c_typedata)
+| BodyVarVoidArg of (string * c_typedata)
+
+type bodyhead_t = {
+  bodyhead_root : body_root_t;
+  bodyhead_vars : body_var_t list; (* outermost first (left to right) *)
+  bodyhead_return_type : c_typedata;
+}
+
+type genchunk_t = {
+  genchunk_bodyhead_list : bodyhead_t list;
+  genchunk_env : Environ.env;
+  genchunk_exp : EConstr.t;
+  genchunk_fixfunc_impls : Id.Set.t;
+  genchunk_fixfunc_gotos : Id.Set.t;
+  genchunk_fixfunc_calls : Id.Set.t;
+  genchunk_closure_impls : Id.Set.t;
+}
+
+type entry_type_t =
+| EntryTypeTopfunc of (bool * string) (* (static, primary_cfunc) *)
+| EntryTypeFixfunc of Id.t (* fixfunc_id *)
+| EntryTypeClosure of Id.t (* closure_id *)
+
+type entry_func_t = {
+  entryfunc_type : entry_type_t;
+  entryfunc_body : bodyhead_t;
+}
+
 type fixterm_t = {
   fixterm_id : Id.t;
   fixterm_inlinable : bool;
@@ -38,6 +74,7 @@ type fixfunc_t = {
   fixfunc_id : Id.t;
   fixfunc_used_for_call : bool;
   fixfunc_used_for_goto : bool;
+  fixfunc_bodyhead : bodyhead_t;
   fixfunc_formal_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype may be void *)
   fixfunc_return_type : c_typedata; (* may be void. *)
   fixfunc_is_higher_order : bool; (* means that arguments contain function *)
@@ -55,6 +92,8 @@ type fixfunc_t = {
 
   fixfunc_label : string option;
 }
+
+let _ = ignore (fun x -> x.fixfunc_bodyhead)
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
@@ -103,42 +142,6 @@ let get_closure_id (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
       id_of_annotated_name nary.(j)
   | _ ->
       user_err (Pp.str "[codegen:bug] unexpected closure term:" +++ Printer.pr_econstr_env env sigma term)
-
-type body_root_t =
-| BodyRootTopfunc of (bool * string) (* (static, primary_cfunc) *)
-| BodyRootClosure of Id.t (* closure_id *)
-| BodyRootFixfunc of Id.t (* fixfunc_id *)
-
-type body_var_t =
-| BodyVarFixfunc of Id.t (* fixfunc_id *)
-| BodyVarArg of (string * c_typedata)
-| BodyVarVoidArg of (string * c_typedata)
-
-type bodyhead_t = {
-  bodyhead_root : body_root_t;
-  bodyhead_vars : body_var_t list; (* outermost first (left to right) *)
-  bodyhead_return_type : c_typedata;
-}
-
-type genchunk_t = {
-  genchunk_bodyhead_list : bodyhead_t list;
-  genchunk_env : Environ.env;
-  genchunk_exp : EConstr.t;
-  genchunk_fixfunc_impls : Id.Set.t;
-  genchunk_fixfunc_gotos : Id.Set.t;
-  genchunk_fixfunc_calls : Id.Set.t;
-  genchunk_closure_impls : Id.Set.t;
-}
-
-type entry_type_t =
-| EntryTypeTopfunc of (bool * string) (* (static, primary_cfunc) *)
-| EntryTypeFixfunc of Id.t (* fixfunc_id *)
-| EntryTypeClosure of Id.t (* closure_id *)
-
-type entry_func_t = {
-  entryfunc_type : entry_type_t;
-  entryfunc_body : bodyhead_t;
-}
 
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
@@ -743,6 +746,21 @@ let make_used_for_call_set (genchunks : genchunk_t list) : Id.Set.t =
 let make_used_for_goto_set (genchunks : genchunk_t list) : Id.Set.t =
   idset_union_list (List.map (fun genchunk -> genchunk.genchunk_fixfunc_gotos) genchunks)
 
+let make_fixfunc_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.t =
+  List.fold_left
+    (fun tbl genchunk ->
+      List.fold_left
+        (fun tbl bodyhead ->
+          List.fold_left
+          (fun tbl bodyvar ->
+            match bodyvar with
+            | BodyVarFixfunc fixfunc_id ->
+                Id.Map.add fixfunc_id bodyhead tbl
+            | _ -> tbl)
+          tbl bodyhead.bodyhead_vars)
+        tbl genchunk.genchunk_bodyhead_list)
+    Id.Map.empty genchunks
+
 let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
   match EConstr.kind sigma term' with
@@ -1276,6 +1294,7 @@ let collect_fixpoints
     ~(inlinable_fixterm_tbl : bool Id.Map.t)
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
+    ~(fixfunc_bodyhead_tbl : bodyhead_t Id.Map.t)
     ~(topfunc_tbl : (bool * string) Id.Map.t)
     ~(sibling_tbl : (bool * string) Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
@@ -1302,6 +1321,7 @@ let collect_fixpoints
                   fixfunc_id = fixfunc_id;
                   fixfunc_used_for_call = Id.Set.mem fixfunc_id used_for_call_set;
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
+                  fixfunc_bodyhead = Id.Map.find fixfunc_id fixfunc_bodyhead_tbl;
                   fixfunc_formal_arguments = formal_arguments;
                   fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfunc_tbl;
@@ -2521,6 +2541,7 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
   let used_for_call_set = make_used_for_call_set genchunks in
   let used_for_goto_set = make_used_for_goto_set genchunks in
+  let fixfunc_bodyhead_tbl = make_fixfunc_bodyhead_tbl genchunks in
   let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term genchunks in
@@ -2549,8 +2570,29 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   in
   let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
   let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
-  let fixfunc_tbl = collect_fixpoints ~fixterm_tbl ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~used_for_call_set ~used_for_goto_set ~topfunc_tbl ~sibling_tbl ~extra_arguments_tbl ~c_names_tbl ~cfunc_tbl ~fixfunc_label_tbl sigma in
-  let closure_tbl = collect_closures ~extra_arguments_tbl ~closure_c_name_tbl ~closure_label_tbl sigma closure_terms in
+  let fixfunc_tbl =
+    collect_fixpoints
+      ~fixterm_tbl
+      ~higher_order_fixfunc_tbl
+      ~inlinable_fixterm_tbl
+      ~used_for_call_set
+      ~used_for_goto_set
+      ~fixfunc_bodyhead_tbl
+      ~topfunc_tbl
+      ~sibling_tbl
+      ~extra_arguments_tbl
+      ~c_names_tbl
+      ~cfunc_tbl
+      ~fixfunc_label_tbl
+      sigma
+  in
+  let closure_tbl =
+    collect_closures
+      ~extra_arguments_tbl
+      ~closure_c_name_tbl
+      ~closure_label_tbl
+      sigma closure_terms
+  in
   show_fixfunc_table env sigma fixfunc_tbl;
   let used_vars = used_variables env sigma whole_term in
   let code_pairs = List.map2
