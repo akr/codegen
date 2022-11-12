@@ -85,7 +85,7 @@ type fixfunc_t = {
 
   fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *)
 
-  fixfunc_extra_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *)
+  fixfunc_extra_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype is not void *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
     However, they can be different for primary function and siblings.
     In such case, extra arguments are all bounded variables by lambda and let-in and not filtered. *)
