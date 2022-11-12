@@ -143,6 +143,13 @@ let get_closure_id (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   | _ ->
       user_err (Pp.str "[codegen:bug] unexpected closure term:" +++ Printer.pr_econstr_env env sigma term)
 
+let pr_args (arg : (string * c_typedata) list) : Pp.t =
+  Pp.str "[" ++
+  pp_joinmap_list (Pp.str ",")
+    (fun (x,t) -> Pp.str "(" ++ Pp.str (compose_c_decl t x) ++ Pp.str ")")
+    arg ++
+  Pp.str "]"
+
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
     (fun fixfunc_id fixfunc ->
@@ -152,10 +159,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "inlinable=" ++ Pp.bool fixfunc.fixfunc_fixterm.fixterm_inlinable +++
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
-        Pp.str "formal_arguments=(" ++
-          pp_joinmap_list (Pp.str ",")
-            (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty))
-            fixfunc.fixfunc_formal_arguments ++ Pp.str ")" +++
+        Pp.str "formal_arguments=" ++ pr_args fixfunc.fixfunc_formal_arguments +++
         Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
         Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
@@ -166,6 +170,7 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.mt ())
       ))
     fixfunc_tbl
+
 
 let _ = ignore show_fixfunc_table
 
@@ -901,13 +906,6 @@ let fixterm_free_variables (env : Environ.env) (sigma : Evd.evar_map)
   let result = Hashtbl.create 0 in
   ignore (fixterm_free_variables_rec env sigma term ~result);
   result
-
-let pr_args (arg : (string * c_typedata) list) : Pp.t =
-  Pp.str "[" ++
-  pp_joinmap_list (Pp.str ",")
-    (fun (x,t) -> Pp.str "(" ++ Pp.str (compose_c_decl t x) ++ Pp.str ")")
-    arg ++
-  Pp.str "]"
 
 let check_eq_extra_arguments exargs1 exargs2 =
   if exargs1 <> exargs2 then
