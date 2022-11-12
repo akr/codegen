@@ -862,16 +862,16 @@ let fixterm_free_variables (env : Environ.env) (sigma : Evd.evar_map)
   ignore (fixterm_free_variables_rec env sigma term ~result);
   result
 
-let pr_extra_argument (exarg : (string * string) list) : Pp.t =
+let pr_args (arg : (string * c_typedata) list) : Pp.t =
   Pp.str "[" ++
   pp_joinmap_list (Pp.str ",")
-    (fun (x,t) -> Pp.str "(" ++ Pp.str x ++ Pp.str "," ++ Pp.str t ++ Pp.str ")")
-    exarg ++
+    (fun (x,t) -> Pp.str "(" ++ Pp.str (compose_c_decl t x) ++ Pp.str ")")
+    arg ++
   Pp.str "]"
 
-let check_eq_extra_arguments exarg1 exarg2 =
-  if exarg1 <> exarg2 then
-    user_err (Pp.str "[codegen:bug] exargs length differ:" +++ pr_extra_argument exarg1 +++ Pp.str "<>" +++ pr_extra_argument exarg2)
+let check_eq_extra_arguments exargs1 exargs2 =
+  if exargs1 <> exargs2 then
+    user_err (Pp.str "[codegen:bug] exargs length differ:" +++ pr_args exargs1 +++ Pp.str "<>" +++ pr_args exargs2)
 
 let _ = ignore check_eq_extra_arguments
 
@@ -2121,6 +2121,8 @@ let gen_func_single
     | EntryTypeTopfunc _ -> bodyhead_fargs entfunc.entryfunc_body
     | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
+        (*msg_debug_hov (Pp.str "[codegen:gen_func_single:c_fargs:EntryTypeFixfunc] fixfunc_extra_arguments=" ++ pr_args fixfunc.fixfunc_extra_arguments);
+        msg_debug_hov (Pp.str "[codegen:gen_func_single:c_fargs:EntryTypeFixfunc] bodyhead_fargs=" ++ pr_args (bodyhead_fargs entfunc.entryfunc_body));*)
         fixfunc.fixfunc_extra_arguments @ (bodyhead_fargs entfunc.entryfunc_body)
     | EntryTypeClosure closure_id ->
         (bodyhead_fargs entfunc.entryfunc_body) @ [("closure", pointer_to_void)]
