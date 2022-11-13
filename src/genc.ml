@@ -237,20 +237,6 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   | _ ->
       [([], (env, term))]
 
-let lam_fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
-    ((*fargs of outermost lambdas*)(Names.Name.t Context.binder_annot * EConstr.types) list *
-     (*environment under the outermost lambdas*)Environ.env *
-     (((*env including fixfunc names but without lambdas of fixfunc*)Environ.env *
-       (*env including fixfunc names and lambdas of fixfunc*)Environ.env *
-       (*fixfunc name*)Names.Name.t Context.binder_annot *
-       (*fixfunc type*)EConstr.types *
-       (*fargs*)(Names.Name.t Context.binder_annot * EConstr.types) list) list *
-      ((*env for body*)Environ.env *
-       (*body*)EConstr.t)) list) =
-  let (fargs, body) = EConstr.decompose_lam sigma term in
-  let env2 = env_push_assums env fargs in
-  (fargs, env2, fix_body_list env2 sigma body)
-
 let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * c_typedata) list) * c_typedata =
   match EConstr.kind sigma term with
   | Prod (x,t,b) ->
@@ -787,6 +773,17 @@ let make_fixfunc_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.
                 Id.Map.add fixfunc_id bodyhead tbl
             | _ -> tbl)
           tbl bodyhead.bodyhead_vars)
+        tbl genchunk.genchunk_bodyhead_list)
+    Id.Map.empty genchunks
+
+let make_closure_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.t =
+  List.fold_left
+    (fun tbl genchunk ->
+      List.fold_left
+        (fun tbl bodyhead ->
+          match bodyhead.bodyhead_root with
+          | BodyRootClosure closure_id -> Id.Map.add closure_id bodyhead tbl
+          | _ -> tbl)
         tbl genchunk.genchunk_bodyhead_list)
     Id.Map.empty genchunks
 
@@ -1362,16 +1359,6 @@ let collect_fixpoints
   in
   make_fixfunc_table (List.of_seq fixfuncs)
 
-let c_fargs_of (env : Environ.env) (sigma : Evd.evar_map) (fargs : (Names.Name.t Context.binder_annot * EConstr.types) list) =
-  let (_, c_fargs) =
-    List.fold_left_map
-      (fun env (annotated_name, ty) ->
-        let env' = Environ.pop_rel_context 1 env in
-        (env, (str_of_annotated_name annotated_name, c_typename env' sigma ty)))
-      env fargs
-  in
-  c_fargs
-
 let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   let closure_tbl = Hashtbl.create 0 in
   List.iter
@@ -1380,6 +1367,7 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   closure_tbl
 
 let collect_closures
+    ~(closure_bodyhead_tbl : bodyhead_t Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
     ~(closure_label_tbl : string Id.Map.t)
@@ -1393,15 +1381,6 @@ let collect_closures
       let c_closure_function_ty = c_closure_function_type closure_env sigma closure_ty in
       let cloid = get_closure_id closure_env sigma closure_exp in
       let cloname = Id.Map.find cloid closure_c_name_tbl in
-      let (outermost_fargs, env1, fix_bodies) = lam_fix_body_list closure_env sigma closure_exp in
-      let outermost_fargs = c_fargs_of env1 sigma outermost_fargs in
-      let (fixes, (env4, body)) = List.hd fix_bodies in
-      let fix_fargs_list = List.map
-        (fun (env2, env3, fixfunc_name, fixfunc_type, fix_fargs) ->
-          c_fargs_of env3 sigma fix_fargs)
-        fixes
-      in
-      let c_fargs = List.concat (List.rev outermost_fargs :: List.map List.rev fix_fargs_list) in
       let fv_index_set = free_variables_index_set closure_env sigma closure_exp in
       let vars = List.concat_map
         (fun index ->
@@ -1418,12 +1397,13 @@ let collect_closures
           | Some extra_arguments -> extra_arguments)
         (IntSet.elements fv_index_set)
       in
+      let bodyhead = Id.Map.find cloid closure_bodyhead_tbl in
       let vars = List.sort_uniq (fun (str1,c_ty1) (str2,c_ty2) -> String.compare str1 str2) vars in
       closures := {
           closure_id=cloid;
           closure_c_name=cloname;
           closure_c_func_type=c_closure_function_ty;
-          closure_args=c_fargs;
+          closure_args = bodyhead_fargs bodyhead;
           closure_vars=vars;
           closure_label = Id.Map.find_opt cloid closure_label_tbl;
         } :: !closures)
@@ -2571,8 +2551,10 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
       ~fixfunc_label_tbl
       sigma
   in
+  let closure_bodyhead_tbl = make_closure_bodyhead_tbl genchunks in
   let closure_tbl =
     collect_closures
+      ~closure_bodyhead_tbl
       ~extra_arguments_tbl
       ~closure_c_name_tbl
       ~closure_label_tbl
