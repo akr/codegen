@@ -262,6 +262,11 @@ let rec c_args_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : E
   | _ ->
       ([], c_typename env sigma term)
 
+let c_args_without_void_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((string * c_typedata) list) * c_typedata =
+  let (args, ret) = c_args_and_ret_type env sigma term in
+  let args_without_void = List.filter (fun (var, c_ty) -> not (c_type_is_void c_ty)) args in
+  (args_without_void, ret)
+
 let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
@@ -2499,14 +2504,11 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entries : (bool * string * string * Id.t) list) : Pp.t =
+let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
-    (fun (static, cfunc_name_to_define, cfunc_name_to_call, fixfunc_id) ->
-      let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-      let args = List.append fixfunc.fixfunc_extra_arguments fixfunc.fixfunc_formal_arguments_without_void in
-      let return_type = fixfunc.fixfunc_return_type in
+    (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
       Pp.v 0 (
-        gen_function_header ~static return_type cfunc_name_to_define args +++
+        gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
         vbrace (
           Pp.hov 0 (
             (if c_type_is_void return_type then
@@ -2517,11 +2519,11 @@ let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entr
             Pp.str "(" ++
             pp_joinmap_list (Pp.str "," ++ Pp.spc ())
               (fun (c_arg, c_ty) -> Pp.str c_arg)
-              args ++
+              formal_arguments_without_void ++
             Pp.str ");"))))
     stub_sibling_entries
 
-let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) (stubs : (bool * string * string * Id.t) list) : Pp.t =
+let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) (stubs : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
   let static_and_primary_cfunc = (static, primary_cfunc) in
   let env = Global.env () in
@@ -2606,10 +2608,12 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) ?(stubs : (bool * string * string * Id.t) list = []) (primary_cfunc : string) : Pp.t =
+let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) ?(stubs : (bool * string * string * (string * c_typedata) list * c_typedata) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs stubs)
 
 let detect_stubs (cfuncs : string list) static_ty_term_list =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
   let primary_nary =
     let (primary_static, primary_ty, primary_term) = List.hd static_ty_term_list in
     let (args, body) = Term.decompose_lam primary_term in
@@ -2625,16 +2629,17 @@ let detect_stubs (cfuncs : string list) static_ty_term_list =
       match Hashtbl.find_opt h j with
       | None ->
           let fixfunc_id = id_of_annotated_name primary_nary.(j) in
+          let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr ty) in
           let entfunc = (static, cfunc, j, fixfunc_id) in
           result_impls := entfunc :: !result_impls;
-          Hashtbl.add h j (cfunc, fixfunc_id, [])
-      | Some (orig_cfunc, orig_fixfunc_id, stubs) ->
-          let stub = (static, cfunc, orig_cfunc, orig_fixfunc_id) in
-          Hashtbl.replace h j (orig_cfunc, orig_fixfunc_id, stub :: stubs))
+          Hashtbl.add h j (cfunc, fixfunc_id, formal_arguments_without_void, return_type, [])
+      | Some (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs) ->
+          let stub = (static, cfunc, orig_cfunc, formal_arguments_without_void, return_type) in
+          Hashtbl.replace h j (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stub :: stubs))
     cfuncs static_ty_term_list;
   let result_stubs =
     List.concat_map
-      (fun (j, (orig_cfunc, orig_fixfunc_id, stubs)) -> stubs)
+      (fun (j, (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs)) -> stubs)
       (List.of_seq (Hashtbl.to_seq h))
   in
   (List.rev !result_impls, result_stubs)
