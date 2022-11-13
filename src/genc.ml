@@ -2292,20 +2292,16 @@ let pr_multi_topfunc_case (bodyhead : bodyhead_t) (primary_cfunc : string) : Pp.
 let pr_multi_fixfunc_defs (bodyhead : bodyhead_t) (fixfunc : fixfunc_t) (body_function_name : string) : Pp.t =
   let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
   let return_type = bodyhead.bodyhead_return_type in
-  (if CList.is_empty fixfunc.fixfunc_extra_arguments &&
-     CList.is_empty fixfunc.fixfunc_formal_arguments_without_void then
+  let arguments = fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments_without_void in
+  (if CList.is_empty arguments then
     Pp.mt ()
   else
     (Pp.hv 0 (
     Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
-    hovbrace (
-    pr_members fixfunc.fixfunc_extra_arguments +++
-    pr_members fixfunc.fixfunc_formal_arguments_without_void) ++ Pp.str ";"))) +++
+    hovbrace (pr_members arguments) ++ Pp.str ";"))) +++
   pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
     (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
-    (List.append
-      fixfunc.fixfunc_extra_arguments
-      fixfunc.fixfunc_formal_arguments_without_void)
+    arguments
     return_type
     body_function_name
 
