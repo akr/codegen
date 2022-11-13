@@ -1376,11 +1376,12 @@ let collect_closures
   List.iter
     (fun (closure_env, closure_exp, var_to_bind) ->
       (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_exp=" ++ Printer.pr_econstr_env closure_env sigma closure_exp);*)
-      let closure_ty = Reductionops.nf_all closure_env sigma (Retyping.get_type_of closure_env sigma closure_exp) in
-      (*msg_debug_hov (Pp.str "[codegen:collect_closures] closure_ty=" ++ Printer.pr_econstr_env closure_env sigma closure_ty);*)
-      let c_closure_function_ty = c_closure_function_type closure_env sigma closure_ty in
       let cloid = get_closure_id closure_env sigma closure_exp in
       let cloname = Id.Map.find cloid closure_c_name_tbl in
+      let bodyhead = Id.Map.find cloid closure_bodyhead_tbl in
+      let args = bodyhead_fargs bodyhead in
+      let arg_types = List.map snd args in
+      let c_closure_function_ty = c_closure_type arg_types bodyhead.bodyhead_return_type in
       let fv_index_set = free_variables_index_set closure_env sigma closure_exp in
       let vars = List.concat_map
         (fun index ->
@@ -1397,13 +1398,12 @@ let collect_closures
           | Some extra_arguments -> extra_arguments)
         (IntSet.elements fv_index_set)
       in
-      let bodyhead = Id.Map.find cloid closure_bodyhead_tbl in
       let vars = List.sort_uniq (fun (str1,c_ty1) (str2,c_ty2) -> String.compare str1 str2) vars in
       closures := {
           closure_id=cloid;
           closure_c_name=cloname;
           closure_c_func_type=c_closure_function_ty;
-          closure_args = bodyhead_fargs bodyhead;
+          closure_args = args;
           closure_vars=vars;
           closure_label = Id.Map.find_opt cloid closure_label_tbl;
         } :: !closures)

@@ -276,7 +276,7 @@ let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   else
     (get_ind_config env sigma t).is_void_type
 
-let make_c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
+let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
   let arg_types =
     rcons
       (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
@@ -304,7 +304,7 @@ and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : ECon
           user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
       args
   in
-  make_c_closure_type arg_types (get_ind_config env sigma ret_type).c_type
+  c_closure_type arg_types (get_ind_config env sigma ret_type).c_type
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in
