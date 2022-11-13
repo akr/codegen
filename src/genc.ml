@@ -1882,7 +1882,6 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | Lambda _ -> assert false
   | Fix ((ks, j), ((nary, tary, fary))) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments_without_void = fixfunc_j.fixfunc_formal_arguments_without_void in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
           (gen_funcall (cfunc_of_fixfunc fixfunc_j)
@@ -1893,7 +1892,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         let assignments =
           List.map2
             (fun (lhs, c_ty) rhs -> (lhs, rhs, c_ty))
-            nj_formal_arguments_without_void
+            fixfunc_j.fixfunc_formal_arguments_without_void
             cargs_without_void
         in
         let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
@@ -1980,15 +1979,14 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
             let pp = gen_funcall ("(*" ^ closure_var ^ ")") (Array.of_list (rcons cargs_without_void closure_var)) in
             gen_tail_cont cont pp
         | Some fixfunc ->
-            let formal_arguments_without_void = fixfunc.fixfunc_formal_arguments_without_void in
-            if List.length cargs_without_void < List.length formal_arguments_without_void then
+            if List.length cargs_without_void < List.length fixfunc.fixfunc_formal_arguments_without_void then
               user_err (Pp.str "[codegen] gen_tail: partial application for fix-bounded-variable (higher-order term not supported yet):" +++
                 Printer.pr_econstr_env env sigma term);
             if not fixfunc.fixfunc_is_higher_order then
               let assignments =
                 List.map2
                   (fun (lhs, c_ty) rhs -> (lhs, rhs, c_ty))
-                  formal_arguments_without_void
+                  fixfunc.fixfunc_formal_arguments_without_void
                   cargs_without_void
               in
               let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
@@ -2035,14 +2033,13 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
 
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
-      let nj_formal_arguments_without_void = fixfunc_j.fixfunc_formal_arguments_without_void in
-      if List.length cargs_without_void < List.length nj_formal_arguments_without_void then
+      if List.length cargs_without_void < List.length fixfunc_j.fixfunc_formal_arguments_without_void then
         user_err (Pp.str "[codegen] gen_tail: partial application for fix-term (higher-order term not supported yet):" +++
           Printer.pr_econstr_env env sigma term);
       let assignments =
         List.map2
           (fun (lhs, c_ty) rhs ->  (lhs, rhs, c_ty))
-          nj_formal_arguments_without_void
+          fixfunc_j.fixfunc_formal_arguments_without_void
           cargs_without_void
       in
       let pp_assignments = gen_parallel_assignment (Array.of_list assignments) in
