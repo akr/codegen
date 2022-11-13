@@ -2493,7 +2493,7 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
+let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
     (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
       Pp.v 0 (
@@ -2512,7 +2512,7 @@ let gen_stub_sibling_functions ~(fixfunc_tbl : fixfunc_table) (stub_sibling_entr
             Pp.str ");"))))
     stub_sibling_entries
 
-let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) (stubs : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
+let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
   let static_and_primary_cfunc = (static, primary_cfunc) in
   let env = Global.env () in
@@ -2590,15 +2590,14 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
         | _ ->
             gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~genchunks env sigma used_vars
       in
-      let pp_stub_sibling_entfuncs = gen_stub_sibling_functions ~fixfunc_tbl stubs in
-      (decl +++ pp_stub_sibling_entfuncs, impl))
+      (decl, impl))
     genchunks_list entry_funcs_list
   in
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) ?(stubs : (bool * string * string * (string * c_typedata) list * c_typedata) list = []) (primary_cfunc : string) : Pp.t =
-  local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs stubs)
+let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
+  local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
 let detect_stubs (cfuncs : string list) static_ty_term_list =
   let env = Global.env () in
@@ -2643,7 +2642,8 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
       let primary_entfunc = List.hd primary_and_sibling_entfuncs in
       let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
       let (_, primary_cfunc, _, _) = primary_entfunc in
-      gen_function ~sibling_entfuncs ~stubs primary_cfunc
+      gen_function ~sibling_entfuncs primary_cfunc +++
+      gen_stub_sibling_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
