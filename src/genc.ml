@@ -76,7 +76,6 @@ type fixfunc_t = {
   fixfunc_used_for_goto : bool;
   fixfunc_bodyhead : bodyhead_t;
   fixfunc_formal_arguments_without_void : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype is not void *)
-  fixfunc_return_type : c_typedata; (* may be void. *)
   fixfunc_is_higher_order : bool; (* means that arguments contain function *)
 
   fixfunc_topfunc : (bool * string) option; (* (static, cfunc_name) *)
@@ -160,7 +159,6 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
         Pp.str "formal_arguments_without_void=" ++ pr_args fixfunc.fixfunc_formal_arguments_without_void +++
-        Pp.str "return_type=" ++ Pp.str (compose_c_abstract_decl fixfunc.fixfunc_return_type) +++
         Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
@@ -1341,7 +1339,6 @@ let collect_fixpoints
                 let fixfunc_id = id_of_annotated_name name in
                 let bodyhead = Id.Map.find fixfunc_id fixfunc_bodyhead_tbl in
                 let formal_arguments_without_void = bodyhead_fixfunc_fargs_without_void bodyhead fixfunc_id in
-                let return_type = bodyhead.bodyhead_return_type in
                 {
                   fixfunc_fixterm = fixterm;
                   fixfunc_id = fixfunc_id;
@@ -1349,7 +1346,6 @@ let collect_fixpoints
                   fixfunc_used_for_goto = Id.Set.mem fixfunc_id used_for_goto_set;
                   fixfunc_bodyhead = bodyhead;
                   fixfunc_formal_arguments_without_void = formal_arguments_without_void;
-                  fixfunc_return_type = return_type;
                   fixfunc_is_higher_order = Id.Map.find fixfunc_id higher_order_fixfunc_tbl;
                   fixfunc_topfunc = Id.Map.find_opt fixfunc_id topfunc_tbl;
                   fixfunc_sibling = Id.Map.find_opt fixfunc_id sibling_tbl;
