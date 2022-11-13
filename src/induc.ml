@@ -276,6 +276,19 @@ let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   else
     (get_ind_config env sigma t).is_void_type
 
+let make_c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
+  let arg_types =
+    rcons
+      (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
+      { c_type_left="void *"; c_type_right="" } (* closure invocation pass the closure itself as the last argument *)
+  in
+  let arg_abstract_decls = List.map compose_c_abstract_decl arg_types in
+  (* closure type in C is a pointer to pointer to function that is actually
+     pointer to the first member of closure struct where the first member is a pointer to a function  *)
+  let declarator_left = "" in
+  let declarator_right = "(" ^ String.concat ", " arg_abstract_decls ^ ")" in
+  compose_c_type ret_type declarator_left declarator_right
+
 let rec c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
   match EConstr.kind sigma t with
   | Prod _ -> c_type_pointer_to (c_type_pointer_to (c_closure_function_type env sigma t))
@@ -291,18 +304,7 @@ and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : ECon
           user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
       args
   in
-  let arg_types =
-    rcons
-      (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
-      { c_type_left="void *"; c_type_right="" } (* closure invocation pass the closure itself as the last argument *)
-  in
-  let arg_abstract_decls = List.map compose_c_abstract_decl arg_types in
-  (* closure type in C is a pointer to pointer to function that is actually
-     pointer to the first member of closure struct where the first member is a pointer to a function  *)
-  let declarator_left = "" in
-  let declarator_right = "(" ^ String.concat ", " arg_abstract_decls ^ ")" in
-  compose_c_type (get_ind_config env sigma ret_type).c_type declarator_left declarator_right
-
+  make_c_closure_type arg_types (get_ind_config env sigma ret_type).c_type
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in
