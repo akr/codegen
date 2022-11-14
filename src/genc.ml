@@ -767,12 +767,12 @@ let make_fixfunc_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.
       List.fold_left
         (fun tbl bodyhead ->
           List.fold_left
-          (fun tbl bodyvar ->
-            match bodyvar with
-            | BodyVarFixfunc fixfunc_id ->
-                Id.Map.add fixfunc_id bodyhead tbl
-            | _ -> tbl)
-          tbl bodyhead.bodyhead_vars)
+            (fun tbl bodyvar ->
+              match bodyvar with
+              | BodyVarFixfunc fixfunc_id ->
+                  Id.Map.add fixfunc_id bodyhead tbl
+              | _ -> tbl)
+            tbl bodyhead.bodyhead_vars)
         tbl genchunk.genchunk_bodyhead_list)
     Id.Map.empty genchunks
 
