@@ -2473,25 +2473,6 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
-  pp_sjoinmap_list
-    (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
-      Pp.v 0 (
-        gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
-        vbrace (
-          Pp.hov 0 (
-            (if c_type_is_void return_type then
-              Pp.mt ()
-            else
-              Pp.str "return") +++
-            Pp.str cfunc_name_to_call ++
-            Pp.str "(" ++
-            pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-              (fun (c_arg, c_ty) -> Pp.str c_arg)
-              formal_arguments_without_void ++
-            Pp.str ");"))))
-    stub_sibling_entries
-
 let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
     (*primary_cfunc*) string *
     (*sibling_entfuncs*) (bool * string * int * Id.t) list =
@@ -2648,6 +2629,25 @@ let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool 
       cfunc_static_ty_term_list_list
   in
   (cfunc_static_ty_term_list, stubs)
+
+let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
+  pp_sjoinmap_list
+    (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
+      Pp.v 0 (
+        gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
+        vbrace (
+          Pp.hov 0 (
+            (if c_type_is_void return_type then
+              Pp.mt ()
+            else
+              Pp.str "return") +++
+            Pp.str cfunc_name_to_call ++
+            Pp.str "(" ++
+            pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+              (fun (c_arg, c_ty) -> Pp.str c_arg)
+              formal_arguments_without_void ++
+            Pp.str ");"))))
+    stub_sibling_entries
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
