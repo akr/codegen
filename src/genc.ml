@@ -2582,8 +2582,9 @@ let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (p
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
 let detect_stubs (cfuncs : string list) (static_ty_term_list : ((*static*)bool * Constr.types * Constr.t) list) :
-    (bool * string * int * Id.t) list *
-    (bool * string * string * (string * c_typedata) list * c_typedata) list =
+    (*primary_cfunc*) string *
+    (*sibling_entfuncs*) (bool * string * int * Id.t) list *
+    (*stubs*) (bool * string * string * (string * c_typedata) list * c_typedata) list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let primary_nary =
@@ -2609,12 +2610,16 @@ let detect_stubs (cfuncs : string list) (static_ty_term_list : ((*static*)bool *
           let stub = (static, cfunc, orig_cfunc, formal_arguments_without_void, return_type) in
           Hashtbl.replace h j (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stub :: stubs))
     cfuncs static_ty_term_list;
+  let primary_and_sibling_entfuncs = List.rev !result_impls in
+  let primary_entfunc = List.hd primary_and_sibling_entfuncs in
+  let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
+  let (_, primary_cfunc, _, _) = primary_entfunc in
   let result_stubs =
     List.concat_map
       (fun (j, (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs)) -> stubs)
       (List.of_seq (Hashtbl.to_seq h))
   in
-  (List.rev !result_impls, result_stubs)
+  (primary_cfunc, sibling_entfuncs, result_stubs)
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
@@ -2622,10 +2627,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
   | [_] -> user_err (Pp.str "[codegen:bug] gen_mutual with single cfunc_name")
   | cfuncs ->
       let static_ty_term_list = List.map make_simplified_for_cfunc cfuncs in
-      let (primary_and_sibling_entfuncs, stubs) = detect_stubs cfuncs static_ty_term_list in
-      let primary_entfunc = List.hd primary_and_sibling_entfuncs in
-      let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
-      let (_, primary_cfunc, _, _) = primary_entfunc in
+      let (primary_cfunc, sibling_entfuncs, stubs) = detect_stubs cfuncs static_ty_term_list in
       gen_function ~sibling_entfuncs primary_cfunc +++
       gen_stub_sibling_functions stubs
 
