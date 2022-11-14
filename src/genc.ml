@@ -2581,7 +2581,9 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
-let detect_stubs (cfuncs : string list) static_ty_term_list =
+let detect_stubs (cfuncs : string list) (static_ty_term_list : ((*static*)bool * Constr.types * Constr.t) list) :
+    (bool * string * int * Id.t) list *
+    (bool * string * string * (string * c_typedata) list * c_typedata) list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let primary_nary =
