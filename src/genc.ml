@@ -2492,8 +2492,43 @@ let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string *
             Pp.str ");"))))
     stub_sibling_entries
 
-let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * int * Id.t) list) : Pp.t =
-  let (static, ty, whole_term) = make_simplified_for_cfunc primary_cfunc in (* modify global env *)
+let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
+    (*primary_cfunc*) string *
+    (*sibling_entfuncs*) (bool * string * int * Id.t) list =
+  let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
+  let (args, body) = Term.decompose_lam primary_term in
+  if Constr.isFix body then
+    let primary_nary =
+      let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+      nary
+    in
+    let h = Hashtbl.create 0 in
+    let result_impls = ref [] in
+    List.iter
+      (fun (cfunc, static, ty, term) ->
+        let (args, body) = Term.decompose_lam term in
+        let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+        match Hashtbl.find_opt h j with
+        | None ->
+            let fixfunc_id = id_of_annotated_name primary_nary.(j) in
+            let entfunc = (static, cfunc, j, fixfunc_id) in
+            result_impls := entfunc :: !result_impls;
+            Hashtbl.add h j (cfunc, fixfunc_id)
+        | Some (orig_cfunc, orig_fixfunc_id) ->
+            assert false)
+      cfunc_static_ty_term_list;
+    let primary_and_sibling_entfuncs = List.rev !result_impls in
+    let primary_entfunc = List.hd primary_and_sibling_entfuncs in
+    let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
+    let (_, primary_cfunc, _, _) = primary_entfunc in
+    (primary_cfunc, sibling_entfuncs)
+  else
+    (assert (List.length cfunc_static_ty_term_list = 1);
+    (primary_cfunc, []))
+
+let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
+  let (_, sibling_entfuncs) = split_siblings cfunc_static_ty_term_list in
+  let (primary_cfunc, static, ty, whole_term) = List.hd cfunc_static_ty_term_list in
   let static_and_primary_cfunc = (static, primary_cfunc) in
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -2578,8 +2613,8 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
-  local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
+let gen_function (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
+  local_gensym_with (fun () -> gen_func_sub cfunc_static_ty_term_list)
 
 let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
     (*cfunc_static_ty_term_list*) ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list *
@@ -2614,40 +2649,6 @@ let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool 
   in
   (cfunc_static_ty_term_list, stubs)
 
-let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
-    (*primary_cfunc*) string *
-    (*sibling_entfuncs*) (bool * string * int * Id.t) list =
-  let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
-  let (args, body) = Term.decompose_lam primary_term in
-  if Constr.isFix body then
-    let primary_nary =
-      let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-      nary
-    in
-    let h = Hashtbl.create 0 in
-    let result_impls = ref [] in
-    List.iter
-      (fun (cfunc, static, ty, term) ->
-        let (args, body) = Term.decompose_lam term in
-        let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-        match Hashtbl.find_opt h j with
-        | None ->
-            let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-            let entfunc = (static, cfunc, j, fixfunc_id) in
-            result_impls := entfunc :: !result_impls;
-            Hashtbl.add h j (cfunc, fixfunc_id)
-        | Some (orig_cfunc, orig_fixfunc_id) ->
-            assert false)
-      cfunc_static_ty_term_list;
-    let primary_and_sibling_entfuncs = List.rev !result_impls in
-    let primary_entfunc = List.hd primary_and_sibling_entfuncs in
-    let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
-    let (_, primary_cfunc, _, _) = primary_entfunc in
-    (primary_cfunc, sibling_entfuncs)
-  else
-    (assert (List.length cfunc_static_ty_term_list = 1);
-    (primary_cfunc, []))
-
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
   | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
@@ -2660,8 +2661,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
           cfuncs
       in
       let (cfunc_static_ty_term_list, stubs) = detect_stubs cfunc_static_ty_term_list in
-      let (primary_cfunc, sibling_entfuncs) = split_siblings cfunc_static_ty_term_list in
-      gen_function ~sibling_entfuncs primary_cfunc +++
+      gen_function cfunc_static_ty_term_list +++
       gen_stub_sibling_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
