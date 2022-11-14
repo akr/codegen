@@ -2617,8 +2617,6 @@ let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool 
 let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
     (*primary_cfunc*) string *
     (*sibling_entfuncs*) (bool * string * int * Id.t) list =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
   let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
   let (args, body) = Term.decompose_lam primary_term in
   if Constr.isFix body then
@@ -2635,11 +2633,10 @@ let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)boo
         match Hashtbl.find_opt h j with
         | None ->
             let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-            let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr ty) in
             let entfunc = (static, cfunc, j, fixfunc_id) in
             result_impls := entfunc :: !result_impls;
-            Hashtbl.add h j (cfunc, fixfunc_id, formal_arguments_without_void, return_type, [])
-        | Some (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs) ->
+            Hashtbl.add h j (cfunc, fixfunc_id)
+        | Some (orig_cfunc, orig_fixfunc_id) ->
             assert false)
       cfunc_static_ty_term_list;
     let primary_and_sibling_entfuncs = List.rev !result_impls in
