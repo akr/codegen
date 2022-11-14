@@ -2581,53 +2581,89 @@ let gen_func_sub (primary_cfunc : string) (sibling_entfuncs : (bool * string * i
 let gen_function ?(sibling_entfuncs : (bool * string * int * Id.t) list = []) (primary_cfunc : string) : Pp.t =
   local_gensym_with (fun () -> gen_func_sub primary_cfunc sibling_entfuncs)
 
-let detect_stubs (cfuncs : string list) (static_ty_term_list : ((*static*)bool * Constr.types * Constr.t) list) :
-    (*primary_cfunc*) string *
-    (*sibling_entfuncs*) (bool * string * int * Id.t) list *
+let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
+    (*cfunc_static_ty_term_list*) ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list *
     (*stubs*) (bool * string * string * (string * c_typedata) list * c_typedata) list =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let primary_nary =
-    let (primary_static, primary_ty, primary_term) = List.hd static_ty_term_list in
-    let (args, body) = Term.decompose_lam primary_term in
-    let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-    nary
-  in
-  let h = Hashtbl.create 0 in
-  let result_impls = ref [] in
-  List.iter2
-    (fun cfunc (static, ty, term) ->
-      let (args, body) = Term.decompose_lam term in
-      let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-      match Hashtbl.find_opt h j with
+  let m = ref ConstrMap.empty in
+  let acc = ref [] in
+  List.iter
+    (fun (cfunc, static, ty, term) ->
+      match ConstrMap.find_opt term !m with
       | None ->
-          let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-          let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr ty) in
-          let entfunc = (static, cfunc, j, fixfunc_id) in
-          result_impls := entfunc :: !result_impls;
-          Hashtbl.add h j (cfunc, fixfunc_id, formal_arguments_without_void, return_type, [])
-      | Some (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs) ->
-          let stub = (static, cfunc, orig_cfunc, formal_arguments_without_void, return_type) in
-          Hashtbl.replace h j (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stub :: stubs))
-    cfuncs static_ty_term_list;
-  let primary_and_sibling_entfuncs = List.rev !result_impls in
-  let primary_entfunc = List.hd primary_and_sibling_entfuncs in
-  let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
-  let (_, primary_cfunc, _, _) = primary_entfunc in
-  let result_stubs =
+          let s = ref [(cfunc, static, ty, term)] in
+          acc := s :: !acc;
+          m := ConstrMap.add term s !m
+      | Some s ->
+          s := (cfunc, static, ty, term) :: !s)
+    cfunc_static_ty_term_list;
+  let cfunc_static_ty_term_list_list = List.rev_map (fun l -> List.rev !l) !acc in
+  let cfunc_static_ty_term_list = List.map List.hd cfunc_static_ty_term_list_list in
+  let stubs =
     List.concat_map
-      (fun (j, (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs)) -> stubs)
-      (List.of_seq (Hashtbl.to_seq h))
+      (fun cfunc_static_ty_term_list ->
+        match cfunc_static_ty_term_list with
+        | [] -> assert false
+        | (first_cfunc, first_static, first_ty, first_term) :: rest_cfunc_static_ty_term_list ->
+            let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr first_ty) in
+            List.map
+              (fun (cfunc, static, ty, term) -> (static, cfunc, first_cfunc, formal_arguments_without_void, return_type))
+              rest_cfunc_static_ty_term_list)
+      cfunc_static_ty_term_list_list
   in
-  (primary_cfunc, sibling_entfuncs, result_stubs)
+  (cfunc_static_ty_term_list, stubs)
+
+let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
+    (*primary_cfunc*) string *
+    (*sibling_entfuncs*) (bool * string * int * Id.t) list =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
+  let (args, body) = Term.decompose_lam primary_term in
+  if Constr.isFix body then
+    let primary_nary =
+      let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+      nary
+    in
+    let h = Hashtbl.create 0 in
+    let result_impls = ref [] in
+    List.iter
+      (fun (cfunc, static, ty, term) ->
+        let (args, body) = Term.decompose_lam term in
+        let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+        match Hashtbl.find_opt h j with
+        | None ->
+            let fixfunc_id = id_of_annotated_name primary_nary.(j) in
+            let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr ty) in
+            let entfunc = (static, cfunc, j, fixfunc_id) in
+            result_impls := entfunc :: !result_impls;
+            Hashtbl.add h j (cfunc, fixfunc_id, formal_arguments_without_void, return_type, [])
+        | Some (orig_cfunc, orig_fixfunc_id, formal_arguments_without_void, return_type, stubs) ->
+            assert false)
+      cfunc_static_ty_term_list;
+    let primary_and_sibling_entfuncs = List.rev !result_impls in
+    let primary_entfunc = List.hd primary_and_sibling_entfuncs in
+    let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
+    let (_, primary_cfunc, _, _) = primary_entfunc in
+    (primary_cfunc, sibling_entfuncs)
+  else
+    (assert (List.length cfunc_static_ty_term_list = 1);
+    (primary_cfunc, []))
 
 let gen_mutual (cfunc_names : string list) : Pp.t =
   match cfunc_names with
   | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
-  | [_] -> user_err (Pp.str "[codegen:bug] gen_mutual with single cfunc_name")
   | cfuncs ->
-      let static_ty_term_list = List.map make_simplified_for_cfunc cfuncs in
-      let (primary_cfunc, sibling_entfuncs, stubs) = detect_stubs cfuncs static_ty_term_list in
+      let cfunc_static_ty_term_list =
+        List.map
+          (fun cfunc ->
+            let (static, ty, term) = make_simplified_for_cfunc cfunc in
+            (cfunc, static, ty, term))
+          cfuncs
+      in
+      let (cfunc_static_ty_term_list, stubs) = detect_stubs cfunc_static_ty_term_list in
+      let (primary_cfunc, sibling_entfuncs) = split_siblings cfunc_static_ty_term_list in
       gen_function ~sibling_entfuncs primary_cfunc +++
       gen_stub_sibling_functions stubs
 
@@ -2692,7 +2728,7 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
-          f (Pp.v 0 (gen_function cfunc_name ++ Pp.fnl ()))
+          f (Pp.v 0 (gen_mutual [cfunc_name] ++ Pp.fnl ()))
       | GenMutual cfunc_names ->
           f (Pp.v 0 (gen_mutual cfunc_names ++ Pp.fnl ()))
       | GenPrototype cfunc_name ->
