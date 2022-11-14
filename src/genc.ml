@@ -2483,16 +2483,15 @@ let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)boo
       let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
       nary
     in
-    let result_impls = ref [] in
-    List.iter
-      (fun (cfunc, static, ty, term) ->
-        let (args, body) = Term.decompose_lam term in
-        let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-        let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-        let entfunc = (static, cfunc, j, fixfunc_id) in
-        result_impls := entfunc :: !result_impls)
-      cfunc_static_ty_term_list;
-    let primary_and_sibling_entfuncs = List.rev !result_impls in
+    let primary_and_sibling_entfuncs =
+      List.map
+        (fun (cfunc, static, ty, term) ->
+          let (args, body) = Term.decompose_lam term in
+          let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+          let fixfunc_id = id_of_annotated_name primary_nary.(j) in
+          (static, cfunc, j, fixfunc_id))
+        cfunc_static_ty_term_list
+    in
     let primary_entfunc = List.hd primary_and_sibling_entfuncs in
     let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
     let (_, primary_cfunc, _, _) = primary_entfunc in
