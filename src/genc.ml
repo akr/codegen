@@ -2632,15 +2632,8 @@ let gen_prototype (cfunc_name : string) : Pp.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
-  let (formal_arguments, return_type) = c_args_and_ret_type env sigma whole_ty in
-  let formal_arguments' =
-    List.filter_map
-      (fun (c_arg, c_ty) ->
-        if c_type_is_void c_ty then None
-        else Some (c_arg, c_ty))
-      formal_arguments
-  in
-  gen_function_header ~static return_type cfunc_name formal_arguments' ++ Pp.str ";"
+  let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma whole_ty in
+  gen_function_header ~static return_type cfunc_name formal_arguments_without_void ++ Pp.str ";"
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lam term in
