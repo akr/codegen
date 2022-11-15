@@ -571,16 +571,6 @@ let bodyhead_fargs (bodyhead : bodyhead_t) : (string * c_typedata) list =
   let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   List.filter_map (function BodyVarArg (var, c_ty) -> Some (var, c_ty) | _ -> None) bodyvars
 
-let bodyhead_fixfunc_fargs_with_void (bodyhead : bodyhead_t) (fixfunc_id : Id.t) : (string * c_typedata) list =
-  let pred = function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false in
-  let vars = List.tl (list_find_suffix pred bodyhead.bodyhead_vars) in
-  List.filter_map
-    (function
-      | BodyVarArg (var, c_ty) -> Some (var, c_ty)
-      | BodyVarVoidArg (var, c_ty) -> Some (var, c_ty)
-      | BodyVarFixfunc fixfunc_id -> None)
-    vars
-
 let bodyhead_fixfunc_fargs_without_void (bodyhead : bodyhead_t) (fixfunc_id : Id.t) : (string * c_typedata) list =
   let pred = function BodyVarFixfunc var_fixfunc_id -> Id.equal var_fixfunc_id fixfunc_id | _ -> false in
   let vars = List.tl (list_find_suffix pred bodyhead.bodyhead_vars) in
@@ -590,8 +580,6 @@ let bodyhead_fixfunc_fargs_without_void (bodyhead : bodyhead_t) (fixfunc_id : Id
       | BodyVarVoidArg (var, c_ty) -> None
       | BodyVarFixfunc fixfunc_id -> None)
     vars
-
-let _ = ignore bodyhead_fixfunc_fargs_with_void
 
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
