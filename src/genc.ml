@@ -2474,7 +2474,6 @@ let make_simplified_for_cfunc (cfunc_name : string) :
   | Some (body,_, _) -> (static, ty, body)
 
 let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
-    (*primary_cfunc*) string *
     (*sibling_entfuncs*) (bool * string * int * Id.t) list =
   let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
   let (args, body) = Term.decompose_lam primary_term in
@@ -2492,16 +2491,13 @@ let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)boo
           (static, cfunc, j, fixfunc_id))
         cfunc_static_ty_term_list
     in
-    let primary_entfunc = List.hd primary_and_sibling_entfuncs in
-    let sibling_entfuncs = List.tl primary_and_sibling_entfuncs in
-    let (_, primary_cfunc, _, _) = primary_entfunc in
-    (primary_cfunc, sibling_entfuncs)
+    List.tl primary_and_sibling_entfuncs
   else
     (assert (List.length cfunc_static_ty_term_list = 1);
-    (primary_cfunc, []))
+    [])
 
 let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
-  let (_, sibling_entfuncs) = split_siblings cfunc_static_ty_term_list in
+  let sibling_entfuncs = split_siblings cfunc_static_ty_term_list in
   let (primary_cfunc, static, ty, whole_term) = List.hd cfunc_static_ty_term_list in
   let static_and_primary_cfunc = (static, primary_cfunc) in
   let env = Global.env () in
