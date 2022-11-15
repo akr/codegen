@@ -2496,12 +2496,10 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_static_ty_ter
   else
     []
 
-let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
+let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
   let (primary_cfunc, primary_static, primry_ty, primry_term) = List.hd cfunc_static_ty_term_list in
   let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_static_ty_term_list) in
   let static_and_primary_cfunc = (primary_static, primary_cfunc) in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
   let primry_term = EConstr.of_constr primry_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma primry_term in
@@ -2583,11 +2581,9 @@ let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Co
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
+let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
     (*cfunc_static_ty_term_list*) ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list *
     (*stubs*) (bool * string * string * (string * c_typedata) list * c_typedata) list =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
   let m = ref ConstrMap.empty in
   let acc = ref [] in
   List.iter
@@ -2642,12 +2638,14 @@ let gen_function (cfunc_names : string list) : Pp.t =
       let cfunc_static_ty_term_list =
         List.map
           (fun cfunc ->
-            let (static, ty, term) = make_simplified_for_cfunc cfunc in
+            let (static, ty, term) = make_simplified_for_cfunc cfunc in (* modify global env *)
             (cfunc, static, ty, term))
           cfuncs
       in
-      let (cfunc_static_ty_term_list, stubs) = detect_stubs cfunc_static_ty_term_list in
-      local_gensym_with (fun () -> gen_func_sub cfunc_static_ty_term_list) +++
+      let env = Global.env () in
+      let sigma = Evd.from_env env in
+      let (cfunc_static_ty_term_list, stubs) = detect_stubs env sigma cfunc_static_ty_term_list in
+      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_static_ty_term_list) +++
       gen_stub_sibling_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
