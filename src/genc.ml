@@ -2498,27 +2498,27 @@ let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)boo
 
 let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
   let sibling_entfuncs = split_siblings cfunc_static_ty_term_list in
-  let (primary_cfunc, static, ty, whole_term) = List.hd cfunc_static_ty_term_list in
-  let static_and_primary_cfunc = (static, primary_cfunc) in
+  let (primary_cfunc, primary_static, primry_ty, primry_term) = List.hd cfunc_static_ty_term_list in
+  let static_and_primary_cfunc = (primary_static, primary_cfunc) in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let whole_term = EConstr.of_constr whole_term in
+  let primry_term = EConstr.of_constr primry_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
-  let fixterm_tbl = make_fixterm_tbl env sigma whole_term in
+  let fixterm_tbl = make_fixterm_tbl env sigma primry_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
   let higher_order_fixfunc_tbl = make_higher_order_fixfunc_tbl sigma ~fixterm_tbl in
-  let inlinable_fixterm_tbl = make_inlinable_fixterm_tbl ~higher_order_fixfunc_tbl env sigma whole_term in
-  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc:(static, primary_cfunc) env sigma whole_term in
+  let inlinable_fixterm_tbl = make_inlinable_fixterm_tbl ~higher_order_fixfunc_tbl env sigma primry_term in
+  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc env sigma primry_term in
   let used_for_call_set = make_used_for_call_set genchunks in
   let used_for_goto_set = make_used_for_goto_set genchunks in
   let fixfunc_bodyhead_tbl = make_fixfunc_bodyhead_tbl genchunks in
-  let topfunc_tbl = make_topfunc_tbl sigma whole_term ~static_and_primary_cfunc in
+  let topfunc_tbl = make_topfunc_tbl sigma primry_term ~static_and_primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
-  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma whole_term genchunks in
+  let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma primry_term genchunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
   let cfunc_tbl = make_cfunc_tbl ~used_for_call_set ~sibling_tbl sigma genchunks in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:2");*)
-  let closure_terms = collect_closure_terms env sigma whole_term in
+  let closure_terms = collect_closure_terms env sigma primry_term in
   let closure_c_name_tbl = make_closure_c_name_tbl sigma closure_terms in
   let genchunks_list = split_function_genchunks genchunks in
   List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;
@@ -2566,7 +2566,7 @@ let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Co
       sigma closure_terms
   in
   show_fixfunc_table env sigma fixfunc_tbl;
-  let used_vars = used_variables env sigma whole_term in
+  let used_vars = used_variables env sigma primry_term in
   let code_pairs = List.map2
     (fun genchunks entry_funcs ->
       let (decl, impl) =
