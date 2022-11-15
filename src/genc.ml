@@ -2583,9 +2583,6 @@ let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Co
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let gen_function (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
-  local_gensym_with (fun () -> gen_func_sub cfunc_static_ty_term_list)
-
 let detect_stubs (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
     (*cfunc_static_ty_term_list*) ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list *
     (*stubs*) (bool * string * string * (string * c_typedata) list * c_typedata) list =
@@ -2638,9 +2635,9 @@ let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string *
             Pp.str ");"))))
     stub_sibling_entries
 
-let gen_mutual (cfunc_names : string list) : Pp.t =
+let gen_function (cfunc_names : string list) : Pp.t =
   match cfunc_names with
-  | [] -> user_err (Pp.str "[codegen:bug] gen_mutual with empty cfunc_names")
+  | [] -> user_err (Pp.str "[codegen:bug] gen_function with empty cfunc_names")
   | cfuncs ->
       let cfunc_static_ty_term_list =
         List.map
@@ -2650,7 +2647,7 @@ let gen_mutual (cfunc_names : string list) : Pp.t =
           cfuncs
       in
       let (cfunc_static_ty_term_list, stubs) = detect_stubs cfunc_static_ty_term_list in
-      gen_function cfunc_static_ty_term_list +++
+      local_gensym_with (fun () -> gen_func_sub cfunc_static_ty_term_list) +++
       gen_stub_sibling_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
@@ -2714,9 +2711,9 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
     (fun gen ->
       match gen with
       | GenFunc cfunc_name ->
-          f (Pp.v 0 (gen_mutual [cfunc_name] ++ Pp.fnl ()))
+          f (Pp.v 0 (gen_function [cfunc_name] ++ Pp.fnl ()))
       | GenMutual cfunc_names ->
-          f (Pp.v 0 (gen_mutual cfunc_names ++ Pp.fnl ()))
+          f (Pp.v 0 (gen_function cfunc_names ++ Pp.fnl ()))
       | GenPrototype cfunc_name ->
           f (Pp.v 0 (gen_prototype cfunc_name ++ Pp.fnl ()))
       | GenSnippet str ->
