@@ -595,7 +595,7 @@ let _ = ignore bodyhead_fixfunc_fargs_with_void
 
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
-    ~(static_and_primary_cfunc : bool * string)
+    ~(primary_static_and_cfunc : bool * string)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     genchunk_t list =
@@ -756,7 +756,7 @@ let obtain_function_genchunks
           else
             (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
   in
-  let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc static_and_primary_cfunc) ~bodyvars:[] env term in
+  let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc primary_static_and_cfunc) ~bodyvars:[] env term in
   let result = List.of_seq genchunks in
   (*show_genchunks sigma result;*)
   result
@@ -793,12 +793,12 @@ let make_closure_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.
         tbl genchunk.genchunk_bodyhead_list)
     Id.Map.empty genchunks
 
-let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_primary_cfunc : bool * string) : (bool * string) Id.Map.t =
+let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(primary_static_and_cfunc : bool * string) : (bool * string) Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
   match EConstr.kind sigma term' with
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_id = id_of_annotated_name nary.(j) in
-      Id.Map.add fixfunc_id static_and_primary_cfunc Id.Map.empty
+      Id.Map.add fixfunc_id primary_static_and_cfunc Id.Map.empty
   | _ -> Id.Map.empty
 
 let make_sibling_tbl (sibling_entfuncs : sibling_t list) : (bool * string) Id.Map.t =
@@ -2526,18 +2526,18 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_static_ty_ter
 let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
   let (primary_cfunc, primary_static, primry_ty, primry_term) = List.hd cfunc_static_ty_term_list in
   let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_static_ty_term_list) in
-  let static_and_primary_cfunc = (primary_static, primary_cfunc) in
+  let primary_static_and_cfunc = (primary_static, primary_cfunc) in
   let primry_term = EConstr.of_constr primry_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma primry_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
   let higher_order_fixfunc_tbl = make_higher_order_fixfunc_tbl sigma ~fixterm_tbl in
   let inlinable_fixterm_tbl = make_inlinable_fixterm_tbl ~higher_order_fixfunc_tbl env sigma primry_term in
-  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~static_and_primary_cfunc env sigma primry_term in
+  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~primary_static_and_cfunc env sigma primry_term in
   let used_for_call_set = make_used_for_call_set genchunks in
   let used_for_goto_set = make_used_for_goto_set genchunks in
   let fixfunc_bodyhead_tbl = make_fixfunc_bodyhead_tbl genchunks in
-  let topfunc_tbl = make_topfunc_tbl sigma primry_term ~static_and_primary_cfunc in
+  let topfunc_tbl = make_topfunc_tbl sigma primry_term ~primary_static_and_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma primry_term genchunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
