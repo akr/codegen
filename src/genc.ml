@@ -96,6 +96,12 @@ let _ = ignore (fun x -> x.fixfunc_bodyhead)
 
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
+type sibling_t = {
+  sibling_static : bool;
+  sibling_cfunc : string;
+  sibling_fixfunc_id : Id.t;
+}
+
 let primary_entry_label (c_name : string) : string = "entry_" ^ c_name
 let sibling_entry_label (c_name : string) : string = "entry_" ^ c_name
 let fixfunc_entry_label (c_name : string) : string = c_name (* fixfuncs has already unique prefix, "fixfuncN_" *)
@@ -795,9 +801,9 @@ let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(static_and_prim
       Id.Map.add fixfunc_id static_and_primary_cfunc Id.Map.empty
   | _ -> Id.Map.empty
 
-let make_sibling_tbl (sibling_entfuncs : (bool * string * int * Id.t) list) : (bool * string) Id.Map.t =
+let make_sibling_tbl (sibling_entfuncs : sibling_t list) : (bool * string) Id.Map.t =
   List.fold_left
-    (fun sibling_tbl (static, sibling_cfunc_name, i, fixfunc_id) ->
+    (fun sibling_tbl { sibling_static=static; sibling_cfunc=sibling_cfunc_name; sibling_fixfunc_id=fixfunc_id } ->
       Id.Map.add fixfunc_id (static, sibling_cfunc_name) sibling_tbl)
     Id.Map.empty
     sibling_entfuncs
@@ -2473,8 +2479,7 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
-    (*sibling_entfuncs*) (bool * string * int * Id.t) list =
+let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) : sibling_t list =
   let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
   let (args, body) = Term.decompose_lam primary_term in
   if Constr.isFix body then
@@ -2488,7 +2493,7 @@ let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)boo
           let (args, body) = Term.decompose_lam term in
           let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
           let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-          (static, cfunc, j, fixfunc_id))
+          { sibling_static=static; sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
         cfunc_static_ty_term_list
     in
     List.tl primary_and_sibling_entfuncs
