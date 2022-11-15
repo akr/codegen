@@ -516,6 +516,9 @@ let idset_union_list (s : Id.Set.t list) =
 let idset_union_ary (ary : Id.Set.t array) =
   Array.fold_left Id.Set.union Id.Set.empty ary
 
+let stringset_union_list (s : StringSet.t list) : StringSet.t =
+  List.fold_left StringSet.union StringSet.empty s
+
 type unionfind_t = int array
 
 let unionfind_make (n : int) : unionfind_t =

@@ -82,6 +82,7 @@ val idmap_of_list : (Names.Id.t * 'a) list -> 'a Names.Id.Map.t
 val disjoint_id_map_union : 'a Names.Id.Map.t -> 'a Names.Id.Map.t -> 'a Names.Id.Map.t
 val disjoint_id_map_union_ary : 'a Names.Id.Map.t array -> 'a Names.Id.Map.t
 val disjoint_id_map_union_list : 'a Names.Id.Map.t list -> 'a Names.Id.Map.t
+val stringset_union_list : State.StringSet.t list -> State.StringSet.t
 type unionfind_t
 val unionfind_make : int -> unionfind_t
 val unionfind_find : unionfind_t -> int -> int

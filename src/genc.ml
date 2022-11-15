@@ -1388,6 +1388,7 @@ let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   closure_tbl
 
 let collect_closures
+    ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
     ~(closure_bodyhead_tbl : bodyhead_t Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
@@ -1404,22 +1405,23 @@ let collect_closures
       let arg_types = List.map snd args in
       let c_closure_function_ty = c_closure_type arg_types bodyhead.bodyhead_return_type in
       let fv_index_set = free_variables_index_set closure_env sigma closure_exp in
-      let vars = List.concat_map
-        (fun index ->
-          (*msg_debug_hov (Pp.str "[codegen:collect_closures] index=" ++ Pp.int index);*)
-          let decl = EConstr.lookup_rel index closure_env in
-          let id = id_of_name (Context.Rel.Declaration.get_name decl) in
-          let ty = Context.Rel.Declaration.get_type decl in
-          let env_for_ty = Environ.pop_rel_context index closure_env in
-          (*msg_debug_hov (Pp.str "[codegen:collect_closures] ty=" ++ Printer.pr_econstr_env env_for_ty sigma ty);*)
-          let c_ty = c_typename env_for_ty sigma ty in
-          match Id.Map.find_opt id extra_arguments_tbl with
-          | None ->
-              [(Id.to_string id, c_ty)]
-          | Some extra_arguments -> extra_arguments)
-        (IntSet.elements fv_index_set)
+      let vars_set = stringset_union_list
+        (List.map
+          (fun index ->
+            (*msg_debug_hov (Pp.str "[codegen:collect_closures] index=" ++ Pp.int index);*)
+            let decl = EConstr.lookup_rel index closure_env in
+            let id = id_of_name (Context.Rel.Declaration.get_name decl) in
+            match Id.Map.find_opt id extra_arguments_tbl with
+            | None -> StringSet.singleton (Id.to_string id)
+            | Some extra_arguments -> StringSet.of_list (List.map fst extra_arguments))
+          (IntSet.elements fv_index_set))
       in
-      let vars = List.sort_uniq (fun (str1,c_ty1) (str2,c_ty2) -> String.compare str1 str2) vars in
+      let naive_extra_arguments = compute_naive_extra_arguments ~fixfunc_fixterm_tbl closure_env sigma in
+      let vars =
+        List.filter
+          (fun (varname, vartype) -> StringSet.mem varname vars_set)
+          naive_extra_arguments
+      in
       closures := {
           closure_id=cloid;
           closure_c_name=cloname;
@@ -2564,6 +2566,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   let closure_bodyhead_tbl = make_closure_bodyhead_tbl genchunks in
   let closure_tbl =
     collect_closures
+      ~fixfunc_fixterm_tbl
       ~closure_bodyhead_tbl
       ~extra_arguments_tbl
       ~closure_c_name_tbl
