@@ -1423,11 +1423,11 @@ let collect_closures
           naive_extra_arguments
       in
       closures := {
-          closure_id=cloid;
-          closure_c_name=cloname;
-          closure_c_func_type=c_closure_function_ty;
+          closure_id = cloid;
+          closure_c_name = cloname;
+          closure_c_func_type = c_closure_function_ty;
           closure_args = args;
-          closure_vars=vars;
+          closure_vars = vars;
           closure_label = Id.Map.find_opt cloid closure_label_tbl;
         } :: !closures)
     closure_terms;
