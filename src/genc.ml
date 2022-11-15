@@ -1443,50 +1443,50 @@ let collect_closures
     closure_terms;
   closure_tbl_of_list !closures
 
-(* the reslut of used_variables is used to avoid
+(* the reslut of make_used_variables is used to avoid
    useless accessor call and assignment in translation of match-expression *)
-let rec used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
+let rec make_used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
-      user_err (Pp.str "[codegen:used_variables] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:make_used_variables] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
-      user_err (Pp.str "[codegen:used_variables] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+      user_err (Pp.str "[codegen:make_used_variables] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Const _ | Construct _ -> Id.Set.empty
   | Rel i ->
       let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
       Id.Set.singleton (id_of_name name)
   | Lambda (x,t,b) ->
       let env2 = env_push_assum env x t in
-      used_variables env2 sigma b
+      make_used_variables env2 sigma b
   | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
       Array.fold_left
-        (fun set f -> Id.Set.union set (used_variables env2 sigma f))
+        (fun set f -> Id.Set.union set (make_used_variables env2 sigma f))
         Id.Set.empty
         fary
   | LetIn (x,e,t,b) ->
       let env2 = env_push_def env x e t in
       Id.Set.union
-        (used_variables env sigma e)
-        (used_variables env2 sigma b)
+        (make_used_variables env sigma e)
+        (make_used_variables env2 sigma b)
   | Case (ci,u,pms,p,iv,item,bl) ->
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       Id.Set.union
-        (used_variables env sigma item)
+        (make_used_variables env sigma item)
         (CArray.fold_left2
           (fun set (nas,body) (ctx,_) ->
             let env2 = EConstr.push_rel_context ctx env in
-            Id.Set.union set (used_variables env2 sigma body))
+            Id.Set.union set (make_used_variables env2 sigma body))
           Id.Set.empty
           bl bl0)
   | App (f,args) ->
       Id.Set.union
-        (used_variables env sigma f)
+        (make_used_variables env sigma f)
         (Array.fold_left
-          (fun set arg -> Id.Set.union set (used_variables env sigma arg))
+          (fun set arg -> Id.Set.union set (make_used_variables env sigma arg))
           Id.Set.empty
           args)
-  | Proj (proj, e) -> used_variables env sigma e
+  | Proj (proj, e) -> make_used_variables env sigma e
 
 let local_gensym_id : (int ref) option ref = ref None
 
@@ -2577,7 +2577,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
       sigma closure_terms
   in
   show_fixfunc_table env sigma fixfunc_tbl;
-  let used_vars = used_variables env sigma primry_term in
+  let used_vars = make_used_variables env sigma primry_term in
   let code_pairs = List.map2
     (fun genchunks entry_funcs ->
       let (decl, impl) =
