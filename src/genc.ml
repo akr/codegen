@@ -2479,31 +2479,26 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> (static, ty, body)
 
-let split_siblings (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) : sibling_t list =
-  let (primary_cfunc, primary_static, primary_ty, primary_term) = List.hd cfunc_static_ty_term_list in
+let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) : sibling_t list =
   let (args, body) = Term.decompose_lam primary_term in
   if Constr.isFix body then
     let primary_nary =
       let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
       nary
     in
-    let primary_and_sibling_entfuncs =
-      List.map
-        (fun (cfunc, static, ty, term) ->
-          let (args, body) = Term.decompose_lam term in
-          let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
-          let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-          { sibling_static=static; sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
-        cfunc_static_ty_term_list
-    in
-    List.tl primary_and_sibling_entfuncs
+    List.map
+      (fun (cfunc, static, ty, term) ->
+        let (args, body) = Term.decompose_lam term in
+        let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+        let fixfunc_id = id_of_annotated_name primary_nary.(j) in
+        { sibling_static=static; sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
+      sibling_cfunc_static_ty_term_list
   else
-    (assert (List.length cfunc_static_ty_term_list = 1);
-    [])
+    []
 
 let gen_func_sub (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
-  let sibling_entfuncs = split_siblings cfunc_static_ty_term_list in
   let (primary_cfunc, primary_static, primry_ty, primry_term) = List.hd cfunc_static_ty_term_list in
+  let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_static_ty_term_list) in
   let static_and_primary_cfunc = (primary_static, primary_cfunc) in
   let env = Global.env () in
   let sigma = Evd.from_env env in
