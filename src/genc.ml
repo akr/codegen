@@ -1200,6 +1200,13 @@ let entfuncs_of_bodyhead
   (match normal_ent with Some nent -> [{entryfunc_type=nent; entryfunc_body=bodyhead}] | None -> []) @
   (match closure_ent with Some cent -> [{entryfunc_type=cent; entryfunc_body=bodyhead}] | None -> [])
 
+let make_entry_funcs_list ~used_for_call_set ~sibling_tbl genchunks_list =
+  List.map
+    (fun genchunks ->
+      let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
+      List.concat_map (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl) bodyhead_list)
+    genchunks_list
+
 let make_labels_tbl
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
@@ -1307,6 +1314,15 @@ let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_tab
   match fixfunc_label with
   | Some _ -> fixfunc_label
   | None -> closure_label
+
+let make_label_tbl_pairs ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list =
+  List.map2
+    (fun genchunks entry_funcs ->
+      match entry_funcs with
+      | [] -> (Id.Map.empty, Id.Map.empty)
+      | first_entfunc :: _ ->
+          make_labels_tbl genchunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
+    genchunks_list entry_funcs_list
 
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   let fixfunc_tbl = Hashtbl.create 0 in
@@ -2520,22 +2536,8 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   let closure_c_name_tbl = make_closure_c_name_tbl sigma closure_terms in
   let genchunks_list = split_function_genchunks genchunks in
   List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;
-  let entry_funcs_list =
-    List.map
-      (fun genchunks ->
-        let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
-        List.concat_map (entfuncs_of_bodyhead ~used_for_call_set ~sibling_tbl) bodyhead_list)
-      genchunks_list
-  in
-  let label_tbl_pairs =
-    List.map2
-      (fun genchunks entry_funcs ->
-        match entry_funcs with
-        | [] -> (Id.Map.empty, Id.Map.empty)
-        | first_entfunc :: _ ->
-            make_labels_tbl genchunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
-      genchunks_list entry_funcs_list
-  in
+  let entry_funcs_list = make_entry_funcs_list ~used_for_call_set ~sibling_tbl genchunks_list in
+  let label_tbl_pairs = make_label_tbl_pairs ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list in
   let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
   let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
   let fixfunc_tbl =
