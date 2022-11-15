@@ -1344,15 +1344,15 @@ let collect_fixpoints
     ~(fixfunc_label_tbl : string Id.Map.t)
     (sigma : Evd.evar_map) : fixfunc_table =
   let fixfuncs =
-    Id.Map.fold
-      (fun fixterm_id (env,term) seq ->
+    List.concat_map
+      (fun (fixterm_id, (env,term)) ->
         let ((ks, j), (nary, tary, fary)) = destFix sigma term in
         let fixterm = {
           fixterm_id = fixterm_id;
           fixterm_inlinable = Id.Map.find fixterm_id inlinable_fixterm_tbl;
         } in
         let fixfuncs =
-          Array.to_seq
+          Array.to_list
             (Array.map2
               (fun name ty ->
                 let fixfunc_id = id_of_annotated_name name in
@@ -1375,11 +1375,10 @@ let collect_fixpoints
                 })
               nary tary)
         in
-        Seq.append fixfuncs seq)
-      fixterm_tbl
-      Seq.empty
+        fixfuncs)
+      (Id.Map.bindings fixterm_tbl)
   in
-  make_fixfunc_table (List.of_seq fixfuncs)
+  make_fixfunc_table fixfuncs
 
 let closure_tbl_of_list (closure_list : closure_t list) : closure_table =
   let closure_tbl = Hashtbl.create 0 in
