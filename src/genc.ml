@@ -2625,7 +2625,7 @@ let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   in
   (cfunc_static_ty_term_list, stubs)
 
-let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
+let gen_stub_functions (stub_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
     (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
       Pp.v 0 (
@@ -2642,7 +2642,7 @@ let gen_stub_sibling_functions (stub_sibling_entries : (bool * string * string *
               (fun (c_arg, c_ty) -> Pp.str c_arg)
               formal_arguments_without_void ++
             Pp.str ");"))))
-    stub_sibling_entries
+    stub_entries
 
 let gen_function (cfunc_names : string list) : Pp.t =
   match cfunc_names with
@@ -2659,7 +2659,7 @@ let gen_function (cfunc_names : string list) : Pp.t =
       let sigma = Evd.from_env env in
       let (cfunc_static_ty_term_list, stubs) = detect_stubs env sigma cfunc_static_ty_term_list in
       local_gensym_with (fun () -> gen_func_sub env sigma cfunc_static_ty_term_list) +++
-      gen_stub_sibling_functions stubs
+      gen_stub_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
   let (static, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
