@@ -1793,8 +1793,11 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   let cargs_without_void =
     (List.filter_map
       (fun arg ->
-        let arg_ty = Retyping.get_type_of env sigma arg in
-        if ind_is_void_type env sigma arg_ty then
+        let i = destRel sigma arg in
+        let decl = Environ.lookup_rel i env in
+        let arg_ty = EConstr.of_constr (Context.Rel.Declaration.get_type decl) in
+        let env1 = Environ.pop_rel_context i env in
+        if ind_is_void_type env1 sigma arg_ty then
           None
         else
           Some (carg_of_garg env (destRel sigma arg)))
@@ -1955,8 +1958,11 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   let cargs_without_void =
     (List.filter_map
       (fun arg ->
-        let arg_ty = Retyping.get_type_of env sigma arg in
-        if ind_is_void_type env sigma arg_ty then
+        let i = destRel sigma arg in
+        let decl = Environ.lookup_rel i env in
+        let arg_ty = EConstr.of_constr (Context.Rel.Declaration.get_type decl) in
+        let env1 = Environ.pop_rel_context i env in
+        if ind_is_void_type env1 sigma arg_ty then
           None
         else
           Some (carg_of_garg env (destRel sigma arg)))
