@@ -2622,24 +2622,23 @@ let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   in
   (cfunc_static_ty_term_list, stubs)
 
+let gen_stub_function (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) : Pp.t =
+  gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
+  vbrace (
+    Pp.hov 0 (
+      (if c_type_is_void return_type then
+        Pp.mt ()
+      else
+        Pp.str "return") +++
+      Pp.str cfunc_name_to_call ++
+      Pp.str "(" ++
+      pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+        (fun (c_arg, c_ty) -> Pp.str c_arg)
+        formal_arguments_without_void ++
+      Pp.str ");"))
+
 let gen_stub_functions (stub_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
-  pp_sjoinmap_list
-    (fun (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) ->
-      Pp.v 0 (
-        gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
-        vbrace (
-          Pp.hov 0 (
-            (if c_type_is_void return_type then
-              Pp.mt ()
-            else
-              Pp.str "return") +++
-            Pp.str cfunc_name_to_call ++
-            Pp.str "(" ++
-            pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-              (fun (c_arg, c_ty) -> Pp.str c_arg)
-              formal_arguments_without_void ++
-            Pp.str ");"))))
-    stub_entries
+  pp_sjoinmap_list gen_stub_function stub_entries
 
 let gen_function (cfunc_names : string list) : Pp.t =
   match cfunc_names with
