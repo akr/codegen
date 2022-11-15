@@ -1200,7 +1200,11 @@ let entfuncs_of_bodyhead
   (match normal_ent with Some nent -> [{entryfunc_type=nent; entryfunc_body=bodyhead}] | None -> []) @
   (match closure_ent with Some cent -> [{entryfunc_type=cent; entryfunc_body=bodyhead}] | None -> [])
 
-let make_entry_funcs_list ~used_for_call_set ~sibling_tbl genchunks_list =
+let make_entry_funcs_list
+    ~(used_for_call_set : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    (genchunks_list : genchunk_t list list) :
+      entry_func_t list list =
   List.map
     (fun genchunks ->
       let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
@@ -1315,7 +1319,15 @@ let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_tab
   | Some _ -> fixfunc_label
   | None -> closure_label
 
-let make_label_tbl_pairs ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list =
+let make_label_tbl_pairs
+    ~(used_for_call_set : Id.Set.t)
+    ~(used_for_goto_set : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(closure_c_name_tbl : string Id.Map.t)
+    (genchunks_list : genchunk_t list list)
+    (entry_funcs_list : entry_func_t list list) :
+      (string Id.Map.t * string Id.Map.t) list =
   List.map2
     (fun genchunks entry_funcs ->
       match entry_funcs with
