@@ -2368,7 +2368,7 @@ let gen_func_multi
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entry_funcs : entry_func_t list)
     ~(genchunks : genchunk_t list)
-    (env : Environ.env) (sigma : Evd.evar_map)
+    (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let first_c_name =
     match (List.hd entry_funcs).entryfunc_type with
@@ -2595,7 +2595,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
         | [entfunc] ->
             gen_func_single ~fixfunc_tbl ~closure_tbl ~entfunc ~genchunks sigma used_vars
         | _ ->
-            gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~genchunks env sigma used_vars
+            gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~genchunks sigma used_vars
       in
       (decl, impl))
     genchunks_list entry_funcs_list
