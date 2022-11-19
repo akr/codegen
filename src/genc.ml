@@ -26,8 +26,13 @@ open State
 open Induc
 open Specialize
 
+type cfunc_t = {
+  cfunc_static : bool;
+  cfunc_name : string;
+}
+
 type body_root_t =
-| BodyRootTopfunc of (bool * string) (* (static, primary_cfunc) *)
+| BodyRootTopfunc of cfunc_t (* (static, primary_cfunc) *)
 | BodyRootClosure of Id.t (* closure_id *)
 | BodyRootFixfunc of Id.t (* fixfunc_id *)
 
@@ -53,7 +58,7 @@ type genchunk_t = {
 }
 
 type entry_type_t =
-| EntryTypeTopfunc of (bool * string) (* (static, primary_cfunc) *)
+| EntryTypeTopfunc of cfunc_t
 | EntryTypeFixfunc of Id.t (* fixfunc_id *)
 | EntryTypeClosure of Id.t (* closure_id *)
 
@@ -78,11 +83,11 @@ type fixfunc_t = {
   fixfunc_formal_arguments_without_void : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype is not void *)
   fixfunc_is_higher_order : bool; (* means that arguments contain function *)
 
-  fixfunc_topfunc : (bool * string) option; (* (static, cfunc_name) *)
-  fixfunc_sibling : (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_topfunc : cfunc_t option;
+  fixfunc_sibling : cfunc_t option;
   fixfunc_c_name : string;
 
-  fixfunc_cfunc : (bool * string) option; (* (static, cfunc_name) *)
+  fixfunc_cfunc : cfunc_t option;
 
   fixfunc_extra_arguments : (string * c_typedata) list; (* [(varname1, vartype1); ...] *) (* vartype is not void *)
   (* extra arguments are mostly same for fix-bouded functions in a fix-term.
@@ -97,8 +102,7 @@ let _ = ignore (fun x -> x.fixfunc_bodyhead)
 type fixfunc_table = (Id.t, fixfunc_t) Hashtbl.t
 
 type sibling_t = {
-  sibling_static : bool;
-  sibling_cfunc : string;
+  sibling_cfunc : cfunc_t;
   sibling_fixfunc_id : Id.t;
 }
 
@@ -107,8 +111,8 @@ let sibling_entry_label (c_name : string) : string = "entry_" ^ c_name
 let fixfunc_entry_label (c_name : string) : string = c_name (* fixfuncs has already unique prefix, "fixfuncN_" *)
 let fixfunc_exit_label (c_name : string) : string = "exit_" ^ c_name
 
-let cfunc_of_fixfunc (fixfunc : fixfunc_t) : string =
-  snd (Option.get fixfunc.fixfunc_cfunc)
+let cfunc_name_of_fixfunc (fixfunc : fixfunc_t) : string =
+  (Option.get fixfunc.fixfunc_cfunc).cfunc_name
 
 type closure_t = {
   closure_id : Id.t;
@@ -165,10 +169,10 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
         Pp.str "formal_arguments_without_void=" ++ pr_args fixfunc.fixfunc_formal_arguments_without_void +++
-        Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
-        Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
+        Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
+        Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
-        Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some (static,cfunc) -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ cfunc ^ ")")) +++
+        Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.mt ())
@@ -187,7 +191,7 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
             pp_sjoinmap_list
               (fun bodyhead ->
                 (match bodyhead.bodyhead_root with
-                | BodyRootTopfunc (static,primary_cfunc) -> Pp.str ("Topfunc:" ^ primary_cfunc ^ if static then "(static)" else "")
+                | BodyRootTopfunc {cfunc_static=static; cfunc_name=primary_cfunc} -> Pp.str ("Topfunc:" ^ primary_cfunc ^ if static then "(static)" else "")
                 | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
                 | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)
                 ) ++
@@ -583,7 +587,7 @@ let bodyhead_fixfunc_fargs_without_void (bodyhead : bodyhead_t) (fixfunc_id : Id
 
 let obtain_function_genchunks
     ~(higher_order_fixfunc_tbl : bool Id.Map.t) ~(inlinable_fixterm_tbl : bool Id.Map.t)
-    ~(primary_static_and_cfunc : bool * string)
+    ~(primary_cfunc : cfunc_t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) :
     genchunk_t list =
@@ -744,7 +748,7 @@ let obtain_function_genchunks
           else
             (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls)
   in
-  let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc primary_static_and_cfunc) ~bodyvars:[] env term in
+  let (genchunks, genchunk_body_list, fixfunc_impls, fixfunc_gotos, fixfunc_calls, closure_impls) = obtain_function_genchunks_lamfix ~tail_position:true ~individual_body:true ~bodyroot:(BodyRootTopfunc primary_cfunc) ~bodyvars:[] env term in
   let result = List.of_seq genchunks in
   (*show_genchunks sigma result;*)
   result
@@ -781,33 +785,33 @@ let make_closure_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.
         tbl genchunk.genchunk_bodyhead_list)
     Id.Map.empty genchunks
 
-let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(primary_static_and_cfunc : bool * string) : (bool * string) Id.Map.t =
+let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(primary_cfunc : cfunc_t) : cfunc_t Id.Map.t =
   let (fargs, term') = decompose_lam sigma term in
   match EConstr.kind sigma term' with
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_id = id_of_annotated_name nary.(j) in
-      Id.Map.add fixfunc_id primary_static_and_cfunc Id.Map.empty
+      Id.Map.add fixfunc_id primary_cfunc Id.Map.empty
   | _ -> Id.Map.empty
 
-let make_sibling_tbl (sibling_entfuncs : sibling_t list) : (bool * string) Id.Map.t =
+let make_sibling_tbl (sibling_entfuncs : sibling_t list) : cfunc_t Id.Map.t =
   List.fold_left
-    (fun sibling_tbl { sibling_static=static; sibling_cfunc=sibling_cfunc_name; sibling_fixfunc_id=fixfunc_id } ->
-      Id.Map.add fixfunc_id (static, sibling_cfunc_name) sibling_tbl)
+    (fun sibling_tbl { sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id } ->
+      Id.Map.add fixfunc_id cfunc sibling_tbl)
     Id.Map.empty
     sibling_entfuncs
 
 let make_c_names_tbl
     ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
     ~(used_for_call_set : Id.Set.t)
-    ~(topfunc_tbl : (bool * string) Id.Map.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t) : string Id.Map.t =
+    ~(topfunc_tbl : cfunc_t Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t) : string Id.Map.t =
   idmap_of_list
     (List.map
       (fun (fixfunc_id, _) ->
         let c_name =
           match (Id.Map.find_opt fixfunc_id topfunc_tbl), (Id.Map.find_opt fixfunc_id sibling_tbl) with
-          | Some (_,cfunc), _ -> cfunc
-          | None, Some (_,cfunc) -> cfunc
+          | Some {cfunc_name=name}, _ -> name
+          | None, Some {cfunc_name=name} -> name
           | None, None ->
               if Id.Set.mem fixfunc_id used_for_call_set then
                 global_gensym_with_id fixfunc_id
@@ -964,8 +968,8 @@ let compute_precise_extra_arguments
 let make_extra_arguments_tbl
     ~(fixfunc_fixterm_tbl : Id.t Id.Map.t)
     ~(fixterm_tbl : (Environ.env * EConstr.t) Id.Map.t)
-    ~(topfunc_tbl : (bool * string) Id.Map.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(topfunc_tbl : cfunc_t Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
     (genchunks : genchunk_t list) : ((string * c_typedata) list) Id.Map.t =
   let fixterm_free_variables = fixterm_free_variables env sigma term in
@@ -1014,8 +1018,8 @@ let make_extra_arguments_tbl
 
 let make_cfunc_tbl
     ~(used_for_call_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
-    (sigma : Evd.evar_map) (genchunks : genchunk_t list) : (bool * string) Id.Map.t =
+    ~(sibling_tbl : cfunc_t Id.Map.t)
+    (sigma : Evd.evar_map) (genchunks : genchunk_t list) : cfunc_t Id.Map.t =
   let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
   let result = ref Id.Map.empty in
   List.iter
@@ -1027,28 +1031,28 @@ let make_cfunc_tbl
             | _ -> None)
           bodyhead.bodyhead_vars
       in
-      let static_and_cfunc_name =
+      let cfunc_opt =
         match bodyhead.bodyhead_root with
-        | BodyRootTopfunc (static, primary_cfunc)  -> Some (static, primary_cfunc)
+        | BodyRootTopfunc primary_cfunc  -> Some primary_cfunc
         | BodyRootClosure _
         | BodyRootFixfunc _ ->
             match fixfunc_ids with
             | [] -> None
             | first_fixfunc_id :: _ ->
                 match Id.Map.find_opt first_fixfunc_id sibling_tbl with
-                | Some (sibling_static, sibling_cfunc_name) -> Some (sibling_static, sibling_cfunc_name)
+                | Some sibling_cfunc -> Some sibling_cfunc
                 | None ->
                     let used_for_call = List.exists (fun fixfunc_id -> Id.Set.mem fixfunc_id used_for_call_set) fixfunc_ids in
                     if used_for_call then
-                      Some (true, global_gensym_with_id first_fixfunc_id)
+                      Some {cfunc_static=true; cfunc_name=(global_gensym_with_id first_fixfunc_id)}
                     else
                       None
       in
-      match static_and_cfunc_name with
-      | Some (static, cfunc_name) ->
+      match cfunc_opt with
+      | Some cfunc ->
           List.iter
             (fun fixfunc_id ->
-              result := Id.Map.add fixfunc_id (static, cfunc_name) !result)
+              result := Id.Map.add fixfunc_id cfunc !result)
             fixfunc_ids
       | None -> ())
     bodyhead_list;
@@ -1149,13 +1153,13 @@ let split_function_genchunks (genchunks : genchunk_t list) : genchunk_t list lis
 
 let entfuncs_of_bodyhead
     ~(used_for_call_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
     (bodyhead : bodyhead_t) : entry_func_t list =
   let { bodyhead_root=bodyroot; bodyhead_vars=bodyvars } = bodyhead in
   let normal_ent =
     match bodyroot with
-    | BodyRootTopfunc (primary_static, primary_cfunc) ->
-        Some (EntryTypeTopfunc (primary_static, primary_cfunc))
+    | BodyRootTopfunc cfunc ->
+        Some (EntryTypeTopfunc cfunc)
     | BodyRootFixfunc _
     | BodyRootClosure _ ->
         (let fixfunc_ids =
@@ -1190,7 +1194,7 @@ let entfuncs_of_bodyhead
 
 let make_entry_funcs_list
     ~(used_for_call_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
     (genchunks_list : genchunk_t list list) :
       entry_func_t list list =
   List.map
@@ -1202,8 +1206,8 @@ let make_entry_funcs_list
 let make_labels_tbl
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
-    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
+    ~(cfunc_tbl : cfunc_t Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
     (genchunks : genchunk_t list) ~(first_entfunc : entry_func_t) : string Id.Map.t * string Id.Map.t =
   let bodyhead_list = List.concat_map (fun genchunk -> genchunk.genchunk_bodyhead_list) genchunks in
@@ -1229,7 +1233,7 @@ let make_labels_tbl
       msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
         Pp.str "bodyroot=" ++
           (match bodyhead.bodyhead_root with
-          | BodyRootTopfunc (static,primary_cfunc) -> Pp.str ("Topfunc:" ^ primary_cfunc)
+          | BodyRootTopfunc {cfunc_name=primary_cfunc} -> Pp.str ("Topfunc:" ^ primary_cfunc)
           | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
           | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
         Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
@@ -1243,10 +1247,10 @@ let make_labels_tbl
             then
               (let label =
                 match bodyhead.bodyhead_root with
-                | BodyRootTopfunc (static,primary_cfunc) -> primary_entry_label primary_cfunc
+                | BodyRootTopfunc primary_cfunc -> primary_entry_label primary_cfunc.cfunc_name
                 | BodyRootFixfunc fixfunc_id ->
                     (match Id.Map.find_opt fixfunc_id sibling_tbl with
-                    | Some (static,sibling_cfunc) -> sibling_entry_label sibling_cfunc
+                    | Some sibling_cfunc -> sibling_entry_label sibling_cfunc.cfunc_name
                     | None -> fixfunc_entry_label (Id.to_string first_fixfunc_id))
                 | BodyRootClosure closure_id ->
                     fixfunc_entry_label (Id.to_string first_fixfunc_id)
@@ -1310,8 +1314,8 @@ let label_of_bodyhead ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_tab
 let make_label_tbl_pairs
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
-    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
+    ~(cfunc_tbl : cfunc_t Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
     (genchunks_list : genchunk_t list list)
     (entry_funcs_list : entry_func_t list list) :
@@ -1327,8 +1331,8 @@ let make_label_tbl_pairs
 let make_label_tbl_pair
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
-    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
+    ~(cfunc_tbl : cfunc_t Id.Map.t)
     ~(closure_c_name_tbl : string Id.Map.t)
     (genchunks_list : genchunk_t list list)
     (entry_funcs_list : entry_func_t list list) :
@@ -1350,11 +1354,11 @@ let collect_fixpoints
     ~(used_for_call_set : Id.Set.t)
     ~(used_for_goto_set : Id.Set.t)
     ~(fixfunc_bodyhead_tbl : bodyhead_t Id.Map.t)
-    ~(topfunc_tbl : (bool * string) Id.Map.t)
-    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(topfunc_tbl : cfunc_t Id.Map.t)
+    ~(sibling_tbl : cfunc_t Id.Map.t)
     ~(extra_arguments_tbl : ((string * c_typedata) list) Id.Map.t)
     ~(c_names_tbl : string Id.Map.t)
-    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(cfunc_tbl : cfunc_t Id.Map.t)
     ~(fixfunc_label_tbl : string Id.Map.t)
     (sigma : Evd.evar_map) : fixfunc_table =
   let fixfuncs =
@@ -1849,7 +1853,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_assignments +++ pp_goto_entry
             else
               gen_head_cont cont
-                (gen_funcall (cfunc_of_fixfunc fixfunc)
+                (gen_funcall (cfunc_name_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list cargs_without_void))))
@@ -1904,7 +1908,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       let fixfunc_j = Hashtbl.find fixfunc_tbl (id_of_annotated_name nary.(j)) in
       if not fixfunc_j.fixfunc_fixterm.fixterm_inlinable then
         gen_head_cont cont
-          (gen_funcall (cfunc_of_fixfunc fixfunc_j)
+          (gen_funcall (cfunc_name_of_fixfunc fixfunc_j)
             (Array.append
               (Array.of_list (List.map fst fixfunc_j.fixfunc_extra_arguments))
               (Array.of_list cargs_without_void)))
@@ -2017,7 +2021,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
               pp_assignments +++ pp_goto_entry
             else
               gen_tail_cont cont
-                (gen_funcall (cfunc_of_fixfunc fixfunc)
+                (gen_funcall (cfunc_name_of_fixfunc fixfunc)
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list cargs_without_void))))
@@ -2083,9 +2087,9 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       in
       pp_assignments +++ pp_sjoin_list pp_fixfuncs
 
-let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : string)
+let gen_function_header (cfunc : cfunc_t) (return_type : c_typedata)
     (formal_arguments : (string * c_typedata) list) : Pp.t =
-  let pp_static = (if static then Pp.str "static" else Pp.mt ()) in
+  let pp_static = (if cfunc.cfunc_static then Pp.str "static" else Pp.mt ()) in
   let pp_parameters =
     Pp.str "(" ++
     (if formal_arguments = [] then
@@ -2097,7 +2101,7 @@ let gen_function_header ~(static : bool) (return_type : c_typedata) (c_name : st
         formal_arguments)) ++
     Pp.str ")"
   in
-  Pp.hov 0 (pp_static +++ pr_c_decl return_type (Pp.str c_name ++ Pp.hov 0 (pp_parameters)))
+  Pp.hov 0 (pp_static +++ pr_c_decl return_type (Pp.str cfunc.cfunc_name ++ Pp.hov 0 (pp_parameters)))
 
 let pr_members (args : (string * c_typedata) list) : Pp.t =
   pp_sjoinmap_list
@@ -2137,15 +2141,15 @@ let gen_func_single
     (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let bodyhead = entfunc.entryfunc_body in
-  let (static, primary_cfunc) =
+  let cfunc =
     match entfunc.entryfunc_type with
-    | EntryTypeTopfunc (static, primary_cfunc) -> (static, primary_cfunc)
+    | EntryTypeTopfunc cfunc -> cfunc
     | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
         (Option.get fixfunc.fixfunc_cfunc)
     | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
-        (true, closure_func_name clo)
+        {cfunc_static=true; cfunc_name=closure_func_name clo}
   in
   let (pp_struct_closure, pp_closure_assigns, closure_vars) =
     match entfunc.entryfunc_type with
@@ -2198,9 +2202,9 @@ let gen_func_single
     local_vars
   in
   (pp_struct_closure +++
-   gen_function_header ~static return_type primary_cfunc c_fargs ++ Pp.str ";",
+   gen_function_header cfunc return_type c_fargs ++ Pp.str ";",
    Pp.v 0 (
-   gen_function_header ~static return_type primary_cfunc c_fargs +++
+   gen_function_header cfunc return_type c_fargs +++
    vbrace (
      pp_sjoinmap_list
        (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
@@ -2208,7 +2212,7 @@ let gen_func_single
      +++
      pp_body)))
 
-let pr_entry_function ~(static:bool) (c_funcname : string) (func_enum_index : string)
+let pr_entry_function (cfunc : cfunc_t) (func_enum_index : string)
     (args_struct_type : string) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
     (body_function_name : string) : Pp.t =
   let null = "((void*)0)" in (* We don't use NULL because it needs stddef.h.  nullptr can be used in C2x. *)
@@ -2247,7 +2251,7 @@ let pr_entry_function ~(static:bool) (c_funcname : string) (func_enum_index : st
       Pp.str "return codegen_ret;"
   in
   Pp.v 0 (
-    gen_function_header ~static return_type c_funcname formal_arguments +++
+    gen_function_header cfunc return_type formal_arguments +++
     vbrace (
       pp_vardecl_args +++
       pp_vardecl_ret +++
@@ -2288,32 +2292,32 @@ let pr_case (case_value : string option) (assigns : (string * string) list) (got
     pp_assigns +++
     pp_goto)
 
-let pr_multi_topfunc_defs (bodyhead : bodyhead_t) (static : bool) (primary_cfunc : string) (body_function_name : string) : Pp.t =
+let pr_multi_topfunc_defs (bodyhead : bodyhead_t) (cfunc : cfunc_t) (body_function_name : string) : Pp.t =
   let formal_arguments = bodyhead_fargs bodyhead in
   let return_type = bodyhead.bodyhead_return_type in
   (if CList.is_empty formal_arguments then
     Pp.mt ()
   else
     (Pp.hv 0 (
-      Pp.str (topfunc_args_struct_type primary_cfunc) +++
+      Pp.str (topfunc_args_struct_type cfunc.cfunc_name) +++
       hovbrace (pr_members formal_arguments) ++ Pp.str ";"))) +++
-  pr_entry_function ~static primary_cfunc (topfunc_enum_index primary_cfunc)
-    (topfunc_args_struct_type primary_cfunc)
+  pr_entry_function cfunc (topfunc_enum_index cfunc.cfunc_name)
+    (topfunc_args_struct_type cfunc.cfunc_name)
     formal_arguments return_type
     body_function_name
 
-let pr_multi_topfunc_case (bodyhead : bodyhead_t) (primary_cfunc : string) : Pp.t =
+let pr_multi_topfunc_case (bodyhead : bodyhead_t) (primary_cfunc_name : string) : Pp.t =
   let formal_arguments = bodyhead_fargs bodyhead in
   pr_case None
     (List.map
       (fun (c_arg, t) ->
           (c_arg,
-           ("((" ^ topfunc_args_struct_type primary_cfunc ^ " *)codegen_args)->" ^ c_arg)))
+           ("((" ^ topfunc_args_struct_type primary_cfunc_name ^ " *)codegen_args)->" ^ c_arg)))
       formal_arguments)
     None (* no need to goto label because EntryTypeTopfunc is always at last *)
 
 let pr_multi_fixfunc_defs (bodyhead : bodyhead_t) (fixfunc : fixfunc_t) (body_function_name : string) : Pp.t =
-  let (static, cfunc) = Option.get fixfunc.fixfunc_cfunc in
+  let cfunc = Option.get fixfunc.fixfunc_cfunc in
   let return_type = bodyhead.bodyhead_return_type in
   let arguments = fixfunc.fixfunc_extra_arguments @ fixfunc.fixfunc_formal_arguments_without_void in
   (if CList.is_empty arguments then
@@ -2322,7 +2326,7 @@ let pr_multi_fixfunc_defs (bodyhead : bodyhead_t) (fixfunc : fixfunc_t) (body_fu
     (Pp.hv 0 (
     Pp.str (fixfunc_args_struct_type fixfunc.fixfunc_c_name) +++
     hovbrace (pr_members arguments) ++ Pp.str ";"))) +++
-  pr_entry_function ~static cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
+  pr_entry_function cfunc (fixfunc_enum_index fixfunc.fixfunc_c_name)
     (fixfunc_args_struct_type fixfunc.fixfunc_c_name)
     arguments
     return_type
@@ -2346,6 +2350,7 @@ let pr_multi_fixfunc_case (is_last : bool) (fixfunc : fixfunc_t) : Pp.t =
     goto
 
 let pr_multi_closure_defs (bodyhead : bodyhead_t) (clo : closure_t) (body_function_name : string) : Pp.t =
+  let cfunc = {cfunc_static=true; cfunc_name=(closure_func_name clo)} in
   gen_closure_struct clo +++
   (Pp.hv 0 (
     Pp.str (closure_args_struct_type clo.closure_c_name) +++
@@ -2353,7 +2358,7 @@ let pr_multi_closure_defs (bodyhead : bodyhead_t) (clo : closure_t) (body_functi
       pr_members clo.closure_args +++
       pr_members [("closure", c_type_pointer_to (closure_struct_type clo))]
     ) ++ Pp.str ";")) +++
-  pr_entry_function ~static:true (closure_func_name clo) (closure_enum_index clo.closure_c_name)
+  pr_entry_function cfunc (closure_enum_index clo.closure_c_name)
     (closure_args_struct_type clo.closure_c_name)
     (List.append clo.closure_args [("closure", pointer_to_void)])
     bodyhead.bodyhead_return_type
@@ -2372,10 +2377,10 @@ let gen_func_multi
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let first_c_name =
     match (List.hd entry_funcs).entryfunc_type with
-    | EntryTypeTopfunc (_, primary_cfunc) -> primary_cfunc
+    | EntryTypeTopfunc cfunc -> cfunc.cfunc_name
     | EntryTypeFixfunc fixfunc_id ->
         let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
-        (cfunc_of_fixfunc fixfunc)
+        (cfunc_name_of_fixfunc fixfunc)
     | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
         closure_func_name clo
@@ -2399,11 +2404,11 @@ let gen_func_multi
         (fun i entry_func ->
           let is_last = (i = num_entry_funcs - 1) in
           (match entry_func with
-          | {entryfunc_type=(EntryTypeTopfunc (static, primary_cfunc)); entryfunc_body=bodyhead} ->
+          | {entryfunc_type=(EntryTypeTopfunc cfunc); entryfunc_body=bodyhead} ->
               assert is_last;
-              let enumindex = topfunc_enum_index primary_cfunc in
-              let defs = pr_multi_topfunc_defs bodyhead static primary_cfunc body_function_name in
-              let case = pr_multi_topfunc_case bodyhead primary_cfunc in
+              let enumindex = topfunc_enum_index cfunc.cfunc_name in
+              let defs = pr_multi_topfunc_defs bodyhead cfunc body_function_name in
+              let case = pr_multi_topfunc_case bodyhead cfunc.cfunc_name in
               (enumindex, defs, case)
           | {entryfunc_type=(EntryTypeFixfunc fixfunc_id); entryfunc_body=bodyhead} ->
               let fixfunc = Hashtbl.find fixfunc_tbl fixfunc_id in
@@ -2488,7 +2493,7 @@ let is_static_function_icommand (icommand : instance_command) : bool =
   | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
 
 let make_simplified_for_cfunc (cfunc_name : string) :
-    (*static*)bool * Constr.types * Constr.t =
+    cfunc_t * Constr.types * Constr.t =
   let (sp_cfg, sp_inst) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
@@ -2514,9 +2519,9 @@ let make_simplified_for_cfunc (cfunc_name : string) :
   match Global.body_of_constant_body Library.indirect_accessor cdef with
   | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
                       Printer.pr_constant env ctnt)
-  | Some (body,_, _) -> (static, ty, body)
+  | Some (body,_, _) -> ({cfunc_static=static; cfunc_name=cfunc_name}, ty, body)
 
-let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) : sibling_t list =
+let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) : sibling_t list =
   let (args, body) = Term.decompose_lam primary_term in
   if Constr.isFix body then
     let primary_nary =
@@ -2524,30 +2529,29 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_static_ty_ter
       nary
     in
     List.map
-      (fun (cfunc, static, ty, term) ->
+      (fun (cfunc, ty, term) ->
         let (args, body) = Term.decompose_lam term in
         let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
         let fixfunc_id = id_of_annotated_name primary_nary.(j) in
-        { sibling_static=static; sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
-      sibling_cfunc_static_ty_term_list
+        { sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
+      sibling_cfunc_ty_term_list
   else
     []
 
-let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_term_list : (string * bool * Constr.types * Constr.t) list) : Pp.t =
-  let (primary_cfunc, primary_static, primry_ty, primry_term) = List.hd cfunc_static_ty_term_list in
-  let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_static_ty_term_list) in
-  let primary_static_and_cfunc = (primary_static, primary_cfunc) in
+let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) : Pp.t =
+  let (primary_cfunc, primry_ty, primry_term) = List.hd cfunc_ty_term_list in
+  let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_ty_term_list) in
   let primry_term = EConstr.of_constr primry_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma primry_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in
   let higher_order_fixfunc_tbl = make_higher_order_fixfunc_tbl sigma ~fixterm_tbl in
   let inlinable_fixterm_tbl = make_inlinable_fixterm_tbl ~higher_order_fixfunc_tbl env sigma primry_term in
-  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~primary_static_and_cfunc env sigma primry_term in
+  let genchunks = obtain_function_genchunks ~higher_order_fixfunc_tbl ~inlinable_fixterm_tbl ~primary_cfunc env sigma primry_term in
   let used_for_call_set = make_used_for_call_set genchunks in
   let used_for_goto_set = make_used_for_goto_set genchunks in
   let fixfunc_bodyhead_tbl = make_fixfunc_bodyhead_tbl genchunks in
-  let topfunc_tbl = make_topfunc_tbl sigma primry_term ~primary_static_and_cfunc in
+  let topfunc_tbl = make_topfunc_tbl sigma primry_term ~primary_cfunc in
   let sibling_tbl = make_sibling_tbl sibling_entfuncs in
   let extra_arguments_tbl = make_extra_arguments_tbl ~fixfunc_fixterm_tbl ~fixterm_tbl ~topfunc_tbl ~sibling_tbl env sigma primry_term genchunks in
   let c_names_tbl = make_c_names_tbl ~fixfunc_fixterm_tbl ~used_for_call_set ~topfunc_tbl ~sibling_tbl in
@@ -2603,39 +2607,39 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
-let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_term_list : ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list) :
-    (*cfunc_static_ty_term_list*) ((*cfunc*)string * (*static*)bool * Constr.types * Constr.t) list *
-    (*stubs*) (bool * string * string * (string * c_typedata) list * c_typedata) list =
+let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) :
+    (*cfunc_ty_term_list*) (cfunc_t * Constr.types * Constr.t) list *
+    (*stubs*) ((*cfunc_to_define*)cfunc_t * (*cfunc_name_to_call*)string * (*args*)(string * c_typedata) list * (*retun_type*)c_typedata) list =
   let m = ref ConstrMap.empty in
   let acc = ref [] in
   List.iter
-    (fun (cfunc, static, ty, term) ->
+    (fun (cfunc, ty, term) ->
       match ConstrMap.find_opt term !m with
       | None ->
-          let s = ref [(cfunc, static, ty, term)] in
+          let s = ref [(cfunc, ty, term)] in
           acc := s :: !acc;
           m := ConstrMap.add term s !m
       | Some s ->
-          s := (cfunc, static, ty, term) :: !s)
-    cfunc_static_ty_term_list;
-  let cfunc_static_ty_term_list_list = List.rev_map (fun l -> List.rev !l) !acc in
-  let cfunc_static_ty_term_list = List.map List.hd cfunc_static_ty_term_list_list in
+          s := (cfunc, ty, term) :: !s)
+    cfunc_ty_term_list;
+  let cfunc_ty_term_list_list = List.rev_map (fun l -> List.rev !l) !acc in
+  let cfunc_ty_term_list = List.map List.hd cfunc_ty_term_list_list in
   let stubs =
     List.concat_map
-      (fun cfunc_static_ty_term_list ->
-        match cfunc_static_ty_term_list with
+      (fun cfunc_ty_term_list ->
+        match cfunc_ty_term_list with
         | [] -> assert false
-        | (first_cfunc, first_static, first_ty, first_term) :: rest_cfunc_static_ty_term_list ->
+        | (first_cfunc, first_ty, first_term) :: rest_cfunc_ty_term_list ->
             let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma (EConstr.of_constr first_ty) in
             List.map
-              (fun (cfunc, static, ty, term) -> (static, cfunc, first_cfunc, formal_arguments_without_void, return_type))
-              rest_cfunc_static_ty_term_list)
-      cfunc_static_ty_term_list_list
+              (fun (cfunc, ty, term) -> (cfunc, first_cfunc.cfunc_name, formal_arguments_without_void, return_type))
+              rest_cfunc_ty_term_list)
+      cfunc_ty_term_list_list
   in
-  (cfunc_static_ty_term_list, stubs)
+  (cfunc_ty_term_list, stubs)
 
-let gen_stub_function (static, cfunc_name_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) : Pp.t =
-  gen_function_header ~static return_type cfunc_name_to_define formal_arguments_without_void +++
+let gen_stub_function (cfunc_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) : Pp.t =
+  gen_function_header cfunc_to_define return_type formal_arguments_without_void +++
   vbrace (
     Pp.hov 0 (
       (if c_type_is_void return_type then
@@ -2649,33 +2653,33 @@ let gen_stub_function (static, cfunc_name_to_define, cfunc_name_to_call, formal_
         formal_arguments_without_void ++
       Pp.str ");"))
 
-let gen_stub_functions (stub_entries : (bool * string * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
+let gen_stub_functions (stub_entries : (cfunc_t * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
   pp_sjoinmap_list gen_stub_function stub_entries
 
 let gen_function (cfunc_names : string list) : Pp.t =
   match cfunc_names with
   | [] -> user_err (Pp.str "[codegen:bug] gen_function with empty cfunc_names")
-  | cfuncs ->
-      let cfunc_static_ty_term_list =
+  | cfunc_names ->
+      let cfunc_ty_term_list =
         List.map
-          (fun cfunc ->
-            let (static, ty, term) = make_simplified_for_cfunc cfunc in (* modify global env *)
-            (cfunc, static, ty, term))
-          cfuncs
+          (fun cfunc_name ->
+            let (cfunc, ty, term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
+            (cfunc, ty, term))
+          cfunc_names
       in
       let env = Global.env () in
       let sigma = Evd.from_env env in
-      let (cfunc_static_ty_term_list, stubs) = detect_stubs env sigma cfunc_static_ty_term_list in
-      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_static_ty_term_list) +++
+      let (cfunc_ty_term_list, stubs) = detect_stubs env sigma cfunc_ty_term_list in
+      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_ty_term_list) +++
       gen_stub_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
-  let (static, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
+  let (cfunc, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma whole_ty in
-  gen_function_header ~static return_type cfunc_name formal_arguments_without_void ++ Pp.str ";"
+  gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";"
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lam term in
@@ -2690,16 +2694,16 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
     (fun gen ->
       gen,
       (match gen with
-      | GenFunc cfunc ->
-          let (static, ty, term) = make_simplified_for_cfunc cfunc in
+      | GenFunc cfunc_name ->
+          let (cfunc, ty, term) = make_simplified_for_cfunc cfunc_name in
           (match common_key_for_siblings term with
           | Some (j, key) as jkey ->
               map := ConstrMap.update
                 key
                 (fun njs_opt ->
                   match njs_opt with
-                  | None -> Some [(cfunc, j)]
-                  | Some njs -> Some ((cfunc, j) :: njs))
+                  | None -> Some [(cfunc_name, j)]
+                  | Some njs -> Some ((cfunc_name, j) :: njs))
                 !map;
               jkey
           | None -> None)
@@ -2715,13 +2719,13 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
           | Some njs ->
               (match njs with
               | [] -> assert false
-              | [(cfunc, j)] -> Some (GenFunc cfunc)
+              | [(cfunc_name, j)] -> Some (GenFunc cfunc_name)
               | _ ->
                   map := ConstrMap.remove key !map;
                   let njs = List.sort (fun (_,j1) (_,j2) -> Int.compare j1 j2) njs in
-                  let cfuncs = List.map fst njs in
-                  msg_info_hov (Pp.str "[codegen] mutually recursive functions detected:" +++ pp_sjoinmap_list Pp.str cfuncs);
-                  Some (GenMutual cfuncs))
+                  let cfunc_names = List.map fst njs in
+                  msg_info_hov (Pp.str "[codegen] mutually recursive functions detected:" +++ pp_sjoinmap_list Pp.str cfunc_names);
+                  Some (GenMutual cfunc_names))
           | None -> None))
     gens
 
@@ -2750,7 +2754,7 @@ let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) C
 
 (* Vernacular commands *)
 
-let command_gen (cfunc_list : string_or_qualid list) : unit =
+let command_gen (cfunc_names : string_or_qualid list) : unit =
   let gen_list =
     List.map
       (fun arg ->
@@ -2770,7 +2774,7 @@ let command_gen (cfunc_list : string_or_qualid list) : unit =
             | Some sp_inst -> (env, sp_inst)
           in
           GenFunc sp_inst.sp_cfunc_name)
-      cfunc_list
+      cfunc_names
   in
   (* Don't call codegen_resolve_dependencies.
      CodeGen Gen is used to test code generation of specified functions.
