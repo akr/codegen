@@ -160,6 +160,10 @@ let pr_args (arg : (string * c_typedata) list) : Pp.t =
     arg ++
   Pp.str "]"
 
+let pr_cfunc (cfunc : cfunc_t) : Pp.t =
+  let {cfunc_static=static; cfunc_name=cfunc_name} = cfunc in
+  Pp.str (cfunc_name ^ if static then "(static)" else "")
+
 let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl : fixfunc_table) : unit =
   Hashtbl.iter
     (fun fixfunc_id fixfunc ->
@@ -170,10 +174,10 @@ let show_fixfunc_table (env : Environ.env) (sigma : Evd.evar_map) (fixfunc_tbl :
         Pp.str "used_for_call=" ++ Pp.bool fixfunc.fixfunc_used_for_call +++
         Pp.str "used_for_goto=" ++ Pp.bool fixfunc.fixfunc_used_for_goto +++
         Pp.str "formal_arguments_without_void=" ++ pr_args fixfunc.fixfunc_formal_arguments_without_void +++
-        Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
-        Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
+        Pp.str "topfunc=" ++ (match fixfunc.fixfunc_topfunc with None -> Pp.str "None" | Some cfunc -> Pp.str "Some(" ++ pr_cfunc cfunc ++ Pp.str ")") +++
+        Pp.str "sibling=" ++ (match fixfunc.fixfunc_sibling with None -> Pp.str "None" | Some cfunc -> Pp.str "Some(" ++ pr_cfunc cfunc ++ Pp.str ")") +++
         Pp.str "c_name=" ++ Pp.str fixfunc.fixfunc_c_name +++
-        Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some {cfunc_static=static; cfunc_name=name} -> Pp.str ("Some(" ^ (if static then "true" else "false") ^ "," ^ name ^ ")")) +++
+        Pp.str "fixfunc_cfunc=" ++ (match fixfunc.fixfunc_cfunc with None -> Pp.str "None" | Some cfunc -> Pp.str "Some(" ++ pr_cfunc cfunc ++ Pp.str ")") +++
         Pp.str "extra_arguments=(" ++ pp_joinmap_list (Pp.str ",") (fun (farg, c_ty) -> Pp.str farg ++ Pp.str ":" ++ Pp.str (compose_c_abstract_decl c_ty)) fixfunc.fixfunc_extra_arguments ++ Pp.str ")" +++
         Pp.str "fixfunc_label=" ++ Pp.str (match fixfunc.fixfunc_label with None -> "None" | Some s -> "(Some " ^ s ^ ")") +++
         Pp.mt ())
@@ -192,7 +196,7 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
             pp_sjoinmap_list
               (fun bodyhead ->
                 (match bodyhead.bodyhead_root with
-                | BodyRootTopfunc {cfunc_static=static; cfunc_name=primary_cfunc_name} -> Pp.str ("Topfunc:" ^ primary_cfunc_name ^ if static then "(static)" else "")
+                | BodyRootTopfunc primary_cfunc -> Pp.str "Topfunc:" ++ pr_cfunc primary_cfunc
                 | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
                 | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)
                 ) ++
