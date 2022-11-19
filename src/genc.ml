@@ -2575,6 +2575,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
       ~fixfunc_label_tbl
       sigma
   in
+  show_fixfunc_table env sigma fixfunc_tbl;
   let closure_bodyhead_tbl = make_closure_bodyhead_tbl genchunks in
   let closure_tbl =
     collect_closures
@@ -2585,7 +2586,6 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
       ~closure_label_tbl
       sigma closure_terms
   in
-  show_fixfunc_table env sigma fixfunc_tbl;
   let used_vars = make_used_variables env sigma primry_term in
   let code_pairs = List.map2
     (fun genchunks entry_funcs ->
