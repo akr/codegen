@@ -32,7 +32,7 @@ type cfunc_t = {
 }
 
 type body_root_t =
-| BodyRootTopfunc of cfunc_t (* (static, primary_cfunc) *)
+| BodyRootTopfunc of cfunc_t (* primary_cfunc *)
 | BodyRootClosure of Id.t (* closure_id *)
 | BodyRootFixfunc of Id.t (* fixfunc_id *)
 
