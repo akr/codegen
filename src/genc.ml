@@ -1324,6 +1324,20 @@ let make_label_tbl_pairs
           make_labels_tbl genchunks ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl ~first_entfunc)
     genchunks_list entry_funcs_list
 
+let make_label_tbl_pair
+    ~(used_for_call_set : Id.Set.t)
+    ~(used_for_goto_set : Id.Set.t)
+    ~(sibling_tbl : (bool * string) Id.Map.t)
+    ~(cfunc_tbl : (bool * string) Id.Map.t)
+    ~(closure_c_name_tbl : string Id.Map.t)
+    (genchunks_list : genchunk_t list list)
+    (entry_funcs_list : entry_func_t list list) :
+      (string Id.Map.t * string Id.Map.t) =
+  let label_tbl_pairs = make_label_tbl_pairs ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list in
+  let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
+  let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
+  (fixfunc_label_tbl, closure_label_tbl)
+
 let make_fixfunc_table (fixfuncs : fixfunc_t list) : fixfunc_table =
   let fixfunc_tbl = Hashtbl.create 0 in
   List.iter (fun fixfunc -> Hashtbl.add fixfunc_tbl fixfunc.fixfunc_id fixfunc) fixfuncs;
@@ -2544,9 +2558,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_static_ty_ter
   let genchunks_list = split_function_genchunks genchunks in
   List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;
   let entry_funcs_list = make_entry_funcs_list ~used_for_call_set ~sibling_tbl genchunks_list in
-  let label_tbl_pairs = make_label_tbl_pairs ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list in
-  let fixfunc_label_tbl = disjoint_id_map_union_list (List.map fst label_tbl_pairs) in
-  let closure_label_tbl = disjoint_id_map_union_list (List.map snd label_tbl_pairs) in
+  let (fixfunc_label_tbl, closure_label_tbl) = make_label_tbl_pair ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list in
   let fixfunc_tbl =
     collect_fixpoints
       ~fixterm_tbl
