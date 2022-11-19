@@ -129,6 +129,7 @@ let closure_struct_type clo = { c_type_left="struct "^(closure_struct_tag clo); 
 let closure_entry_function_prefix = "codegen_closre_entry_"
 let closure_func_name clo = closure_entry_function_prefix^clo.closure_c_name
 let closure_entry_label (c_name : string) : string = "closure_entry_" ^ c_name
+let closure_cfunc clo = { cfunc_static=true; cfunc_name=closure_func_name clo }
 
 let closure_args_struct_type (c_name : string) : string =
   "struct codegen_closure_args_" ^ c_name
@@ -2149,7 +2150,7 @@ let gen_func_single
         (Option.get fixfunc.fixfunc_cfunc)
     | EntryTypeClosure closure_id ->
         let clo = Hashtbl.find closure_tbl closure_id in
-        {cfunc_static=true; cfunc_name=closure_func_name clo}
+        closure_cfunc clo
   in
   let (pp_struct_closure, pp_closure_assigns, closure_vars) =
     match entfunc.entryfunc_type with
@@ -2350,7 +2351,7 @@ let pr_multi_fixfunc_case (is_last : bool) (fixfunc : fixfunc_t) : Pp.t =
     goto
 
 let pr_multi_closure_defs (bodyhead : bodyhead_t) (clo : closure_t) (body_function_name : string) : Pp.t =
-  let cfunc = {cfunc_static=true; cfunc_name=(closure_func_name clo)} in
+  let cfunc = closure_cfunc clo in
   gen_closure_struct clo +++
   (Pp.hv 0 (
     Pp.str (closure_args_struct_type clo.closure_c_name) +++
