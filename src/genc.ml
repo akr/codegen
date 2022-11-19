@@ -2522,7 +2522,7 @@ let make_simplified_for_cfunc (cfunc_name : string) :
                       Printer.pr_constant env ctnt)
   | Some (body,_, _) -> ({cfunc_static=static; cfunc_name=cfunc_name}, ty, body)
 
-let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) : sibling_t list =
+let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (cfunc_t * Constr.t) list) : sibling_t list =
   let (args, body) = Term.decompose_lam primary_term in
   if Constr.isFix body then
     let primary_nary =
@@ -2530,18 +2530,18 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_ty_term_list 
       nary
     in
     List.map
-      (fun (cfunc, ty, term) ->
+      (fun (cfunc, term) ->
         let (args, body) = Term.decompose_lam term in
         let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
         let fixfunc_id = id_of_annotated_name primary_nary.(j) in
         { sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
-      sibling_cfunc_ty_term_list
+      sibling_cfunc_term_list
   else
     []
 
-let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) : Pp.t =
-  let (primary_cfunc, primry_ty, primry_term) = List.hd cfunc_ty_term_list in
-  let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_ty_term_list) in
+let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (cfunc_t * Constr.t) list) : Pp.t =
+  let (primary_cfunc, primry_term) = List.hd cfunc_term_list in
+  let sibling_entfuncs = make_sibling_entfuncs primry_term (List.tl cfunc_term_list) in
   let primry_term = EConstr.of_constr primry_term in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma primry_term in
@@ -2609,7 +2609,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list 
   pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
 
 let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) :
-    (*cfunc_ty_term_list*) (cfunc_t * Constr.types * Constr.t) list *
+    (*cfunc_term_list*) (cfunc_t * Constr.t) list *
     (*stubs*) ((*cfunc_to_define*)cfunc_t * (*cfunc_name_to_call*)string * (*args*)(string * c_typedata) list * (*retun_type*)c_typedata) list =
   let m = ref ConstrMap.empty in
   let acc = ref [] in
@@ -2624,7 +2624,13 @@ let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list 
           s := (cfunc, ty, term) :: !s)
     cfunc_ty_term_list;
   let cfunc_ty_term_list_list = List.rev_map (fun l -> List.rev !l) !acc in
-  let cfunc_ty_term_list = List.map List.hd cfunc_ty_term_list_list in
+  let cfunc_term_list =
+    List.map
+      (fun cfunc_ty_term_list ->
+        let (cfunc, ty, term) = List.hd cfunc_ty_term_list in
+        (cfunc, term))
+      cfunc_ty_term_list_list
+  in
   let stubs =
     List.concat_map
       (fun cfunc_ty_term_list ->
@@ -2637,7 +2643,7 @@ let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list 
               rest_cfunc_ty_term_list)
       cfunc_ty_term_list_list
   in
-  (cfunc_ty_term_list, stubs)
+  (cfunc_term_list, stubs)
 
 let gen_stub_function (cfunc_to_define, cfunc_name_to_call, formal_arguments_without_void, return_type) : Pp.t =
   gen_function_header cfunc_to_define return_type formal_arguments_without_void +++
@@ -2670,8 +2676,8 @@ let gen_function (cfunc_names : string list) : Pp.t =
       in
       let env = Global.env () in
       let sigma = Evd.from_env env in
-      let (cfunc_ty_term_list, stubs) = detect_stubs env sigma cfunc_ty_term_list in
-      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_ty_term_list) +++
+      let (cfunc_term_list, stubs) = detect_stubs env sigma cfunc_ty_term_list in
+      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_term_list) +++
       gen_stub_functions stubs
 
 let gen_prototype (cfunc_name : string) : Pp.t =
