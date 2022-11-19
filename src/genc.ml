@@ -139,8 +139,8 @@ let fixfunc_args_struct_type (c_name : string) : string =
 let topfunc_args_struct_type (c_name : string) : string =
   "struct codegen_topfunc_args_" ^ c_name
 
-let body_function_name (primary_cfunc : string) : string =
-  "codegen_body_function_" ^ primary_cfunc
+let body_function_name (primary_cfunc_name : string) : string =
+  "codegen_body_function_" ^ primary_cfunc_name
 
 let get_closure_id (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.t =
   match EConstr.kind sigma term with
@@ -191,7 +191,7 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
             pp_sjoinmap_list
               (fun bodyhead ->
                 (match bodyhead.bodyhead_root with
-                | BodyRootTopfunc {cfunc_static=static; cfunc_name=primary_cfunc} -> Pp.str ("Topfunc:" ^ primary_cfunc ^ if static then "(static)" else "")
+                | BodyRootTopfunc {cfunc_static=static; cfunc_name=primary_cfunc_name} -> Pp.str ("Topfunc:" ^ primary_cfunc_name ^ if static then "(static)" else "")
                 | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
                 | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)
                 ) ++
@@ -1033,7 +1033,7 @@ let make_cfunc_tbl
       in
       let cfunc_opt =
         match bodyhead.bodyhead_root with
-        | BodyRootTopfunc primary_cfunc  -> Some primary_cfunc
+        | BodyRootTopfunc primary_cfunc -> Some primary_cfunc
         | BodyRootClosure _
         | BodyRootFixfunc _ ->
             match fixfunc_ids with
@@ -1233,7 +1233,7 @@ let make_labels_tbl
       msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
         Pp.str "bodyroot=" ++
           (match bodyhead.bodyhead_root with
-          | BodyRootTopfunc {cfunc_name=primary_cfunc} -> Pp.str ("Topfunc:" ^ primary_cfunc)
+          | BodyRootTopfunc {cfunc_name=primary_cfunc_name} -> Pp.str ("Topfunc:" ^ primary_cfunc_name)
           | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
           | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
         Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
@@ -2258,9 +2258,9 @@ let pr_entry_function (cfunc : cfunc_t) (func_enum_index : string)
       pp_call +++
       pp_return))
 
-let func_index_enum_tag_name primary_cfunc = "codegen_func_indextype_" ^ primary_cfunc
+let func_index_enum_tag_name primary_cfunc_name = "codegen_func_indextype_" ^ primary_cfunc_name
 
-let topfunc_enum_index primary_cfunc = "codegen_topfunc_index_" ^ primary_cfunc
+let topfunc_enum_index primary_cfunc_name = "codegen_topfunc_index_" ^ primary_cfunc_name
 let fixfunc_enum_index fixfunc_c_name = "codegen_fixfunc_index_" ^ fixfunc_c_name
 let closure_enum_index closure_c_name = "codegen_closure_index_" ^ closure_c_name
 
