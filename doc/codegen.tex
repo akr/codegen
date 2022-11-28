@@ -1387,7 +1387,7 @@ We mix borrow information and set of variables in set-operations.
 Assume $L=\{x_1,\ldots,x_n\}$ and $B=\{(T_1,y_1),\ldots,(T_m,y_m)\}$.
 \begin{align*}
   B \cap L = L \cap B &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \in L \} \\
-  B - L &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \not\in L \}
+  B - L &= \{(T_i,y_i) \in B ~|~ 1\leq i\leq m,~ y_i \notin L \}
 \end{align*}
 
 We also mix borrow information and set of types (including $\top$) in set-operations.
@@ -1635,7 +1635,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
       \begin{aligned}[t] \ldq & {\passign(\fvarsd{f}, \rep{x})} \\ & \kwgoto\:\mathtt{entry\_}f\ttsemi \rdq \end{aligned}
     && \begin{aligned}[t] & (|x| > 0) \wedge f \in \tr \end{aligned} \\
   &\A{K}{f\:\rep{x}} = K(\dq{f\ttparen{\rep{y}\ttcomma \rep{x}}})
-    && \begin{aligned}[t] & (|x| > 0) \wedge f \not\in \tr \quad \text{where} \quad \rep{y} = \EXARGS(f) \end{aligned} \\
+    && \begin{aligned}[t] & (|x| > 0) \wedge f \notin \tr \quad \text{where} \quad \rep{y} = \EXARGS(f) \end{aligned} \\
       &\A{K}{c\:\rep{x}} = K(\dq{c\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{C\:\rep{x}} = K(\dq{C\ttparen{\rep{x}}})                                   && |x| \geq 0 \\
   &\A{K}{\letin{x}{t_1}{t_2}} = \ldq \A{K'}{t_1}\; \A{K}{t_2} \rdq
@@ -1671,7 +1671,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
                     \end{aligned} & \text{otherwise}
                   \end{cases}
                 \end{alignedat} \\
-  &\A{K}{(\ofix{\rep{f:=t}}{f_j})\:\rep{x}} =                      && f_j \not\in \tr \quad |x| > 0 \\
+  &\A{K}{(\ofix{\rep{f:=t}}{f_j})\:\rep{x}} =                      && f_j \notin \tr \quad |x| > 0 \\
      & \quad\begin{alignedat}[t]{2}
        \ldq & K(f_j\ttparen{\rep{y}\ttcomma \rep{x}})                  \\
             & \kwgoto\:\mathtt{skip\_}f_j\ttsemi                                    \\
