@@ -126,7 +126,7 @@ type closure_table = (Id.t, closure_t) Hashtbl.t
 
 let closure_struct_tag clo = "codegen_closure_struct_"^clo.closure_c_name
 let closure_struct_type clo = { c_type_left="struct "^(closure_struct_tag clo); c_type_right="" }
-let closure_entry_function_prefix = "codegen_closre_entry_"
+let closure_entry_function_prefix = "codegen_closure_entry_"
 let closure_func_name clo = closure_entry_function_prefix^clo.closure_c_name
 let closure_entry_label (c_name : string) : string = "closure_entry_" ^ c_name
 let closure_cfunc clo = { cfunc_static=true; cfunc_name=closure_func_name clo }
