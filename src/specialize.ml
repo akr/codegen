@@ -194,36 +194,65 @@ let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty 
       is_type_arg :: determine_type_arguments env sigma b
   | _ -> []
 
-let is_monomorphic_type_for_determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool =
+let type_can_be_monomorphic (env : Environ.env) (sigma : Evd.evar_map)  (ty : EConstr.t) : bool =
+  let num_left_args = Environ.nb_rel env in
   let rec aux env ty =
-    match EConstr.kind sigma ty with
+    let (f, args) = decompose_appvect sigma ty in
+    match EConstr.kind sigma f with
     | Prod (x,t,b) ->
         let env2 = env_push_assum env x t in
-        is_monomorphic_type env sigma t &&
-        is_monomorphic_type env2 sigma b
-    | Ind _ -> true
-    | App (f,args) when isInd sigma f -> Array.for_all (aux env) args
-    | Rel _ -> true
-        (* type variable.
-          Since type variables are defined as static in determine_static_arguments,
-          the variable will be instantiated with a monomorphic type. *)
-    | _ -> false
+        aux env t && aux env2 b
+    | Sort _ -> (* polymorphic type must be static *)
+        false
+    | Ind _ ->
+        true
+    | Rel i ->
+        let l = Environ.nb_rel env - i in
+        if l < num_left_args then
+          (* This variable references a prior argument.
+             The value of the variable can be inductive type, prod, or sort because this variable is a type.
+             This argument can be dynamic. *)
+          true
+        else
+          (* This variable is bound in this type.
+            It means that this type is polymorphic.
+            Thus codegen treat it as static because codegen generates monomorpic code. *)
+          false
+    | _ ->
+        (* This type contains a complex expression.
+          This argument can be dynamic. *)
+        true
   in
   aux env ty
 
-let rec determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
+let determine_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
   (* msg_info_hov (Printer.pr_econstr_env env sigma ty); *)
-  let ty = Reductionops.whd_all env sigma ty in
-  match EConstr.kind sigma ty with
-  | Prod (x,t,b) ->
-      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] t=" ++ Printer.pr_econstr_env env sigma t);*)
-      let t = Reductionops.nf_all env sigma t in
-      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] normalized_t=" ++ Printer.pr_econstr_env env sigma t);*)
-      let is_static_arg = not (is_monomorphic_type_for_determine_static_arguments env sigma t) in
-      (*msg_debug_hov (Pp.str "[codegen:determine_static_arguments] is_static_arg=" ++ Pp.bool is_static_arg);*)
-      let env = env_push_assum env x t in
-      is_static_arg :: determine_static_arguments env sigma b
-  | _ -> []
+  assert (Environ.nb_rel env = 0);
+  let ty = Reductionops.nf_all env sigma ty in
+  let (args_rev, result_type) = decompose_prod sigma ty in
+  let args = List.rev args_rev in
+  let (_, arg_statics) = CList.fold_left_map
+    (fun env (arg_name, arg_type) ->
+      let arg_static = not (type_can_be_monomorphic env sigma arg_type) in
+      let env' = env_push_assum env arg_name arg_type in
+      (env', arg_static))
+    env args
+  in
+  let (env_result, fv_set_list) = CList.fold_left_map
+    (fun env (arg_name, arg_type) ->
+      let arg_fv = free_variables_level_set env sigma arg_type in
+      let env' = env_push_assum env arg_name arg_type in
+      (env', arg_fv))
+    env args
+  in
+  let result_fv_set = free_variables_level_set env_result sigma result_type in
+  let fv_set = IntSet.union (intset_union_list fv_set_list) result_fv_set in
+  let arg_statics =
+    List.mapi
+      (fun i static -> static || (IntSet.mem i fv_set))
+      arg_statics
+  in
+  arg_statics
 
 let determine_sd_list (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : s_or_d list =
   List.map
@@ -234,9 +263,11 @@ let codegen_auto_arguments_internal
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : specialization_config =
+  assert (Constr.isConst func || Constr.isConstruct func);
   match ConstrMap.find_opt func !specialize_config_map with
   | Some sp_cfg -> sp_cfg (* already defined *)
   | None ->
+      let env = Environ.pop_rel_context (Environ.nb_rel env) env in
       let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       let sd_list = (determine_sd_list env sigma ty) in
       codegen_define_static_arguments ?cfunc env sigma func sd_list
@@ -244,9 +275,11 @@ let codegen_auto_arguments_internal
 let codegen_auto_sd_list
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : s_or_d list =
+  assert (Constr.isConst func || Constr.isConstruct func);
   match ConstrMap.find_opt func !specialize_config_map with
   | Some sp_cfg -> sp_cfg.sp_sd_list (* already defined *)
   | None ->
+      let env = Environ.pop_rel_context (Environ.nb_rel env) env in
       let ty = Retyping.get_type_of env sigma (EConstr.of_constr func) in
       determine_sd_list env sigma ty
 

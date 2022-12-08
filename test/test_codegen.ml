@@ -2760,6 +2760,24 @@ let test_auto_construct (ctx : test_ctxt) : unit =
       assert(one() == 1);
     |}
 
+let test_auto_nat_fold (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^ {|
+      Definition nat_fold (A : Type) (f : A -> nat -> A) :=
+        fix nat_fold (n : nat) (a0 : A) : A :=
+          match n with
+          | O => a0
+          | S m => nat_fold m (f a0 m)
+          end.
+      Definition sum_plus_one (n : nat) : nat :=
+        S (nat_fold nat Nat.add n 0).
+      CodeGen AutoArgs nat_fold.
+      CodeGen Func nat_fold nat => "nat_fold".
+      CodeGen Func sum_plus_one.
+    |}) {|
+      assert(sum_plus_one(3) == 4);
+    |}
+
 let test_option_bool_struct (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -4368,6 +4386,7 @@ let suite : OUnit2.test =
     "test_auto_ind_match_cstrmember_with_arg" >:: test_auto_ind_match_cstrmember_with_arg;
     "test_auto_const" >:: test_auto_const;
     "test_auto_construct" >:: test_auto_construct;
+    "test_auto_nat_fold" >:: test_auto_nat_fold;
     "test_option_bool_struct" >:: test_option_bool_struct;
     "test_reduceeta_makes_single_function" >:: test_reduceeta_makes_single_function;
     "test_multiple_primitives_shares_cfunc" >:: test_multiple_primitives_shares_cfunc;
