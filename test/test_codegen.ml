@@ -2458,6 +2458,48 @@ let test_unused_fixfunc_in_external_fixterm (ctx : test_ctxt) : unit =
       assert(f(4) == 15);
     |}
 
+let test_delete_unreachable_fixfuncs_drop_last (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f (x : nat) :=
+        let y :=
+          (fix g1 (n : nat) :=
+            match n with
+            | O => O
+            | S m => g1 m
+            end
+          with g2 (n : nat) := true (* unreachable *)
+          for g1) x
+        in
+        S y.
+      CodeGen Func f.
+    |}) {|
+      assert(f(0) == 1);
+      assert(f(1) == 1);
+    |}
+
+let test_delete_unreachable_fixfuncs_drop_first (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f (x : nat) :=
+        let y :=
+          (fix g1 (n : nat) := true (* unreachable *)
+           with g2 (n : nat) :=
+            match n with
+            | O => O
+            | S m => g2 m
+            end
+          for g2) x
+        in
+        S y.
+      CodeGen Func f.
+    |}) {|
+      assert(f(0) == 1);
+      assert(f(1) == 1);
+    |}
+
 let test_primitive_projection (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -4386,6 +4428,8 @@ let suite : OUnit2.test =
     "test_parallel_assignment" >:: test_parallel_assignment;
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
+    "test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last;
+    "test_delete_unreachable_fixfuncs_drop_first" >:: test_delete_unreachable_fixfuncs_drop_first;
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
     "test_matchapp_twoarg" >:: test_matchapp_twoarg;

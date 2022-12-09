@@ -2048,6 +2048,139 @@ let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) 
   (*msg_debug_hov (Pp.str "[codegen] complete_args result:" +++ Printer.pr_econstr_env env sigma result);*)
   result
 
+let reachable (start : IntSet.t) (edge : int -> IntSet.t) : IntSet.t =
+  let rec loop q result =
+    match IntSet.choose_opt q with
+    | Some i ->
+        let q = IntSet.remove i q in
+        let nexts = edge i in
+        let q = IntSet.union q (IntSet.diff nexts result) in
+        let result = IntSet.union nexts result in
+        loop q result
+    | None ->
+        result
+  in
+  loop start start
+
+let boolarray_count (ary : bool array) (i : int) (n : int) : int =
+  let rec aux i n acc =
+    if n <= 0 then
+      acc
+    else
+      if ary.(i) then
+        aux (i+1) (n-1) (acc+1)
+      else
+        aux (i+1) (n-1) acc
+  in
+  aux i n 0
+
+let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
+  (*
+    (term', fv) = aux aenv term
+    term : source term
+    term' : result term which has no unreachable fixfunc
+    fv : set of free fixfunc variables.  variable is represented as a de Bruijn level.
+  *)
+  let rec aux (aenv : aenv_t) (term : EConstr.t) : EConstr.t * IntSet.t =
+    (*let env = aenv.aenv_env in
+    msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] start:" +++
+      Pp.str "term=" ++ Printer.pr_econstr_env env sigma term);*)
+    let (term', fv) = aux1 aenv term in
+    (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] end:" +++
+      Pp.v 0 (
+        Pp.str "term=" ++ Printer.pr_econstr_env env sigma term +++
+        Pp.str "term2=" ++ Printer.pr_econstr_env env sigma term' +++
+        Pp.str "fv={" ++
+          pp_sjoinmap_list (fun j -> Name.print (Context.Rel.Declaration.get_name (Environ.lookup_rel (Environ.nb_rel env - j) env))) (IntSet.elements fv) ++
+        Pp.str "}"));*)
+    (term', fv)
+  and aux1 (aenv : aenv_t) (term : EConstr.t) : EConstr.t * IntSet.t =
+    let env = aenv.aenv_env in
+    let (term, args) = decompose_appvect sigma term in
+    let (term', fv) =
+      match EConstr.kind sigma term with
+      | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+          user_err (Pp.str "[codegen:delete_unreachable_fixfuncs] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
+      | Cast _ | App _ ->
+          user_err (Pp.str "[codegen:delete_unreachable_fixfuncs] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
+      | Sort _ | Prod _ | Ind _ -> (term, IntSet.empty)
+      | Rel i ->
+          if List.nth aenv.aenv_fix_bounded (i-1) then
+            (term, IntSet.singleton (Environ.nb_rel env - i))
+          else
+            (term, IntSet.empty)
+      | Const _ | Construct _ -> (term, IntSet.empty)
+      | Proj (proj, e) -> (term, IntSet.empty)
+      | LetIn (x,e,t,b) ->
+          let aenv2 = aenv_push_assum aenv x t in
+          let (e', fv1) = aux aenv e in
+          let (b', fv2) = aux aenv2 b in
+          let fv = IntSet.union fv1 fv2 in
+          (mkLetIn (x,e',t,b'), fv)
+      | Case (ci,u,pms,p,iv,item,bl) ->
+          let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
+          let bl_fvs =
+            Array.map2
+              (fun (nas, body) (ctx, _) ->
+                let aenv2 = aenv_push_branch_ctx aenv ctx in
+                aux aenv2 body)
+              bl bl0
+          in
+          let bl' = Array.map2 (fun (nas, _) (b, fv) -> (nas, b)) bl bl_fvs in
+          let fv = intset_union_ary (Array.map snd bl_fvs) in
+          (mkCase (ci, u, pms, p, iv, item, bl'), fv)
+      | Lambda (x,t,b) ->
+          let aenv2 = aenv_push_assum aenv x t in
+          let (b', fv) = aux aenv2 b in
+          (mkLambda (x,t,b'), fv)
+      | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+          let n = Environ.nb_rel env in
+          let h = Array.length fary in
+          let aenv2 = aenv_push_fix aenv prec in
+          let fary_fvs = Array.map (aux aenv2) fary in
+          let fary' = Array.map fst fary_fvs in
+          let fvs = Array.map snd fary_fvs in
+          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary fvs) in
+          let edges =
+            Array.map
+              (IntSet.filter_map
+                (fun i -> if i < n then None else Some (i - n)))
+              fvs
+          in
+          (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] edges:" +++
+            pp_sjoinmap_ary
+              (fun i ->
+                Pp.str (str_of_annotated_name nary.(i)) ++
+                Pp.str ":[" ++
+                pp_sjoinmap_list (fun j -> Pp.str (str_of_annotated_name nary.(j))) (IntSet.elements (edges.(i))) ++
+                Pp.str "]")
+              (iota_ary 0 h));*)
+          let reachable_set = reachable (IntSet.singleton j) (fun i -> edges.(i)) in
+          assert (IntSet.max_elt reachable_set < h);
+          assert (0 <= IntSet.min_elt reachable_set);
+          (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] reachable=[" ++
+            pp_sjoinmap_list (fun i -> Pp.str (str_of_annotated_name nary.(i))) (IntSet.elements reachable_set) ++
+            Pp.str "]");*)
+          (*let reachable_set = IntSet.union reachable_set (IntSet.of_list (iota_list 0 h)) in (* dummy fill *)*)
+          let reachable_ary = Array.init h (fun i -> IntSet.mem i reachable_set) in
+          let reachable_list = Array.to_list reachable_ary in
+          let update_rels term =
+            let h2 = IntSet.cardinal reachable_set in
+            let s = List.init h (fun i -> mkRel (boolarray_count reachable_ary (h-i) i + 1)) in
+            Vars.substl s (Vars.liftn h2 (h+1) term)
+          in
+          let ks' = CArray.filter_with reachable_list ks in
+          let j' = boolarray_count reachable_ary 0 j in
+          let nary' = CArray.filter_with reachable_list nary in
+          let tary' = CArray.filter_with reachable_list tary in
+          let fary' = Array.map update_rels (CArray.filter_with reachable_list fary') in
+          (mkFix ((ks', j'), (nary', tary', fary')), fv)
+    in
+    (mkApp (term', args), fv)
+  in
+  let (result_term, result_fv) = aux (aenv_of_env env0) term in
+  result_term
+
 let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
@@ -2293,6 +2426,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
+  let term = delete_unreachable_fixfuncs env sigma term in
+  debug_simplification env sigma "delete_unreachable_fixfuncs" term;
   monomorphism_check env sigma term;
   Linear.borrowcheck env sigma term;
   Linear.downwardcheck env sigma cfunc term;
