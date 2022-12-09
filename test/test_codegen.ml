@@ -2419,6 +2419,19 @@ let test_parallel_assignment (ctx : test_ctxt) : unit =
       assert(f(5, 1, 2) == 2);
     |}
 
+let test_toplevel_nonrecursive_fixpoint (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Fixpoint f (n : nat) := true
+      with g (n : nat) := false.
+      CodeGen Func f.
+      CodeGen Func g.
+    |}) {|
+      assert(f(0) == true);
+      assert(g(0) == false);
+    |}
+
 let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -4426,6 +4439,7 @@ let suite : OUnit2.test =
     "test_unused_argument" >:: test_unused_argument;
     "test_inner_fixfunc_goto_exarg_fixfunc" >:: test_inner_fixfunc_goto_exarg_fixfunc;
     "test_parallel_assignment" >:: test_parallel_assignment;
+    "test_toplevel_nonrecursive_fixpoint" >:: test_toplevel_nonrecursive_fixpoint;
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
     "test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last;
