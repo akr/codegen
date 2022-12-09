@@ -2140,7 +2140,6 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           let fary_fvs = Array.map (aux aenv2) fary in
           let fary' = Array.map fst fary_fvs in
           let fvs = Array.map snd fary_fvs in
-          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary fvs) in
           let edges =
             Array.map
               (IntSet.filter_map
@@ -2174,6 +2173,7 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           let nary' = CArray.filter_with reachable_list nary in
           let tary' = CArray.filter_with reachable_list tary in
           let fary' = Array.map update_rels (CArray.filter_with reachable_list fary') in
+          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary (CArray.filter_with reachable_list fvs)) in
           (mkFix ((ks', j'), (nary', tary', fary')), fv)
     in
     (mkApp (term', args), fv)
