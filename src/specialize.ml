@@ -293,6 +293,20 @@ let command_auto_arguments (func_list : Libnames.qualid list) : unit =
   let sigma = Evd.from_env env in
   List.iter (codegen_auto_arguments_1 env sigma) func_list
 
+let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let func = func_of_qualid env func in
+  let sp_cfg = codegen_auto_arguments_internal env sigma func in
+  let sd_list_defined = drop_trailing_d sp_cfg.sp_sd_list in
+  let sd_list_expected = drop_trailing_d sd_list in
+  (if sd_list_defined <> sd_list_expected then
+    user_err (Pp.str "[codegen] static/dynamic argument unexpectedly configured for" +++
+    Printer.pr_constr_env env sigma func ++ Pp.str ":" +++
+    Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_expected ++ Pp.str "]" +++
+    Pp.str "expected but" +++
+    Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_defined ++ Pp.str "]"))
+
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
