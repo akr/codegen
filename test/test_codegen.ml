@@ -385,6 +385,7 @@ let bool_paren_src = {|
       ".
 |}
 
+(* bool implementation using struct.  It is not assignable to integer types. *)
 let struct_bool_src = {|
       CodeGen InductiveType bool => "bool".
       CodeGen InductiveMatch bool => "sw_struct_bool"
