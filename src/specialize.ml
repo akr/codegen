@@ -2079,7 +2079,7 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
     (term', fv) = aux aenv term
     term : source term
     term' : result term which has no unreachable fixfunc
-    fv : set of free fixfunc variables.  variable is represented as a de Bruijn level.
+    fv : set of free fixfunc variables in term'.  The variables are represented as de Bruijn levels.
   *)
   let rec aux (aenv : aenv_t) (term : EConstr.t) : EConstr.t * IntSet.t =
     (*let env = aenv.aenv_env in
