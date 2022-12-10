@@ -22,7 +22,7 @@ module ConstrMap = HMap.Make(Constr)
 module ConstrSet = CSet.Make(Constr)
 module StringSet = CSet.Make(String)
 
-(* Set/Unset Debug CodeGen Simplification. *)
+(* Unset/Set Debug CodeGen Simplification. *)
 let opt_debug_simplification = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -30,7 +30,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_simplification);
           optwrite = (:=) opt_debug_simplification }
 
-(* Set/Unset Debug CodeGen NormalizeV. *)
+(* Unset/Set Debug CodeGen NormalizeV. *)
 let opt_debug_normalizeV = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -38,7 +38,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_normalizeV);
           optwrite = (:=) opt_debug_normalizeV }
 
-(* Set/Unset Debug CodeGen Reduction. *)
+(* Unset/Set Debug CodeGen Reduction. *)
 let opt_debug_reduction = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -46,7 +46,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_reduction);
           optwrite = (:=) opt_debug_reduction }
 
-(* Set/Unset Debug CodeGen ReduceExp. *)
+(* Unset/Set Debug CodeGen ReduceExp. *)
 let opt_debug_reduce_exp = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -54,7 +54,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_reduce_exp);
           optwrite = (:=) opt_debug_reduce_exp }
 
-(* Set/Unset Debug CodeGen ReduceApp. *)
+(* Unset/Set Debug CodeGen ReduceApp. *)
 let opt_debug_reduce_app = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -62,7 +62,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_reduce_app);
           optwrite = (:=) opt_debug_reduce_app }
 
-(* Set/Unset Debug CodeGen Replace. *)
+(* Unset/Set Debug CodeGen Replace. *)
 let opt_debug_replace = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -70,7 +70,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_replace);
           optwrite = (:=) opt_debug_replace }
 
-(* Set/Unset Debug CodeGen ReduceEta. *)
+(* Unset/Set Debug CodeGen ReduceEta. *)
 let opt_debug_reduce_eta = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -78,7 +78,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_reduce_eta);
           optwrite = (:=) opt_debug_reduce_eta }
 
-(* Set/Unset Debug CodeGen CompleteArguments. *)
+(* Unset/Set Debug CodeGen CompleteArguments. *)
 let opt_debug_complete_arguments = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -86,7 +86,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_complete_arguments);
           optwrite = (:=) opt_debug_complete_arguments }
 
-(* Set/Unset Debug CodeGen ExpandEta. *)
+(* Unset/Set Debug CodeGen ExpandEta. *)
 let opt_debug_expand_eta = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -94,7 +94,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_expand_eta);
           optwrite = (:=) opt_debug_expand_eta }
 
-(* Set/Unset Debug CodeGen DeleteLet. *)
+(* Unset/Set Debug CodeGen DeleteLet. *)
 let opt_debug_delete_let = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -102,7 +102,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_delete_let);
           optwrite = (:=) opt_debug_delete_let }
 
-(* Set/Unset Debug CodeGen BorrowCheck. *)
+(* Unset/Set Debug CodeGen BorrowCheck. *)
 let opt_debug_borrowcheck = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
@@ -110,7 +110,7 @@ let () = let open Goptions in declare_bool_option
           optread  = (fun () -> !opt_debug_borrowcheck);
           optwrite = (:=) opt_debug_borrowcheck }
 
-(* Set/Unset Debug CodeGen MatchApp. *)
+(* Unset/Set Debug CodeGen MatchApp. *)
 let opt_debug_matchapp = ref false
 let () = let open Goptions in declare_bool_option
         { optdepr  = false;
