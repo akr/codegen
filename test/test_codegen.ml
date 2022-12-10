@@ -2508,6 +2508,32 @@ let test_delete_unreachable_fixfuncs_drop_last (ctx : test_ctxt) : unit =
       assert(f(1) == 1);
     |}
 
+let test_delete_unreachable_fixfuncs_drop_middle (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Definition f (x : nat) :=
+        let y :=
+          (fix g1 (n : nat) :=
+            match n with
+            | O => O
+            | S m => g3 m
+            end
+          with g2 (n : nat) := true (* unreachable *)
+          with g3 (n : nat) :=
+            match n with
+            | O => O
+            | S m => g1 m
+            end
+          for g1) x
+        in
+        S y.
+      CodeGen Func f.
+    |}) {|
+      assert(f(0) == 1);
+      assert(f(1) == 1);
+    |}
+
 let test_delete_unreachable_fixfuncs_drop_first (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^
@@ -4486,6 +4512,7 @@ let suite : OUnit2.test =
     "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
     "test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last;
+    "test_delete_unreachable_fixfuncs_drop_middle" >:: test_delete_unreachable_fixfuncs_drop_middle;
     "test_delete_unreachable_fixfuncs_drop_first" >:: test_delete_unreachable_fixfuncs_drop_first;
     "test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc" >:: test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc;
     "test_primitive_projection" >:: test_primitive_projection;
