@@ -208,9 +208,8 @@ let show_genchunks (sigma : Evd.evar_map) (genchunks : genchunk_t list) : unit =
                     | BodyVarFixfunc fixfunc_id -> Pp.str "Fixfunc:" ++ Id.print fixfunc_id
                     | BodyVarArg (var, c_ty) -> Pp.str "Arg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty
                     | BodyVarVoidArg (var, c_ty) -> Pp.str "VoidArg:" ++ Pp.str var ++ Pp.str ":" ++ pr_c_abstract_decl c_ty)
-                  bodyhead.bodyhead_vars) ++
-                Pp.str "]" ++
-                Pp.str "[" ++
+                  bodyhead.bodyhead_vars) +++
+                Pp.str "Return:" ++
                 pr_c_abstract_decl bodyhead.bodyhead_return_type ++
                 Pp.str "]")
               genchunk.genchunk_bodyhead_list)
