@@ -385,6 +385,22 @@ let bool_paren_src = {|
       ".
 |}
 
+let struct_bool_src = {|
+      CodeGen InductiveType bool => "bool".
+      CodeGen InductiveMatch bool => "sw_struct_bool"
+      | true => "default"
+      | false => "case 0".
+      CodeGen Constant true => "struct_bool_true".
+      CodeGen Constant false => "struct_bool_false".
+      CodeGen Snippet "
+      #include <stdbool.h> /* for bool, true and false */
+      typedef struct { bool b; } struct_bool;
+      static struct_bool struct_bool_true = { true };
+      static struct_bool struct_bool_false = { false };
+      #define sw_struct_bool(b) ((b)->b)
+      ".
+|}
+
 let nat_src = {|
       CodeGen InductiveType nat => "nat".
       CodeGen InductiveMatch nat => ""
@@ -2513,6 +2529,33 @@ let test_delete_unreachable_fixfuncs_drop_first (ctx : test_ctxt) : unit =
       assert(f(1) == 1);
     |}
 
+let test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (struct_bool_src ^ (* struct_bool is incompatible with nat.  Asssigning a struct_bool value to nat variable causes an compile error. *)
+    nat_src ^
+    {|
+      Definition f n :=
+        n +
+        (fix g1 (i : nat) :=
+          (fix h1 (k : nat) : nat := 0
+          with h2 (l : nat) := (* h2 should be deleted because h2 is not called at all. *)
+            match i with
+            | O => false
+            | S i' => g2 i'
+            end
+          for h1)
+        with g2 (j : nat) : bool := (* g2 should be deleted because it is called only from h2 which should deleted. *)
+          match j with
+          | O => true (* g2 returns an bool.  g1 returns nat.  If the result of g2 is assigned to the result variable for g1, it conflicts. *)
+          | S j' => g2 j'
+          end
+        for g1) n n.
+      CodeGen Func f.
+    |}) {|
+      assert(f(0) == 0);
+      assert(f(1) == 1);
+    |}
+
 let test_primitive_projection (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
@@ -4444,6 +4487,7 @@ let suite : OUnit2.test =
     "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
     "test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last;
     "test_delete_unreachable_fixfuncs_drop_first" >:: test_delete_unreachable_fixfuncs_drop_first;
+    "test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc" >:: test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc;
     "test_primitive_projection" >:: test_primitive_projection;
     "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
     "test_matchapp_twoarg" >:: test_matchapp_twoarg;
