@@ -2074,6 +2074,39 @@ let boolarray_count_sub (ary : bool array) (i : int) (n : int) : int =
   in
   aux i n 0
 
+let boolarray_count (ary : bool array) : int =
+  boolarray_count_sub ary 0 (Array.length ary)
+
+let array_filter_with (filter : bool array)
+    ?(result_length = boolarray_count filter)
+    (ary : 'a array) : 'a array =
+  let n = Array.length ary in
+  if Array.length filter <> n then
+    invalid_arg "array_filter_with";
+  if CArray.is_empty ary then
+    begin
+      if result_length <> 0 then
+        invalid_arg "array_filter_with(result_length)";
+      [||]
+    end
+  else
+    begin
+      let result = Array.make result_length ary.(0) in
+      let j = ref 0 in
+      for i = 0 to n-1 do
+        if filter.(i) then
+          begin
+            (if result_length <= !j then
+              invalid_arg "array_filter_with(result_length)");
+            result.(!j) <- ary.(i);
+            j := !j + 1;
+          end
+      done;
+      if result_length <> !j then
+        invalid_arg "array_filter_with(result_length)";
+      result
+    end
+
 let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (*
     (term', fv) = aux aenv term
@@ -2165,13 +2198,12 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           let h2 = IntSet.cardinal reachable_set in
           let subst = List.init h (fun i -> mkRel (1 + boolarray_count_sub reachable_ary (h-i) i)) in
           let update_rels term = Vars.substl subst (Vars.liftn h2 (h+1) term) in
-          let reachable_list = Array.to_list reachable_ary in
-          let ks' = CArray.filter_with reachable_list ks in
+          let ks' = array_filter_with ~result_length:h2 reachable_ary ks in
           let j' = boolarray_count_sub reachable_ary 0 j in
-          let nary' = CArray.filter_with reachable_list nary in
-          let tary' = CArray.filter_with reachable_list tary in
-          let fary' = Array.map update_rels (CArray.filter_with reachable_list fary') in
-          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary (CArray.filter_with reachable_list fvs)) in
+          let nary' = array_filter_with ~result_length:h2 reachable_ary nary in
+          let tary' = array_filter_with ~result_length:h2 reachable_ary tary in
+          let fary' = Array.map update_rels (array_filter_with ~result_length:h2 reachable_ary fary') in
+          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary (array_filter_with ~result_length:h2 reachable_ary fvs)) in
           (mkFix ((ks', j'), (nary', tary', fary')), fv)
     in
     (mkApp (term', args), fv)
