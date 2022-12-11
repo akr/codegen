@@ -2137,14 +2137,15 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           (*let reachable_set = IntSet.union reachable_set (IntSet.of_list (iota_list 0 h)) in (* dummy fill *)*)
           let reachable_ary = Array.init h (fun i -> IntSet.mem i reachable_set) in
           let h2 = IntSet.cardinal reachable_set in
+          let filter ary = array_filter_with ~result_length:h2 reachable_ary ary in
           let subst = List.init h (fun i -> mkRel (1 + boolarray_count_sub reachable_ary (h-i) i)) in
           let update_rels term = Vars.substl subst (Vars.liftn h2 (h+1) term) in
-          let ks' = array_filter_with ~result_length:h2 reachable_ary ks in
+          let ks' = filter ks in
           let j' = boolarray_count_sub reachable_ary 0 j in
-          let nary' = array_filter_with ~result_length:h2 reachable_ary nary in
-          let tary' = array_filter_with ~result_length:h2 reachable_ary tary in
-          let fary' = Array.map update_rels (array_filter_with ~result_length:h2 reachable_ary fary') in
-          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary (array_filter_with ~result_length:h2 reachable_ary fvs)) in
+          let nary' = filter nary in
+          let tary' = filter tary in
+          let fary' = Array.map update_rels (filter fary') in
+          let fv = IntSet.filter (fun l -> l < n) (intset_union_ary (filter fvs)) in
           (mkFix ((ks', j'), (nary', tary', fary')), fv)
     in
     (mkApp (term', args), fv)
