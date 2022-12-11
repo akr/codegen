@@ -2062,7 +2062,7 @@ let reachable (start : IntSet.t) (edge : int -> IntSet.t) : IntSet.t =
   in
   loop start start
 
-let boolarray_count (ary : bool array) (i : int) (n : int) : int =
+let boolarray_count_sub (ary : bool array) (i : int) (n : int) : int =
   let rec aux i n acc =
     if n <= 0 then
       acc
@@ -2163,11 +2163,11 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           (*let reachable_set = IntSet.union reachable_set (IntSet.of_list (iota_list 0 h)) in (* dummy fill *)*)
           let reachable_ary = Array.init h (fun i -> IntSet.mem i reachable_set) in
           let h2 = IntSet.cardinal reachable_set in
-          let subst = List.init h (fun i -> mkRel (boolarray_count reachable_ary (h-i) i + 1)) in
+          let subst = List.init h (fun i -> mkRel (1 + boolarray_count_sub reachable_ary (h-i) i)) in
           let update_rels term = Vars.substl subst (Vars.liftn h2 (h+1) term) in
           let reachable_list = Array.to_list reachable_ary in
           let ks' = CArray.filter_with reachable_list ks in
-          let j' = boolarray_count reachable_ary 0 j in
+          let j' = boolarray_count_sub reachable_ary 0 j in
           let nary' = CArray.filter_with reachable_list nary in
           let tary' = CArray.filter_with reachable_list tary in
           let fary' = Array.map update_rels (CArray.filter_with reachable_list fary') in
