@@ -27,6 +27,11 @@ val array_copy_set : 'a array -> int -> 'a -> 'a array
 val array_find_index : ('a -> bool) -> 'a array -> int
 val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
+val array_count_sub : ('a -> bool) -> 'a array -> int -> int -> int
+val array_count : ('a -> bool) -> 'a array -> int -> int -> int
+val boolarray_count_sub : bool array -> int -> int -> int
+val boolarray_count : bool array -> int
+val array_filter_with : bool array -> ?result_length:int -> 'a array -> 'a array
 val ncons : int -> 'a -> 'a list -> 'a list
 val ntimes : int -> ('a -> 'a) -> 'a -> 'a
 val rcons : 'a list -> 'a -> 'a list
@@ -84,6 +89,7 @@ val disjoint_id_map_union : 'a Names.Id.Map.t -> 'a Names.Id.Map.t -> 'a Names.I
 val disjoint_id_map_union_ary : 'a Names.Id.Map.t array -> 'a Names.Id.Map.t
 val disjoint_id_map_union_list : 'a Names.Id.Map.t list -> 'a Names.Id.Map.t
 val stringset_union_list : State.StringSet.t list -> State.StringSet.t
+val reachable : IntSet.t -> (int -> IntSet.t) -> IntSet.t
 type unionfind_t
 val unionfind_make : int -> unionfind_t
 val unionfind_find : unionfind_t -> int -> int

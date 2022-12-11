@@ -220,6 +220,65 @@ let array_flatten (v : 'a array array) : 'a array =
     done;
     u
 
+let array_count_sub (p : 'a -> bool) (ary : 'a array) (i : int) (n : int) : int =
+  let rec aux i n acc =
+    if n <= 0 then
+      acc
+    else
+      if p ary.(i) then
+        aux (i+1) (n-1) (acc+1)
+      else
+        aux (i+1) (n-1) acc
+  in
+  aux i n 0
+
+let array_count (p : 'a -> bool) (ary : 'a array) (i : int) (n : int) : int = array_count_sub p ary 0 (Array.length ary)
+
+let boolarray_count_sub (ary : bool array) (i : int) (n : int) : int =
+  let rec aux i n acc =
+    if n <= 0 then
+      acc
+    else
+      if ary.(i) then
+        aux (i+1) (n-1) (acc+1)
+      else
+        aux (i+1) (n-1) acc
+  in
+  aux i n 0
+
+let boolarray_count (ary : bool array) : int =
+  boolarray_count_sub ary 0 (Array.length ary)
+
+let array_filter_with (filter : bool array)
+    ?(result_length = boolarray_count filter)
+    (ary : 'a array) : 'a array =
+  let n = Array.length ary in
+  if Array.length filter <> n then
+    invalid_arg "array_filter_with";
+  if CArray.is_empty ary then
+    begin
+      if result_length <> 0 then
+        invalid_arg "array_filter_with(result_length)";
+      [||]
+    end
+  else
+    begin
+      let result = Array.make result_length ary.(0) in
+      let j = ref 0 in
+      for i = 0 to n-1 do
+        if filter.(i) then
+          begin
+            (if result_length <= !j then
+              invalid_arg "array_filter_with(result_length)");
+            result.(!j) <- ary.(i);
+            j := !j + 1;
+          end
+      done;
+      if result_length <> !j then
+        invalid_arg "array_filter_with(result_length)";
+      result
+    end
+
 let ncons n x s = CList.addn n x s
 
 let rec ntimes n f v =
@@ -521,6 +580,20 @@ let idset_union_ary (ary : Id.Set.t array) =
 
 let stringset_union_list (s : StringSet.t list) : StringSet.t =
   List.fold_left StringSet.union StringSet.empty s
+
+let reachable (start : IntSet.t) (edge : int -> IntSet.t) : IntSet.t =
+  let rec loop q result =
+    match IntSet.choose_opt q with
+    | Some i ->
+        let q = IntSet.remove i q in
+        let nexts = edge i in
+        let q = IntSet.union q (IntSet.diff nexts result) in
+        let result = IntSet.union nexts result in
+        loop q result
+    | None ->
+        result
+  in
+  loop start start
 
 type unionfind_t = int array
 
