@@ -2093,15 +2093,15 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           (mkLetIn (x,e',t,b'), fv)
       | Case (ci,u,pms,p,iv,item,bl) ->
           let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
-          let bl_fvs =
+          let bl_fv_ary =
             Array.map2
               (fun (nas, body) (ctx, _) ->
                 let aenv2 = aenv_push_branch_ctx aenv ctx in
                 aux aenv2 body)
               bl bl0
           in
-          let bl' = Array.map2 (fun (nas, _) (b, fv) -> (nas, b)) bl bl_fvs in
-          let fv = intset_union_ary (Array.map snd bl_fvs) in
+          let bl' = Array.map2 (fun (nas, _) (b, fv) -> (nas, b)) bl bl_fv_ary in
+          let fv = intset_union_ary (Array.map snd bl_fv_ary) in
           (mkCase (ci, u, pms, p, iv, item, bl'), fv)
       | Lambda (x,t,b) ->
           let aenv2 = aenv_push_assum aenv x t in
@@ -2111,9 +2111,9 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           let n = Environ.nb_rel env in
           let h = Array.length fary in
           let aenv2 = aenv_push_fix aenv prec in
-          let fary_fvs = Array.map (aux aenv2) fary in
-          let fary' = Array.map fst fary_fvs in
-          let fvs = Array.map snd fary_fvs in
+          let fary_fv_ary = Array.map (aux aenv2) fary in
+          let fary' = Array.map fst fary_fv_ary in
+          let fvs = Array.map snd fary_fv_ary in
           let edges =
             Array.map
               (IntSet.filter_map
