@@ -2134,7 +2134,6 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] reachable=[" ++
             pp_sjoinmap_list (fun i -> Pp.str (str_of_annotated_name nary.(i))) (IntSet.elements reachable_set) ++
             Pp.str "]");*)
-          (*let reachable_set = IntSet.union reachable_set (IntSet.of_list (iota_list 0 h)) in (* dummy fill *)*)
           let reachable_ary = Array.init h (fun i -> IntSet.mem i reachable_set) in
           let h2 = IntSet.cardinal reachable_set in
           let filter ary = array_filter_with ~result_length:h2 reachable_ary ary in
