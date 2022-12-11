@@ -2143,7 +2143,7 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           let edges =
             Array.map
               (IntSet.filter_map
-                (fun i -> if i < n then None else Some (i - n)))
+                (fun l -> if l < n then None else Some (l - n)))
               fvs
           in
           (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] edges:" +++
@@ -2155,19 +2155,17 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
                 Pp.str "]")
               (iota_ary 0 h));*)
           let reachable_set = reachable (IntSet.singleton j) (fun i -> edges.(i)) in
-          assert (IntSet.max_elt reachable_set < h);
           assert (0 <= IntSet.min_elt reachable_set);
+          assert (IntSet.max_elt reachable_set < h);
           (*msg_debug_hov (Pp.str "[codegen:delete_unreachable_fixfuncs] reachable=[" ++
             pp_sjoinmap_list (fun i -> Pp.str (str_of_annotated_name nary.(i))) (IntSet.elements reachable_set) ++
             Pp.str "]");*)
           (*let reachable_set = IntSet.union reachable_set (IntSet.of_list (iota_list 0 h)) in (* dummy fill *)*)
           let reachable_ary = Array.init h (fun i -> IntSet.mem i reachable_set) in
+          let h2 = IntSet.cardinal reachable_set in
+          let subst = List.init h (fun i -> mkRel (boolarray_count reachable_ary (h-i) i + 1)) in
+          let update_rels term = Vars.substl subst (Vars.liftn h2 (h+1) term) in
           let reachable_list = Array.to_list reachable_ary in
-          let update_rels term =
-            let h2 = IntSet.cardinal reachable_set in
-            let s = List.init h (fun i -> mkRel (boolarray_count reachable_ary (h-i) i + 1)) in
-            Vars.substl s (Vars.liftn h2 (h+1) term)
-          in
           let ks' = CArray.filter_with reachable_list ks in
           let j' = boolarray_count reachable_ary 0 j in
           let nary' = CArray.filter_with reachable_list nary in
