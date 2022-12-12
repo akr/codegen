@@ -352,8 +352,8 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
   let rec make_inlinable_fixterm_tbl_lamfix (env : Environ.env) (term : EConstr.t) :
       (* this lambda/fix is inlinable or not *) bool *
       (* fixterms inlinable or not *) bool Id.Map.t *
-      (* variables at non-tail position *) IntSet.t *
-      (* variables at tail position *) IntSet.t =
+      (* fixfunc variables at non-tail position, represented as de Bruijn levels *) IntSet.t *
+      (* fixfunc variables at tail position, represented as de Bruijn levels *) IntSet.t =
     (*msg_debug_hov (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] start:" +++
       Printer.pr_econstr_env env sigma term); *)
     let result = make_inlinable_fixterm_tbl_lamfix1 env term in
@@ -401,8 +401,8 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
   and make_inlinable_fixterm_tbl_lamfix1 (env : Environ.env) (term : EConstr.t) :
       (* this lambda/fix is inlinable or not *) bool *
       (* fixterms inlinable or not *) bool Id.Map.t *
-      (* variables at non-tail position *) IntSet.t *
-      (* variables at tail position *) IntSet.t =
+      (* fixfunc variables at non-tail position, represented as de Bruijn levels *) IntSet.t *
+      (* fixfunc variables at tail position, represented as de Bruijn levels *) IntSet.t =
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
