@@ -410,19 +410,19 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Lambda (x,t,b) ->
         let env2 = env_push_assum env x t in
-        let (inlinable_here, inlinablemap_b, level_nontailset_b, level_tailset_b) = make_inlinable_fixterm_tbl_lamfix env2 b in
-        (inlinable_here, inlinablemap_b, level_nontailset_b, level_tailset_b)
+        let (inlinable_here, inlinablemap_b, nontailset_b, tailset_b) = make_inlinable_fixterm_tbl_lamfix env2 b in
+        (inlinable_here, inlinablemap_b, nontailset_b, tailset_b)
     | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
         let n = Environ.nb_rel env in
         let env2 = EConstr.push_rec_types prec env in
         let fixfuncs_result = Array.map (make_inlinable_fixterm_tbl_lamfix env2) fary in
-        let inlinable_here_fs = Array.for_all (fun (inlinable_here, inlinablemap_f, level_nontailset_f, level_tailset_f) -> inlinable_here) fixfuncs_result in
-        let level_tailset_fs = intset_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, level_nontailset_f, level_tailset_f) -> level_tailset_f) fixfuncs_result) in
-        let level_nontailset_fs = intset_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, level_nontailset_f, level_tailset_f) -> level_nontailset_f) fixfuncs_result) in
-        let inlinablemap_fs = disjoint_id_map_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, level_nontailset_f, level_tailset_f) -> inlinablemap_f) fixfuncs_result) in
-        let fixfunc_referenced_at_nontail_position = IntSet.exists ((<=) n) level_nontailset_fs in
-        let level_tailset_fs' = IntSet.filter ((>) n) level_tailset_fs in
-        let level_nontailset_fs' = IntSet.filter ((>) n) level_nontailset_fs in
+        let inlinable_here_fs = Array.for_all (fun (inlinable_here, inlinablemap_f, nontailset_f, tailset_f) -> inlinable_here) fixfuncs_result in
+        let tailset_fs = intset_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, nontailset_f, tailset_f) -> tailset_f) fixfuncs_result) in
+        let nontailset_fs = intset_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, nontailset_f, tailset_f) -> nontailset_f) fixfuncs_result) in
+        let inlinablemap_fs = disjoint_id_map_union_ary (Array.map (fun (inlinable_here, inlinablemap_f, nontailset_f, tailset_f) -> inlinablemap_f) fixfuncs_result) in
+        let fixfunc_referenced_at_nontail_position = IntSet.exists ((<=) n) nontailset_fs in
+        let tailset_fs' = IntSet.filter ((>) n) tailset_fs in
+        let nontailset_fs' = IntSet.filter ((>) n) nontailset_fs in
         let fixterm_is_higher_order = Array.exists (fun x -> Id.Map.find (id_of_annotated_name x) higher_order_fixfunc_tbl) nary in
         if not inlinable_here_fs ||
            fixfunc_referenced_at_nontail_position ||
@@ -432,14 +432,14 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
             Or, at least one fix-bounded function has a function in arguments.
             Assuming fix-bounded functions are strongly-connected,
             there is no tail position in this fix-term. *)
-          let level_nontailset = IntSet.union level_tailset_fs' level_nontailset_fs' in
+          let nontailset = IntSet.union tailset_fs' nontailset_fs' in
           let inlinablemap_fs' =
             Array.fold_left
               (fun fs name -> Id.Map.add (id_of_annotated_name name) false fs)
               inlinablemap_fs
               nary
           in
-          (false, inlinablemap_fs', level_nontailset, IntSet.empty)
+          (false, inlinablemap_fs', nontailset, IntSet.empty)
         else
           let inlinablemap_fs' =
             Array.fold_left
@@ -447,10 +447,10 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
               inlinablemap_fs
               nary
           in
-          (true, inlinablemap_fs', level_nontailset_fs', level_tailset_fs')
+          (true, inlinablemap_fs', nontailset_fs', tailset_fs')
     | _ ->
-        let (inlinablemap, level_nontailset, level_tailset) = make_inlinable_fixterm_tbl_exp env term in
-        (true, inlinablemap, level_nontailset, level_tailset)
+        let (inlinablemap, nontailset, tailset) = make_inlinable_fixterm_tbl_exp env term in
+        (true, inlinablemap, nontailset, tailset)
   and make_inlinable_fixterm_tbl_exp (env : Environ.env) (term : EConstr.t) :
       (* fixterms inlinable or not *) bool Id.Map.t *
       (* variables at non-tail position *) IntSet.t *
@@ -525,42 +525,42 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
         (Id.Map.empty, IntSet.empty, IntSet.empty)
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
-        let (inlinablemap_e, level_nontailset_e, level_tailset_e) = make_inlinable_fixterm_tbl_exp env e in
-        let (inlinablemap_b, level_nontailset_b, level_tailset_b) = make_inlinable_fixterm_tbl_exp env2 b in
-        let level_nontailset = intset_union3 level_tailset_e level_nontailset_e level_nontailset_b in
+        let (inlinablemap_e, nontailset_e, tailset_e) = make_inlinable_fixterm_tbl_exp env e in
+        let (inlinablemap_b, nontailset_b, tailset_b) = make_inlinable_fixterm_tbl_exp env2 b in
+        let nontailset = intset_union3 tailset_e nontailset_e nontailset_b in
         let inlinablemap = disjoint_id_map_union inlinablemap_e inlinablemap_b in
-        (inlinablemap, level_nontailset, level_tailset_b)
+        (inlinablemap, nontailset, tailset_b)
     | Case (ci,u,pms,p,iv,item,bl) ->
         let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
         (* item cannot contain fix-term because item must be a Rel which type is inductive (non-function) type *)
         let branches_result = Array.map2
           (fun (nas,body) (ctx,_) ->
             let env2 = EConstr.push_rel_context ctx env in
-            let (inlinablemap_br, level_nontailset_br, level_tailset_br) = make_inlinable_fixterm_tbl_exp env2 body in
-            (inlinablemap_br, level_nontailset_br, level_tailset_br))
+            let (inlinablemap_br, nontailset_br, tailset_br) = make_inlinable_fixterm_tbl_exp env2 body in
+            (inlinablemap_br, nontailset_br, tailset_br))
           bl bl0
         in
-        let level_tailset = intset_union_ary (Array.map (fun (inlinablemap_br, level_nontailset_br, level_tailset_br) -> level_tailset_br) branches_result) in
-        let level_nontailset = intset_union_ary (Array.map (fun (inlinablemap_br, level_nontailset_br, level_tailset_br) -> level_nontailset_br) branches_result) in
-        let inlinablemap = disjoint_id_map_union_ary (Array.map (fun (inlinablemap_br, level_nontailset_br, level_tailset_br) -> inlinablemap_br) branches_result) in
-        (inlinablemap, level_nontailset, level_tailset)
+        let tailset = intset_union_ary (Array.map (fun (inlinablemap_br, nontailset_br, tailset_br) -> tailset_br) branches_result) in
+        let nontailset = intset_union_ary (Array.map (fun (inlinablemap_br, nontailset_br, tailset_br) -> nontailset_br) branches_result) in
+        let inlinablemap = disjoint_id_map_union_ary (Array.map (fun (inlinablemap_br, nontailset_br, tailset_br) -> inlinablemap_br) branches_result) in
+        (inlinablemap, nontailset, tailset)
     | Lambda _ ->
         if CArray.is_empty args then (* closure creation *)
-          let (inlinable_here, inlinablemap, level_nontailset, level_tailset) = make_inlinable_fixterm_tbl_lamfix env term in
-          let level_nontailset' = IntSet.union level_tailset level_nontailset in
-          (inlinablemap, level_nontailset', IntSet.empty)
+          let (inlinable_here, inlinablemap, nontailset, tailset) = make_inlinable_fixterm_tbl_lamfix env term in
+          let nontailset' = IntSet.union tailset nontailset in
+          (inlinablemap, nontailset', IntSet.empty)
         else
           assert false
     | Fix _ ->
         if CArray.is_empty args then (* closure creation *)
-          let (inlinable_here, inlinablemap, level_nontailset, level_tailset) = make_inlinable_fixterm_tbl_lamfix env term in
-          let level_nontailset' = IntSet.union level_tailset level_nontailset in
-          (inlinablemap, level_nontailset', IntSet.empty)
+          let (inlinable_here, inlinablemap, nontailset, tailset) = make_inlinable_fixterm_tbl_lamfix env term in
+          let nontailset' = IntSet.union tailset nontailset in
+          (inlinablemap, nontailset', IntSet.empty)
         else
-          let (inlinable_here, inlinablemap, level_nontailset, level_tailset) = make_inlinable_fixterm_tbl_lamfix env term in
-          (inlinablemap, level_nontailset, level_tailset)
+          let (inlinable_here, inlinablemap, nontailset, tailset) = make_inlinable_fixterm_tbl_lamfix env term in
+          (inlinablemap, nontailset, tailset)
   in
-  let (inlinable_here, inlinablemap, level_nontailset, level_tailset) = make_inlinable_fixterm_tbl_lamfix env term in
+  let (inlinable_here, inlinablemap, nontailset, tailset) = make_inlinable_fixterm_tbl_lamfix env term in
   inlinablemap
 
 let determine_fixfunc_call_or_goto (tail_position : bool) (fixfunc_is_higher_order : bool) (fixterm_is_inlinable : bool)
