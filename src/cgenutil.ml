@@ -862,6 +862,37 @@ let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     | _ ->
       user_err (Pp.str "[codegen:bug:decompose_lam_n_env] unexpected non-lambda term:" +++ Printer.pr_econstr_env env sigma term)
 
+(* The innermost let binding is appeared first in the result:
+  Here, "exp" means AST of exp, not string.
+
+    decompose_lets
+      "let x : nat := 0 in
+       let y : nat := 1 in
+       let z : nat := 2 in
+      body"
+
+  returns
+
+    ([("z","2","nat"); ("y","1","nat"); ("x","0","nat")], "body")
+
+  This order of bindings is same as Constr.rel_context used by
+  Environ.push_rel_context.
+*)
+let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
+  let rec aux term defs =
+    match EConstr.kind sigma term with
+    | LetIn (x, e, ty, b) ->
+        aux b ((x, e, ty) :: defs)
+    | _ -> (defs, term)
+  in
+  aux term []
+
+let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
+  match defs with
+  | [] -> body
+  | (x,e,ty) :: rest ->
+      compose_lets rest (mkLetIn (x, e, ty, body))
+
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg:" +++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in

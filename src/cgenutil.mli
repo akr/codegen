@@ -128,6 +128,8 @@ val decompose_appvect : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
 val decompose_lam_upto_n : Environ.env -> Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t Context.binder_annot * EConstr.t) list * EConstr.t)
 val decompose_lam_n_env :
   Environ.env -> Evd.evar_map -> int -> EConstr.t -> Environ.env * EConstr.t
+val decompose_lets : Evd.evar_map -> EConstr.t -> (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t
+val compose_lets : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list -> EConstr.t -> EConstr.t
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
 val out_punivs : 'a EConstr.puniverses -> 'a

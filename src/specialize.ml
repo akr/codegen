@@ -977,37 +977,6 @@ and normalizeV1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
 let normalizeV (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   normalizeV_rec (aenv_of_env env) sigma term
 
-(* The innermost let binding is appeared first in the result:
-  Here, "exp" means AST of exp, not string.
-
-    decompose_lets
-      "let x : nat := 0 in
-       let y : nat := 1 in
-       let z : nat := 2 in
-      body"
-
-  returns
-
-    ([("z","2","nat"); ("y","1","nat"); ("x","0","nat")], "body")
-
-  This order of bindings is same as Constr.rel_context used by
-  Environ.push_rel_context.
-*)
-let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
-  let rec aux term defs =
-    match EConstr.kind sigma term with
-    | LetIn (x, e, ty, b) ->
-        aux b ((x, e, ty) :: defs)
-    | _ -> (defs, term)
-  in
-  aux term []
-
-let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
-  match defs with
-  | [] -> body
-  | (x,e,ty) :: rest ->
-      compose_lets rest (mkLetIn (x, e, ty, body))
-
 let debug_reduction (rule : string) (msg : unit -> Pp.t) : unit =
   if !opt_debug_reduction then
     msg_debug_hov (Pp.str ("[codegen] reduction(" ^ rule ^ "):") ++ Pp.fnl () ++ msg ())
