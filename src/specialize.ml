@@ -2121,16 +2121,6 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
   let (result_term, result_fv) = aux (aenv_of_env env0) term in
   result_term
 
-let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
-  match EConstr.kind sigma term with
-  | Lambda (x,t,e) ->
-      let env2 = env_push_assum env x t in
-      x :: formal_argument_names env2 sigma e
-  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
-      let env2 = push_rec_types prec env in
-      formal_argument_names env2 sigma fary.(j)
-  | _ -> []
-
 let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
   let ty = Retyping.get_type_of env sigma term in
   if not (is_monomorphic_type env sigma (Reductionops.nf_all env sigma ty)) then
@@ -2191,6 +2181,16 @@ let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     | Proj _ -> ()
   in
   aux env term
+
+let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
+  match EConstr.kind sigma term with
+  | Lambda (x,t,e) ->
+      let env2 = env_push_assum env x t in
+      x :: formal_argument_names env2 sigma e
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      formal_argument_names env2 sigma fary.(j)
+  | _ -> []
 
 let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let make_new_name prefix counter old_name =
