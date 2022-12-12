@@ -353,8 +353,7 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
       (* this lambda/fix is inlinable or not *) bool *
       (* fixterms inlinable or not *) bool Id.Map.t *
       (* variables at non-tail position *) IntSet.t *
-      (* variables at tail position *) IntSet.t
-      =
+      (* variables at tail position *) IntSet.t =
     (*msg_debug_hov (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] start:" +++
       Printer.pr_econstr_env env sigma term); *)
     let result = make_inlinable_fixterm_tbl_lamfix1 env term in
@@ -382,14 +381,16 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
       Pp.str "}" +++
       Pp.str "nontailset={" ++
       pp_joinmap_list (Pp.str ",")
-        (fun i ->
+        (fun l ->
+          let i = Environ.nb_rel env - l in
           let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
           Pp.int i ++ Pp.str "=" ++ Name.print name)
         (IntSet.elements nontailset) ++
       Pp.str "}" +++
       Pp.str "tailset={" ++
       pp_joinmap_list (Pp.str ",")
-        (fun i ->
+        (fun l ->
+          let i = Environ.nb_rel env - l in
           let name = Context.Rel.Declaration.get_name (Environ.lookup_rel i env) in
           Pp.int i ++ Pp.str "=" ++ Name.print name
           )
@@ -401,8 +402,7 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
       (* this lambda/fix is inlinable or not *) bool *
       (* fixterms inlinable or not *) bool Id.Map.t *
       (* variables at non-tail position *) IntSet.t *
-      (* variables at tail position *) IntSet.t
-      =
+      (* variables at tail position *) IntSet.t =
     match EConstr.kind sigma term with
     | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
