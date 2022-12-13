@@ -143,13 +143,38 @@
 \DeclareMathOperator{\FIXFV}{FIXFV}
 \DeclareMathOperator{\EXARGS}{EXARGS}
 
-\newcommand{\tD}{{t^\mathrm{D}}}
-\newcommand{\tE}{{t^\mathrm{E}}}
-\newcommand{\tL}{{t^\mathrm{L}}}
-\newcommand{\tM}{{t^\mathrm{M}}}
-\newcommand{\tF}{{t^\mathrm{F}}}
-\newcommand{\tC}{{t^\mathrm{C}}}
-\newcommand{\tA}{{t^\mathrm{A}}}
+\newcommand{\tDL}{t^\mathrm{DL}}
+\newcommand{\tD}{t^\mathrm{D}}
+\newcommand{\tE}{t^\mathrm{E}}
+\newcommand{\tL}{t^\mathrm{L}}
+\newcommand{\tM}{t^\mathrm{M}}
+\newcommand{\tF}{t^\mathrm{F}}
+\newcommand{\tC}{t^\mathrm{C}}
+\newcommand{\tA}{t^\mathrm{A}}
+
+\newcommand{\HDL}{\mathrm{HEAD}^\mathrm{DL}}
+\newcommand{\HD}{\mathrm{HEAD}^\mathrm{D}}
+\newcommand{\HE}{\mathrm{HEAD}^\mathrm{E}}
+\newcommand{\HL}{\mathrm{HEAD}^\mathrm{L}}
+\newcommand{\HM}{\mathrm{HEAD}^\mathrm{M}}
+\newcommand{\HF}{\mathrm{HEAD}^\mathrm{F}}
+\newcommand{\HC}{\mathrm{HEAD}^\mathrm{C}}
+\newcommand{\HA}{\mathrm{HEAD}^\mathrm{A}}
+
+\newcommand{\TDL}{\mathrm{TAIL}^\mathrm{DL}}
+\newcommand{\TD}{\mathrm{TAIL}^\mathrm{D}}
+\newcommand{\TE}{\mathrm{TAIL}^\mathrm{E}}
+\newcommand{\TL}{\mathrm{TAIL}^\mathrm{L}}
+\newcommand{\TM}{\mathrm{TAIL}^\mathrm{M}}
+\newcommand{\TF}{\mathrm{TAIL}^\mathrm{F}}
+\newcommand{\TC}{\mathrm{TAIL}^\mathrm{C}}
+\newcommand{\TA}{\mathrm{TAIL}^\mathrm{A}}
+
+\newcommand{\HOLEH}{\square_\mathrm{H}}
+\newcommand{\HOLET}{\square_\mathrm{T}}
+
+\newcommand{\HEAD}{\mathrm{HEAD}}
+\newcommand{\TAIL}{\mathrm{TAIL}}
 
 \DeclareMathOperator{\merg}{merge}
 
@@ -187,27 +212,29 @@
 \newcommand{\cv}[3]{\cvop\BRA{#1\,/\,#2}_{#3}}
 
 \DeclareMathOperator{\TRop}{TR}
-\newcommand{\TRLF}[1]{\TRop_\text{LF}\BRA{#1}}
+\newcommand{\TRFUN}[1]{\TRop_\text{FUN}\BRA{#1}}
 \newcommand{\TREXP}[1]{\TRop_\text{EXP}\BRA{#1}}
 \newcommand{\tr}{\mathit{TR}}
 
 \DeclareMathOperator{\INLop}{INL}
-\newcommand{\INL}[1]{\INLop_\text{LF}\BRA{#1}}
+\newcommand{\INL}[1]{\INLop\BRA{#1}}
 
-\DeclareMathOperator{\RNTop}{RNT}
-\newcommand{\RNTLF}[1]{\RNTop_\text{LF}\BRA{#1}}
+\DeclareMathOperator{\RNTop}{IFIX}
+\newcommand{\RNTFUN}[1]{\RNTop_\text{FUN}\BRA{#1}}
 \newcommand{\RNTEXP}[1]{\RNTop_\text{EXP}\BRA{#1}}
 
-\DeclareMathOperator{\Nop}{N}
-\DeclareMathOperator{\Top}{T}
+\DeclareMathOperator{\MyH}{HEAD}
+\DeclareMathOperator{\MyT}{TAIL}
 
-\newcommand{\NLF}[1]{\Nop_\text{LF}\BRA{#1}}
-\newcommand{\NEXP}[1]{\Nop_\text{EXP}\BRA{#1}}
-\newcommand{\TLF}[1]{\Top_\text{LF}\BRA{#1}}
-\newcommand{\TEXP}[1]{\Top_\text{EXP}\BRA{#1}}
+\newcommand{\HFUN}[1]{\MyH_\text{FUN}\BRA{#1}}
+\newcommand{\HEXP}[1]{\MyH_\text{EXP}\BRA{#1}}
+\newcommand{\TFUN}[1]{\MyT_\text{FUN}\BRA{#1}}
+\newcommand{\TEXP}[1]{\MyT_\text{EXP}\BRA{#1}}
 
 \newcommand{\true}{\mathrm{T}}
 \newcommand{\false}{\mathrm{F}}
+
+\newcommand{\HigherOrderFixfunc}{\mathrm{HigherOrderFixfunc}}
 
 \DeclareMathOperator{\APP}{APP}
 \DeclareMathOperator{\components}{components}
@@ -666,13 +693,13 @@ Thus match-branches doesn't trigger the eta expansion.)
 \end{gather*}
 
 This transformations makes a term in following syntax.
-The entire term is represented as $\tD'$.
+The entire term is represented as $\tDL$.
 ($\tD$ for functions and $\tE$ for non-function constants.)
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE &= x \\
     &\bnfor f \\
@@ -685,7 +712,7 @@ The entire term is represented as $\tD'$.
     &\bnfor \tD \\
 \end{align*}
 
-The type of $\tE$ in $\tD'$ is an inductive type because
+The type of $\tE$ in $\tDL$ is an inductive type because
 the eta expansions (etaex-fix and etaex-abs) transform the body of abstraction and fixpoint until its type is not function type.
 
 \subsection{V-Normalization}\label{sec:v-normalization}
@@ -731,9 +758,9 @@ Since we apply V-reductions for a eta-expanded term,
 the result term can be represented in following syntax.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
   \tE &= x \\
     &\bnfor f \\
@@ -868,9 +895,9 @@ Thus, function position can be v-variable, f-variable, constant, construcor, or 
 Also, zeta-flat removes a let-in at the binder term of a let-in.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -890,9 +917,9 @@ because such variables are redex of delta reduction.
 Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-deletion}) more effective.
 
 \begin{align*}
-  \tD &= \lamT{x}{\fbox{$T$}}{\tD'} & \leftarrow \\
+  \tD &= \lamT{x}{\fbox{$T$}}{\tDL} & \leftarrow \\
       &\bnfor \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:\fbox{$T$}}{\tM} & \leftarrow \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -915,9 +942,9 @@ We assume the normalized static arguments have no free variables.
 It makes the syntax as follows.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -990,9 +1017,9 @@ This transformation removes non-variable arguments from applications.
 Thus the result will be V-normal form again.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -1088,9 +1115,9 @@ Also, constants and constructors are always fully applied to arguments.
 F-variables cannot occur in $\tE$ because they cannot be a inductive type.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -1116,9 +1143,9 @@ This step checks
 (2) types and sorts doesn't occur at expression.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -1416,9 +1443,9 @@ we only need to change variable names in binders:
 (4) variables of constructor members of conditional.
 
 \begin{align*}
-  \tD &= \lamT{\fbox{$x$}}{T}{\tD'} & \leftarrow (1) \\
+  \tD &= \lamT{\fbox{$x$}}{T}{\tDL} & \leftarrow (1) \\
       &\bnfor \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{\fbox{$x$}}{\tM:T}{\tM} & \leftarrow (3) \\
   \tM &= \omatch{x}{\rep{C\:\rep{\fbox{$x$}}\Rightarrow \tL}} & \leftarrow (4) \\
@@ -1434,9 +1461,9 @@ we only need to change variable names in binders:
 \subsection{The \gallina{} Subset for C Code Generation}\label{sec:gallinasubsetforcgen}
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tD'} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
       &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
-  \tD' &= \tD \\
+  \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
@@ -1447,6 +1474,10 @@ we only need to change variable names in binders:
     &\bnfor \tD \\
   \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
+
+\subsection{Detection of Higher Order Fixfuncs}\label{sec:higher-order-fixfunc-detection}
+
+We call the set of f-variables of higher order fixfuncs $\HigherOrderFixfunc$.
 
 \subsection{Detection of Inlinable Fixpoints}\label{sec:inlinable-fixpoint-detection}
 We detect inlinable fixpoints.
@@ -1460,75 +1491,110 @@ Thus, we can translate the tail positions of $\rep{f}$ to
 (2) assignment to $x$ and $\kwgoto{}\;u$ otherwise.
 This translation is equivalent to inlining a tail-recursive function, which means generating a loop at a non-tail position.
 
-$\RNTLF{t} = (\INL{t}, \TRLF{t}, \NLF{t}, \TLF{t})$ classify variables in $t$.
+$\TRFUN{t}$ is the second component of $\RNTFUN{t}$.
+It is a set of fixfuncs which are translatable without actual functions.
+
+$\RNTFUN{t}$ and $\RNTEXP{t}$ are defined mutually recursive.
+$\RNTFUN{t}$ is four-tuple.
+$\RNTEXP{t}$ is three-tuple.
+We introduce 7 functions to refer the components of them.
 \begin{align*}
-  \INL{t} &: \text{$t$ is inlinable or not ($\true$ or $\false$)} \\
-  \TRLF{t} &: \text{tail-recursive fixpoint bounded functions that do not need to be real functions in $t$} \\
-  \NLF{t} &: \text{free variables at non-tail positions of $t$} \\
-  \TLF{t} &: \text{free variables at tail positions of $t$}
+  \RNTFUN{t} &= (\INL{t}, \TRFUN{t}, \HFUN{t}, \TFUN{t}) \\
+  \RNTEXP{t} &= (\TREXP{t}, \HEXP{t}, \TEXP{t})
 \end{align*}
 
-``tail position'' is extended to the function position of the application at a tail position. \\
-$\TRop_\text{LF}$ distinguishes fixpoint bounded functions translatable without actual functions (but with \kwgoto{}) or not.
+The components means as follows.
+\begin{align*}
+  \INL{t} &: \text{$t$ is inlinable or not ($\true$ or $\false$)} \\
+  \TRFUN{t}, \TREXP{t} &: \text{set of tail-recursive fixfuncs in $t$} \\
+  \HFUN{t}, \HFUN{t} &: \text{free f-variables at head positions of $t$} \\
+  \TFUN{t}, \TFUN{t} &: \text{free f-variables at tail positions of $t$}
+\end{align*}
 
-We also define $\RNTEXP{t} = (\TREXP{t}, \NEXP{t}, \TEXP{t})$.
-$\RNTLF{t}$ and $\RNTEXP{t}$ are mutually recursive.
-$\RNTLF{t}$ traverses abstractions and fixpoints ($\tD$ and $\tD'$).
+$\RNTFUN{t}$ traverses abstractions and fixpoints ($\tD$ and $\tDL$).
 $\RNTEXP{t}$ traverses other constructs ($\tL$, $\tM$, $\tE$, and $\tF$).
 
+``tail position'' is extended to the function position of the application at a tail position. \\
+$\TRop_\text{FUN}$ distinguishes fixpoint bounded functions translatable without actual functions (but with \kwgoto{}) or not.
+
 \begin{align*}
-  \RNTLF{\lam{x}{t}} &= (\INL{t}, \TRLF{t}, \NLF{t}-\{x\}, \TLF{t} - \{x\}) \\
-  \RNTLF{\ofix{\rep{f:=t}}{f_j}} &=
+  \RNTFUN{\lam{x}{t}} &= (\INL{t}, \TRFUN{t}, \HFUN{t}, \TFUN{t}) \\
+  \RNTFUN{\ofix{\rep{f:=t}}{f_j}} &=
     \begin{cases}
       \begin{aligned}[t]
         \bigl(& \true, \\
-              & \tbigcup_i \TRLF{t_i} \cup \{\rep{f}\}, \\
-              & \tbigcup_i \NLF{t_i} - \{\rep{f}\}, \\
-              & \tbigcup_i \TLF{t_i} - \{\rep{f}\} \bigr)
+              & \tbigcup_i \TRFUN{t_i} \cup \{\rep{f}\}, \\
+              & \tbigcup_i \HFUN{t_i} - \{\rep{f}\}, \\
+              & \tbigcup_i \TFUN{t_i} - \{\rep{f}\} \bigr)
       \end{aligned}
         & \begin{aligned}[t]
-          & \text{the fixpoint is not higher order} \wedge {} \\
-          & \bigl(\tbigcup_i \NLF{t_i} \cap \{\rep{f}\} = \varnothing\bigr) \wedge {} \\
+          & \bigl(\tbigcup_i \HFUN{t_i} \cap \{\rep{f}\} = \varnothing\bigr) \wedge {} \\
+          & \bigl(\HigherOrderFixfunc \cap \{\rep{f}\} = \varnothing\bigr) \wedge {} \\
           & \forall i,~ \INL{t_i}
           \end{aligned} \\
       \begin{aligned}[t]
         \bigl(& \false, \\
-              & \tbigcup_i \TRLF{t_i}, \\
-              & \tbigcup_i (\NLF{t_i} \cup \TLF{t_i}) - \{\rep{f}\}, \\
+              & \tbigcup_i \TRFUN{t_i}, \\
+              & \tbigcup_i (\HFUN{t_i} \cup \TFUN{t_i}) - \{\rep{f}\}, \\
               & \varnothing \bigr)
       \end{aligned}
         & \text{otherwise}
     \end{cases} \\
-  \RNTLF{t} &= (\true, \TREXP{t}, \NEXP{t}, \TEXP{t}) \\
-    & \text{where}~\text{$t$ is not abstraction nor fixpoint}
+  \RNTFUN{t} &= (\true, \TREXP{t}, \HEXP{t}, \TEXP{t}) \\
+    & \text{if}~\text{$t$ is not abstraction nor fixpoint}
 \end{align*}
 \begin{align*}
-  \RNTEXP{x\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \{x\}) \\
-  \RNTEXP{f\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \{f\}) \\
-  \RNTEXP{c\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
-  \RNTEXP{C\:\rep{y}} &= (\varnothing, \{\rep{y}\}, \varnothing) \\
-  \RNTEXP{\letin{x}{t}{u}} &= (\TREXP{t} \cup \TREXP{u}, \NEXP{t} \cup \TEXP{t} \cup \NEXP{u} - \{x\}, \TEXP{u} - \{x\}) \\
-  \RNTEXP{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TREXP{t_i}, \tbigcup_i \NEXP{t_i} - \{\rep{x_i}\}, \tbigcup_i \TEXP{t_i} - \{\rep{x_i}\} \bigr) \\
-  \RNTEXP{t} &= (\TRLF{t}, \NEXP{t} \cup \TEXP{t}, \varnothing) \\
-    & \text{where}~t = \lam{x}{u} \\
-  \RNTEXP{t\:\rep{y}} &=
-    \begin{cases}
-      (\TRLF{t}, \NEXP{t} \cup \TEXP{t}, \varnothing) & |y| = 0 \\
-      (\TRLF{t}, \NEXP{t} \cup \{\rep{y}\}, \TEXP{t}) & \text{otherwise}
-    \end{cases} \\
-    & \text{where}~t = \ofix{\rep{f:=u}}{f_j}
+  \RNTEXP{x\:\rep{y}} &= (\varnothing, \varnothing, \varnothing) \\
+  \RNTEXP{f\:\rep{y}} &= (\varnothing, \varnothing, \{f\}) \\
+  \RNTEXP{c\:\rep{y}} &= (\varnothing, \varnothing, \varnothing) \\
+  \RNTEXP{C\:\rep{y}} &= (\varnothing, \varnothing, \varnothing) \\
+  \RNTEXP{\letin{x}{t}{u}} &=
+    ( \begin{aligned}[t]
+      & \TREXP{t} \cup \TREXP{u}, \\
+      & \HEXP{t} \cup \TEXP{t} \cup \HEXP{u}, \\
+      & \TEXP{u})
+      \end{aligned} \\
+  \RNTEXP{\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}} &= \bigl(\tbigcup_i \TREXP{t_i}, \tbigcup_i \HEXP{t_i}, \tbigcup_i \TEXP{t_i} \bigr) \\
+  \RNTEXP{t} &= (\TRFUN{t}, \HEXP{t} \cup \TEXP{t}, \varnothing) \\
+    & \text{if}~(t = \lam{x}{u}) \vee (t = \ofix{\rep{f:=u}}{f_j}) \\
+  \RNTEXP{t\:\rep{y}} &= (\TRFUN{t}, \HEXP{t}, \TEXP{t}) \\
+    & \text{if}~(t = \ofix{\rep{f:=u}}{f_j}) \wedge (|y| > 0)
 \end{align*}
 
 {\small Note:
 \begin{itemize}
   \item The variables in $t$ are unique.
-    \codegen{} uses de Bruijn's indexes for $\Nop$ and $\Top$;
+    \codegen{} uses de Bruijn's indexes for $\MyH$ and $\MyT$;
     the variables renamed by \secref{sec:cvaralloc} for $\TRop$.
   \item $y$ of $\omatch{y}{\rep{C\:\rep{x}\Rightarrow t}}$ is not counted because $y$ is not a function and does not affect the final $\TRop$.
   \item $\INLop$ guarantees that consecutive fixpoints and abstractions ($\tD$, traversed by $\RNTop_\text{LF}$) synthesizes non-inlinableness:
     an outer fixpoint is not inlinable if an inner fixpoint is not-inlinable.
     This property holds in most case without $\INLop$ but an curious fixpoint (such as non-recursive fixpoint) can break this property.
     Thus we added $\INLop$.
+\end{itemize}}
+
+\subsection{Head Position and Tail Position}\label{sec:head-position-and-tail-position}
+
+\begin{align*}
+  \tDL_p &= \tD_p \\
+       &\bnfor \tL_p \\
+  \tD_p &= \lamT{x}{T}{\tDL_p} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD_p}}{f_j} \\
+  \tL_p &= \letinM{x}{\tM_\HEAD:T}{\tM_p} \\
+  \tM_p &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL_p}} \\
+    &\bnfor \tE_p \\
+  \tE_p &= x \\
+    &\bnfor c \bnfor C \\
+    &\bnfor \tF_p\:\rep{x}  \\
+    &\bnfor \tD_\TAIL \\
+  \tF_p &= x \bnfor f \bnfor c \bnfor C \\
+    &\bnfor \ofix{\rep{f/k{:}T:=\tD_p}}{f_j} & f_j \in \tr \\
+    &\bnfor \ofix{\rep{f/k{:}T:=\tD_\TAIL}}{f_j} & f_j \notin \tr
+\end{align*}
+
+{\small Note:
+\begin{itemize}
+  \item $\tr = \TRFUN{t}$ where the translating function is defined as \kwDefinition~$c := t$.
 \end{itemize}}
 
 \subsection{Top-Level Functions Detection}\label{sec:top-level-function-detection}
@@ -1691,7 +1757,7 @@ $K(e) = \dq{v = e\ttsemi}$ in simple situations.
     The latter embeds the value of the expression (with name translation from \gallina{} to C).
   \item \gallina{} types, constants, and constructors have corresponding (user-configurable) C names and they are implicitly translated.
     \gallina{} variables are translated by the mapping defined in \secref{sec:cvaralloc}.
-  \item $\tr = \TRLF{t}$ where the translating function is defined as \kwDefinition~$c := t$.
+  \item $\tr = \TRFUN{t}$ where the translating function is defined as \kwDefinition~$c := t$.
   \item $\mathit{swfunc}_T, \mathit{caselabel}_{C_i}$, and $\mathit{get\_member}_{C_i j}$ are defined by a user to translate \kwmatch-expressions for the inductive type $T$.
   \item $\mathit{linear\_dealloc}_{T}(x)$ is the deallocation function for the linear type $T$.  It is empty for unrestricted types.
   \item $\passign(\rep{y}, \rep{x})$ is a parallel assignment. It is translated to a sequence of assignments to assign $x_1\ldots x_n$ into $y_1\ldots y_n$.  It may require temporary variables.
