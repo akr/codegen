@@ -603,6 +603,7 @@ $\KV(K)$ is the bound variables usable in the hole of the context $K$.
   \item Call Site Replacement
   \item Eta Reduction to Expose Fixpoint
   \item Argument Completion
+  \item Unreachable Fixfunc Deletion
   \item Monomorphism Check
   \item Borrow Check
   \item C Variable Allocation
@@ -1128,6 +1129,10 @@ F-variables cannot occur in $\tE$ because they cannot be a inductive type.
     &\bnfor \tD \\
   \tF &= x \bnfor f \bnfor c \bnfor C \bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j}
 \end{align*}
+
+\subsection{Unreachable Fixfunc Deletion}\label{sec:unreachable-fixfunc-deletion}
+
+\codegen{} deletes unreachable fix-bounded functions.
 
 \subsection{Monomorphism Check}\label{sec:check-monomorphism}
 
