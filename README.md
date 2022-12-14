@@ -7,6 +7,14 @@ from Gallina definitions.
 
 https://github.com/akr/codegen
 
+## Features
+
+- Gallina to C translation
+- Monomorphization by partial evaluation
+- Customizable inductive type implementation in C
+- Downward-only closures
+- Guaranteed tail recursion elimination
+
 ## Requiements
 
 You need Coq and OCaml.
