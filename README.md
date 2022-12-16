@@ -12,6 +12,7 @@ https://github.com/akr/codegen
 - Gallina to C translation
 - Monomorphization by partial evaluation
 - Customizable inductive type implementation in C
+- Linearity checker for safe destructive update of values
 - Downward-only closures
 - Guaranteed tail recursion elimination
 
