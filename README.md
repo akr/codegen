@@ -9,11 +9,12 @@ https://github.com/akr/codegen
 
 ## Features
 
-- Gallina to C translation
+- Simple Gallina to C translation (the translated code corresponds strict evaluation of Gallina term)
 - Monomorphization by partial evaluation
 - Customizable inductive type implementation in C
 - Linearity checker for safe destructive update of values
-- Downward-only closures
+- Borrow checker to ease read only access of linear values
+- Downward-only closures (functions can be passed as arguments but return values cannot contain functions)
 - Guaranteed tail recursion elimination
 
 ## Requiements
