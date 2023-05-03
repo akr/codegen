@@ -1038,7 +1038,7 @@ let rec free_variables_rec (sigma : Evd.evar_map) (numlocal : int) (fv : bool ar
       if numlocal < i then
         fv.(i-numlocal-1) <- true
   | _ ->
-      Termops.fold_constr_with_binders sigma Stdlib.Int.succ
+      EConstr.fold_with_binders sigma Stdlib.Int.succ
         (fun numlocal u e -> free_variables_rec sigma numlocal fv e)
         numlocal () term
 
@@ -1341,7 +1341,7 @@ let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : boo
       Int.equal len (Array.length l2) &&
       eq c1 c2 && CArray.equal eq l1 l2
     | Proj (p1,c1), Proj (p2,c2) -> Projection.CanOrd.equal p1 p2 && eq c1 c2
-    | Evar (e1,l1), Evar (e2,l2) -> Evar.equal e1 e2 && List.equal eq l1 l2
+    | Evar (e1,l1), Evar (e2,l2) -> Evar.equal e1 e2 && SList.equal eq l1 l2
     | Const (c1,u1), Const (c2,u2) ->
       Constant.CanOrd.equal c1 c2 && instance_equal u1 u2
     | Ind (c1,u1), Ind (c2,u2) -> Ind.CanOrd.equal c1 c2 && instance_equal u1 u2

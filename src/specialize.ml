@@ -790,7 +790,7 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
       in
       let n = List.length args in
       let term' = Vars.lift n (search_fixclo_to_expand_eta env sigma term) in
-      compose_lam args' (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n))))
+      it_mkLambda (mkApp (term', Array.map mkRel (array_rev (iota_ary 1 n)))) args'
 and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
@@ -1126,7 +1126,7 @@ and reduce_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
   | Lambda _ ->
       let (lams, b) = decompose_lam sigma term in
       let aenv2 = aenv_push_assums aenv lams in
-      compose_lam lams (reduce_exp aenv2 sigma b)
+      it_mkLambda (reduce_exp aenv2 sigma b) lams
   | LetIn (x,e,t,b) ->
       let e' = reduce_exp aenv sigma e in (* xxx: we don't want to reduce function? *)
       if isLetIn sigma e' then
@@ -1886,11 +1886,11 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
             let args3 = [||] in
             let f3 = Vars.lift (-n) f in
             let env3 = env_push_assums env lams3 in
-            compose_lam lams3 (reduce_eta env3 sigma (mkApp (f3,args3)))
+            it_mkLambda (reduce_eta env3 sigma (mkApp (f3,args3))) lams3
           else
-            compose_lam lams (reduce_eta env2 sigma b)
+            it_mkLambda (reduce_eta env2 sigma b) lams
       | _ ->
-        compose_lam lams (reduce_eta env2 sigma b))
+        it_mkLambda (reduce_eta env2 sigma b) lams)
   | LetIn (x,e,t,b) ->
       let e' = reduce_eta env sigma e in
       let env2 = env_push_def env x e' t in
@@ -1970,7 +1970,7 @@ and complete_args_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t)
       let term' = Vars.lift r term in
       let args = (Array.map mkRel (array_rev (iota_ary 1 r))) in
       (* reduction/expansion: eta-expansion *)
-      compose_lam fargs (mkApp (term', args))
+      it_mkLambda (mkApp (term', args)) fargs
   in
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
