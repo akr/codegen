@@ -912,7 +912,7 @@ let inductive_abstract_constructor_type_relatively_to_inductive_types_context_nf
   let (ctx, t) = nf_lc in
   let t = Term.it_mkProd_or_LetIn t ctx in
   let t = Inductive.abstract_constructor_type_relatively_to_inductive_types_context ntypes mutind t in
-  Term.decompose_prod_assum t
+  Term.decompose_prod_decls t
 
 let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer.t) (ty : EConstr.t) : unit =
   (*Feedback.msg_debug (Pp.str "mangle_term_buf:" +++ Printer.pr_econstr_env env sigma ty);*)
@@ -1130,6 +1130,8 @@ let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   | Constrexpr.CPrim _ -> "CPrim"
   | Constrexpr.CDelimiters _ -> "CDelimiters"
   | Constrexpr.CArray _ -> "CArray"
+  | Constrexpr.CGenarg _ -> "CGenarg"
+  | Constrexpr.CGenargGlob _ -> "CGenargGlob"
 
 let global_gensym ?(prefix : string = "g") () : string =
   let n = !gensym_id in

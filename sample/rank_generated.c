@@ -1,5 +1,9 @@
 static pair_MDArr_nat
 buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
+         nat v7_m2);
+
+static pair_MDArr_nat
+buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
          nat v7_m2)
 {
   nat v8_cp;
@@ -25,6 +29,10 @@ buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
       goto entry_buildDir2;
   }
 }
+
+static pair_2MDArr_nat
+buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
+         nat v7_i, MDArr v8_D1, MDArr v9_D2, nat v10_m1);
 
 static pair_2MDArr_nat
 buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
@@ -63,6 +71,9 @@ buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
       goto entry_buildDir1;
   }
 }
+
+static pair_MDArr_MDArr
+buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2);
 
 static pair_MDArr_MDArr
 buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
@@ -116,8 +127,9 @@ buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
   return make_pair_MDArr_MDArr(v26_m, v27_m);
 }
 
-static nat
-pred(nat v1_n)
+static nat pred(nat v1_n);
+
+static nat pred(nat v1_n)
 {
   nat v2_u;
   switch (v1_n)
@@ -130,16 +142,18 @@ pred(nat v1_n)
   }
 }
 
-static nat
-neq0(nat v1_n)
+static nat neq0(nat v1_n);
+
+static nat neq0(nat v1_n)
 {
   nat v2_n;
   v2_n = pred(v1_n);
   return succn(v2_n);
 }
 
-static Aux
-rank_init(bool v1_b, bits v2_s)
+static Aux rank_init(bool v1_b, bits v2_s);
+
+static Aux rank_init(bool v1_b, bits v2_s)
 {
   nat v3_n;
   nat v4_kp;
@@ -181,8 +195,9 @@ rank_init(bool v1_b, bits v2_s)
   return mkAux(v1_b, v2_s, v5_k, v7_sz2, v19_d, v20_d);
 }
 
-static nat
-rank_lookup(Aux v1_aux, nat v2_i)
+static nat rank_lookup(Aux v1_aux, nat v2_i);
+
+static nat rank_lookup(Aux v1_aux, nat v2_i)
 {
   bool v3_b;
   bits v4_s;

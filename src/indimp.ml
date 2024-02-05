@@ -115,11 +115,12 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
        (*cstr union member name*)string *
        ((*member type*)c_typedata *
         (*member name*)string *
-        (*accessor name*)string) list) list) list) =
+        (*accessor name*)string) list) list) list *
+     EInstance.t) =
   let global_prefix = global_gensym () in
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
-  let (ind, _) = destInd sigma f in
+  let (ind, u) = destInd sigma f in
   let (mutind, _) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
   check_ind_id_conflict mutind_body;
@@ -130,7 +131,8 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let ind_id = oneind_body.mind_typename in
         let i_suffix = "_" ^ Id.to_string ind_id in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
-        let ind1 = Constr.mkInd (mutind, i) in
+        let u' = EInstance.kind sigma u in
+        let ind1 = Constr.mkIndU ((mutind, i), u') in
         let coq_type1 = Constr.mkApp (ind1, Array.map (EConstr.to_constr sigma) params) in
         ignore (register_ind_type env sigma coq_type1 ind_typename "");
         ind_typename)
@@ -151,7 +153,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
             (fun j0 ->
               let j = j0 + 1 in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
-              let cstrterm = mkApp ((mkConstruct (ind, j)), params) in
+              let cstrterm = mkApp ((mkConstructU ((ind, j), u)), params) in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
               let cstrtype = Retyping.get_type_of env sigma cstrterm in
               let (args, result_type) = decompose_prod sigma cstrtype in
@@ -184,11 +186,11 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         (ind_typename, enum_tag, swfunc, cstr_and_members))
       (Array.to_list ind_typenames)
   in
-  (mutind, params, ind_names)
+  (mutind, params, ind_names, u)
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind, params, ind_names) = generate_indimp_names env sigma coq_type in
+  let (mutind, params, ind_names, u) = generate_indimp_names env sigma coq_type in
   if List.length ind_names <> 1 then
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let (ind_typename, enum_tag, swfunc, cstr_and_members) = List.hd ind_names in
@@ -205,7 +207,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let env =
     CList.fold_left_i
       (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-        let cstrterm0 = EConstr.to_constr sigma (mkConstruct (ind, j)) in
+        let cstrterm0 = EConstr.to_constr sigma (mkConstructU ((ind, j), u)) in
         let params' = Array.map (EConstr.to_constr sigma) params in
         ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
         let spi ={ spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None } in
@@ -366,7 +368,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind, params, ind_names) = generate_indimp_names env sigma coq_type in
+  let (mutind, params, ind_names, u) = generate_indimp_names env sigma coq_type in
   let env =
     CList.fold_left_i
       (fun i env (ind_typename, enum_tag, swfunc, cstr_and_members) ->
@@ -380,11 +382,12 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
             cstr_and_members
         in
         let params' = Array.map (EConstr.to_constr sigma) params in
-        let coq_type_i = Constr.mkApp (Constr.mkInd ind, params') in
+        let u' = EInstance.kind sigma u in
+        let coq_type_i = Constr.mkApp (Constr.mkIndU (ind, u'), params') in
         ignore (register_ind_match env sigma coq_type_i swfunc cstr_caselabel_accessors_list);
         CList.fold_left_i
           (fun j env (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors) ->
-            let cstrterm0 = Constr.mkConstruct (ind, j) in
+            let cstrterm0 = Constr.mkConstructU ((ind, j), u') in
             ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
             let spi = { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None } in
             let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some spi) in

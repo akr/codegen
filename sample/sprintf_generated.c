@@ -1,5 +1,6 @@
-static buffer
-codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
+static buffer codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n);
+
+static buffer codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
 {
   bool v5_b;
   bool v6_b;
@@ -150,8 +151,9 @@ codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
   return v77_b;
 }
 
-static buffer
-add_mesg(nat v1_a, nat v2_b)
+static buffer add_mesg(nat v1_a, nat v2_b);
+
+static buffer add_mesg(nat v1_a, nat v2_b)
 {
   nat v3_n;
   buffer v4_b;

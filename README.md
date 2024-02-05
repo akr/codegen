@@ -21,13 +21,13 @@ https://github.com/akr/codegen
 
 You need Coq and OCaml.
 
-- Coq 8.16 (Coq 8.15 doesn't work)
-- OCaml 4.14.0
+- Coq 8.18 (Coq 8.17 doesn't work)
+- OCaml 5.1.1
 
 You also need following to test codegen.
 
-- ocamlfind 1.9.5
-- ounit2 2.2.6 (ounit2 2.2.5 doesn't work)
+- ocamlfind 1.9.6
+- ounit2 2.2.7 (ounit2 2.2.5 doesn't work)
 
 ## How to build, test and install
 

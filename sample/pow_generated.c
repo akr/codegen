@@ -15,8 +15,9 @@ typedef uint64_t nat;
  * because uphalf' is applied to k' which is k-1.  */
 #define uphalf(n) (((n)+1)>>1)
 
-static nat
-fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
+static nat fastpow_iter(nat v1_a, nat v2_k, nat v3_x);
+
+static nat fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
 {
   nat v4_k_;
   bool v5_b;
@@ -48,8 +49,9 @@ fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
   }
 }
 
-static nat
-fastpow(nat v1_a, nat v2_k)
+static nat fastpow(nat v1_a, nat v2_k);
+
+static nat fastpow(nat v1_a, nat v2_k)
 {
   nat v3_n;
   nat v4_n;

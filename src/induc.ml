@@ -88,7 +88,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
 let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr array =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (f, args) = Constr.decompose_appvect coq_type in
+  let (f, args) = Constr.decompose_app coq_type in
   (if not (Constr.isInd f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
     Printer.pr_constr_env env sigma coq_type));

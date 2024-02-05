@@ -20,9 +20,9 @@ DECLARE PLUGIN "coq-codegen.plugin"
 
 {
 
-let () = Mltop.add_known_plugin (fun () ->
-  Feedback.msg_info Pp.(str"coq-codegen 0.1"))
-  "coq-codegen.plugin"
+let () = Mltop.add_init_function "coq-codegen.plugin"
+  (fun () ->
+    Feedback.msg_info Pp.(str"coq-codegen 0.1"))
 
 (*open Cgenutil*)
 open State
