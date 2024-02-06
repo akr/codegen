@@ -481,9 +481,9 @@ let codegen_define_instance
             c_id (Id.to_string (p_id ()))
     in
     check_cfunc_name_conflict cfunc_name;
-    let presimp_constr =
+    let env, sigma, presimp_constr =
       if not need_presimplified_ctnt then
-        func (* use the original function for fully dynamic function *)
+        env, sigma, func (* use the original function for fully dynamic function *)
       else
         let globref = Declare.declare_definition
           ~info:(Declare.Info.make ())
@@ -492,8 +492,11 @@ let codegen_define_instance
           ~body:(EConstr.of_constr presimp)
           sigma
         in
-        let declared_ctnt = Globnames.destConstRef globref in
-        Constr.mkConst declared_ctnt
+        let env = Global.env () in
+        let sigma = Evd.from_env env in
+        let sigma, declared_ctnt = fresh_global env sigma globref in
+        let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
+        env, sigma, declared_ctnt
     in
     let simplified_status =
       if is_function_icommand icommand then
@@ -2375,17 +2378,18 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
-  let declared_ctnt =
-    let globref = Declare.declare_definition
-      ~info:(Declare.Info.make ())
-      ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())
-      ~opaque:false
-      ~body:term
-      sigma
-    in
-    Globnames.destConstRef globref
+  let globref = Declare.declare_definition
+    ~info:(Declare.Info.make ())
+    ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())
+    ~opaque:false
+    ~body:term
+    sigma
   in
+  let declared_ctnt = Globnames.destConstRef globref in
   let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let sigma, declared_ctnt_term = fresh_global env sigma globref in
+  let declared_ctnt_term = EConstr.to_constr sigma declared_ctnt_term in
   let sp_inst2 = {
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
@@ -2400,7 +2404,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   (let m = !gallina_instance_map in
     let m = ConstrMap.set sp_inst.sp_presimp_constr (sp_cfg, sp_inst2) m in
     let m = ConstrMap.set presimp (sp_cfg, sp_inst2) m in
-    let m = ConstrMap.add (Constr.mkConst declared_ctnt) (sp_cfg, sp_inst2) m in
+    let m = ConstrMap.add declared_ctnt_term (sp_cfg, sp_inst2) m in
     gallina_instance_map := m);
   (let m = !cfunc_instance_map in
     let m = CString.Map.set sp_inst.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2)) m in
