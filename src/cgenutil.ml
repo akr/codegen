@@ -1316,12 +1316,9 @@ let show_goals () : unit Proofview.tactic =
     Proofview.tclUNIT ()
   end
 
-let lib_ref (name : string) : EConstr.t =
-  match Coqlib.lib_ref name with
-  | GlobRef.VarRef id -> mkVar id
-  | GlobRef.ConstRef cnst -> mkConst cnst
-  | GlobRef.IndRef ind -> mkInd ind
-  | GlobRef.ConstructRef cstr -> mkConstruct cstr
+let lib_ref (env : Environ.env) (sigma : Evd.evar_map) (name : string) : Evd.evar_map * EConstr.t =
+  let gr = Coqlib.lib_ref name in
+  fresh_global env sigma gr
 
 let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : bool =
   let name_equal x1 x2 = Context.eq_annot Names.Name.equal x1 x2 in

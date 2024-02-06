@@ -159,7 +159,7 @@ val global_gensym_with_id : Names.Id.t -> string
 val pr_raw_econstr : Evd.evar_map -> EConstr.t -> Pp.t
 val check_convertible : string -> Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t -> unit
 val show_goals : unit -> unit Proofview.tactic
-val lib_ref : string -> EConstr.t
+val lib_ref : Environ.env -> Evd.evar_map -> string -> Evd.evar_map * EConstr.t
 val exact_term_eq : Evd.evar_map -> EConstr.t -> EConstr.t -> bool
 val compose_c_type : State.c_typedata -> string -> string -> State.c_typedata
 val c_type_pointer_to : State.c_typedata -> State.c_typedata

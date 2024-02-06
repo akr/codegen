@@ -155,7 +155,7 @@ let env_rel_to_named (env : Environ.env) (sigma : Evd.evar_map) : (Environ.env *
   This function verifies: lhs_appmatch = rhs_matchapp
 *)
 let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : Evd.evar_map =
-  let eq = lib_ref "core.eq.type" in
+  let sigma, eq = lib_ref env sigma "core.eq.type" in
   let eq_ty = Retyping.get_type_of env sigma lhs_appmatch in
   let eq_goal = mkApp (eq, [| eq_ty; lhs_appmatch; rhs_matchapp |]) in
   let (proof_env, namemap) = env_rel_to_named env sigma in
