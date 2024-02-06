@@ -85,18 +85,18 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
           Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr array =
+let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr array * Univ.Instance.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (f, args) = Constr.decompose_app coq_type in
   (if not (Constr.isInd f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
     Printer.pr_constr_env env sigma coq_type));
-  let ind = Univ.out_punivs (Constr.destInd f) in
+  let ind, u = Constr.destInd f in
   let (mutind, i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
-  (mutind, mutind_body, i, oneind_body, args)
+  (mutind, mutind_body, i, oneind_body, args, u)
 
 (* check
  * - coq_type is f args1...argN
@@ -109,7 +109,7 @@ let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Decl
 let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
         user_err (Pp.str "[codegen] coinductive type not supported:" +++
@@ -150,7 +150,7 @@ let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Decl
       Printer.pr_constr_env env sigma ty))
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type_left : string) (c_type_right) : ind_config =
-  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
   let is_void_type = String.equal c_type_left "void" && String.equal c_type_right "" in
@@ -198,7 +198,7 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type_left : str
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
-  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env coq_type in
+  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   let ind_cfg = get_ind_config env sigma (EConstr.of_constr coq_type) in
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (
@@ -241,7 +241,8 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
   ind_cfg
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let (mutind, mutind_body, i, oneind_body, args) = get_ind_coq_type env (EConstr.to_constr sigma t) in
+  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env (EConstr.to_constr sigma t) in
+  let u' = EInstance.make u in
   let printed_type = mangle_term env sigma t in
   let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
@@ -250,7 +251,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
       (fun j0 ->
         let j = j0 + 1 in
         let consname = oneind_body.Declarations.mind_consnames.(j0) in
-        let cstr = mkConstruct ((mutind, i), j) in
+        let cstr = mkConstructU (((mutind, i), j), u') in
         let args = Array.map EConstr.of_constr args in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term env sigma consterm in

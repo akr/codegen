@@ -1617,7 +1617,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
   (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
   let item_cvar = carg_of_garg env item_relindex in
-  let ind = fst (Constr.destInd (if Constr.isApp item_type then fst (Constr.destApp item_type) else item_type)) in
+  let ind, u = Constr.destInd (if Constr.isApp item_type then fst (Constr.destApp item_type) else item_type) in
   let (mutind, ind_index) = ind in
   let mind_body = Environ.lookup_mind mutind env in
   let oind_body = mind_body.Declarations.mind_packets.(ind_index) in
@@ -1638,7 +1638,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
       Array.map
         (fun i ->
           let cstr = (ind, i+1) in
-          let cstr_exp = Constr.mkApp (Constr.mkConstruct cstr, params) in
+          let cstr_exp = Constr.mkApp (Constr.mkConstructU (cstr, u), params) in
           (*msg_debug_hov (Pp.str "[codegen:gen_match] cstr_exp:" +++ Printer.pr_constr_env env sigma cstr_exp);*)
           match ConstrMap.find_opt cstr_exp !deallocator_cfunc_map with
           | None -> Lazy.force deallocator_for_type
@@ -1863,10 +1863,10 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list cargs_without_void))))
 
-  | Const (ctnt,_) ->
-      gen_head_cont cont (gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs_without_void))
-  | Construct (cstr,_) ->
-      gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs_without_void))
+  | Const (ctnt,u) ->
+      gen_head_cont cont (gen_app_const_construct env sigma (mkConstU (ctnt, u)) (Array.of_list cargs_without_void))
+  | Construct (cstr,u) ->
+      gen_head_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstructU (cstr, u)) (Array.of_list cargs_without_void))
   | Case (ci,u,pms,p,iv,item,bl) ->
       assert (CArray.is_empty argsary);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
@@ -2030,11 +2030,11 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
                   (Array.append
                     (Array.of_list (List.map fst fixfunc.fixfunc_extra_arguments))
                     (Array.of_list cargs_without_void))))
-  | Const (ctnt,_) ->
-      let pp = gen_app_const_construct env sigma (mkConst ctnt) (Array.of_list cargs_without_void) in
+  | Const (ctnt,u) ->
+      let pp = gen_app_const_construct env sigma (mkConstU (ctnt, u)) (Array.of_list cargs_without_void) in
       gen_tail_cont cont pp
-  | Construct (cstr,univ) ->
-      gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstruct cstr) (Array.of_list cargs_without_void))
+  | Construct (cstr,u) ->
+      gen_tail_cont ~omit_void_exp:true cont (gen_app_const_construct env sigma (mkConstructU (cstr,u)) (Array.of_list cargs_without_void))
   | Lambda (x,t,b) ->
       user_err (Pp.str "[codegen] gen_tail: lambda term without argument (higher-order term not supported yet):" +++
         Printer.pr_econstr_env env sigma term)
@@ -2775,7 +2775,7 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
         | StrOrQid_Qid qid ->
           let env = Global.env () in
           let sigma = Evd.from_env env in
-          let func = func_of_qualid env qid in
+          let sigma, func = func_of_qualid env sigma qid in
           let sp_cfg = codegen_auto_arguments_internal env sigma func in
           (if List.mem SorD_S sp_cfg.sp_sd_list then
             user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));

@@ -120,12 +120,12 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
           else
             funcs |> List.map @@ fun func ->
               let gref = Smartlocate.global_with_alias func in
-              let func = match gref with
-                | ConstRef ctnt -> Constr.mkConst ctnt
-                | ConstructRef cstr -> Constr.mkConstruct cstr
+              (match gref with
+                | ConstRef _ | ConstructRef _ -> ()
                 | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++
-                                 Printer.pr_global gref)
-              in
+                                 Printer.pr_global gref));
+              let sigma', func = fresh_global env sigma gref in
+              let func = EConstr.to_constr sigma' func in
               match ConstrMap.find_opt func !specialize_config_map with
               | None -> user_err (Pp.str "[codegen] not specialized:" +++ Printer.pr_global gref)
               | Some sp_cfg -> sp_cfg
@@ -133,12 +133,14 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
   msg_info_hov (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal !specialize_config_map));
   List.iter pr_cfg l
 
-let func_of_qualid (env : Environ.env) (qualid : Libnames.qualid) : Constr.t =
+let func_of_qualid (env : Environ.env) (sigma : Evd.evar_map) (qualid : Libnames.qualid) : Evd.evar_map * Constr.t =
   let gref = Smartlocate.global_with_alias qualid in
-  match gref with
-    | ConstRef ctnt -> Constr.mkConst ctnt
-    | ConstructRef cstr -> Constr.mkConstruct cstr
-    | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++ Printer.pr_global gref)
+  (match gref with
+    | ConstRef _ | ConstructRef _ -> ()
+    | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++ Printer.pr_global gref));
+  let sigma, t = fresh_global env sigma gref in
+  let t = EConstr.to_constr sigma t in
+  (sigma, t)
 
 let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let func_is_cstr =
@@ -178,7 +180,7 @@ let codegen_define_or_check_static_arguments ?(cfunc : string option) (env : Env
 let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let func = func_of_qualid env func in
+  let sigma, func = func_of_qualid env sigma func in
   (if ConstrMap.mem func !specialize_config_map then
     user_err (Pp.str "[codegen] specialization already configured:" +++ Printer.pr_constr_env env sigma func));
   ignore (codegen_define_static_arguments env sigma func sd_list)
@@ -285,7 +287,7 @@ let codegen_auto_sd_list
 
 let codegen_auto_arguments_1 (env : Environ.env) (sigma : Evd.evar_map)
     (func : Libnames.qualid) : unit =
-  let func = func_of_qualid env func in
+  let sigma, func = func_of_qualid env sigma func in
   ignore (codegen_auto_arguments_internal env sigma func)
 
 let command_auto_arguments (func_list : Libnames.qualid list) : unit =
@@ -296,7 +298,7 @@ let command_auto_arguments (func_list : Libnames.qualid list) : unit =
 let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let func = func_of_qualid env func in
+  let sigma, func = func_of_qualid env sigma func in
   let sp_cfg = codegen_auto_arguments_internal env sigma func in
   let sd_list_defined = drop_trailing_d sp_cfg.sp_sd_list in
   let sd_list_expected = drop_trailing_d sd_list in
@@ -542,7 +544,7 @@ let codegen_instance_command
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let func = func_of_qualid env func in
+  let sigma, func = func_of_qualid env sigma func in
   let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
   let func_istypearg_list = determine_type_arguments env sigma func_type in
   (if List.length func_istypearg_list < List.length sd_list then
@@ -592,7 +594,7 @@ let command_constant
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let funcs = List.map (func_of_qualid env) func_qualids in
+  let sigma, funcs = CList.fold_left_map (fun sigma func -> func_of_qualid env sigma func) sigma func_qualids in
   let ctnts = List.map
     (fun func ->
       match Constr.kind func with
@@ -606,13 +608,13 @@ let command_global_inline (func_qualids : Libnames.qualid list) : unit =
 let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let func = func_of_qualid env func_qualid in
+  let sigma, func = func_of_qualid env sigma func_qualid in
   let ctnt =
     match Constr.kind func with
     | Const (ctnt, _) -> ctnt
     | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
   in
-  let funcs = List.map (func_of_qualid env) func_qualids in
+  let sigma, funcs = CList.fold_left_map (fun sigma func -> func_of_qualid env sigma func) sigma func_qualids in
   let ctnts = List.map
     (fun func ->
       match Constr.kind func with
@@ -1483,10 +1485,10 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
       in
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
-          let f' = Constr.mkConst ctnt in
+          let f' = Constr.mkConstU (ctnt, EInstance.kind sigma u) in
           normalize_args f'
       | Construct (cstr, u) ->
-          let f' = Constr.mkConstruct cstr in
+          let f' = Constr.mkConstructU (cstr, EInstance.kind sigma u) in
           normalize_args f'
       | _ ->
           let f' = normalize_static_arguments env sigma f in
@@ -1790,21 +1792,21 @@ and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term 
       in
       (env', mkCase (ci,u,pms,p,iv,item,bl'), referred_cfuncs)
   | Const (ctnt, u) ->
-      let f' = Constr.mkConst ctnt in
+      let f' = Constr.mkConstU (ctnt, EInstance.kind sigma u) in
       let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
       (env2, f'', StringSet.singleton referred_cfunc)
   | Construct (cstr, u) ->
-      let f' = Constr.mkConstruct cstr in
+      let f' = Constr.mkConstructU (cstr, EInstance.kind sigma u) in
       let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' [| |] in
       (env2, f'', StringSet.singleton referred_cfunc)
   | App (f, args) ->
       match EConstr.kind sigma f with
       | Const (ctnt, u) ->
-          let f' = Constr.mkConst ctnt in
+          let f' = Constr.mkConstU (ctnt, EInstance.kind sigma u) in
           let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' args in
           (env2, f'', StringSet.singleton referred_cfunc)
       | Construct (cstr, u) ->
-          let f' = Constr.mkConstruct cstr in
+          let f' = Constr.mkConstructU (cstr, EInstance.kind sigma u) in
           let (env2, f'', referred_cfunc) = replace_app ~cfunc env sigma f' args in
           (env2, f'', StringSet.singleton referred_cfunc)
       | _ ->
@@ -2511,16 +2513,18 @@ let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let gref = Smartlocate.global_with_alias func in
-  let (mutind,func) =
+  let mutind =
     match gref with
     | IndRef ind ->
         let (mutind,_) = ind in
-        (mutind, Constr.mkInd ind)
+        mutind
     | ConstructRef cstr ->
         let ((mutind,_),_) = cstr in
-        (mutind, Constr.mkConstruct cstr)
+        mutind
     | _ -> user_err (Pp.str "[codegen] inductive or constructor expected:" +++ Printer.pr_global gref)
   in
+  let sigma, func = fresh_global env sigma gref in
+  let func = EConstr.to_constr sigma func in
   let mind_body = Environ.lookup_mind mutind env in
   (if mind_body.mind_nparams <> List.length user_args then
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++

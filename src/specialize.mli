@@ -1,5 +1,5 @@
 val command_print_specialization : Libnames.qualid list -> unit
-val func_of_qualid : Environ.env -> Libnames.qualid -> Constr.t
+val func_of_qualid : Environ.env -> Evd.evar_map -> Libnames.qualid -> Evd.evar_map * Constr.t
 val codegen_define_or_check_static_arguments : ?cfunc:string -> Environ.env -> Evd.evar_map -> Constr.t -> State.s_or_d list -> State.specialization_config
 val command_arguments : Libnames.qualid -> State.s_or_d list -> unit
 val codegen_auto_arguments_internal :

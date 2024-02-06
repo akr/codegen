@@ -60,7 +60,7 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
   | Context.Rel.Declaration.LocalDef _ -> false
 
-let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) : Declarations.mutual_inductive_body * EConstr.t array =
+let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (u : EInstance.t) : Declarations.mutual_inductive_body * EConstr.t array =
   let open Declarations in
   let mind_body = Environ.lookup_mind mutind env in
   let pp_all_ind_names () =
@@ -83,27 +83,27 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
     user_err (Pp.str "[codegen] indexed types not supported:" +++ pp_indexed_ind_names ());
   if not (List.for_all (valid_type_param env sigma) mind_body.mind_params_ctxt) then
     user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
-  let ind_ary = Array.map (fun j -> EConstr.mkInd (mutind, j))
+  let ind_ary = Array.map (fun j -> EConstr.mkIndU ((mutind, j), u))
     (iota_ary 0 mind_body.mind_ntypes) in
   (mind_body,ind_ary)
 
 let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
   let (ty_f, ty_args) = decompose_appvect sigma ty in
-  let (mutind,i) =
+  let ((mutind,i), u) =
     match EConstr.kind sigma ty_f with
-    | Ind (ind,univ) -> ind
+    | Ind (ind,u) -> ind, u
     | _ -> user_err_hov (Pp.str "[codegen:mutual_inductive_types] inductive type expected:" +++
                          Printer.pr_econstr_env env sigma ty)
   in
-  let (_,ind_ary) = make_ind_ary env sigma mutind in
+  let (_,ind_ary) = make_ind_ary env sigma mutind u in
   Array.map (fun ind -> nf_all env sigma (mkApp (ind, ty_args))) ind_ary
 
-let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (params : EConstr.t array)
+let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (u : EInstance.t) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let open Context.Rel.Declaration in
   let (mutind, i) = ind in
-  let (mind_body,ind_ary) = make_ind_ary env sigma mutind in
+  let (mind_body,ind_ary) = make_ind_ary env sigma mutind u in
   (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
     pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
     Pp.str "params=[" ++
@@ -153,9 +153,9 @@ let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd
     match EConstr.kind sigma ty_f with
     | Sort _ -> has_sort_ref := true
     | Prod _ -> has_func_ref := true
-    | Ind (ind, univ) ->
+    | Ind (ind, u) ->
         ty_set_ref := (ConstrSet.add (EConstr.to_constr sigma ty) !ty_set_ref);
-        ind_cstrarg_iter env sigma ind ty_args
+        ind_cstrarg_iter env sigma ind u ty_args
           (fun ind_id cons_id argty ->
             traverse_constructor_argument_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
@@ -899,12 +899,12 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
         (List.append (CArray.map_to_list (fun rel -> Environ.nb_rel env - destRel sigma rel) argsary) vs)
   | Rel _ -> ()
   | Const _ -> ()
-  | Construct (cstr,univ) ->
+  | Construct (cstr,u) ->
       let (ind,j) = cstr in
       let (mutind,i) = ind in
       let mind_body = Environ.lookup_mind mutind env in
       let params = CArray.map_of_list (fun l -> mkRel (Environ.nb_rel env - l)) (CList.firstn mind_body.mind_nparams vs) in
-      let ty = mkApp (mkInd ind, params) in
+      let ty = mkApp (mkIndU (ind, u), params) in
       (*msg_debug_hov (Pp.str "[codegen:borrowcheck_constructor] ty=" ++ Printer.pr_econstr_env env sigma ty);*)
       if is_borrow_type env sigma ty then
         user_err_hov (Pp.str "[codegen] constructor of borrow type used:" +++ Printer.pr_econstr_env env sigma term)
