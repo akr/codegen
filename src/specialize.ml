@@ -1124,7 +1124,7 @@ and reduce_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
   | Rel i ->
       reduce_var aenv.aenv_env sigma term
   | Lambda _ ->
-      let (lams, b) = decompose_lam sigma term in
+      let (lams, b) = decompose_lambda sigma term in
       let aenv2 = aenv_push_assums aenv lams in
       it_mkLambda (reduce_exp aenv2 sigma b) lams
   | LetIn (x,e,t,b) ->
@@ -1828,7 +1828,7 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
       user_err (Pp.str "[codegen:replace] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ | Sort _ | Prod _ | Ind _ -> term
   | Lambda _ ->
-      let (lams, b) = decompose_lam sigma term in
+      let (lams, b) = decompose_lambda sigma term in
       let env2 = env_push_assums env lams in
       (match EConstr.kind sigma b with
       | App (f, args) when isFix sigma f ->

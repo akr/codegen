@@ -240,7 +240,7 @@ let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       Array.blit ntfary 0 ntfary 1 j; ntfary.(0) <- ntf_j; (* move ntfary.(j) to the beginning *)
       List.concat_map
         (fun (n,t,f) ->
-          let (f_fargs, f_body) = decompose_lam sigma f in
+          let (f_fargs, f_body) = decompose_lambda sigma f in
           let env3 = env_push_assums env2 f_fargs in
           let l = fix_body_list env3 sigma f_body in
           match l with
@@ -791,7 +791,7 @@ let make_closure_bodyhead_tbl (genchunks : genchunk_t list) : bodyhead_t Id.Map.
     Id.Map.empty genchunks
 
 let make_topfunc_tbl (sigma : Evd.evar_map) (term : EConstr.t) ~(primary_cfunc : cfunc_t) : cfunc_t Id.Map.t =
-  let (fargs, term') = decompose_lam sigma term in
+  let (fargs, term') = decompose_lambda sigma term in
   match EConstr.kind sigma term' with
   | Fix ((ks, j), (nary, tary, fary)) ->
       let fixfunc_id = id_of_annotated_name nary.(j) in
@@ -2527,7 +2527,7 @@ let make_simplified_for_cfunc (cfunc_name : string) :
   | Some (body,_, _) -> ({cfunc_static=static; cfunc_name=cfunc_name}, ty, body)
 
 let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (cfunc_t * Constr.t) list) : sibling_t list =
-  let (args, body) = Term.decompose_lam primary_term in
+  let (args, body) = Term.decompose_lambda primary_term in
   if Constr.isFix body then
     let primary_nary =
       let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
@@ -2535,7 +2535,7 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (
     in
     List.map
       (fun (cfunc, term) ->
-        let (args, body) = Term.decompose_lam term in
+        let (args, body) = Term.decompose_lambda term in
         let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
         let fixfunc_id = id_of_annotated_name primary_nary.(j) in
         { sibling_cfunc=cfunc; sibling_fixfunc_id=fixfunc_id })
@@ -2693,7 +2693,7 @@ let gen_prototype (cfunc_name : string) : Pp.t =
   gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";"
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
-  let (args, body) = Term.decompose_lam term in
+  let (args, body) = Term.decompose_lambda term in
   match Constr.kind body with
   | Fix ((ks, j), (nary, tary, fary)) ->
       Some (j, Term.compose_lam args (Constr.mkFix ((ks, 0), (nary, tary, fary))))
