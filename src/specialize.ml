@@ -493,7 +493,6 @@ let codegen_define_instance
           sigma
         in
         let env = Global.env () in
-        let sigma = Evd.from_env env in
         let sigma, declared_ctnt = fresh_global env sigma globref in
         let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
         env, sigma, declared_ctnt
@@ -2387,7 +2386,6 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let declared_ctnt = Globnames.destConstRef globref in
   let env = Global.env () in
-  let sigma = Evd.from_env env in
   let sigma, declared_ctnt_term = fresh_global env sigma globref in
   let declared_ctnt_term = EConstr.to_constr sigma declared_ctnt_term in
   let sp_inst2 = {
