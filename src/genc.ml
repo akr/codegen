@@ -520,7 +520,7 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
         else
           (Id.Map.empty, IntSet.empty, IntSet.empty) (* v-variable *)
     | Const _ | Construct _ -> (Id.Map.empty, IntSet.empty, IntSet.empty)
-    | Proj (proj, e) ->
+    | Proj (proj, sr, e) ->
         (* e must be a Rel which type is inductive (non-function) type *)
         (Id.Map.empty, IntSet.empty, IntSet.empty)
     | LetIn (x,e,t,b) ->
@@ -692,7 +692,7 @@ let obtain_function_genchunks
           in
           (Seq.empty, [], Id.Set.empty, fixfunc_gotos, fixfunc_calls, Id.Set.empty)
     | Const _ | Construct _ -> (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
-    | Proj (proj, e) -> (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
+    | Proj (proj, sr, e) -> (Seq.empty, [], Id.Set.empty, Id.Set.empty, Id.Set.empty, Id.Set.empty)
     | LetIn (x,e,t,b) ->
         let env2 = env_push_def env x e t in
         let (genchunks1, body_entries1, fixfunc_impls1, fixfunc_gotos1, fixfunc_calls1, closure_impls1) = obtain_function_genchunks_body ~tail_position:false env e in
@@ -845,7 +845,7 @@ let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
       let name = Context.Rel.Declaration.get_name decl in
       Id.Set.singleton (id_of_name name)
   | Const _ | Construct _ -> Id.Set.empty
-  | Proj (proj, e) -> fixterm_free_variables_rec env sigma e ~result
+  | Proj (proj, sr, e) -> fixterm_free_variables_rec env sigma e ~result
   | App (f, args) ->
       let fv_f = fixterm_free_variables_rec env sigma f ~result in
       let ids = Array.map
@@ -1499,7 +1499,7 @@ let rec make_used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : E
           (fun set arg -> Id.Set.union set (make_used_variables env sigma arg))
           Id.Set.empty
           args)
-  | Proj (proj, e) -> make_used_variables env sigma e
+  | Proj (proj, sr, e) -> make_used_variables env sigma e
 
 let local_gensym_id : (int ref) option ref = ref None
 
@@ -1876,7 +1876,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
         | Some _ -> gen_switch_without_break
       in
       gen_match used_vars gen_switch (gen_head ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
-  | Proj (pr, item) ->
+  | Proj (pr, sr, item) ->
       ((if not (CArray.is_empty argsary) then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_head_cont ~omit_void_exp:true cont))
@@ -2042,7 +2042,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       assert (CArray.is_empty argsary);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       gen_match used_vars gen_switch_without_break (gen_tail ~fixfunc_tbl ~closure_tbl ~used_vars ~cont) env sigma ci item (bl,bl0)
-  | Proj (pr, item) ->
+  | Proj (pr, sr, item) ->
       ((if not (CArray.is_empty argsary) then
         user_err (Pp.str "[codegen:gen_head] projection cannot return a function, yet:" +++ Printer.pr_econstr_env env sigma term));
       gen_proj env sigma pr item (gen_tail_cont ~omit_void_exp:true cont))

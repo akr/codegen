@@ -951,7 +951,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Case (ci,u,pms,p,iv,c,bl) -> user_err (Pp.str "[codegen] mangle_term_buf:case:")
   | Fix ((ks, j), (nary, tary, fary)) -> user_err (Pp.str "[codegen] mangle_term_buf:fix:")
   | CoFix (i, (nary, tary, fary)) -> user_err (Pp.str "[codegen] mangle_term_buf:cofix:")
-  | Proj (proj, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
+  | Proj (proj, r, expr) -> user_err (Pp.str "[codegen] mangle_term_buf:proj:")
   | Int n -> user_err (Pp.str "[codegen] mangle_term_buf:int:")
   | Float n -> user_err (Pp.str "[codegen] mangle_term_buf:float:")
   | Array _ -> user_err (Pp.str "[codegen] mangle_term_buf:array:")
@@ -1285,7 +1285,7 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
           Pp.str "for" +++
           Name.print nary.(j) ++
           Pp.str ")")
-    | Proj (proj, e) ->
+    | Proj (proj, r, e) ->
         Pp.hov 2 (
           Pp.str "(Proj" ++
           Projection.print proj +++
@@ -1322,7 +1322,7 @@ let lib_ref (env : Environ.env) (sigma : Evd.evar_map) (name : string) : Evd.eva
 
 let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : bool =
   let name_equal x1 x2 = Context.eq_annot Names.Name.equal x1 x2 in
-  let instance_equal u1 u2 = Univ.Instance.equal (EInstance.kind sigma u1) (EInstance.kind sigma u2) in
+  let instance_equal u1 u2 = UVars.Instance.equal (EInstance.kind sigma u1) (EInstance.kind sigma u2) in
   let rec eq t1 t2 =
     match EConstr.kind sigma t1, EConstr.kind sigma t2 with
     | Rel n1, Rel n2 -> Int.equal n1 n2
@@ -1339,14 +1339,14 @@ let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : boo
       let len = Array.length l1 in
       Int.equal len (Array.length l2) &&
       eq c1 c2 && CArray.equal eq l1 l2
-    | Proj (p1,c1), Proj (p2,c2) -> Projection.CanOrd.equal p1 p2 && eq c1 c2
+    | Proj (p1,r1,c1), Proj (p2,r2,c2) -> Projection.CanOrd.equal p1 p2 && eq c1 c2
     | Evar (e1,l1), Evar (e2,l2) -> Evar.equal e1 e2 && SList.equal eq l1 l2
     | Const (c1,u1), Const (c2,u2) ->
       Constant.CanOrd.equal c1 c2 && instance_equal u1 u2
     | Ind (c1,u1), Ind (c2,u2) -> Ind.CanOrd.equal c1 c2 && instance_equal u1 u2
     | Construct (c1,u1), Construct (c2,u2) ->
       Construct.CanOrd.equal c1 c2 && instance_equal u1 u2
-    | Case (ci1,u1,pms1,(nas1,p1),iv1,c1,bl1), Case (ci2,u2,pms2,(nas2,p2),iv2,c2,bl2) ->
+    | Case (ci1,u1,pms1,((nas1,p1),sr1),iv1,c1,bl1), Case (ci2,u2,pms2,((nas2,p2),sr2),iv2,c2,bl2) ->
       Ind.CanOrd.equal ci1.ci_ind ci2.ci_ind && instance_equal u1 u2 &&
       CArray.equal eq pms1 pms2 && CArray.equal name_equal nas1 nas2 && eq p1 p2 &&
       eq_invert eq iv1 iv2 &&

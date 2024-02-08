@@ -710,7 +710,7 @@ and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
           let env2 = EConstr.push_rel_context ctx env in
           check_letin_in_cstr_type env2 sigma br)
         brs0
-  | Proj (proj, e) ->
+  | Proj (proj, sr, e) ->
       check_letin_in_cstr_type env sigma e
   | App (f, args) ->
       check_letin_in_cstr_type env sigma f;
@@ -822,9 +822,9 @@ and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
           bl bl0
       in
       mkCase (ci, u, pms, p, iv, c, bl')
-  | Proj (proj, e) ->
+  | Proj (proj, sr, e) ->
       let e' = search_fixclo_to_expand_eta env sigma e in
-      mkProj (proj, e')
+      mkProj (proj, sr, e')
   | App (f, args) ->
       let f' = search_fixclo_to_expand_eta env sigma f in
       let args' = Array.map (search_fixclo_to_expand_eta env sigma) args in
@@ -836,10 +836,10 @@ and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
       mkFix ((ks, j), (nary, tary, fary'))
 
 let map_under_context_with_binders (g : 'a -> 'a) (f : 'a -> EConstr.t -> EConstr.t) (l : 'a) (d : EConstr.case_return) : EConstr.case_return =
-  let (nas, p) = d in
+  let ((nas, p), sr) = d in
   let l = Util.iterate g (Array.length nas) l in
   let p' = f l p in
-  if p' == p then d else (nas, p')
+  if p' == p then d else ((nas, p'), sr)
 
 (*val map_return_predicate_with_binders : ('a -> 'a) -> ('a -> EConstr.t -> EConstr.t) -> 'a -> EConstr.case_return -> EConstr.case_return*)
 
@@ -974,9 +974,9 @@ and normalizeV1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
         mkApp (f', args')
       in
       wrap_lets hoisted_args app
-  | Proj (proj, e) ->
+  | Proj (proj, sr, e) ->
       if isRel sigma e then term
-      else wrap_lets [e] (mkProj (proj, mkRel 1))
+      else wrap_lets [e] (mkProj (proj, sr, mkRel 1))
 
 let normalizeV (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   normalizeV_rec (aenv_of_env env) sigma term
@@ -1156,9 +1156,9 @@ and reduce_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
       try_iota_match aenv sigma term
         (fun term2 -> reduce_exp aenv sigma term2)
         (fun term2 -> term2)
-  | Proj (pr,item) ->
+  | Proj (pr,sr,item) ->
       let item' = reduce_var aenv.aenv_env sigma item in
-      let default () = mkProj (pr, item') in
+      let default () = mkProj (pr, sr, item') in
       let i = destRel sigma item' in
       (match EConstr.lookup_rel i aenv.aenv_env with
       | Context.Rel.Declaration.LocalAssum _ -> default ()
@@ -1373,8 +1373,8 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
   | Cast _ ->
       user_err (Pp.str "[codegen:normalize_types] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ | Sort _ | Ind _ -> term
-  | Proj (proj, e) ->
-      mkProj (proj, normalize_types env sigma e)
+  | Proj (proj, sr, e) ->
+      mkProj (proj, sr, normalize_types env sigma e)
   | App (f, args) ->
       let f' = normalize_types env sigma f in
       let args' = Array.map (normalize_types env sigma) args in
@@ -1394,9 +1394,9 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
          Note that "S" of "in list S" is represented by pms.  *)
       let pms' = Array.map (Reductionops.nf_all env sigma) pms in
       let p' =
-        let (nas,body), (ctx,_) = p, p0 in
+        let ((nas,body),sr), ((ctx,_),_) = p, p0 in
         let env2 = EConstr.push_rel_context ctx env in
-        (nas, Reductionops.nf_all env2 sigma body)
+        ((nas, Reductionops.nf_all env2 sigma body), sr)
       in
       let iv' = map_invert (Reductionops.nf_all env sigma) iv in
       let item' = normalize_types env sigma item in
@@ -1460,7 +1460,7 @@ let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (t
           bl bl0
       in
       mkCase (ci,u,pms,p,iv,item,bl')
-  | Proj (proj, e) ->
+  | Proj (proj, sr, e) ->
       term (* e is a variable because V-normal form *)
   | App (f, args) ->
       let normalize_args f' =
@@ -1520,8 +1520,8 @@ let unlift_unused (sigma : Evd.evar_map) (vars_used : bool list) (term : EConstr
         if not (List.nth vars_used (i-1)) then
           user_err (Pp.str "[codegen:bug] unlift_unused found that vars_used is invalid");
         mkRel (i - count_false_in_prefix (i-1) vars_used)
-    | Proj (proj, e) ->
-        mkProj (proj, aux vars_used e)
+    | Proj (proj, sr, e) ->
+        mkProj (proj, sr, aux vars_used e)
     | App (f, args) ->
         mkApp (aux vars_used f, Array.map (aux vars_used) args)
     | LetIn (x,e,t,b) ->
@@ -1529,9 +1529,9 @@ let unlift_unused (sigma : Evd.evar_map) (vars_used : bool list) (term : EConstr
     | Case (ci,u,pms,p,iv,item,bl) ->
        let pms' = Array.map (aux vars_used) pms in
        let p' =
-         let (nas,body) = p in
+         let ((nas,body),sr) = p in
          let body' = aux (CList.addn (Array.length nas) true vars_used) body in
-         (nas,body')
+         ((nas,body'),sr)
        in
        let iv' = map_invert (aux vars_used) iv in
        let item' = aux vars_used item in
@@ -1572,9 +1572,9 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
   | Rel i ->
       let fvs = IntSet.singleton (Environ.nb_rel env - i) in
       (fvs, fun vars_used -> mkRel (i - count_false_in_prefix (i-1) vars_used))
-  | Proj (proj, e) ->
+  | Proj (proj, sr, e) ->
       let (fvs, f) = delete_unused_let_rec env sigma e in
-      (fvs, fun vars_used -> mkProj (proj, f vars_used))
+      (fvs, fun vars_used -> mkProj (proj, sr, f vars_used))
   | App (f, args) ->
       let (fvs1, ff) = delete_unused_let_rec env sigma f in
       let fargs2 = Array.map (delete_unused_let_rec env sigma) args in
@@ -1613,7 +1613,7 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
           IntSet.empty pms
       in
       let fv = IntSet.union fv
-        (let (nas,body), (ctx,_) = p, p0 in
+        (let ((nas,body),sr), ((ctx,_),_) = p, p0 in
         let env2 = EConstr.push_rel_context ctx env in
         free_variables_level_set ~without:(Array.length nas) env2 sigma body)
       in
@@ -1637,9 +1637,9 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
        fun vars_used ->
          let pms' = Array.map (unlift_unused sigma vars_used) pms in
          let p' =
-           let (nas,body) = p in
+           let ((nas,body),sr) = p in
            let body' = unlift_unused sigma (CList.addn (Array.length nas) true vars_used) body in
-           (nas,body')
+           ((nas,body'),sr)
          in
          let iv' = map_invert (unlift_unused sigma vars_used) iv in
          let item' = unlift_unused sigma vars_used item in
@@ -1909,7 +1909,7 @@ and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
           bl bl0
       in
       mkCase (ci,u,pms,p,iv,item,bl')
-  | Proj (pr,item) ->
+  | Proj (pr,sr,item) ->
       term
   | Fix ((ks,j), ((nary, tary, fary) as prec)) ->
       let env2 = push_rec_types prec env in
@@ -2012,8 +2012,8 @@ and complete_args_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t)
           bl bl0)
   | Fix _ ->
       complete_args_fun aenv sigma term
-  | Proj (proj, e) ->
-      mkProj (proj, complete_args_exp aenv sigma e)
+  | Proj (proj, sr, e) ->
+      mkProj (proj, sr, complete_args_exp aenv sigma e)
 
 let complete_args (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   (*msg_debug_hov (Pp.str "[codegen] complete_args arg:" +++ Printer.pr_econstr_env env sigma term);*)
@@ -2057,7 +2057,7 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
           else
             (term, IntSet.empty)
       | Const _ | Construct _ -> (term, IntSet.empty)
-      | Proj (proj, e) -> (term, IntSet.empty)
+      | Proj (proj, sr, e) -> (term, IntSet.empty)
       | LetIn (x,e,t,b) ->
           let aenv2 = aenv_push_assum aenv x t in
           let (e', fv1) = aux aenv e in
@@ -2165,7 +2165,7 @@ let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
     | Construct _ -> ()
     | Case (ci,u,pms,mpred,iv,item,bl) ->
         let (_, _, _, mpred0, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, mpred, iv, item, bl) in
-        (let (nas,body), (ctx,_) = mpred, mpred0 in
+        (let ((nas,body),sr), ((ctx,_),_) = mpred, mpred0 in
           let env2 = EConstr.push_rel_context ctx env in
           let body = Reductionops.nf_all env2 sigma body in
           if not (is_monomorphic_type env2 sigma body) then

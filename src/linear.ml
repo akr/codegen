@@ -270,7 +270,7 @@ let rec check_fix_downwardness (env : Environ.env) (sigma : Evd.evar_map) (cfunc
         nary tary;
       let env2 = EConstr.push_rec_types prec env in
       Array.iter (check_fix_downwardness env2 sigma cfunc) fary
-  | Proj (proj, expr) ->
+  | Proj (proj, sr, expr) ->
       check_fix_downwardness env sigma cfunc expr
 
 let downwardcheck (env : Environ.env) (sigma : Evd.evar_map) (cfunc : string) (term : EConstr.t) : unit =
@@ -880,7 +880,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
            borrow_union bused1 bused2,
            bresult2)
 
-  | Proj (proj, expr) ->
+  | Proj (proj, sr, expr) ->
       if CList.is_empty vs then
         let expr_ty = nf_all env sigma (Retyping.get_type_of env sigma expr) in
         let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env expr expr_ty in
@@ -934,7 +934,7 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
           borrowcheck_constructor env2 sigma body vs)
         bl bl0
 
-  | Proj (proj, expr) ->
+  | Proj (proj, sr, expr) ->
       borrowcheck_constructor env sigma expr []
 
 let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
@@ -987,7 +987,7 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
   let sigma = Evd.from_env env in
   match gref with
   | ConstRef ctnt ->
-      (let fctntu = Univ.in_punivs ctnt in
+      (let fctntu = UVars.in_punivs ctnt in
       let (ty, u) = Environ.constant_type env fctntu in
       let ty = nf_all env sigma (EConstr.of_constr ty) in
       (match EConstr.kind sigma ty with

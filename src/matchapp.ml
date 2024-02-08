@@ -202,8 +202,8 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
   match find_match_app env sigma term with
   | None -> None
   | Some (q, env, ma_match, ma_args) ->
-      let (ci, u, pms, ((mpred_nas, mpred_body) as mpred), iv, item, bl) = ma_match in
-      let (_, _, _, (mpred_ctx, _), _, _, bl0) = EConstr.annotate_case env sigma ma_match in
+      let (ci, u, pms, ((mpred_nas, mpred_body) as mpred, sr), iv, item, bl) = ma_match in
+      let (_, _, _, ((mpred_ctx, _), _), _, _, bl0) = EConstr.annotate_case env sigma ma_match in
       let rec decompose_prod_n_acc env fargs n term =
         let term = whd_all env sigma term in
         if n <= 0 then
@@ -239,7 +239,8 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
             bl bl0
         in
         let lhs_appmatch = mkApp (mkCase ma_match, ma_args) in
-        let rhs_matchapp = mkCase (ci, u, pms, (mpred_nas, mpred_body), iv, item, bl') in
+        let mpred_sr = Sorts.Relevant in
+        let rhs_matchapp = mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl') in
         let sigma = verify_case_transform env sigma lhs_appmatch rhs_matchapp in
         Some (sigma, q rhs_matchapp)
 
