@@ -23,12 +23,12 @@ development-without-install : revert-development-without-install
 	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
 
 revert-development-without-install :
+	rm -f "$(COQMF_COQLIB)/user-contrib/codegen" || ( echo "Do 'make uninstall' first"; false )
 	rm -f theories/META.coq-codegen
 	rm -f theories/codegen_plugin.cmi
 	rm -f theories/codegen_plugin.cmxs
 	rm -f theories/codegen_plugin.cmxa
 	rm -f theories/codegen_plugin.cmx
-	rm -f $(COQMF_COQLIB)/user-contrib/codegen
 else
 development-without-install :
 	@echo 'COQMF_COQLIB not defined.  run "make" first.'
