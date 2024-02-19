@@ -131,13 +131,16 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let ind_id = oneind_body.mind_typename in
         let i_suffix = "_" ^ Id.to_string ind_id in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
-        let u' = EInstance.kind sigma u in
-        let ind1 = Constr.mkIndU ((mutind, i), u') in
-        let coq_type1 = Constr.mkApp (ind1, Array.map (EConstr.to_constr sigma) params) in
-        ignore (register_ind_type env sigma coq_type1 ind_typename "");
         ind_typename)
       mutind_body.mind_packets
   in
+  Array.iteri
+    (fun i ind_typename ->
+      let u' = EInstance.kind sigma u in
+      let ind1 = Constr.mkIndU ((mutind, i), u') in
+      let coq_type1 = Constr.mkApp (ind1, Array.map (EConstr.to_constr sigma) params) in
+      ignore (register_ind_type env sigma coq_type1 ind_typename ""))
+    ind_typenames;
   let ind_names =
     List.mapi
       (fun i ind_typename ->
