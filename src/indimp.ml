@@ -193,7 +193,7 @@ let register_indimp env sigma mutind_names u =
           (fun j cstr_and_members ->
             let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
             let caselabel = if j = 0 then "default" else "case " ^ cstr_enum_name in
-            let accessors = List.map (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } -> accessor) members_and_accessors_list in
+            let accessors = List.map (fun { member_name=member_name; member_accessor_name=accessor } -> accessor) members_and_accessors_list in
             (cstrid, caselabel, accessors))
           cstr_and_members_list
       in
@@ -314,7 +314,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     pp_sjoinmap_list
       (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
         pp_sjoinmap_list
-          (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } ->
+          (fun { member_name=member_name; member_accessor_name=accessor } ->
             Pp.h (Pp.str "#define" +++
                   Pp.str accessor ++
                   Pp.str "(x)" +++
@@ -437,7 +437,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
           pp_sjoinmap_list
             (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
               pp_sjoinmap_list
-                (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } ->
+                (fun { member_name=member_name; member_accessor_name=accessor } ->
                   Pp.h (Pp.str "#define" +++
                         Pp.str accessor ++
                         Pp.str "(x)" +++
@@ -476,7 +476,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                         Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                         Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_name ++ Pp.str ";") +++
                         pp_sjoinmap_list
-                          (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } ->
+                          (fun { member_name=member_name; member_accessor_name=accessor } ->
                             Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
                           members_and_accessors +++
                         Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
