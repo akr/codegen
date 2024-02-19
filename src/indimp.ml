@@ -102,10 +102,32 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
     done
   done
 
+type member_coqnames = { member_global_prefix: string; member_cstr_ID: Id.t; member_coqenv: Environ.env; member_coqname: Name.t; member_coqtype: EConstr.types }
 type member_names = { member_type: c_typedata; member_name: string; member_accessor_name: string}
-type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
+type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_coqnames list }
 type ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names list }
 type mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: ind_names list }
+
+let obtain_member_names sigma k { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } =
+  let member_type = c_typename env sigma arg_type in
+  if c_type_is_void member_type then
+    None
+  else
+    let k_suffix =
+      string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
+      match arg_name with
+      | Name.Anonymous -> ""
+      | Name.Name id -> "_" ^ c_id (Id.to_string id)
+    in
+    let member_name = global_prefix ^ "_member" ^ k_suffix in
+    let accessor = global_prefix ^ "_get" ^ k_suffix in
+    Some { member_type=member_type; member_name=member_name; member_accessor_name=accessor}
+
+let obtain_member_names_list sigma member_coqnames_list =
+  CList.map_filter_i
+    (fun k member_coqnames ->
+      obtain_member_names sigma k member_coqnames)
+    member_coqnames_list
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names * EInstance.t =
   let global_prefix = global_gensym () in
@@ -158,21 +180,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
               let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
               let members_and_accessors =
-                CList.map_filter_i
-                  (fun k (arg_name, arg_type) ->
-                    let member_type = c_typename env sigma arg_type in
-                    if c_type_is_void member_type then
-                      None
-                    else
-                      let k_suffix =
-                        string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
-                        match Context.binder_name arg_name with
-                        | Name.Anonymous -> ""
-                        | Name.Name id -> "_" ^ c_id (Id.to_string id)
-                      in
-                      let member_name = global_prefix ^ "_member" ^ k_suffix in
-                      let accessor = global_prefix ^ "_get" ^ k_suffix in
-                      Some { member_type=member_type; member_name=member_name; member_accessor_name=accessor})
+                List.map
+                  (fun (arg_name, arg_type) ->
+                    { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=Context.binder_name arg_name; member_coqtype=arg_type })
                   (List.rev args)
               in
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
@@ -193,7 +203,7 @@ let register_indimp env sigma mutind_names u =
           (fun j cstr_and_members ->
             let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
             let caselabel = if j = 0 then "default" else "case " ^ cstr_enum_name in
-            let accessors = List.map (fun { member_name=member_name; member_accessor_name=accessor } -> accessor) members_and_accessors_list in
+            let accessors = List.map (fun { member_name=member_name; member_accessor_name=accessor } -> accessor) (obtain_member_names_list sigma members_and_accessors_list) in
             (cstrid, caselabel, accessors))
           cstr_and_members_list
       in
@@ -244,7 +254,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
         pp_sjoinmap_list
           (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } ->
             Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
-          cstr_and_members.cstr_members)
+          (obtain_member_names_list sigma cstr_and_members.cstr_members))
       cstr_and_members_list
   in
   let cstr_and_members_with_decls =
@@ -322,7 +332,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
                     Pp.str ("((x)." ^ member_name ^ ")")
                   else
                     Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
-          members_and_accessors)
+          (obtain_member_names_list sigma members_and_accessors))
       cstr_and_members_list
   in
   let pp_cstr =
@@ -331,7 +341,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
         let args =
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
             (fun member_and_accessor -> Pp.str member_and_accessor.member_name)
-            members_and_accessors
+            (obtain_member_names_list sigma members_and_accessors)
         in
         Pp.h (Pp.str "#define" +++
                 Pp.str cstrname ++
@@ -415,7 +425,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
               pp_sjoinmap_list
                 (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } ->
                   Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
-                members_and_accessors)
+                (obtain_member_names_list sigma members_and_accessors))
             cstr_and_members_list
         in
         let cstr_and_members_with_decls =
@@ -442,7 +452,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                         Pp.str accessor ++
                         Pp.str "(x)" +++
                         Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
-                members_and_accessors)
+                (obtain_member_names_list sigma members_and_accessors))
             cstr_and_members_list
         in
         let pp_cstr =
@@ -464,7 +474,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                 else
                   pp_joinmap_list (Pp.str "," ++ Pp.spc ())
                     (fun { member_type=member_type; member_name=member_name; member_accessor_name=accessor } -> Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
-                    members_and_accessors
+                    (obtain_member_names_list sigma members_and_accessors)
               in
               Pp.v 0 (Pp.hov 2 (
                         Pp.str "static" +++
@@ -478,7 +488,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
                         pp_sjoinmap_list
                           (fun { member_name=member_name; member_accessor_name=accessor } ->
                             Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
-                          members_and_accessors +++
+                          (obtain_member_names_list sigma members_and_accessors) +++
                         Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
             cstr_and_members_list
         in
