@@ -1235,14 +1235,14 @@ let make_labels_tbl
         else
           (false, false)
       in
-      msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
+      (* msg_debug_hov (Pp.str "[codegen:make_labels_tbl]" +++
         Pp.str "bodyroot=" ++
           (match bodyhead.bodyhead_root with
           | BodyRootTopfunc {cfunc_name=primary_cfunc_name} -> Pp.str ("Topfunc:" ^ primary_cfunc_name)
           | BodyRootFixfunc fixfunc_id -> Pp.str ("Fixfunc:" ^ Id.to_string fixfunc_id)
           | BodyRootClosure closure_id -> Pp.str ("Closure:" ^ Id.to_string closure_id)) +++
         Pp.str "fixfunc_is_first=" ++ Pp.bool fixfunc_is_first +++
-        Pp.str "closure_is_first=" ++ Pp.bool closure_is_first);
+        Pp.str "closure_is_first=" ++ Pp.bool closure_is_first);*)
       let fixfunc_label =
         match fixfunc_ids with
         | [] -> None
@@ -2565,7 +2565,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
   let closure_terms = collect_closure_terms env sigma primary_term in
   let closure_c_name_tbl = make_closure_c_name_tbl sigma closure_terms in
   let genchunks_list = split_function_genchunks genchunks in
-  List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;
+  (*List.iter (fun genchunks -> show_genchunks sigma genchunks) genchunks_list;*)
   let entry_funcs_list = make_entry_funcs_list ~used_for_call_set ~sibling_tbl genchunks_list in
   let (fixfunc_label_tbl, closure_label_tbl) = make_label_tbl_pair ~used_for_call_set ~used_for_goto_set ~sibling_tbl ~cfunc_tbl ~closure_c_name_tbl genchunks_list entry_funcs_list in
   let fixfunc_tbl =
