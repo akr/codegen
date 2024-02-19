@@ -108,7 +108,7 @@ type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: st
 type ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names list }
 type mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: ind_names list }
 
-let obtain_member_names sigma k { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } =
+let obtain_member_names (sigma : Evd.evar_map) (k : int) { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } : member_names option =
   let member_type = c_typename env sigma arg_type in
   if c_type_is_void member_type then
     None
@@ -123,7 +123,7 @@ let obtain_member_names sigma k { member_global_prefix=global_prefix; member_cst
     let accessor = global_prefix ^ "_get" ^ k_suffix in
     Some { member_type=member_type; member_name=member_name; member_accessor_name=accessor}
 
-let obtain_member_names_list sigma member_coqnames_list =
+let obtain_member_names_list (sigma : Evd.evar_map) (member_coqnames_list : member_coqnames list) : member_names list =
   CList.map_filter_i
     (fun k member_coqnames ->
       obtain_member_names sigma k member_coqnames)
@@ -185,7 +185,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   in
   ({ mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names }, u)
 
-let register_indimp env sigma mutind_names u =
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) (u : EInstance.t) : Environ.env =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
   List.iteri
     (fun i { ind_type_name=ind_typename } ->
