@@ -224,8 +224,8 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names } = mutind_names in
-  let { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_list } = List.hd ind_names in
+  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
+  let { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_list } = List.hd ind_names_list in
   let constant_constructor_only =
     List.for_all
       (fun cstr_and_members ->
