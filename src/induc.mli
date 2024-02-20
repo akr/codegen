@@ -16,6 +16,7 @@ val c_type_is_void : State.c_typedata -> bool
 val c_typename : Environ.env -> Evd.evar_map -> EConstr.types -> State.c_typedata
 val c_closure_function_type : Environ.env -> Evd.evar_map -> EConstr.types -> State.c_typedata
 val c_closure_type : State.c_typedata list -> State.c_typedata -> State.c_typedata
+val coq_type_is_void : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val case_swfunc : Environ.env -> Evd.evar_map -> EConstr.types -> string
 val case_cstrlabel :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> string

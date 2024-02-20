@@ -307,6 +307,14 @@ and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : ECon
   in
   c_closure_type arg_types (get_ind_config env sigma ret_type).c_type
 
+let coq_type_is_void (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
+  match EConstr.kind sigma t with
+  | Prod _ -> false
+  | _ ->
+      match lookup_ind_config (EConstr.to_constr sigma t) with
+      | Some ind_cfg -> c_type_is_void ind_cfg.c_type
+      | None -> false (* The Coq type is not registered (yet).  We consider it non-void.  It may be registed as void later, though. *)
+
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in
   match ind_cfg.c_swfunc with
