@@ -121,9 +121,7 @@ let obtain_member_names (sigma : Evd.evar_map) (k : int) { member_global_prefix=
   { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor}
 
 let obtain_member_names_list (sigma : Evd.evar_map) (member_coqnames_list : member_coqnames list) : member_names list =
-  List.mapi
-    (fun k member_coqnames -> obtain_member_names sigma k member_coqnames)
-    member_coqnames_list
+  List.mapi (obtain_member_names sigma) member_coqnames_list
 
 let cstr_names_obtain_member_names (sigma : Evd.evar_map) (cstr_names : member_coqnames cstr_names): member_names cstr_names =
   {
