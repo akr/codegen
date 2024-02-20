@@ -103,30 +103,26 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
   done
 
 type member_coqnames = { member_global_prefix: string; member_cstr_ID: Id.t; member_coqenv: Environ.env; member_coqname: Name.t; member_coqtype: EConstr.types }
-type member_names = { member_type_lazy: c_typedata Lazy.t; member_name: string; member_accessor_name: string}
+type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
 type 't cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: 't list }
 type 't ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: 't cstr_names list }
 type 't mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: 't ind_names list }
 
-let obtain_member_names (sigma : Evd.evar_map) (k : int) { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } : member_names option =
-  if coq_type_is_void env sigma arg_type then
-    None
-  else
-    let k_suffix =
-      string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
-      match arg_name with
-      | Name.Anonymous -> ""
-      | Name.Name id -> "_" ^ c_id (Id.to_string id)
-    in
-    let member_name = global_prefix ^ "_member" ^ k_suffix in
-    let accessor = global_prefix ^ "_get" ^ k_suffix in
-    let member_type_lazy = lazy (c_typename env sigma arg_type) in
-    Some { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor}
+let obtain_member_names (sigma : Evd.evar_map) (k : int) { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } : member_names =
+  let k_suffix =
+    string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
+    match arg_name with
+    | Name.Anonymous -> ""
+    | Name.Name id -> "_" ^ c_id (Id.to_string id)
+  in
+  let member_name = global_prefix ^ "_member" ^ k_suffix in
+  let accessor = global_prefix ^ "_get" ^ k_suffix in
+  let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
+  { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor}
 
 let obtain_member_names_list (sigma : Evd.evar_map) (member_coqnames_list : member_coqnames list) : member_names list =
-  CList.map_filter_i
-    (fun k member_coqnames ->
-      obtain_member_names sigma k member_coqnames)
+  List.mapi
+    (fun k member_coqnames -> obtain_member_names sigma k member_coqnames)
     member_coqnames_list
 
 let cstr_names_obtain_member_names (sigma : Evd.evar_map) (cstr_names : member_coqnames cstr_names): member_names cstr_names =
@@ -150,11 +146,9 @@ let mutind_names_obtain_member_names (sigma : Evd.evar_map) (mutind_names : memb
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
   List.filter_map
     (fun { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor } ->
-      let member_type = Lazy.force member_type_lazy in
-      if c_type_is_void member_type then
-        None
-      else
-        Some (member_type, member_name, accessor))
+      match member_type_lazy with
+      | lazy None -> None
+      | lazy (Some member_type) -> Some (member_type, member_name, accessor))
     members_and_accessors
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : member_coqnames mutind_names * EInstance.t =
