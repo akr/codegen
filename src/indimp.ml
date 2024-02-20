@@ -102,44 +102,10 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
     done
   done
 
-type member_coqnames = { member_global_prefix: string; member_cstr_ID: Id.t; member_coqenv: Environ.env; member_coqname: Name.t; member_coqtype: EConstr.types }
 type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
-type 't cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: 't list }
-type 't ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: 't cstr_names list }
-type 't mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: 't ind_names list }
-
-let obtain_member_names (sigma : Evd.evar_map) (k : int) { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=arg_name; member_coqtype=arg_type } : member_names =
-  let k_suffix =
-    string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
-    match arg_name with
-    | Name.Anonymous -> ""
-    | Name.Name id -> "_" ^ c_id (Id.to_string id)
-  in
-  let member_name = global_prefix ^ "_member" ^ k_suffix in
-  let accessor = global_prefix ^ "_get" ^ k_suffix in
-  let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
-  { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor}
-
-let obtain_member_names_list (sigma : Evd.evar_map) (member_coqnames_list : member_coqnames list) : member_names list =
-  List.mapi (obtain_member_names sigma) member_coqnames_list
-
-let cstr_names_obtain_member_names (sigma : Evd.evar_map) (cstr_names : member_coqnames cstr_names): member_names cstr_names =
-  {
-    cstr_names with
-    cstr_members = obtain_member_names_list sigma cstr_names.cstr_members
-  }
-
-let ind_names_obtain_member_names (sigma : Evd.evar_map) (ind_names : member_coqnames ind_names) : member_names ind_names =
-  {
-    ind_names with
-    ind_cstrs = List.map (cstr_names_obtain_member_names sigma) ind_names.ind_cstrs
-  }
-
-let mutind_names_obtain_member_names (sigma : Evd.evar_map) (mutind_names : member_coqnames mutind_names) : member_names mutind_names =
-  {
-    mutind_names with
-    mutind_inds = List.map (ind_names_obtain_member_names sigma) mutind_names.mutind_inds
-  }
+type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
+type ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names list }
+type mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: ind_names list }
 
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
   List.filter_map
@@ -149,7 +115,7 @@ let non_void_members_and_accessors (members_and_accessors : member_names list) :
       | lazy (Some member_type) -> Some (member_type, member_name, accessor))
     members_and_accessors
 
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : member_coqnames mutind_names * EInstance.t =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names * EInstance.t =
   let global_prefix = global_gensym () in
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
@@ -193,9 +159,18 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
               let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
               let members_and_accessors =
-                List.map
-                  (fun (arg_name, arg_type) ->
-                    { member_global_prefix=global_prefix; member_cstr_ID=cstrid; member_coqenv=env; member_coqname=Context.binder_name arg_name; member_coqtype=arg_type })
+                List.mapi
+                  (fun k (arg_name, arg_type) ->
+                    let k_suffix =
+                      string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
+                      match Context.binder_name arg_name with
+                      | Name.Anonymous -> ""
+                      | Name.Name id -> "_" ^ c_id (Id.to_string id)
+                    in
+                    let member_name = global_prefix ^ "_member" ^ k_suffix in
+                    let accessor = global_prefix ^ "_get" ^ k_suffix in
+                    let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
+                    { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
                   (List.rev args)
               in
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
@@ -205,7 +180,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   in
   ({ mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names }, u)
 
-let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : member_coqnames mutind_names) (u : EInstance.t) : Environ.env =
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) (u : EInstance.t) : Environ.env =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
   List.iteri
     (fun i { ind_type_name=ind_typename } ->
@@ -223,7 +198,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : m
           (fun j cstr_and_members ->
             let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
             let caselabel = if j = 0 then "default" else "case " ^ cstr_enum_name in
-            let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) (obtain_member_names_list sigma members_and_accessors_list) in
+            let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) members_and_accessors_list in
             (cstrid, caselabel, accessors))
           cstr_and_members_list
       in
@@ -249,7 +224,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names } = mutind_names_obtain_member_names sigma mutind_names in
+  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names } = mutind_names in
   let { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_list } = List.hd ind_names in
   let constant_constructor_only =
     List.for_all
@@ -406,7 +381,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   let (mutind_names, u) = generate_indimp_names env sigma coq_type in
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names_obtain_member_names sigma mutind_names in
+  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
   let pp_ind_types =
     pp_sjoinmap_list
       (fun { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_list } ->
