@@ -2457,6 +2457,8 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
       match gen with
       | GenSnippet snippet ->
           gen :: new_genlist
+      | GenThunk thunk ->
+          gen :: new_genlist
       | GenPrototype cfunc ->
           gen :: new_genlist
       | GenFunc cfunc ->
@@ -2489,6 +2491,8 @@ let command_print_generation_list gen_list =
       match gen with
       | GenSnippet snippet ->
           msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string snippet))
+      | GenThunk thunk ->
+          msg_info_hov (Pp.str "GenThunk" +++ Pp.str "<thunk>")
       | GenPrototype cfunc ->
           msg_info_hov (Pp.str "GenPrototype" +++ Pp.str cfunc)
       | GenFunc cfunc ->

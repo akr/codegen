@@ -262,6 +262,7 @@ type code_generation =
 | GenMutual of string list      (* C function names *)
 | GenPrototype of string        (* C function name *)
 | GenSnippet of string  (* code fragment *)
+| GenThunk of (unit -> string)  (* code fragment *)
 
 (*
  * map from filename (string) to list of code_generation in reverse order.

@@ -46,3 +46,8 @@ let command_header_snippet (str : string) : unit =
 let command_header_rawsnippet (str : string) : unit =
   add_header_snippet str
 
+let add_thunk (f : unit -> string) : unit =
+  codegen_add_source_generation (GenThunk f)
+
+let add_header_thunk (f : unit -> string) : unit =
+  codegen_add_header_generation (GenThunk f)

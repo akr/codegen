@@ -10,6 +10,8 @@ src/state.mli
 src/state.ml
 src/cgenutil.mli
 src/cgenutil.ml
+src/snippet.mli
+src/snippet.ml
 src/induc.mli
 src/induc.ml
 src/matchapp.mli
@@ -20,8 +22,6 @@ src/linear.mli
 src/linear.ml
 src/genc.mli
 src/genc.ml
-src/snippet.mli
-src/snippet.ml
 src/indimp.mli
 src/indimp.ml
 src/g_codegen.mli

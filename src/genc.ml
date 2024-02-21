@@ -23,6 +23,7 @@ open EConstr
 
 open Cgenutil
 open State
+open Snippet
 open Induc
 open Specialize
 
@@ -2751,6 +2752,9 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
       | GenPrototype cfunc_name ->
           f (Pp.v 0 (gen_prototype cfunc_name ++ Pp.fnl ()))
       | GenSnippet str ->
+          f (Pp.v 0 (Pp.str str ++ Pp.fnl ()))
+      | GenThunk thunk ->
+          let str = fix_snippet (thunk ()) in
           f (Pp.v 0 (Pp.str str ++ Pp.fnl ())))
     gen_list
 
