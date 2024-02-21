@@ -217,13 +217,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : m
         1 env cstr_and_members_list)
     0 env ind_names_list
 
-let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
-  msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
-  if List.length mutind_names.mutind_inds <> 1 then
-    user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let env = register_indimp env sigma mutind_names u in
-  ignore env;
+let gen_indimp_immediate (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
   let { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_list } = List.hd ind_names_list in
   let constant_constructor_only =
@@ -371,16 +365,10 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     )
   in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
-  let str = Pp.string_of_ppcmds pp in
-  add_snippet str;
   (*msg_info_hov pp;*)
-  ()
+  Pp.string_of_ppcmds pp
 
-let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
-  msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
-  let env = register_indimp env sigma mutind_names u in
-  ignore env;
+let gen_indimp_heap (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_list } = mutind_names in
   let pp_ind_types =
     pp_sjoinmap_list
@@ -493,10 +481,26 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   in
   let pp = Pp.v 0 (pp_ind_types +++ pp_ind_imps) in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
-  let str = Pp.string_of_ppcmds pp in
-  add_snippet str;
   (*msg_info_hov pp;*)
-  ()
+  Pp.string_of_ppcmds pp
+
+let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
+  msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
+  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
+  if List.length mutind_names.mutind_inds <> 1 then
+    user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
+  let env = register_indimp env sigma mutind_names u in
+  ignore env;
+  let str = gen_indimp_immediate mutind_names in
+  add_snippet str
+
+let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
+  msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
+  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
+  let env = register_indimp env sigma mutind_names u in
+  ignore env;
+  let str = gen_indimp_heap mutind_names in
+  add_snippet str
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
