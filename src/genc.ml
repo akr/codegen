@@ -23,6 +23,7 @@ open EConstr
 
 open Cgenutil
 open State
+open Filegen
 open Snippet
 open Induc
 open Specialize
@@ -2758,13 +2759,13 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
           f (Pp.v 0 (Pp.str str ++ Pp.fnl ())))
     gen_list
 
-let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t) : (code_generation list) CString.Map.t =
+let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t CString.Map.t) : (code_generation list) CString.Map.t CString.Map.t =
   let gen_map =
     if List.mem DisableDependencyResolver gflist then gen_map
-    else CString.Map.map codegen_resolve_dependencies gen_map in
+    else CString.Map.map (CString.Map.map codegen_resolve_dependencies) gen_map in
   let gen_map =
     if List.mem DisableMutualRecursionDetection gflist then gen_map
-    else CString.Map.map codegen_detect_siblings gen_map in
+    else CString.Map.map (CString.Map.map codegen_detect_siblings) gen_map in
   gen_map
 
 (* Vernacular commands *)
@@ -2810,15 +2811,25 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
 
 let command_generate_file (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist !generation_map in
-  List.iter
-    (fun (fn, gen_list) -> gen_file fn (List.rev gen_list))
-    (CString.Map.bindings gen_map);
+  gen_map |> CString.Map.iter
+    (fun fn section_map ->
+      defined_sections |> List.concat_map
+        (fun section ->
+          match CString.Map.find_opt section section_map with
+          | None -> []
+          | Some gen_list -> List.rev gen_list)
+      |> gen_file fn);
   generation_map := CString.Map.empty
 
 let command_generate_test (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist !generation_map in
-  List.iter
-    (fun (fn, gen_list) ->
-      Feedback.msg_info (Pp.str fn);
-      gen_pp_iter Feedback.msg_info (List.rev gen_list))
-    (CString.Map.bindings gen_map)
+  gen_map |> CString.Map.iter
+    (fun fn section_map ->
+      defined_sections |> List.concat_map
+        (fun section ->
+            match CString.Map.find_opt section section_map with
+            | None -> []
+            | Some gen_list -> List.rev gen_list)
+      |> (fun rev_gen_list ->
+          Feedback.msg_info (Pp.str fn);
+          gen_pp_iter Feedback.msg_info rev_gen_list))

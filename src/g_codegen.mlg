@@ -223,10 +223,10 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "Constant" ref(func) constr_list(args) sp_instance_names2(names) ] ->
       { command_constant func args names }
 
-    | [ "CodeGen" "Snippet" string(str) ] -> { command_snippet str }
-    | [ "CodeGen" "HeaderSnippet" string(str) ] -> { command_header_snippet str }
-    | [ "CodeGen" "RawSnippet" string(str) ] -> { command_rawsnippet str }
-    | [ "CodeGen" "HeaderRawSnippet" string(str) ] -> { command_header_rawsnippet str }
+    | [ "CodeGen" "Snippet" string(section) string(str) ] -> { command_snippet section str }
+    | [ "CodeGen" "HeaderSnippet" string(section) string(str) ] -> { command_header_snippet section str }
+    | [ "CodeGen" "RawSnippet" string(section) string(str) ] -> { command_rawsnippet section str }
+    | [ "CodeGen" "HeaderRawSnippet" string(section) string(str) ] -> { command_header_rawsnippet section str }
 
     | [ "CodeGen" "IndImp" constr(coq_type) ] ->
       { command_indimp coq_type }

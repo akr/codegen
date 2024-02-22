@@ -265,32 +265,11 @@ type code_generation =
 | GenThunk of (unit -> string)  (* code fragment *)
 
 (*
- * map from filename (string) to list of code_generation in reverse order.
+ * map from filename (string) and section (string) to list of code_generation in reverse order.
  * CodeGen GenerateFile consumes this.
  *)
 let generation_map = Summary.ref ~name:"CodegenGenerationMap"
-  (CString.Map.empty : (code_generation list) CString.Map.t)
-
-let codegen_add_generation filename (generation : code_generation) : unit =
-  generation_map := CString.Map.update
-    filename
-    (fun entry ->
-      match entry with
-      | None -> Some [generation]
-      | Some rest -> Some (generation :: rest))
-    !generation_map
-
-let codegen_add_source_generation (generation : code_generation) : unit =
-  match !current_source_filename with
-  | None -> Feedback.msg_warning (Pp.str "[codegen] no code will be generated because no CodeGen Source File.")
-  | Some filename ->
-      codegen_add_generation filename generation
-
-let codegen_add_header_generation (generation : code_generation) : unit =
-  match !current_header_filename with
-  | None -> ()
-  | Some filename ->
-      codegen_add_generation filename generation
+  (CString.Map.empty : (code_generation list) CString.Map.t CString.Map.t)
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"

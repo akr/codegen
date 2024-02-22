@@ -27,6 +27,7 @@ open CErrors
 
 open Cgenutil
 open State
+open Filegen
 
 let pr_s_or_d (sd : s_or_d) : Pp.t =
   match sd with
@@ -570,15 +571,15 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunc func user_args names in
-  codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
-  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_header_generation "header_func_decls" (GenPrototype sp_inst.sp_cfunc_name);
+  codegen_add_source_generation "source_func_impls" (GenFunc sp_inst.sp_cfunc_name)
 
 let command_static_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunc func user_args names in
-  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_source_generation "source_func_impls" (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
     (func : Libnames.qualid)
@@ -2483,7 +2484,8 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
 
 let command_resolve_dependencies () : unit =
   generation_map :=
-    CString.Map.map codegen_resolve_dependencies !generation_map
+    !generation_map |> CString.Map.map
+      (CString.Map.map codegen_resolve_dependencies)
 
 let command_print_generation_list gen_list =
   List.iter
@@ -2508,11 +2510,15 @@ let command_print_generation_map () =
   (match !current_source_filename with
   | None -> msg_info_hov (Pp.str "current_source_filename = None")
   | Some fn -> msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string fn)));
-  CString.Map.iter
-    (fun filename gen_list ->
-      msg_info_hov (Pp.str filename);
-      command_print_generation_list gen_list)
-    !generation_map
+  !generation_map |> CString.Map.iter
+    (fun filename section_map ->
+      defined_sections |> List.iter
+        (fun section ->
+          match CString.Map.find_opt section section_map with
+          | None -> ()
+          | Some gen_list ->
+              msg_info_hov (Pp.str (filename ^ ":" ^ section));
+              command_print_generation_list gen_list))
 
 let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
   let open Declarations in

@@ -479,14 +479,14 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  add_thunk (fun () -> gen_indimp_immediate mutind_names)
+  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate mutind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
   let (mutind_names, u) = generate_indimp_names env sigma coq_type in
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  add_thunk (fun () -> gen_indimp_heap mutind_names)
+  add_thunk "source_type_impls" (fun () -> gen_indimp_heap mutind_names)
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in

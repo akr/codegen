@@ -10,6 +10,8 @@ src/state.mli
 src/state.ml
 src/cgenutil.mli
 src/cgenutil.ml
+src/filegen.mli
+src/filegen.ml
 src/snippet.mli
 src/snippet.ml
 src/induc.mli

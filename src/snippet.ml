@@ -18,6 +18,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 open State
 open Cgenutil
+open Filegen
 
 let fix_snippet (str : string) : string =
   let len = String.length str in
@@ -26,28 +27,28 @@ let fix_snippet (str : string) : string =
   else
     str
 
-let add_snippet (str : string) : unit =
+let add_snippet (section : string) (str : string) : unit =
   let str' = fix_snippet str in
-  codegen_add_source_generation (GenSnippet str')
+  codegen_add_source_generation section (GenSnippet str')
 
-let add_header_snippet (str : string) : unit =
+let add_header_snippet (section : string) (str : string) : unit =
   let str' = fix_snippet str in
-  codegen_add_header_generation (GenSnippet str')
+  codegen_add_header_generation section (GenSnippet str')
 
-let command_snippet (str : string) : unit =
-  add_snippet (delete_indent (expand_tab str))
+let command_snippet (section : string) (str : string) : unit =
+  add_snippet section (delete_indent (expand_tab str))
 
-let command_rawsnippet (str : string) : unit =
-  add_snippet str
+let command_rawsnippet (section : string) (str : string) : unit =
+  add_snippet section str
 
-let command_header_snippet (str : string) : unit =
-  add_header_snippet (delete_indent (expand_tab str))
+let command_header_snippet (section : string) (str : string) : unit =
+  add_header_snippet section (delete_indent (expand_tab str))
 
-let command_header_rawsnippet (str : string) : unit =
-  add_header_snippet str
+let command_header_rawsnippet (section : string) (str : string) : unit =
+  add_header_snippet section str
 
-let add_thunk (f : unit -> string) : unit =
-  codegen_add_source_generation (GenThunk f)
+let add_thunk (section : string) (f : unit -> string) : unit =
+  codegen_add_source_generation section (GenThunk f)
 
-let add_header_thunk (f : unit -> string) : unit =
-  codegen_add_header_generation (GenThunk f)
+let add_header_thunk (section : string) (f : unit -> string) : unit =
+  codegen_add_header_generation section (GenThunk f)
