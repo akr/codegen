@@ -124,22 +124,11 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let mutind_body = Environ.lookup_mind mutind env in
   check_ind_id_conflict mutind_body;
   let open Declarations in
-  let ind_typenames =
+  let ind_names =
     Array.mapi
       (fun i oneind_body ->
-        let ind_id = oneind_body.mind_typename in
-        let i_suffix = "_" ^ Id.to_string ind_id in
+        let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
-        ind_typename)
-      mutind_body.mind_packets
-  in
-  let ind_names =
-    List.mapi
-      (fun i ind_typename ->
-        let ind = (mutind, i) in
-        let oneind_body = mutind_body.mind_packets.(i) in
-        let ind_id = oneind_body.mind_typename in
-        let i_suffix = "_" ^ Id.to_string ind_id in
         let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
         let swfunc = global_prefix ^ "_sw" ^ i_suffix in
         let numcstr = Array.length oneind_body.mind_consnames in
@@ -148,7 +137,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
             (fun j0 ->
               let j = j0 + 1 in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
-              let cstrterm = mkApp ((mkConstructU ((ind, j), u)), params) in
+              let cstrterm = mkApp ((mkConstructU (((mutind, i), j), u)), params) in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
               let cstrtype = Retyping.get_type_of env sigma cstrterm in
               let (args, result_type) = decompose_prod sigma cstrtype in
@@ -176,8 +165,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
         in
         { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
-      (Array.to_list ind_typenames)
+      mutind_body.mind_packets
   in
+  let ind_names = Array.to_list ind_names in
   ({ mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names }, u)
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) (u : EInstance.t) : Environ.env =
