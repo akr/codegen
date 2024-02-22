@@ -103,7 +103,7 @@ val pp_sjoinmap_ary : ('a -> Pp.t) -> 'a array -> Pp.t
 val pp_sjoinmap_list : ('a -> Pp.t) -> 'a list -> Pp.t
 val pp_join_ary : Pp.t -> Pp.t array -> Pp.t
 val pp_join_list : Pp.t -> Pp.t list -> Pp.t
-val pp_joinmap_ary : Pp.t -> (Pp.t -> Pp.t) -> Pp.t array -> Pp.t
+val pp_joinmap_ary : Pp.t -> ('a -> Pp.t) -> 'a array -> Pp.t
 val pp_joinmap_list : Pp.t -> ('a -> Pp.t) -> 'a list -> Pp.t
 val pp_prejoin_ary : Pp.t -> Pp.t array -> Pp.t
 val pp_prejoin_list : Pp.t -> Pp.t list -> Pp.t
