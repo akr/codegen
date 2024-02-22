@@ -92,8 +92,8 @@ type code_generation =
   | GenPrototype of string
   | GenSnippet of string
   | GenThunk of (unit -> string)
-val generation_map : code_generation list CString.Map.t ref
-val codegen_add_generation : CString.Map.key -> code_generation -> unit
+val generation_map : ((code_generation list) CString.Map.t) ref
+val codegen_add_generation : string -> code_generation -> unit
 val codegen_add_source_generation : code_generation -> unit
 val codegen_add_header_generation : code_generation -> unit
 val gensym_ps_num : int ref

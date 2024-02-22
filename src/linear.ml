@@ -428,7 +428,7 @@ let borrow_union (brw1 : borrow_t) (brw2 : borrow_t) : borrow_t =
 let borrow_union_ary (brws : borrow_t array) : borrow_t =
   Array.fold_left borrow_union ConstrMap.empty brws
 
-let constrmap_filter_map (f : ConstrMap.key -> 'a -> 'b option) (m : 'a ConstrMap.t) : 'b ConstrMap.t =
+let constrmap_filter_map (f : Constr.t -> 'a -> 'b option) (m : 'a ConstrMap.t) : 'b ConstrMap.t =
   List.fold_left
     (fun m (k,b) -> ConstrMap.add k b m)
     ConstrMap.empty
