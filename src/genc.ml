@@ -2611,8 +2611,9 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
       (decl, impl))
     genchunks_list entry_funcs_list
   in
-  [("source_func_decls", pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs);
-   ("source_func_impls", pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs)]
+  let pp = pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
+           pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs in
+  [("source_func_impls", pp)]
 
 let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) :
     (*cfunc_term_list*) (cfunc_t * Constr.t) list *
