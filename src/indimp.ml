@@ -125,14 +125,14 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   check_ind_id_conflict mutind_body;
   let open Declarations in
   let ind_names =
-    Array.mapi
+    mutind_body.mind_packets |> Array.mapi
       (fun i oneind_body ->
         let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
         let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
         let swfunc = global_prefix ^ "_sw" ^ i_suffix in
         let cstr_and_members =
-          Array.mapi
+          oneind_body.mind_consnames |> Array.mapi
             (fun j0 cstrid ->
               let j = j0 + 1 in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
@@ -146,7 +146,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
               let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
               let members_and_accessors =
-                List.mapi
+                (List.rev args) |> List.mapi
                   (fun k (arg_name, arg_type) ->
                     let k_suffix =
                       string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
@@ -158,13 +158,10 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
                     let accessor = global_prefix ^ "_get" ^ k_suffix in
                     let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
                     { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
-                  (List.rev args)
               in
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
-            oneind_body.mind_consnames
         in
         { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
-      mutind_body.mind_packets
   in
   ({ mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names }, u)
 
