@@ -28,10 +28,12 @@ let fix_snippet (str : string) : string =
     str
 
 let add_snippet (section : string) (str : string) : unit =
+  check_section section;
   let str' = fix_snippet str in
   codegen_add_source_generation (GenSnippet (section, str'))
 
 let add_header_snippet (section : string) (str : string) : unit =
+  check_section section;
   let str' = fix_snippet str in
   codegen_add_header_generation (GenSnippet (section, str'))
 

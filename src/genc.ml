@@ -2752,6 +2752,7 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
       | GenSnippet (section, str) -> [(section, Pp.str str)]
       | GenThunk (section, thunk) -> let str = fix_snippet (thunk ()) in [(section, Pp.str str)])
   in
+  assoc |> List.iter (fun (section, pp) -> check_section section);
   let m =
     List.fold_right
       (fun (section, pp) m ->

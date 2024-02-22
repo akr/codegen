@@ -17,6 +17,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
 open State
+open Cgenutil
 
 let defined_sections = [
   "header_prologue";
@@ -51,3 +52,7 @@ let codegen_add_header_generation (generation : code_generation) : unit =
   | None -> ()
   | Some filename ->
       codegen_add_generation filename generation
+
+let check_section (section : string) : unit =
+  (if not (List.mem section defined_sections) then
+    user_err_hov (Pp.str "[codegen] unexpected section:" +++ Pp.str section))
