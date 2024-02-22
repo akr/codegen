@@ -571,15 +571,15 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenFunc func user_args names in
-  codegen_add_header_generation "header_func_decls" (GenPrototype sp_inst.sp_cfunc_name);
-  codegen_add_source_generation "source_func_impls" (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
+  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_static_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names) : unit =
   let (env, sp_inst) = codegen_instance_command CodeGenStaticFunc func user_args names in
-  codegen_add_source_generation "source_func_impls" (GenFunc sp_inst.sp_cfunc_name)
+  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
     (func : Libnames.qualid)
@@ -2456,9 +2456,9 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
   List.fold_right
     (fun gen new_genlist ->
       match gen with
-      | GenSnippet snippet ->
+      | GenSnippet (section, snippet) ->
           gen :: new_genlist
-      | GenThunk thunk ->
+      | GenThunk (section, thunk) ->
           gen :: new_genlist
       | GenPrototype cfunc ->
           gen :: new_genlist
@@ -2484,17 +2484,16 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
 
 let command_resolve_dependencies () : unit =
   generation_map :=
-    !generation_map |> CString.Map.map
-      (CString.Map.map codegen_resolve_dependencies)
+    !generation_map |> CString.Map.map codegen_resolve_dependencies
 
 let command_print_generation_list gen_list =
   List.iter
     (fun gen ->
       match gen with
-      | GenSnippet snippet ->
-          msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string snippet))
-      | GenThunk thunk ->
-          msg_info_hov (Pp.str "GenThunk" +++ Pp.str "<thunk>")
+      | GenSnippet (section, snippet) ->
+          msg_info_hov (Pp.str "GenSnippet" +++ Pp.str (escape_as_coq_string section) +++ Pp.str (escape_as_coq_string snippet))
+      | GenThunk (section, thunk) ->
+          msg_info_hov (Pp.str "GenThunk" +++ Pp.str (escape_as_coq_string section) +++ Pp.str "<thunk>")
       | GenPrototype cfunc ->
           msg_info_hov (Pp.str "GenPrototype" +++ Pp.str cfunc)
       | GenFunc cfunc ->
@@ -2511,14 +2510,9 @@ let command_print_generation_map () =
   | None -> msg_info_hov (Pp.str "current_source_filename = None")
   | Some fn -> msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string fn)));
   !generation_map |> CString.Map.iter
-    (fun filename section_map ->
-      defined_sections |> List.iter
-        (fun section ->
-          match CString.Map.find_opt section section_map with
-          | None -> ()
-          | Some gen_list ->
-              msg_info_hov (Pp.str (filename ^ ":" ^ section));
-              command_print_generation_list gen_list))
+    (fun filename gen_list ->
+      msg_info_hov (Pp.str filename);
+      command_print_generation_list gen_list)
 
 let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
   let open Declarations in

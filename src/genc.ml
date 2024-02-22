@@ -2545,7 +2545,7 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (
   else
     []
 
-let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (cfunc_t * Constr.t) list) : Pp.t =
+let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (cfunc_t * Constr.t) list) : (string * Pp.t) list =
   let (primary_cfunc, primary_term) = List.hd cfunc_term_list in
   let sibling_entfuncs = make_sibling_entfuncs primary_term (List.tl cfunc_term_list) in
   let primary_term = EConstr.of_constr primary_term in
@@ -2611,8 +2611,8 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
       (decl, impl))
     genchunks_list entry_funcs_list
   in
-  pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
-  pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs
+  [("source_func_decls", pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs);
+   ("source_func_impls", pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs)]
 
 let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) :
     (*cfunc_term_list*) (cfunc_t * Constr.t) list *
@@ -2666,10 +2666,10 @@ let gen_stub_function (cfunc_to_define, cfunc_name_to_call, formal_arguments_wit
         formal_arguments_without_void ++
       Pp.str ");"))
 
-let gen_stub_functions (stub_entries : (cfunc_t * string * (string * c_typedata) list * c_typedata) list) : Pp.t =
-  pp_sjoinmap_list gen_stub_function stub_entries
+let gen_stub_functions (stub_entries : (cfunc_t * string * (string * c_typedata) list * c_typedata) list) : (string * Pp.t) list =
+  [("source_func_impls", pp_sjoinmap_list gen_stub_function stub_entries)]
 
-let gen_function (cfunc_names : string list) : Pp.t =
+let gen_function (cfunc_names : string list) : (string * Pp.t) list =
   match cfunc_names with
   | [] -> user_err (Pp.str "[codegen:bug] gen_function with empty cfunc_names")
   | cfunc_names ->
@@ -2683,16 +2683,16 @@ let gen_function (cfunc_names : string list) : Pp.t =
       let env = Global.env () in
       let sigma = Evd.from_env env in
       let (cfunc_term_list, stubs) = detect_stubs env sigma cfunc_ty_term_list in
-      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_term_list) +++
+      local_gensym_with (fun () -> gen_func_sub env sigma cfunc_term_list) @
       gen_stub_functions stubs
 
-let gen_prototype (cfunc_name : string) : Pp.t =
+let gen_prototype (cfunc_name : string) : (string * Pp.t) list =
   let (cfunc, ty, whole_term) = make_simplified_for_cfunc cfunc_name in (* modify global env *)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma whole_ty in
-  gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";"
+  [("source_func_decls", gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";")]
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lambda term in
@@ -2743,29 +2743,37 @@ let codegen_detect_siblings (gen_list : code_generation list) : code_generation 
     gens
 
 let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
-  List.iter
-    (fun gen ->
+  let assoc =
+    gen_list |> List.concat_map (fun gen ->
       match gen with
-      | GenFunc cfunc_name ->
-          f (Pp.v 0 (gen_function [cfunc_name] ++ Pp.fnl ()))
-      | GenMutual cfunc_names ->
-          f (Pp.v 0 (gen_function cfunc_names ++ Pp.fnl ()))
-      | GenPrototype cfunc_name ->
-          f (Pp.v 0 (gen_prototype cfunc_name ++ Pp.fnl ()))
-      | GenSnippet str ->
-          f (Pp.v 0 (Pp.str str ++ Pp.fnl ()))
-      | GenThunk thunk ->
-          let str = fix_snippet (thunk ()) in
-          f (Pp.v 0 (Pp.str str ++ Pp.fnl ())))
-    gen_list
+      | GenFunc cfunc_name -> gen_function [cfunc_name]
+      | GenMutual cfunc_names -> gen_function cfunc_names
+      | GenPrototype cfunc_name -> gen_prototype cfunc_name
+      | GenSnippet (section, str) -> [(section, Pp.str str)]
+      | GenThunk (section, thunk) -> let str = fix_snippet (thunk ()) in [(section, Pp.str str)])
+  in
+  let m =
+    List.fold_right
+      (fun (section, pp) m ->
+        m |> CString.Map.update section
+          (fun pps_opt ->
+            match pps_opt with
+            | None -> Some [pp]
+            | Some pps -> Some (pp :: pps)))
+      assoc CString.Map.empty
+  in
+  defined_sections |> List.iter (fun section ->
+    match CString.Map.find_opt section m with
+    | None -> ()
+    | Some pps -> pps |> List.iter (fun pp -> f (Pp.v 0 (pp ++ Pp.fnl ()))))
 
-let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t CString.Map.t) : (code_generation list) CString.Map.t CString.Map.t =
+let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t) : (code_generation list) CString.Map.t =
   let gen_map =
     if List.mem DisableDependencyResolver gflist then gen_map
-    else CString.Map.map (CString.Map.map codegen_resolve_dependencies) gen_map in
+    else CString.Map.map codegen_resolve_dependencies gen_map in
   let gen_map =
     if List.mem DisableMutualRecursionDetection gflist then gen_map
-    else CString.Map.map (CString.Map.map codegen_detect_siblings) gen_map in
+    else CString.Map.map codegen_detect_siblings gen_map in
   gen_map
 
 (* Vernacular commands *)
@@ -2812,24 +2820,12 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
 let command_generate_file (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist !generation_map in
   gen_map |> CString.Map.iter
-    (fun fn section_map ->
-      defined_sections |> List.concat_map
-        (fun section ->
-          match CString.Map.find_opt section section_map with
-          | None -> []
-          | Some gen_list -> List.rev gen_list)
-      |> gen_file fn);
+    (fun fn gen_list -> gen_file fn (List.rev gen_list));
   generation_map := CString.Map.empty
 
 let command_generate_test (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist !generation_map in
   gen_map |> CString.Map.iter
-    (fun fn section_map ->
-      defined_sections |> List.concat_map
-        (fun section ->
-            match CString.Map.find_opt section section_map with
-            | None -> []
-            | Some gen_list -> List.rev gen_list)
-      |> (fun rev_gen_list ->
-          Feedback.msg_info (Pp.str fn);
-          gen_pp_iter Feedback.msg_info rev_gen_list))
+    (fun fn gen_list ->
+      Feedback.msg_info (Pp.str fn);
+      gen_pp_iter Feedback.msg_info (List.rev gen_list))

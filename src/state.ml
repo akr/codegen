@@ -261,15 +261,15 @@ type code_generation =
   GenFunc of string     (* C function name *)
 | GenMutual of string list      (* C function names *)
 | GenPrototype of string        (* C function name *)
-| GenSnippet of string  (* code fragment *)
-| GenThunk of (unit -> string)  (* code fragment *)
+| GenSnippet of string * string  (* section, code fragment *)
+| GenThunk of string * (unit -> string)  (* section, code fragment *)
 
 (*
- * map from filename (string) and section (string) to list of code_generation in reverse order.
+ * map from filename (string) to list of code_generation in reverse order.
  * CodeGen GenerateFile consumes this.
  *)
 let generation_map = Summary.ref ~name:"CodegenGenerationMap"
-  (CString.Map.empty : (code_generation list) CString.Map.t CString.Map.t)
+  (CString.Map.empty : (code_generation list) CString.Map.t)
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"

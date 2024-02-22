@@ -90,9 +90,9 @@ type code_generation =
     GenFunc of string
   | GenMutual of string list
   | GenPrototype of string
-  | GenSnippet of string
-  | GenThunk of (unit -> string)
-val generation_map : ((code_generation list) CString.Map.t) CString.Map.t ref
+  | GenSnippet of string * string
+  | GenThunk of string * (unit -> string)
+val generation_map : (code_generation list) CString.Map.t ref
 val gensym_ps_num : int ref
 val specialize_global_inline : Names.Cpred.t ref
 val specialize_local_inline : Names.Cpred.t Names.Cmap.t ref

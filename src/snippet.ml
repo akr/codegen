@@ -29,11 +29,11 @@ let fix_snippet (str : string) : string =
 
 let add_snippet (section : string) (str : string) : unit =
   let str' = fix_snippet str in
-  codegen_add_source_generation section (GenSnippet str')
+  codegen_add_source_generation (GenSnippet (section, str'))
 
 let add_header_snippet (section : string) (str : string) : unit =
   let str' = fix_snippet str in
-  codegen_add_header_generation section (GenSnippet str')
+  codegen_add_header_generation (GenSnippet (section, str'))
 
 let command_snippet (section : string) (str : string) : unit =
   add_snippet section (delete_indent (expand_tab str))
@@ -48,7 +48,7 @@ let command_header_rawsnippet (section : string) (str : string) : unit =
   add_header_snippet section str
 
 let add_thunk (section : string) (f : unit -> string) : unit =
-  codegen_add_source_generation section (GenThunk f)
+  codegen_add_source_generation (GenThunk (section, f))
 
 let add_header_thunk (section : string) (f : unit -> string) : unit =
-  codegen_add_header_generation section (GenThunk f)
+  codegen_add_header_generation (GenThunk (section, f))
