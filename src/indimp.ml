@@ -131,17 +131,15 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
         let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
         let swfunc = global_prefix ^ "_sw" ^ i_suffix in
-        let numcstr = Array.length oneind_body.mind_consnames in
         let cstr_and_members =
-          List.init numcstr
-            (fun j0 ->
+          Array.mapi
+            (fun j0 cstrid ->
               let j = j0 + 1 in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
               let cstrterm = mkApp ((mkConstructU (((mutind, i), j), u)), params) in
               (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
               let cstrtype = Retyping.get_type_of env sigma cstrterm in
               let (args, result_type) = decompose_prod sigma cstrtype in
-              let cstrid = oneind_body.mind_consnames.(j0) in
               let j_suffix = "_" ^ Id.to_string cstrid in
               let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
               let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
@@ -163,7 +161,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
                   (List.rev args)
               in
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
+            oneind_body.mind_consnames
         in
+        let cstr_and_members = Array.to_list cstr_and_members in
         { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
       mutind_body.mind_packets
   in
