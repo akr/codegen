@@ -169,13 +169,11 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) : Environ.env =
   let { mutind_inds=ind_names_ary } = mutind_names in
-  ind_names_ary |> Array.iter (fun { ind_pind=pind; ind_params=params; ind_type_name=ind_typename } ->
-      let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
-      ignore (register_ind_type env sigma coq_type_i ind_typename "")) ;
   Array.fold_left
     (fun env ind_names ->
       let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
       let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
+      ignore (register_ind_type env sigma coq_type_i ind_typename "");
       let cstr_caselabel_accessors_ary =
         Array.mapi
           (fun j0 cstr_and_members ->
