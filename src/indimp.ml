@@ -114,7 +114,7 @@ let non_void_members_and_accessors (members_and_accessors : member_names list) :
       | lazy (Some member_type) -> Some (member_type, member_name, accessor))
     members_and_accessors
 
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names array =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names =
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
@@ -122,82 +122,74 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let mutind_body = Environ.lookup_mind mutind env in
   check_ind_id_conflict mutind_body;
   let open Declarations in
-  let ind_names_ary =
-    mutind_body.mind_packets |> Array.mapi
-      (fun i oneind_body ->
-        let global_prefix = global_gensym () in
-        let pind = ((mutind, i), u) in
-        let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
-        let ind_typename = global_prefix ^ "_type" ^ i_suffix in
-        let ind_type_tag = global_prefix ^ "_istruct" ^ i_suffix in
-        let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
-        let swfunc = global_prefix ^ "_sw" ^ i_suffix in
-        let cstr_and_members =
-          oneind_body.mind_consnames |> Array.mapi
-            (fun j0 cstrid ->
-              let j = j0 + 1 in
-              (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
-              let cstrterm = mkApp ((mkConstructU (((mutind, i), j), u)), params) in
-              (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
-              let cstrtype = Retyping.get_type_of env sigma cstrterm in
-              let (args, result_type) = decompose_prod sigma cstrtype in
-              let j_suffix = "_" ^ Id.to_string cstrid in
-              let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
-              let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
-              let cstr_struct = global_prefix ^ "_cstruct" ^ j_suffix in
-              let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
-              let members_and_accessors =
-                (List.rev args) |> List.mapi
-                  (fun k (arg_name, arg_type) ->
-                    let k_suffix =
-                      string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
-                      match Context.binder_name arg_name with
-                      | Name.Anonymous -> ""
-                      | Name.Name id -> "_" ^ c_id (Id.to_string id)
-                    in
-                    let member_name = global_prefix ^ "_member" ^ k_suffix in
-                    let accessor = global_prefix ^ "_get" ^ k_suffix in
-                    let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
-                    { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
+  let oneind_body = mutind_body.mind_packets.(i) in
+  let global_prefix = global_gensym () in
+  let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
+  let ind_typename = global_prefix ^ "_type" ^ i_suffix in
+  let ind_type_tag = global_prefix ^ "_istruct" ^ i_suffix in
+  let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
+  let swfunc = global_prefix ^ "_sw" ^ i_suffix in
+  let cstr_and_members =
+    oneind_body.mind_consnames |> Array.mapi
+      (fun j0 cstrid ->
+        let j = j0 + 1 in
+        (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
+        let cstrterm = mkApp ((mkConstructU (((mutind, i), j), u)), params) in
+        (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
+        let cstrtype = Retyping.get_type_of env sigma cstrterm in
+        let (args, result_type) = decompose_prod sigma cstrtype in
+        let j_suffix = "_" ^ Id.to_string cstrid in
+        let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
+        let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
+        let cstr_struct = global_prefix ^ "_cstruct" ^ j_suffix in
+        let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
+        let members_and_accessors =
+          (List.rev args) |> List.mapi
+            (fun k (arg_name, arg_type) ->
+              let k_suffix =
+                string_of_int (k+1) ^ "_" ^ Id.to_string cstrid ^
+                match Context.binder_name arg_name with
+                | Name.Anonymous -> ""
+                | Name.Name id -> "_" ^ c_id (Id.to_string id)
               in
-              { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
+              let member_name = global_prefix ^ "_member" ^ k_suffix in
+              let accessor = global_prefix ^ "_get" ^ k_suffix in
+              let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
+              { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
         in
-        { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
+        { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
   in
-  ind_names_ary
+  { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members }
 
-let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names_ary : ind_names array) : Environ.env =
-  Array.fold_left
-    (fun env ind_names ->
-      let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
-      let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
-      ignore (register_ind_type env sigma coq_type_i ind_typename "");
-      let cstr_caselabel_accessors_ary =
-        Array.mapi
-          (fun j0 cstr_and_members ->
-            let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
-            let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_name in
-            let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) members_and_accessors_list in
-            (cstrid, caselabel, accessors))
-          cstr_and_members_ary
-      in
-      let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
-      let params' = Array.map (EConstr.to_constr sigma) params in
-      ignore (register_ind_match env sigma coq_type_i swfunc cstr_caselabel_accessors_list);
-      CArray.fold_left_i
-        (fun j0 env cstr_and_members ->
-          let j = j0 + 1 in
-          let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
-          let cstrterm0 = EConstr.to_constr sigma (mkConstructUi (pind, j)) in
-          ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
-          let spi = { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None } in
-          let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some spi) in
-          env)
-        env cstr_and_members_ary)
-    env ind_names_ary
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
+  let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+  let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
+  ignore (register_ind_type env sigma coq_type_i ind_typename "");
+  let cstr_caselabel_accessors_ary =
+    Array.mapi
+      (fun j0 cstr_and_members ->
+        let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
+        let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_name in
+        let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) members_and_accessors_list in
+        (cstrid, caselabel, accessors))
+      cstr_and_members_ary
+  in
+  let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
+  let params' = Array.map (EConstr.to_constr sigma) params in
+  ignore (register_ind_match env sigma coq_type_i swfunc cstr_caselabel_accessors_list);
+  CArray.fold_left_i
+    (fun j0 env cstr_and_members ->
+      let j = j0 + 1 in
+      let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
+      let cstrterm0 = EConstr.to_constr sigma (mkConstructUi (pind, j)) in
+      ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
+      let spi = { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None } in
+      let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 (Array.to_list params') (Some spi) in
+      env)
+    env cstr_and_members_ary
 
-let gen_indimp_immediate_impl (ind_names_ary : ind_names array) : string =
-  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
+let gen_indimp_immediate_impl (ind_names : ind_names) : string =
+  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
   let constant_constructor_only =
     Array.for_all
       (fun cstr_and_members ->
@@ -347,121 +339,117 @@ let gen_indimp_immediate_impl (ind_names_ary : ind_names array) : string =
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp
 
-let gen_indimp_heap_decls (ind_names_ary : ind_names array) : string =
+let gen_indimp_heap_decls (ind_names : ind_names) : string =
   let pp_ind_types =
-    pp_sjoinmap_ary
-      (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
-        Pp.hov 0 (
-          Pp.str "typedef" +++
-          Pp.str "struct" +++
-          Pp.str ind_type_tag +++
-          Pp.str "*" ++
-          Pp.str ind_typename ++
-          Pp.str ";"))
-      ind_names_ary
+    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+    Pp.hov 0 (
+      Pp.str "typedef" +++
+      Pp.str "struct" +++
+      Pp.str ind_type_tag +++
+      Pp.str "*" ++
+      Pp.str ind_typename ++
+      Pp.str ";")
   in
   let pp_decls = Pp.v 0 pp_ind_types in
   Pp.string_of_ppcmds pp_decls
 
-let gen_indimp_heap_impls (ind_names_ary : ind_names array) : string =
+let gen_indimp_heap_impls (ind_names : ind_names) : string =
   let pp_ind_impls =
-    pp_sjoinmap_ary
-      (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
-        let pp_enum_decl =
-          Pp.hov 0 (
-            (Pp.str "enum" +++ Pp.str enum_tag +++
-            hovbrace (pp_joinmap_ary (Pp.str "," ++ Pp.spc ())
-              (fun cstr_and_members -> Pp.str cstr_and_members.cstr_enum_tag)
-              cstr_and_members_ary) ++ Pp.str ";"))
-        in
-        let pp_ind_struct_def =
-          Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_type_tag) +++
-            vbrace (Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;")) ++
-            Pp.str ";"
-        in
-        let pp_swfunc =
-          Pp.h (
-            Pp.str "#define" +++
-            Pp.str swfunc ++ Pp.str "(x)" +++
-            Pp.str "((x)->tag)")
-        in
-        let member_decls =
-          Array.map
-            (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
-              Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;") +++
-              pp_sjoinmap_list
+    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+    let pp_enum_decl =
+      Pp.hov 0 (
+        (Pp.str "enum" +++ Pp.str enum_tag +++
+        hovbrace (pp_joinmap_ary (Pp.str "," ++ Pp.spc ())
+          (fun cstr_and_members -> Pp.str cstr_and_members.cstr_enum_tag)
+          cstr_and_members_ary) ++ Pp.str ";"))
+    in
+    let pp_ind_struct_def =
+      Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_type_tag) +++
+        vbrace (Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;")) ++
+        Pp.str ";"
+    in
+    let pp_swfunc =
+      Pp.h (
+        Pp.str "#define" +++
+        Pp.str swfunc ++ Pp.str "(x)" +++
+        Pp.str "((x)->tag)")
+    in
+    let member_decls =
+      Array.map
+        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+          Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;") +++
+          pp_sjoinmap_list
+            (fun (member_type, member_name, accessor) ->
+              Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
+            (non_void_members_and_accessors members_and_accessors))
+        cstr_and_members_ary
+    in
+    let cstr_and_members_with_decls =
+      Array.map2
+        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_def ->
+          (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
+        cstr_and_members_ary member_decls
+    in
+    let pp_cstr_struct_defs =
+      pp_sjoinmap_ary
+        (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl) ->
+          Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
+          vbrace member_decl ++
+          Pp.str ";")
+        cstr_and_members_with_decls
+    in
+    let pp_accessors =
+      (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
+      pp_sjoinmap_ary
+        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+          pp_sjoinmap_list
+            (fun { member_name=member_name; member_accessor_name=accessor } ->
+              Pp.h (Pp.str "#define" +++
+                    Pp.str accessor ++
+                    Pp.str "(x)" +++
+                    Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
+            members_and_accessors)
+        cstr_and_members_ary
+    in
+    let pp_cstr =
+      (*
+        static list_t list_cons(bool head, list_t tail) {
+          struct list_cons_struct *p;
+          if (!(p = malloc(sizeof(struct list_cons_struct)))) abort();
+          p->tag = list_cons_tag;
+          p->head = head;
+          p->tail = tail;
+          return (list_t)p;
+        }
+      *)
+      pp_sjoinmap_ary
+        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+          let fargs =
+            if members_and_accessors = [] then
+              Pp.str "void"
+            else
+              pp_joinmap_list (Pp.str "," ++ Pp.spc ())
                 (fun (member_type, member_name, accessor) ->
-                  Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
-                (non_void_members_and_accessors members_and_accessors))
-            cstr_and_members_ary
-        in
-        let cstr_and_members_with_decls =
-          Array.map2
-            (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_def ->
-              (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
-            cstr_and_members_ary member_decls
-        in
-        let pp_cstr_struct_defs =
-          pp_sjoinmap_ary
-            (fun (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl) ->
-              Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
-              vbrace member_decl ++
-              Pp.str ";")
-            cstr_and_members_with_decls
-        in
-        let pp_accessors =
-          (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
-          pp_sjoinmap_ary
-            (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
-              pp_sjoinmap_list
-                (fun { member_name=member_name; member_accessor_name=accessor } ->
-                  Pp.h (Pp.str "#define" +++
-                        Pp.str accessor ++
-                        Pp.str "(x)" +++
-                        Pp.str ("(((struct " ^ cstr_struct ^ " *)(x))->" ^ member_name ^ ")")))
-                members_and_accessors)
-            cstr_and_members_ary
-        in
-        let pp_cstr =
-          (*
-            static list_t list_cons(bool head, list_t tail) {
-              struct list_cons_struct *p;
-              if (!(p = malloc(sizeof(struct list_cons_struct)))) abort();
-              p->tag = list_cons_tag;
-              p->head = head;
-              p->tail = tail;
-              return (list_t)p;
-            }
-          *)
-          pp_sjoinmap_ary
-            (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
-              let fargs =
-                if members_and_accessors = [] then
-                  Pp.str "void"
-                else
-                  pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-                    (fun (member_type, member_name, accessor) ->
-                      Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
-                    (non_void_members_and_accessors members_and_accessors)
-              in
-              Pp.v 0 (Pp.hov 2 (
-                        Pp.str "static" +++
-                        Pp.str ind_typename +++
-                        Pp.str cstrname ++
-                        Pp.str "(" ++ fargs ++ Pp.str ")") +++
-                      vbrace (
-                        Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct +++ Pp.str "*p;") +++
-                        Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
-                        Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_name ++ Pp.str ";") +++
-                        pp_sjoinmap_list
-                          (fun { member_name=member_name } ->
-                            Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
-                          members_and_accessors +++
-                        Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
-            cstr_and_members_ary
-        in
-        pp_enum_decl +++ pp_ind_struct_def +++ pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
-    ind_names_ary
+                  Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
+                (non_void_members_and_accessors members_and_accessors)
+          in
+          Pp.v 0 (Pp.hov 2 (
+                    Pp.str "static" +++
+                    Pp.str ind_typename +++
+                    Pp.str cstrname ++
+                    Pp.str "(" ++ fargs ++ Pp.str ")") +++
+                  vbrace (
+                    Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct +++ Pp.str "*p;") +++
+                    Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
+                    Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_name ++ Pp.str ";") +++
+                    pp_sjoinmap_list
+                      (fun { member_name=member_name } ->
+                        Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
+                      members_and_accessors +++
+                    Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
+        cstr_and_members_ary
+    in
+    pp_enum_decl +++ pp_ind_struct_def +++ pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr
   in
   let pp_impls = Pp.v 0 pp_ind_impls in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
@@ -470,20 +458,18 @@ let gen_indimp_heap_impls (ind_names_ary : ind_names array) : string =
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let ind_names_ary = generate_indimp_names env sigma coq_type in
-  if Array.length ind_names_ary <> 1 then
-    user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let env = register_indimp env sigma ind_names_ary in
+  let ind_names = generate_indimp_names env sigma coq_type in
+  let env = register_indimp env sigma ind_names in
   ignore env;
-  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl ind_names_ary)
+  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl ind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let ind_names_ary = generate_indimp_names env sigma coq_type in
-  let env = register_indimp env sigma ind_names_ary in
+  let ind_names = generate_indimp_names env sigma coq_type in
+  let env = register_indimp env sigma ind_names in
   ignore env;
-  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls ind_names_ary);
-  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls ind_names_ary)
+  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls ind_names);
+  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls ind_names)
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in

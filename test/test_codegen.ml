@@ -3250,6 +3250,7 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
       Definition id_list_odd (l : list bool) : list bool :=
         list_of_odd_list (odd_list_of_list l).
       CodeGen IndImp even_list.
+      CodeGen IndImp odd_list.
       CodeGen Func list_of_even_list.
       CodeGen Func list_of_odd_list.
       CodeGen Func even_list_of_list.
