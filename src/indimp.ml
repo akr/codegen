@@ -105,7 +105,6 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
 type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
 type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
 type ind_names = { ind_pind: inductive * EInstance.t; ind_params: EConstr.t array; ind_type_name: string; ind_type_tag: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names array }
-type mutind_names = { mutind_inds: ind_names array }
 
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
   List.filter_map
@@ -115,7 +114,7 @@ let non_void_members_and_accessors (members_and_accessors : member_names list) :
       | lazy (Some member_type) -> Some (member_type, member_name, accessor))
     members_and_accessors
 
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names array =
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
@@ -123,7 +122,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let mutind_body = Environ.lookup_mind mutind env in
   check_ind_id_conflict mutind_body;
   let open Declarations in
-  let ind_names =
+  let ind_names_ary =
     mutind_body.mind_packets |> Array.mapi
       (fun i oneind_body ->
         let global_prefix = global_gensym () in
@@ -165,10 +164,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         in
         { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
   in
-  { mutind_inds=ind_names }
+  ind_names_ary
 
-let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) : Environ.env =
-  let { mutind_inds=ind_names_ary } = mutind_names in
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names_ary : ind_names array) : Environ.env =
   Array.fold_left
     (fun env ind_names ->
       let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
@@ -198,8 +196,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : m
         env cstr_and_members_ary)
     env ind_names_ary
 
-let gen_indimp_immediate_impl (mutind_names : mutind_names) : string =
-  let { mutind_inds=ind_names_ary } = mutind_names in
+let gen_indimp_immediate_impl (ind_names_ary : ind_names array) : string =
   let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
   let constant_constructor_only =
     Array.for_all
@@ -350,8 +347,7 @@ let gen_indimp_immediate_impl (mutind_names : mutind_names) : string =
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp
 
-let gen_indimp_heap_decls (mutind_names : mutind_names) : string =
-  let { mutind_inds=ind_names_ary } = mutind_names in
+let gen_indimp_heap_decls (ind_names_ary : ind_names array) : string =
   let pp_ind_types =
     pp_sjoinmap_ary
       (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
@@ -367,8 +363,7 @@ let gen_indimp_heap_decls (mutind_names : mutind_names) : string =
   let pp_decls = Pp.v 0 pp_ind_types in
   Pp.string_of_ppcmds pp_decls
 
-let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
-  let { mutind_inds=ind_names_ary } = mutind_names in
+let gen_indimp_heap_impls (ind_names_ary : ind_names array) : string =
   let pp_ind_impls =
     pp_sjoinmap_ary
       (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
@@ -475,20 +470,20 @@ let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let mutind_names = generate_indimp_names env sigma coq_type in
-  if Array.length mutind_names.mutind_inds <> 1 then
+  let ind_names_ary = generate_indimp_names env sigma coq_type in
+  if Array.length ind_names_ary <> 1 then
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let env = register_indimp env sigma mutind_names in
+  let env = register_indimp env sigma ind_names_ary in
   ignore env;
-  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl mutind_names)
+  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl ind_names_ary)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let mutind_names = generate_indimp_names env sigma coq_type in
-  let env = register_indimp env sigma mutind_names in
+  let ind_names_ary = generate_indimp_names env sigma coq_type in
+  let env = register_indimp env sigma ind_names_ary in
   ignore env;
-  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls mutind_names);
-  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls mutind_names)
+  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls ind_names_ary);
+  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls ind_names_ary)
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
