@@ -116,7 +116,6 @@ let non_void_members_and_accessors (members_and_accessors : member_names list) :
     members_and_accessors
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names =
-  let global_prefix = global_gensym () in
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
@@ -127,6 +126,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let ind_names =
     mutind_body.mind_packets |> Array.mapi
       (fun i oneind_body ->
+        let global_prefix = global_gensym () in
         let pind = ((mutind, i), u) in
         let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
