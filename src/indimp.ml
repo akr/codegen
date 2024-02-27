@@ -104,7 +104,7 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
 
 type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
 type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
-type ind_names = { ind_type_name: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names array }
+type ind_names = { ind_type_name: string; ind_type_tag: string; enum_tag: string; switch_function: string; ind_cstrs: cstr_names array }
 type mutind_names = { mutind_mutind: MutInd.t; mutind_params: EConstr.t array; mutind_inds: ind_names array }
 
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
@@ -129,6 +129,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       (fun i oneind_body ->
         let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
+        let ind_type_tag = global_prefix ^ "_struct" ^ i_suffix in
         let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
         let swfunc = global_prefix ^ "_sw" ^ i_suffix in
         let cstr_and_members =
@@ -161,7 +162,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               in
               { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
         in
-        { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
+        { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
   in
   ({ mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names }, u)
 
@@ -204,9 +205,20 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : m
         env cstr_and_members_ary)
     env ind_names_ary
 
-let gen_indimp_immediate (mutind_names : mutind_names) : string =
+let gen_indimp_immediate_decl (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
-  let { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
+  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
+  let pp_type_decl =
+    Pp.str "typedef struct" +++ Pp.str ind_type_tag +++ Pp.str ind_typename ++ Pp.str ";"
+  in
+  let pp = Pp.v 0 (pp_type_decl) in
+  (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
+  (*msg_info_hov pp;*)
+  Pp.string_of_ppcmds pp
+
+let gen_indimp_immediate_impl (mutind_names : mutind_names) : string =
+  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
+  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
   let constant_constructor_only =
     Array.for_all
       (fun cstr_and_members ->
@@ -258,7 +270,7 @@ let gen_indimp_immediate (mutind_names : mutind_names) : string =
   in
   let pp_typedef =
     Pp.v 0 (
-      Pp.str "typedef struct" +++
+      Pp.str "typedef struct" +++ Pp.str ind_type_tag +++
       vbrace (
         (if single_constructor then
           Pp.mt ()
@@ -484,7 +496,8 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate mutind_names)
+  add_thunk "source_type_decls" (fun () -> gen_indimp_immediate_decl mutind_names);
+  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl mutind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
