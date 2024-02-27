@@ -3268,6 +3268,40 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
       assert(list_bool_eq(s, id_list_odd(s)));
     |}
 
+let test_indimp_rosetree (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive tree (T : Type) := node : T -> list (tree T) -> tree T.
+      Arguments node {_} _ _.
+      Definition fold_left {A B : Type} (f : A -> B -> A) :=
+        fix fold_left (s : list B) (a0 : A) {struct s} :=
+          match s with
+          | nil => a0
+          | cons b t => fold_left t (f a0 b)
+          end.
+      Fixpoint count (t : tree bool) :=
+        match t with
+        | node b s =>
+            fold_left (fun n t => n + count t) s (if b then 1 else 0)
+        end.
+      Definition nd (b : bool) (s : list (tree bool)) : tree bool := node b s.
+      Definition nl : list (tree bool) := nil.
+      Definition cns (t : tree bool) (s : list (tree bool)) : list (tree bool) := cons t s.
+      CodeGen IndImp (list (tree bool)).
+      CodeGen IndImp (tree bool).
+      CodeGen Func nd.
+      CodeGen Func nl.
+      CodeGen Func cns.
+      CodeGen Func fold_left nat (tree bool).
+      CodeGen Func count.
+    |}) {|
+      assert(count(nd(false, nl())) == 0);
+      assert(count(nd(true, nl())) == 1);
+      assert(count(nd(true, cns(nd(true, nl()), nl()))) == 2);
+      assert(count(nd(false, cns(nd(true, nl()), nl()))) == 1);
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4541,6 +4575,7 @@ let suite : OUnit2.test =
     "test_indimp_record" >:: test_indimp_record;
     "test_indimp_nat" >:: test_indimp_nat;
     "test_indimp_mutual" >:: test_indimp_mutual;
+    "test_indimp_rosetree" >:: test_indimp_rosetree;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

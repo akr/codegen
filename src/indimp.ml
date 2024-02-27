@@ -356,7 +356,7 @@ let gen_indimp_immediate (mutind_names : mutind_names) : string =
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp
 
-let gen_indimp_heap (mutind_names : mutind_names) : string =
+let gen_indimp_heap_decls (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
   let pp_ind_types =
     pp_sjoinmap_ary
@@ -380,7 +380,12 @@ let gen_indimp_heap (mutind_names : mutind_names) : string =
         pp_enum +++ pp_typedef)
       ind_names_ary
   in
-  let pp_ind_imps =
+  let pp_decls = Pp.v 0 pp_ind_types in
+  Pp.string_of_ppcmds pp_decls
+
+let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
+  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
+  let pp_ind_impls =
     pp_sjoinmap_ary
       (fun { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
         let pp_swfunc =
@@ -467,10 +472,10 @@ let gen_indimp_heap (mutind_names : mutind_names) : string =
         pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
     ind_names_ary
   in
-  let pp = Pp.v 0 (pp_ind_types +++ pp_ind_imps) in
+  let pp_impls = Pp.v 0 pp_ind_impls in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
   (*msg_info_hov pp;*)
-  Pp.string_of_ppcmds pp
+  Pp.string_of_ppcmds pp_impls
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
@@ -486,7 +491,8 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   let (mutind_names, u) = generate_indimp_names env sigma coq_type in
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  add_thunk "source_type_impls" (fun () -> gen_indimp_heap mutind_names)
+  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls mutind_names);
+  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls mutind_names)
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
