@@ -115,7 +115,7 @@ let non_void_members_and_accessors (members_and_accessors : member_names list) :
       | lazy (Some member_type) -> Some (member_type, member_name, accessor))
     members_and_accessors
 
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names * EInstance.t =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : mutind_names =
   let global_prefix = global_gensym () in
   let (f, args) = decompose_appvect sigma coq_type in
   let params = array_rev args in (* xxx: args should be parameters of inductive type *)
@@ -165,9 +165,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         in
         { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members })
   in
-  ({ mutind_inds=ind_names }, u)
+  { mutind_inds=ind_names }
 
-let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) (u : EInstance.t) : Environ.env =
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : mutind_names) : Environ.env =
   let { mutind_inds=ind_names_ary } = mutind_names in
   ind_names_ary |> Array.iter (fun { ind_pind=pind; ind_params=params; ind_type_name=ind_typename } ->
       let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
@@ -477,17 +477,17 @@ let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
+  let mutind_names = generate_indimp_names env sigma coq_type in
   if Array.length mutind_names.mutind_inds <> 1 then
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let env = register_indimp env sigma mutind_names u in
+  let env = register_indimp env sigma mutind_names in
   ignore env;
   add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl mutind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let (mutind_names, u) = generate_indimp_names env sigma coq_type in
-  let env = register_indimp env sigma mutind_names u in
+  let mutind_names = generate_indimp_names env sigma coq_type in
+  let env = register_indimp env sigma mutind_names in
   ignore env;
   add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls mutind_names);
   add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls mutind_names)
