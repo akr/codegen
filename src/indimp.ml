@@ -129,7 +129,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       (fun i oneind_body ->
         let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
         let ind_typename = global_prefix ^ "_type" ^ i_suffix in
-        let ind_type_tag = global_prefix ^ "_struct" ^ i_suffix in
+        let ind_type_tag = global_prefix ^ "_istruct" ^ i_suffix in
         let enum_tag = global_prefix ^ "_enum" ^ i_suffix in
         let swfunc = global_prefix ^ "_sw" ^ i_suffix in
         let cstr_and_members =
@@ -144,7 +144,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let j_suffix = "_" ^ Id.to_string cstrid in
               let cstrname = global_prefix ^ "_cstr" ^ j_suffix  in
               let cstr_enum_name = global_prefix ^ "_tag" ^ j_suffix in
-              let cstr_struct = global_prefix ^ "_struct" ^ j_suffix in
+              let cstr_struct = global_prefix ^ "_cstruct" ^ j_suffix in
               let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
               let members_and_accessors =
                 (List.rev args) |> List.mapi
@@ -372,24 +372,14 @@ let gen_indimp_heap_decls (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
   let pp_ind_types =
     pp_sjoinmap_ary
-      (fun { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
-        let pp_enum =
-          Pp.hov 0 (
-            (Pp.str "enum" +++ Pp.str enum_tag +++
-            hovbrace (pp_joinmap_ary (Pp.str "," ++ Pp.spc ())
-              (fun cstr_and_members -> Pp.str cstr_and_members.cstr_enum_tag)
-              cstr_and_members_ary) ++ Pp.str ";"))
-        in
-        let pp_typedef =
-          Pp.hov 0 (
-            Pp.str "typedef" +++
-            Pp.str "enum" +++
-            Pp.str enum_tag +++
-            Pp.str "*" ++
-            Pp.str ind_typename ++
-            Pp.str ";")
-        in
-        pp_enum +++ pp_typedef)
+      (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
+        Pp.hov 0 (
+          Pp.str "typedef" +++
+          Pp.str "struct" +++
+          Pp.str ind_type_tag +++
+          Pp.str "*" ++
+          Pp.str ind_typename ++
+          Pp.str ";"))
       ind_names_ary
   in
   let pp_decls = Pp.v 0 pp_ind_types in
@@ -399,12 +389,24 @@ let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
   let pp_ind_impls =
     pp_sjoinmap_ary
-      (fun { ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
+      (fun { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } ->
+        let pp_enum_decl =
+          Pp.hov 0 (
+            (Pp.str "enum" +++ Pp.str enum_tag +++
+            hovbrace (pp_joinmap_ary (Pp.str "," ++ Pp.spc ())
+              (fun cstr_and_members -> Pp.str cstr_and_members.cstr_enum_tag)
+              cstr_and_members_ary) ++ Pp.str ";"))
+        in
+        let pp_ind_struct_def =
+          Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_type_tag) +++
+            vbrace (Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;")) ++
+            Pp.str ";"
+        in
         let pp_swfunc =
           Pp.h (
             Pp.str "#define" +++
             Pp.str swfunc ++ Pp.str "(x)" +++
-            Pp.str "(*(x))")
+            Pp.str "((x)->tag)")
         in
         let member_decls =
           Array.map
@@ -481,7 +483,7 @@ let gen_indimp_heap_impls (mutind_names : mutind_names) : string =
                         Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
             cstr_and_members_ary
         in
-        pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
+        pp_enum_decl +++ pp_ind_struct_def +++ pp_cstr_struct_defs +++ pp_swfunc +++ pp_accessors +++ pp_cstr)
     ind_names_ary
   in
   let pp_impls = Pp.v 0 pp_ind_impls in
