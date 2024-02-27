@@ -2765,9 +2765,11 @@ let gen_pp_iter (f : Pp.t -> unit) (gen_list : code_generation list) : unit =
       assoc CString.Map.empty
   in
   defined_sections |> List.iter (fun section ->
-    match CString.Map.find_opt section m with
+    f (Pp.v 0 (Pp.str ("/* section-start: " ^ section ^ " */") ++ Pp.fnl ()));
+    (match CString.Map.find_opt section m with
     | None -> ()
-    | Some pps -> pps |> List.iter (fun pp -> f (Pp.v 0 (pp ++ Pp.fnl ()))))
+    | Some pps -> pps |> List.iter (fun pp -> f (Pp.v 0 (pp ++ Pp.fnl ()))));
+    f (Pp.v 0 (Pp.str ("/* section-end: " ^ section ^ " */") ++ Pp.fnl ())))
 
 let complete_gen_map (gflist : genflag list) (gen_map : (code_generation list) CString.Map.t) : (code_generation list) CString.Map.t =
   let gen_map =
