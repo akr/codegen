@@ -205,17 +205,6 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (mutind_names : m
         env cstr_and_members_ary)
     env ind_names_ary
 
-let gen_indimp_immediate_decl (mutind_names : mutind_names) : string =
-  let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
-  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
-  let pp_type_decl =
-    Pp.str "typedef struct" +++ Pp.str ind_type_tag +++ Pp.str ind_typename ++ Pp.str ";"
-  in
-  let pp = Pp.v 0 (pp_type_decl) in
-  (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
-  (*msg_info_hov pp;*)
-  Pp.string_of_ppcmds pp
-
 let gen_indimp_immediate_impl (mutind_names : mutind_names) : string =
   let { mutind_mutind=mutind; mutind_params=params; mutind_inds=ind_names_ary } = mutind_names in
   let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names_ary.(0) in
@@ -498,7 +487,6 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     user_err (Pp.str "[codegen:bug] generate_indimp_immediate is called for mutual inductive type:" +++ Printer.pr_econstr_env env sigma coq_type);
   let env = register_indimp env sigma mutind_names u in
   ignore env;
-  add_thunk "source_type_decls" (fun () -> gen_indimp_immediate_decl mutind_names);
   add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl mutind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
