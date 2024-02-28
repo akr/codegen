@@ -149,7 +149,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let ind_name = global_prefix ^ "_type" ^ i_suffix in
   let ind_struct_tag = global_prefix ^ "_istruct" ^ i_suffix in
   let ind_enum_tag = global_prefix ^ "_enum" ^ i_suffix in
-  let swfunc = global_prefix ^ "_sw" ^ i_suffix in
+  let ind_swfunc = global_prefix ^ "_sw" ^ i_suffix in
   let ind_cstrs =
     oneind_body.mind_consnames |> Array.mapi
       (fun j0 cstr_id ->
@@ -180,10 +180,10 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         in
         { cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members })
   in
-  { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs }
+  { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs }
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
-  let { ind_pind=pind; ind_params=params; ind_name; ind_swfunc=swfunc; ind_cstrs=ind_cstrs } = ind_names in
+  let { ind_pind=pind; ind_params=params; ind_name; ind_swfunc; ind_cstrs } = ind_names in
   let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
   ignore (register_ind_type env sigma coq_type_i ind_name "");
   let cstr_caselabel_accessors_ary =
@@ -196,7 +196,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
   in
   let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
   let params' = Array.map (EConstr.to_constr sigma) params in
-  ignore (register_ind_match env sigma coq_type_i swfunc cstr_caselabel_accessors_list);
+  ignore (register_ind_match env sigma coq_type_i ind_swfunc cstr_caselabel_accessors_list);
   CArray.fold_left_i
     (fun j0 env { cstr_name } ->
       let j = j0 + 1 in
@@ -208,7 +208,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
     env ind_cstrs
 
 let gen_indimp_immediate_impl (ind_names : ind_names) : string =
-  let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs } = ind_names in
+  let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
   let constant_constructor_only =
     Array.for_all
       (fun { cstr_members } ->
@@ -293,7 +293,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   let pp_swfunc =
     Pp.h (
       Pp.str "#define" +++
-      Pp.str swfunc ++ Pp.str "(x)" +++
+      Pp.str ind_swfunc ++ Pp.str "(x)" +++
       (if single_constructor then
         Pp.str "0"
       else
@@ -374,7 +374,7 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
 
 let gen_indimp_heap_impls (ind_names : ind_names) : string =
   let pp_ind_impls =
-    let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs } = ind_names in
+    let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
     let pp_enum_decl =
       Pp.hov 0 (
         (Pp.str "enum" +++ Pp.str ind_enum_tag +++
@@ -390,7 +390,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
     let pp_swfunc =
       Pp.h (
         Pp.str "#define" +++
-        Pp.str swfunc ++ Pp.str "(x)" +++
+        Pp.str ind_swfunc ++ Pp.str "(x)" +++
         Pp.str "((x)->tag)")
     in
     let member_decls =
