@@ -235,28 +235,27 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
           (non_void_cstr_members cstr_members))
       ind_cstrs
   in
-  let cstr_and_members_with_decls =
+  let ind_cstrs_with_decls =
     Array.map2
-      (fun { cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members } member_decl ->
-        (cstr_id, cstr_name, cstr_enum_const, cstr_struct_tag, cstr_umember, cstr_members, member_decl))
+      (fun ind_cstr member_decl -> (ind_cstr, member_decl))
       ind_cstrs member_decls
   in
-  let cstr_and_members_with_decls = Array.to_list cstr_and_members_with_decls in
+  let ind_cstrs_with_decls = Array.to_list ind_cstrs_with_decls in
   let pp_cstr_struct_defs =
     if constant_constructor_only || single_constructor then
       Pp.mt ()
     else
       pp_sjoin_list
         (List.filter_map
-          (fun (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) ->
+          (fun ({ cstr_struct_tag; cstr_members }, member_decl) ->
             if CList.is_empty cstr_members then
               None
             else
               Some (
-                Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
+                Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct_tag) +++
                 vbrace member_decl ++
                 Pp.str ";"))
-          cstr_and_members_with_decls)
+          ind_cstrs_with_decls)
   in
   let pp_typedef =
     Pp.v 0 (
@@ -270,23 +269,23 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
           Pp.mt ()
         else if single_constructor then
           Pp.v 0
-            (let (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) = List.hd cstr_and_members_with_decls in
+            (let (ind_cstr, member_decl) = List.hd ind_cstrs_with_decls in
             member_decl)
         else
           Pp.v 0 (Pp.str "union" +++
                   vbrace (
                     pp_sjoin_list
                       (List.filter_map
-                        (fun (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) ->
+                        (fun ({ cstr_struct_tag; cstr_umember; cstr_members }, member_decl) ->
                           if CList.is_empty cstr_members then
                             None
                           else
                             Some (
                               Pp.hov 0 (Pp.str "struct" +++
-                                        Pp.str cstr_struct +++
+                                        Pp.str cstr_struct_tag +++
                                         Pp.str cstr_umember ++
                                         Pp.str ";")))
-                        cstr_and_members_with_decls)) ++
+                        ind_cstrs_with_decls)) ++
                   Pp.str " as;"))
       ) ++ Pp.str (" " ^ ind_name ^ ";"))
   in
@@ -403,19 +402,18 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
             (non_void_cstr_members cstr_members))
         ind_cstrs
     in
-    let cstr_and_members_with_decls =
+    let ind_cstrs_with_decls =
       Array.map2
-        (fun { cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members } member_decl ->
-          (cstr_id, cstr_name, cstr_enum_const, cstr_struct_tag, cstr_umember, cstr_members, member_decl))
+        (fun ind_cstr member_decl -> (ind_cstr, member_decl))
         ind_cstrs member_decls
     in
     let pp_cstr_struct_defs =
       pp_sjoinmap_ary
-        (fun (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) ->
-          Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct) +++
+        (fun ({ cstr_struct_tag }, member_decl) ->
+          Pp.hov 0 (Pp.str "struct" +++ Pp.str cstr_struct_tag) +++
           vbrace member_decl ++
           Pp.str ";")
-        cstr_and_members_with_decls
+        ind_cstrs_with_decls
     in
     let pp_accessors =
       (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
