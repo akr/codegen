@@ -3303,6 +3303,21 @@ let test_indimp_rosetree (ctx : test_ctxt) : unit =
       assert(count(nd(false, cns(nd(true, nl()), nl()))) == 1);
     |}
 
+let test_indimp_unit_in_member (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (unit_src ^ bool_src ^
+    {|
+      Inductive bool_and_unit := cstr : bool -> unit -> bool_and_unit.
+      Definition mk b := cstr b tt.
+      Definition get v := match v with cstr b u => b end.
+      CodeGen IndImp bool_and_unit.
+      CodeGen Func mk.
+      CodeGen Func get.
+    |}) {|
+      assert(get(mk(false)) == false);
+      assert(get(mk(true)) == true);
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4577,6 +4592,7 @@ let suite : OUnit2.test =
     "test_indimp_nat" >:: test_indimp_nat;
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_indimp_rosetree" >:: test_indimp_rosetree;
+    "test_indimp_unit_in_member" >:: test_indimp_unit_in_member;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

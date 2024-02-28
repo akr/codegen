@@ -302,7 +302,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
     pp_sjoinmap_ary
       (fun { cstr_umember; cstr_members } ->
         pp_sjoinmap_list
-          (fun { member_name; member_accessor } ->
+          (fun (member_type, member_name, member_accessor) ->
             Pp.h (Pp.str "#define" +++
                   Pp.str member_accessor ++
                   Pp.str "(x)" +++
@@ -310,7 +310,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
                     Pp.str ("((x)." ^ member_name ^ ")")
                   else
                     Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")"))))
-          cstr_members)
+          (non_void_cstr_members cstr_members))
       ind_cstrs
   in
   let pp_cstr =
@@ -318,8 +318,8 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
       (fun { cstr_name; cstr_enum_const; cstr_umember; cstr_members } ->
         let args =
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-            (fun { member_name } -> Pp.str member_name)
-            cstr_members
+            (fun (member_type, member_name, member_accessor) -> Pp.str member_name)
+            (non_void_cstr_members cstr_members)
         in
         Pp.h (Pp.str "#define" +++
                 Pp.str cstr_name ++
@@ -420,12 +420,12 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
       pp_sjoinmap_ary
         (fun { cstr_struct_tag; cstr_members } ->
           pp_sjoinmap_list
-            (fun { member_name; member_accessor } ->
+            (fun (member_type, member_name, member_accessor) ->
               Pp.h (Pp.str "#define" +++
                     Pp.str member_accessor ++
                     Pp.str "(x)" +++
                     Pp.str ("(((struct " ^ cstr_struct_tag ^ " *)(x))->" ^ member_name ^ ")")))
-            cstr_members)
+            (non_void_cstr_members cstr_members))
         ind_cstrs
     in
     let pp_cstr =
@@ -460,9 +460,9 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
                     Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                     Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_const ++ Pp.str ";") +++
                     pp_sjoinmap_list
-                      (fun { member_name } ->
+                      (fun (member_type, member_name, member_accessor) ->
                         Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
-                      cstr_members +++
+                      (non_void_cstr_members cstr_members) +++
                     Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")p;")))))
         ind_cstrs
     in
