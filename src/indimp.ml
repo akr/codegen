@@ -134,7 +134,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       (fun j0 cstrid ->
         let j = j0 + 1 in
         (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
-        let cstrterm = mkApp ((mkConstructU (((mutind, i), j), u)), params) in
+        let cstrterm = mkApp (mkConstructUi (pind, j), params) in
         (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
         let cstrtype = Retyping.get_type_of env sigma cstrterm in
         let (args, result_type) = decompose_prod sigma cstrtype in
