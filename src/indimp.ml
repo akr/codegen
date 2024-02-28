@@ -104,7 +104,7 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
 
 type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
 type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_tag: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
-type ind_names = { ind_pind: inductive * EInstance.t; ind_params: EConstr.t array; ind_type_name: string; ind_type_tag: string; ind_enum_tag: string; switch_function: string; ind_cstrs: cstr_names array }
+type ind_names = { ind_pind: inductive * EInstance.t; ind_params: EConstr.t array; ind_type_name: string; ind_type_tag: string; ind_enum_tag: string; ind_swfunc: string; ind_cstrs: cstr_names array }
 
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
   List.filter_map
@@ -159,10 +159,10 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         in
         { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
   in
-  { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members }
+  { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=cstr_and_members }
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
-  let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+  let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_swfunc=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
   let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
   ignore (register_ind_type env sigma coq_type_i ind_typename "");
   let cstr_caselabel_accessors_ary =
@@ -189,7 +189,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
     env cstr_and_members_ary
 
 let gen_indimp_immediate_impl (ind_names : ind_names) : string =
-  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+  let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
   let constant_constructor_only =
     Array.for_all
       (fun cstr_and_members ->
@@ -355,7 +355,7 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
 
 let gen_indimp_heap_impls (ind_names : ind_names) : string =
   let pp_ind_impls =
-    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
     let pp_enum_decl =
       Pp.hov 0 (
         (Pp.str "enum" +++ Pp.str ind_enum_tag +++
