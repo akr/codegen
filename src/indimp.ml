@@ -319,7 +319,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
       (fun { cstr_name; cstr_enum_const; cstr_umember; cstr_members } ->
         let args =
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-            (fun member_and_accessor -> Pp.str member_and_accessor.member_name)
+            (fun { member_name } -> Pp.str member_name)
             cstr_members
         in
         Pp.h (Pp.str "#define" +++
