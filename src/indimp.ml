@@ -214,7 +214,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   let constant_constructor_only =
     Array.for_all
       (fun cstr_and_members ->
-        cstr_and_members.cstr_members = [])
+        CList.is_empty cstr_and_members.cstr_members)
       cstr_and_members_ary
   in
   let single_constructor = Array.length cstr_and_members_ary = 1 in
@@ -251,7 +251,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
       pp_sjoin_list
         (List.filter_map
           (fun (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) ->
-            if cstr_members = [] then
+            if CList.is_empty cstr_members then
               None
             else
               Some (
@@ -280,7 +280,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
                     pp_sjoin_list
                       (List.filter_map
                         (fun (cstr_id, cstr_name, cstr_enum_const, cstr_struct, cstr_umember, cstr_members, member_decl) ->
-                          if cstr_members = [] then
+                          if CList.is_empty cstr_members then
                             None
                           else
                             Some (
@@ -338,7 +338,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
                       Pp.str "=" +++
                       hbrace args
                     in
-                    if List.length cstr_members = 0 then
+                    if CList.is_empty cstr_members then
                       Pp.str cstr_enum_const
                     else
                       (Pp.str cstr_enum_const ++ Pp.str "," +++ hbrace union_init))) ++
@@ -446,7 +446,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
       pp_sjoinmap_ary
         (fun { cstr_name=cstr_name; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_members=cstr_members } ->
           let fargs =
-            if cstr_members = [] then
+            if CList.is_empty cstr_members then
               Pp.str "void"
             else
               pp_joinmap_list (Pp.str "," ++ Pp.spc ())

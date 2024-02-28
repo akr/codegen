@@ -75,7 +75,7 @@ let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg
 let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  if coq_type_list = [] then
+  if CList.is_empty coq_type_list then
     ConstrMap.iter (fun key ind_cfg -> codegen_print_inductive1 env sigma ind_cfg) !ind_config_map
   else
     coq_type_list |> List.iter (fun user_coq_type ->

@@ -114,7 +114,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     in
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
   in
-  let l = if funcs = [] then
+  let l = if CList.is_empty funcs then
             ConstrMap.bindings !specialize_config_map |>
             (List.sort @@ fun (x,_) (y,_) -> Constr.compare x y) |>
             List.map snd
@@ -316,7 +316,7 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
   let rec aux env f f_type sd_list static_args =
     match sd_list with
     | [] ->
-        if static_args = [] then
+        if CList.is_empty static_args then
           f
         else
           user_err (Pp.str "[codegen] too many static arguments")

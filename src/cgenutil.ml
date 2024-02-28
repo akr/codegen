@@ -628,7 +628,7 @@ let unionfind_sets (u : unionfind_t) : int list list =
   done;
   let result = ref [] in
   for i = n-1 downto 0 do
-    if sets.(i) <> [] then
+    if not (CList.is_empty sets.(i)) then
       result := sets.(i) :: !result
   done;
   !result

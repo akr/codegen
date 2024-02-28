@@ -1756,7 +1756,7 @@ let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*ty
         let blocked_assign, nonblocked_assign =
           List.partition (fun (lhs, rhs, ty) -> List.mem lhs rhs_list) assign
         in
-        if nonblocked_assign <> [] then
+        if not (CList.is_empty nonblocked_assign) then
           (List.iter
             (fun (lhs, rhs, ty) ->
               let pp = gen_assignment (Pp.str lhs) (Pp.str rhs) in
@@ -2099,7 +2099,7 @@ let gen_function_header (cfunc : cfunc_t) (return_type : c_typedata)
   let pp_static = (if cfunc.cfunc_static then Pp.str "static" else Pp.mt ()) in
   let pp_parameters =
     Pp.str "(" ++
-    (if formal_arguments = [] then
+    (if CList.is_empty formal_arguments then
       Pp.str "void"
     else
       (pp_joinmap_list (Pp.str "," ++ Pp.spc ())
@@ -2278,7 +2278,7 @@ let pr_case (case_value : string option) (assigns : (string * string) list) (got
     | Some value -> Pp.hov 0 (Pp.str "case" +++ Pp.str value ++ Pp.str ":"))
   in
   let pp_semicolon =
-    if assigns = [] && goto_label = None then
+    if CList.is_empty assigns && goto_label = None then
       (* label (case label and default label here) needs following statement *)
       Pp.str ";"
     else

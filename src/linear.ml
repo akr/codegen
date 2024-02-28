@@ -771,7 +771,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       (IntSet.empty, bresult, bresult)
 
   | LetIn (x, e, ty, b) ->
-      assert (vs = []);
+      assert (CList.is_empty vs);
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env e ty in
       let env2 = env_push_def env x e ty in
       let ty_is_linear = is_linear_type env sigma ty in
@@ -794,7 +794,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         (lconsumed0, bused0, bresult0)
 
   | Case (ci,u,pms,p,iv,item,bl) ->
-      assert (vs = []);
+      assert (CList.is_empty vs);
       let (_, _, _, _, _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, p, iv, item, bl) in
       let item_ty = Retyping.get_type_of env sigma item in
       let (lconsumed1, bused1, bresult1) = borrowcheck_expression env sigma lvar_env borrow_env item item_ty in
