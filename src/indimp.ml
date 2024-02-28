@@ -102,9 +102,30 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
     done
   done
 
-type member_names = { member_type_lazy: c_typedata option Lazy.t; member_name: string; member_accessor_name: string}
-type cstr_names = { cstr_ID: Id.t; cstr_function_name: string; cstr_enum_const: string; cstr_struct_tag: string; cstr_union_member_name: string; cstr_members: member_names list }
-type ind_names = { ind_pind: inductive * EInstance.t; ind_params: EConstr.t array; ind_type_name: string; ind_struct_tag: string; ind_enum_tag: string; ind_swfunc: string; ind_cstrs: cstr_names array }
+type member_names = {
+  member_type_lazy: c_typedata option Lazy.t;
+  member_name: string;
+  member_accessor_name: string;
+}
+
+type cstr_names = {
+  cstr_ID: Id.t;
+  cstr_function_name: string;
+  cstr_enum_const: string;
+  cstr_struct_tag: string;
+  cstr_union_member_name: string;
+  cstr_members: member_names list;
+}
+
+type ind_names = {
+  ind_pind: inductive * EInstance.t;
+  ind_params: EConstr.t array;
+  ind_type_name: string;
+  ind_struct_tag: string;
+  ind_enum_tag: string;
+  ind_swfunc: string;
+  ind_cstrs: cstr_names array;
+}
 
 let non_void_members_and_accessors (members_and_accessors : member_names list) : (c_typedata * string * string) list =
   List.filter_map
