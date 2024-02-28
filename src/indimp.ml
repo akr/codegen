@@ -105,7 +105,7 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
 type member_names = {
   member_type_lazy: c_typedata option Lazy.t;
   member_name: string;
-  member_accessor_name: string;
+  member_accessor: string;
 }
 
 type cstr_names = {
@@ -129,10 +129,10 @@ type ind_names = {
 
 let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * string * string) list =
   List.filter_map
-    (fun { member_type_lazy; member_name; member_accessor_name=accessor } ->
+    (fun { member_type_lazy; member_name; member_accessor } ->
       match member_type_lazy with
       | lazy None -> None
-      | lazy (Some member_type) -> Some (member_type, member_name, accessor))
+      | lazy (Some member_type) -> Some (member_type, member_name, member_accessor))
     cstr_members
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names =
@@ -174,9 +174,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
                 | Name.Name id -> "_" ^ c_id (Id.to_string id)
               in
               let member_name = global_prefix ^ "_member" ^ k_suffix in
-              let accessor = global_prefix ^ "_get" ^ k_suffix in
+              let member_accessor = global_prefix ^ "_get" ^ k_suffix in
               let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
-              { member_type_lazy; member_name; member_accessor_name=accessor })
+              { member_type_lazy; member_name; member_accessor })
         in
         { cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members })
   in
@@ -190,7 +190,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
     Array.mapi
       (fun j0 { cstr_id; cstr_enum_const; cstr_members } ->
         let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_const in
-        let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) cstr_members in
+        let accessors = List.map (fun { member_accessor } -> member_accessor) cstr_members in
         (cstr_id, caselabel, accessors))
       ind_cstrs
   in
@@ -303,9 +303,9 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
     pp_sjoinmap_ary
       (fun { cstr_umember; cstr_members } ->
         pp_sjoinmap_list
-          (fun { member_name; member_accessor_name=accessor } ->
+          (fun { member_name; member_accessor } ->
             Pp.h (Pp.str "#define" +++
-                  Pp.str accessor ++
+                  Pp.str member_accessor ++
                   Pp.str "(x)" +++
                   (if single_constructor then
                     Pp.str ("((x)." ^ member_name ^ ")")
@@ -422,9 +422,9 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
       pp_sjoinmap_ary
         (fun { cstr_struct_tag; cstr_members } ->
           pp_sjoinmap_list
-            (fun { member_name; member_accessor_name=accessor } ->
+            (fun { member_name; member_accessor } ->
               Pp.h (Pp.str "#define" +++
-                    Pp.str accessor ++
+                    Pp.str member_accessor ++
                     Pp.str "(x)" +++
                     Pp.str ("(((struct " ^ cstr_struct_tag ^ " *)(x))->" ^ member_name ^ ")")))
             cstr_members)
