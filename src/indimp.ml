@@ -162,13 +162,13 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members }
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
-  let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+  let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
   let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
   ignore (register_ind_type env sigma coq_type_i ind_typename "");
   let cstr_caselabel_accessors_ary =
     Array.mapi
       (fun j0 cstr_and_members ->
-        let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
+        let { cstr_ID=cstrid; cstr_enum_tag=cstr_enum_name; cstr_members=members_and_accessors_list } = cstr_and_members in
         let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_name in
         let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) members_and_accessors_list in
         (cstrid, caselabel, accessors))
@@ -180,7 +180,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
   CArray.fold_left_i
     (fun j0 env cstr_and_members ->
       let j = j0 + 1 in
-      let { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors_list } = cstr_and_members in
+      let { cstr_function_name=cstrname } = cstr_and_members in
       let cstrterm0 = EConstr.to_constr sigma (mkConstructUi (pind, j)) in
       ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
       let spi = { spi_cfunc_name = Some cstrname; spi_presimp_id = None; spi_simplified_id = None } in
@@ -218,8 +218,8 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let cstr_and_members_with_decls =
     Array.map2
-      (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_def ->
-        (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
+      (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
+        (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl))
       cstr_and_members_ary member_decls
   in
   let cstr_and_members_with_decls = Array.to_list cstr_and_members_with_decls in
@@ -282,7 +282,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let pp_accessors =
     pp_sjoinmap_ary
-      (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+      (fun { cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
         pp_sjoinmap_list
           (fun { member_name=member_name; member_accessor_name=accessor } ->
             Pp.h (Pp.str "#define" +++
@@ -297,7 +297,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let pp_cstr =
     pp_sjoinmap_ary
-      (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+      (fun { cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
         let args =
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
             (fun member_and_accessor -> Pp.str member_and_accessor.member_name)
@@ -341,7 +341,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
 
 let gen_indimp_heap_decls (ind_names : ind_names) : string =
   let pp_ind_types =
-    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag; enum_tag=enum_tag; switch_function=swfunc; ind_cstrs=cstr_and_members_ary } = ind_names in
+    let { ind_type_name=ind_typename; ind_type_tag=ind_type_tag } = ind_names in
     Pp.hov 0 (
       Pp.str "typedef" +++
       Pp.str "struct" +++
@@ -376,7 +376,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
     in
     let member_decls =
       Array.map
-        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+        (fun { cstr_members=members_and_accessors } ->
           Pp.hov 0 (Pp.str ("enum " ^ enum_tag) +++ Pp.str "tag;") +++
           pp_sjoinmap_list
             (fun (member_type, member_name, accessor) ->
@@ -386,8 +386,8 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
     in
     let cstr_and_members_with_decls =
       Array.map2
-        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_def ->
-          (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_def))
+        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
+          (cstrid, cstrname, cstr_enum_name, cstr_struct, cstr_umember, members_and_accessors, member_decl))
         cstr_and_members_ary member_decls
     in
     let pp_cstr_struct_defs =
@@ -401,7 +401,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
     let pp_accessors =
       (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
       pp_sjoinmap_ary
-        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+        (fun { cstr_struct_tag=cstr_struct; cstr_members=members_and_accessors } ->
           pp_sjoinmap_list
             (fun { member_name=member_name; member_accessor_name=accessor } ->
               Pp.h (Pp.str "#define" +++
@@ -423,7 +423,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
         }
       *)
       pp_sjoinmap_ary
-        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } ->
+        (fun { cstr_function_name=cstrname; cstr_enum_tag=cstr_enum_name; cstr_struct_tag=cstr_struct; cstr_members=members_and_accessors } ->
           let fargs =
             if members_and_accessors = [] then
               Pp.str "void"
