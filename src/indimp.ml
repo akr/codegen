@@ -109,7 +109,7 @@ type member_names = {
 }
 
 type cstr_names = {
-  cstr_ID: Id.t;
+  cstr_id: Id.t;
   cstr_function_name: string;
   cstr_enum_const: string;
   cstr_struct_tag: string;
@@ -178,7 +178,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
               { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
         in
-        { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
+        { cstr_id=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors })
   in
   { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_struct_tag=ind_struct_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=cstr_and_members }
 
@@ -189,7 +189,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
   let cstr_caselabel_accessors_ary =
     Array.mapi
       (fun j0 cstr_and_members ->
-        let { cstr_ID=cstrid; cstr_enum_const=cstr_enum_const; cstr_members=members_and_accessors_list } = cstr_and_members in
+        let { cstr_id=cstrid; cstr_enum_const=cstr_enum_const; cstr_members=members_and_accessors_list } = cstr_and_members in
         let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_const in
         let accessors = List.map (fun { member_accessor_name=accessor } -> accessor) members_and_accessors_list in
         (cstrid, caselabel, accessors))
@@ -239,7 +239,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let cstr_and_members_with_decls =
     Array.map2
-      (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
+      (fun { cstr_id=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
         (cstrid, cstrname, cstr_enum_const, cstr_struct, cstr_umember, members_and_accessors, member_decl))
       cstr_and_members_ary member_decls
   in
@@ -407,7 +407,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
     in
     let cstr_and_members_with_decls =
       Array.map2
-        (fun { cstr_ID=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
+        (fun { cstr_id=cstrid; cstr_function_name=cstrname; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_union_member_name=cstr_umember; cstr_members=members_and_accessors } member_decl ->
           (cstrid, cstrname, cstr_enum_const, cstr_struct, cstr_umember, members_and_accessors, member_decl))
         cstr_and_members_ary member_decls
     in
