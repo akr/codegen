@@ -230,7 +230,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
     Array.map
       (fun { cstr_members } ->
         pp_sjoinmap_list
-          (fun (member_type, member_name, accessor) ->
+          (fun (member_type, member_name, member_accessor) ->
             Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
           (non_void_cstr_members cstr_members))
       ind_cstrs
@@ -397,7 +397,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
         (fun { cstr_members } ->
           Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;") +++
           pp_sjoinmap_list
-            (fun (member_type, member_name, accessor) ->
+            (fun (member_type, member_name, member_accessor) ->
               Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
             (non_void_cstr_members cstr_members))
         ind_cstrs
@@ -446,7 +446,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
               Pp.str "void"
             else
               pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-                (fun (member_type, member_name, accessor) ->
+                (fun (member_type, member_name, member_accessor) ->
                   Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
                 (non_void_cstr_members cstr_members)
           in
