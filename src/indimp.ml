@@ -129,7 +129,7 @@ type ind_names = {
 
 let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * string * string) list =
   List.filter_map
-    (fun { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor } ->
+    (fun { member_type_lazy; member_name; member_accessor_name=accessor } ->
       match member_type_lazy with
       | lazy None -> None
       | lazy (Some member_type) -> Some (member_type, member_name, accessor))
@@ -162,7 +162,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
         let j_suffix = "_" ^ Id.to_string cstr_id in
         let cstr_name = global_prefix ^ "_cstr" ^ j_suffix  in
         let cstr_enum_const = global_prefix ^ "_tag" ^ j_suffix in
-        let cstr_struct = global_prefix ^ "_cstruct" ^ j_suffix in
+        let cstr_struct_tag = global_prefix ^ "_cstruct" ^ j_suffix in
         let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
         let cstr_members =
           (List.rev args) |> List.mapi
@@ -176,11 +176,11 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
               let member_name = global_prefix ^ "_member" ^ k_suffix in
               let accessor = global_prefix ^ "_get" ^ k_suffix in
               let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
-              { member_type_lazy=member_type_lazy; member_name=member_name; member_accessor_name=accessor})
+              { member_type_lazy; member_name; member_accessor_name=accessor })
         in
-        { cstr_id=cstr_id; cstr_name=cstr_name; cstr_enum_const=cstr_enum_const; cstr_struct_tag=cstr_struct; cstr_umember=cstr_umember; cstr_members=cstr_members })
+        { cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members })
   in
-  { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_struct_tag=ind_struct_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=ind_cstrs }
+  { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs }
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
   let { ind_pind=pind; ind_params=params; ind_type_name=ind_typename; ind_swfunc=swfunc; ind_cstrs=ind_cstrs } = ind_names in
@@ -208,7 +208,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
     env ind_cstrs
 
 let gen_indimp_immediate_impl (ind_names : ind_names) : string =
-  let { ind_type_name=ind_typename; ind_struct_tag=ind_struct_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=ind_cstrs } = ind_names in
+  let { ind_type_name=ind_typename; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs } = ind_names in
   let constant_constructor_only =
     Array.for_all
       (fun { cstr_members } ->
@@ -303,7 +303,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
     pp_sjoinmap_ary
       (fun { cstr_umember; cstr_members } ->
         pp_sjoinmap_list
-          (fun { member_name=member_name; member_accessor_name=accessor } ->
+          (fun { member_name; member_accessor_name=accessor } ->
             Pp.h (Pp.str "#define" +++
                   Pp.str accessor ++
                   Pp.str "(x)" +++
@@ -360,7 +360,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
 
 let gen_indimp_heap_decls (ind_names : ind_names) : string =
   let pp_ind_types =
-    let { ind_type_name=ind_typename; ind_struct_tag=ind_struct_tag } = ind_names in
+    let { ind_type_name=ind_typename; ind_struct_tag } = ind_names in
     Pp.hov 0 (
       Pp.str "typedef" +++
       Pp.str "struct" +++
@@ -374,7 +374,7 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
 
 let gen_indimp_heap_impls (ind_names : ind_names) : string =
   let pp_ind_impls =
-    let { ind_type_name=ind_typename; ind_struct_tag=ind_struct_tag; ind_enum_tag=ind_enum_tag; ind_swfunc=swfunc; ind_cstrs=ind_cstrs } = ind_names in
+    let { ind_type_name=ind_typename; ind_struct_tag; ind_enum_tag; ind_swfunc=swfunc; ind_cstrs } = ind_names in
     let pp_enum_decl =
       Pp.hov 0 (
         (Pp.str "enum" +++ Pp.str ind_enum_tag +++
@@ -422,7 +422,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
       pp_sjoinmap_ary
         (fun { cstr_struct_tag; cstr_members } ->
           pp_sjoinmap_list
-            (fun { member_name=member_name; member_accessor_name=accessor } ->
+            (fun { member_name; member_accessor_name=accessor } ->
               Pp.h (Pp.str "#define" +++
                     Pp.str accessor ++
                     Pp.str "(x)" +++
@@ -462,7 +462,7 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
                     Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                     Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_const ++ Pp.str ";") +++
                     pp_sjoinmap_list
-                      (fun { member_name=member_name } ->
+                      (fun { member_name } ->
                         Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
                       cstr_members +++
                     Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_typename ^ ")p;")))))
