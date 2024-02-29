@@ -7,6 +7,7 @@ val int_find_i_map : (int -> 'a option) -> ?start:int -> int -> (int * 'a) optio
 val array_rev : 'a array -> 'a array
 val array_firstn : int -> 'a array -> 'a array
 val array_skipn : int -> 'a array -> 'a array
+val array_find_opt : ('a -> bool) -> 'a array -> 'a option
 val array_map2 : ('a -> 'b -> 'c) -> 'a array -> 'b array -> 'c array
 val array_map3 :
   ('a -> 'b -> 'c -> 'd) -> 'a array -> 'b array -> 'c array -> 'd array
@@ -162,6 +163,7 @@ val show_goals : unit -> unit Proofview.tactic
 val lib_ref : Environ.env -> Evd.evar_map -> string -> Evd.evar_map * EConstr.t
 val exact_term_eq : Evd.evar_map -> EConstr.t -> EConstr.t -> bool
 val simple_c_type : string -> State.c_typedata
+val is_simple_c_type : State.c_typedata -> bool
 val compose_c_type : State.c_typedata -> string -> string -> State.c_typedata
 val c_type_pointer_to : State.c_typedata -> State.c_typedata
 val compose_c_decl : State.c_typedata -> string -> string

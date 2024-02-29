@@ -3318,6 +3318,64 @@ let test_indimp_unit_in_member (ctx : test_ctxt) : unit =
       assert(get(mk(true)) == true);
     |}
 
+let test_indimp_named_mybool (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^
+    {|
+      Inductive mybool := mytrue | myfalse.
+      Definition mybool_of_bool (b : bool) :=
+        match b with
+        | true => mytrue
+        | false => myfalse
+        end.
+      Definition bool_of_mybool (m : mybool) :=
+        match m with
+        | mytrue => true
+        | myfalse => false
+        end.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => "sw_mybool"
+      | mytrue => "mytrue_tag"
+      | myfalse => "myfalse_tag".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen IndImp mybool.
+      CodeGen Func mybool_of_bool.
+      CodeGen Func bool_of_mybool.
+    |}) {|
+      assert(bool_of_mybool(mybool_of_bool(true)) == true);
+      assert(bool_of_mybool(mybool_of_bool(false)) == false);
+    |}
+
+let test_indimp_named_mynat (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Inductive mynat := myO : mynat | myS : mynat -> mynat.
+      Fixpoint mynat_of_nat (n : nat) :=
+        match n with
+        | O => myO
+        | S n' => myS (mynat_of_nat n')
+        end.
+      Fixpoint nat_of_mynat (m : mynat) :=
+        match m with
+        | myO => O
+        | myS m' => S (nat_of_mynat m')
+        end.
+      CodeGen InductiveType mynat => "mynat".
+      CodeGen InductiveMatch mynat => "sw_mynat"
+      | myO => "myO_tag"
+      | myS => "myS_tag" "mynat_pred".
+      CodeGen Primitive myO => "myO".
+      CodeGen Primitive myS => "myS".
+      CodeGen IndImp mynat.
+      CodeGen Func mynat_of_nat.
+      CodeGen Func nat_of_mynat.
+    |}) {|
+      assert(nat_of_mynat(mynat_of_nat(3)) == 3);
+      assert(nat_of_mynat(mynat_of_nat(5)) == 5);
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4593,6 +4651,8 @@ let suite : OUnit2.test =
     "test_indimp_mutual" >:: test_indimp_mutual;
     "test_indimp_rosetree" >:: test_indimp_rosetree;
     "test_indimp_unit_in_member" >:: test_indimp_unit_in_member;
+    "test_indimp_named_mybool" >:: test_indimp_named_mybool;
+    "test_indimp_named_mynat" >:: test_indimp_named_mynat;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

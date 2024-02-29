@@ -75,6 +75,11 @@ let array_firstn (n : int) (ary : 'a array) : 'a array =
 let array_skipn (n : int) (ary : 'a array) : 'a array =
   Array.sub ary n (Array.length ary - n)
 
+let array_find_opt (f : 'a -> bool) (ary : 'a array) : 'a option =
+  match int_find_opt (fun i -> f ary.(i)) (Array.length ary) with
+  | None -> None
+  | Some i -> Some ary.(i)
+
 let array_map2 f a1 a2 =
   if Array.length a1 <> Array.length a2 then
     invalid_arg "Array.map2: arrays must have the same length";
@@ -1587,6 +1592,9 @@ let compose_c_tokens (strings : string list) : string =
 
 let simple_c_type (c_type_left : string) : c_typedata =
   { c_type_left=c_type_left; c_type_right="" }
+
+let is_simple_c_type (c_type : c_typedata) =
+  CString.is_empty c_type.c_type_right
 
 (*
   We wrap declarator by parenthesis if it start with '*' and
