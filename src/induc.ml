@@ -189,11 +189,11 @@ let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types
   | Some ind_cfg -> ind_cfg
   | None -> generate_ind_config env sigma t
 
-let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type_left : string) (c_type_right : string) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typedata) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_type env sigma coq_type { c_type_left; c_type_right })
+  ignore (register_ind_type env sigma coq_type c_type)
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =

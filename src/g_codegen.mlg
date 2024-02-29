@@ -24,7 +24,7 @@ let () = Mltop.add_init_function "coq-codegen.plugin"
   (fun () ->
     Feedback.msg_info Pp.(str"coq-codegen 0.1"))
 
-(*open Cgenutil*)
+open Cgenutil
 open State
 open Specialize
 open Linear
@@ -202,9 +202,9 @@ END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type_left) string(c_type_right) ] ->
-      { command_ind_type coq_type c_type_left c_type_right }
+      { command_ind_type coq_type { c_type_left; c_type_right } }
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
-      { command_ind_type coq_type c_type "" }
+      { command_ind_type coq_type (simple_c_type c_type) }
     | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
 
