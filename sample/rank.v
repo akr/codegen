@@ -107,15 +107,15 @@ CodeGen Linear MDArr.
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => ""
-| true => "default"
-| false => "case 0".
+| true => ""
+| false => "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
 CodeGen InductiveType nat => "nat".
 CodeGen InductiveMatch nat => ""
-| O => "case 0"
-| S => "default" "predn".
+| O => "0"
+| S => "" "predn".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "succn".
 CodeGen Primitive addn => "addn".

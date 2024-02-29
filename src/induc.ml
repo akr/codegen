@@ -217,18 +217,27 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
     let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
       | None -> user_err (
         Pp.str "[codegen] inductive match: constructor not found:" +++
-        Id.print consname);
+          Id.print consname);
       | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
     (if oneind_body.Declarations.mind_consnrealdecls.(j0) <> List.length accessors then
-      user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" ++
-      Pp.str "needs" +++
-      Pp.int oneind_body.Declarations.mind_consnrealdecls.(j0) +++
-      Pp.str "but" +++
-      Pp.int (List.length accessors) +++
-      Pp.str "for" +++
-      Id.print cstr_cfg.coq_cstr +++
-      Pp.str "of" +++
-      Printer.pr_constr_env env sigma coq_type));
+      user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" +++
+        Pp.str "needs" +++
+        Pp.int oneind_body.Declarations.mind_consnrealdecls.(j0) +++
+        Pp.str "but" +++
+        Pp.int (List.length accessors) +++
+        Pp.str "for" +++
+        Id.print cstr_cfg.coq_cstr +++
+        Pp.str "of" +++
+        Printer.pr_constr_env env sigma coq_type));
+    let caselabel =
+      (* delete "default" and "case " for backward compatibility. *)
+      if caselabel = "default" then
+        ""
+      else if CString.is_prefix "case " caselabel then
+        String.sub caselabel 5 (String.length caselabel - 5)
+      else
+        caselabel
+    in
     { cstr_cfg with c_caselabel = caselabel; c_accessors = Array.of_list accessors }
   in
   let ind_cfg =

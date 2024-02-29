@@ -363,8 +363,8 @@ let unit_src = {|
 let bool_src = {|
       CodeGen InductiveType bool => "bool".
       CodeGen InductiveMatch bool => ""
-      | true => "default"
-      | false => "case 0".
+      | true => ""
+      | false => "0".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
@@ -376,8 +376,8 @@ let bool_src = {|
 let bool_paren_src = {|
       CodeGen InductiveType bool => "bool (" ")". (* redundant parenthesis *)
       CodeGen InductiveMatch bool => ""
-      | true => "default"
-      | false => "case 0".
+      | true => ""
+      | false => "0".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
       CodeGen Snippet "source_prologue" "
@@ -389,8 +389,8 @@ let bool_paren_src = {|
 let struct_bool_src = {|
       CodeGen InductiveType bool => "bool".
       CodeGen InductiveMatch bool => "sw_struct_bool"
-      | true => "default"
-      | false => "case 0".
+      | true => ""
+      | false => "0".
       CodeGen Constant true => "struct_bool_true".
       CodeGen Constant false => "struct_bool_false".
       CodeGen Snippet "source_prologue" "
@@ -405,8 +405,8 @@ let struct_bool_src = {|
 let nat_src = {|
       CodeGen InductiveType nat => "nat".
       CodeGen InductiveMatch nat => ""
-      | O => "case 0"
-      | S => "default" "nat_pred".
+      | O => "0"
+      | S => "" "nat_pred".
       CodeGen Constant O => "0".
       CodeGen Primitive S => "nat_succ".
 
@@ -458,8 +458,8 @@ let nat_src = {|
 let list_bool_src = {|
       CodeGen InductiveType list bool => "list_bool".
       CodeGen InductiveMatch list bool => "list_bool_is_nil"
-      | nil => "default"
-      | cons => "case 0" "list_bool_head" "list_bool_tail".
+      | nil => ""
+      | cons => "0" "list_bool_head" "list_bool_tail".
       CodeGen Constant nil bool => "((list_bool)NULL)".
       CodeGen Primitive cons bool => "list_bool_cons".
 
@@ -498,8 +498,8 @@ let list_bool_src = {|
 let list_nat_src = {|
       CodeGen InductiveType list nat => "list_nat".
       CodeGen InductiveMatch list nat => "list_nat_is_nil"
-      | nil => "default"
-      | cons => "case 0" "list_nat_head" "list_nat_tail".
+      | nil => ""
+      | cons => "0" "list_nat_head" "list_nat_tail".
       CodeGen Constant nil nat => "((list_nat)NULL)".
       CodeGen Primitive cons nat => "list_nat_cons".
 
@@ -553,7 +553,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
       CodeGen InductiveType bool_pair => "bool_pair".
       CodeGen InductiveMatch bool_pair => ""
-      | bpair => "default" "bool_pair_fst" "bool_pair_snd".
+      | bpair => "" "bool_pair_fst" "bool_pair_snd".
       CodeGen Primitive bpair => "bpair".
 
       CodeGen Snippet "source_prologue" "
@@ -639,7 +639,7 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
       Inductive singleton : Set := C : bool -> singleton.
       CodeGen InductiveType singleton => "singleton".
       CodeGen InductiveMatch singleton => ""
-      | C => "unused-case-label" "access".
+      | C => "" "access".
       CodeGen Snippet "source_prologue" "
       typedef bool singleton;
       #define access(s) s
@@ -667,8 +667,8 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen InductiveType mybool => "mybool".
       CodeGen InductiveMatch mybool => ""
-      | mytrue => "default"
-      | myfalse => "case 0".
+      | mytrue => ""
+      | myfalse => "0".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
       CodeGen Snippet "source_prologue" "
@@ -689,8 +689,8 @@ let test_mybool_true (ctx : test_ctxt) : unit =
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen InductiveType mybool => "mybool".
       CodeGen InductiveMatch mybool => ""
-      | mytrue => "default"
-      | myfalse => "case 0".
+      | mytrue => ""
+      | myfalse => "0".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
       CodeGen Snippet "source_prologue" "
@@ -1208,8 +1208,8 @@ let test_cast (ctx : test_ctxt) : unit =
 let bool_matchcount_src = {|
       CodeGen InductiveType bool => "bool".
       CodeGen InductiveMatch bool => "sw_bool"
-      | true => "default"
-      | false => "case 0".
+      | true => ""
+      | false => "0".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
@@ -2922,8 +2922,8 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
     {|
       CodeGen InductiveType option bool => "option_bool".
       CodeGen InductiveMatch option bool => "sw_option_bool"
-      | None => "default"
-      | Some => "case option_bool_Some" "option_bool_Some_member1".
+      | None => ""
+      | Some => "option_bool_Some" "option_bool_Some_member1".
       CodeGen Primitive None bool => "None_bool".
       CodeGen Primitive Some bool => "Some_bool".
       CodeGen Snippet "source_prologue" "
@@ -3127,8 +3127,8 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
         opt_of_myopt (myopt_of_opt ob).
       CodeGen InductiveType option bool => "option_bool".
       CodeGen InductiveMatch option bool => "sw_option_bool"
-      | Some => "default" "option_bool_get_some"
-      | None => "case 0".
+      | Some => "" "option_bool_get_some"
+      | None => "0".
       CodeGen Primitive Some bool => "some_bool".
       CodeGen Constant None bool => "none_bool".
       CodeGen Snippet "source_prologue" "
@@ -3788,9 +3788,9 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
         #define LC2_tag 0
       ".
       CodeGen InductiveType L => "L".
-      CodeGen InductiveMatch L => "sw_L" | LC1 => "default" | LC2 => "case 0" "L_member".
+      CodeGen InductiveMatch L => "sw_L" | LC1 => "" | LC2 => "0" "L_member".
       CodeGen InductiveType B => "L".
-      CodeGen InductiveMatch B => "sw_L" | BC1 => "default" | BC2 => "case 0" "L_member".
+      CodeGen InductiveMatch B => "sw_L" | BC1 => "" | BC2 => "0" "L_member".
       CodeGen Func f.
     |}) {|
       assert(f(LC1()) == true);

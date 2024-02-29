@@ -51,25 +51,29 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
+  An empty C_CASELABEL, "", means "default:" in C switch statement.
+  A non-empty C_CASELABEL, "foo", means "case foo:" in C switch statement.
+  (If no default label, the first constructor is choosen to use default label.)
+
   Print CodeGen Inductive.              show all inductive types for codegen.
   Print CodeGen Inductive COQ_TYPE*     show the specified inductive types for codegen.
 
   Example:
 
   CodeGen InductiveType bool => "bool".
-  CodeGen InductiveMatch bool => "" | true => "default" | false => "case 0".
+  CodeGen InductiveMatch bool => "" | true => "" | false => "0".
   CodeGen Primitive true => "true".
   CodeGen Primitive false => "false".
   Print CodeGen Inductive bool.
 
   CodeGen InductiveType nat => "uint64_t".
-  CodeGen InductiveMatch nat => "" | O "case 0" | S "default" "pred".
+  CodeGen InductiveMatch nat => "" | O "0" | S "" "pred".
   CodeGen Primitive O => "0".
   CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
   CodeGen InductiveType option bool => "int".
-  CodeGen InductiveMatch option bool => "" | None => "case -1" | Some => "default" "".
+  CodeGen InductiveMatch option bool => "" | None => "-1" | Some => "" "".
   CodeGen Primitive None bool => "(-1)".
   CodeGen Primitive Some bool => "(int)".
   Print CodeGen Inductive (option bool).

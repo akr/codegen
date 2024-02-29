@@ -94,8 +94,8 @@ It is possible to configure code generation of inductive types.
 
     CodeGen InductiveType nat => "uint64_t".
     CodeGen InductiveMatch nat => ""
-    | O => "case 0"
-    | S => "default" "pred".
+    | O => "0"        (* "0" means "case 0:" in C switch statement *)
+    | S => "" "pred". (* "" means "default:" in C switch statement *)
     CodeGen Constant O => "0".
     CodeGen Primitive S => "pred".
 

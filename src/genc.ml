@@ -1595,11 +1595,25 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
     gen_funcall c_fname argvars
 
 let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
+  let branches =
+    if Array.for_all (fun (caselabel, pp_branch) -> not (CString.is_empty caselabel)) branches then
+      branches |> Array.mapi (fun i (caselabel, pp_branch) ->
+        if i = 0 then
+          ("", pp_branch)
+        else
+          (caselabel, pp_branch))
+    else
+      branches
+  in
   Pp.v 0 (
   Pp.hov 0 (Pp.str "switch" +++ Pp.str "(" ++ swexpr ++ Pp.str ")") +++
   vbrace (pp_sjoinmap_ary
     (fun (caselabel, pp_branch) ->
-      Pp.str caselabel ++ Pp.str ":" ++ Pp.brk (1,2) ++ Pp.v 0 pp_branch)
+      (if CString.is_empty caselabel then
+        Pp.str "default:"
+      else
+        Pp.str ("case " ^ caselabel ^ ":")) ++
+      Pp.brk (1,2) ++ Pp.v 0 pp_branch)
     branches))
 
 let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
