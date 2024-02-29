@@ -181,7 +181,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env =
   let { ind_pind=pind; ind_params=params; ind_name; ind_swfunc; ind_cstrs } = ind_names in
   let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
-  ignore (register_ind_type env sigma coq_type_i ind_name "");
+  ignore (register_ind_type env sigma coq_type_i (simple_c_type ind_name));
   let cstr_caselabel_accessors_ary =
     ind_cstrs |> Array.mapi (fun j0 { cstr_id; cstr_enum_const; cstr_members } ->
       let caselabel = if j0 = 0 then "default" else "case " ^ cstr_enum_const in

@@ -1585,6 +1585,9 @@ let compose_c_tokens (strings : string list) : string =
   in
   String.concat "" (f strings)
 
+let simple_c_type (c_type_left : string) : c_typedata =
+  { c_type_left=c_type_left; c_type_right="" }
+
 (*
   We wrap declarator by parenthesis if it start with '*' and
   c_type_right starts with '[' or '('.

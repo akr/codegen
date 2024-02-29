@@ -149,14 +149,13 @@ let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Decl
       Pp.str "of" +++
       Printer.pr_constr_env env sigma ty))
 
-let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type_left : string) (c_type_right) : ind_config =
+let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : c_typedata) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
-  let is_void_type = String.equal c_type_left "void" && String.equal c_type_right "" in
+  let is_void_type = c_type_is_void c_type in
   (if is_void_type then
     check_void_type env sigma mutind_body coq_type);
-  let c_type = { c_type_left=c_type_left; c_type_right=c_type_right } in
   let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
     Array.map (fun cstrname -> {
       coq_cstr = cstrname;
@@ -175,7 +174,7 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
 let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let printed_type = mangle_term env sigma t in
   let c_name = c_id (squeeze_white_spaces printed_type) in
-  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) c_name "" in
+  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) (simple_c_type c_name) in
   Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] inductive type translation automatically configured:" +++
      (Pp.hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
@@ -194,7 +193,7 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type_left : str
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_type env sigma coq_type c_type_left c_type_right)
+  ignore (register_ind_type env sigma coq_type { c_type_left; c_type_right })
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
