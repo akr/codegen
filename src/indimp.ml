@@ -218,7 +218,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
           ind_cstrs |> Array.map (fun { cstr_id; cstr_enum_const; cstr_members } ->
             let caselabel = cstr_enum_const in
             let accessors = List.map (fun { member_accessor } -> member_accessor) cstr_members in
-            (cstr_id, caselabel, accessors))
+            { cstr_id; cstr_caselabel=caselabel; cstr_accessors=accessors })
         in
         let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
         ignore (register_ind_match env sigma coq_type_i ind_swfunc cstr_caselabel_accessors_list);

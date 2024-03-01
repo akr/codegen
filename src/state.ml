@@ -153,7 +153,11 @@ type ind_config = {
   is_void_type : bool;
 }
 
-type ind_cstr_caselabel_accessors = Id.t * string * string list
+type ind_cstr_caselabel_accessors = {
+  cstr_id: Names.Id.t;
+  cstr_caselabel: string;
+  cstr_accessors: string list;
+}
 
 type s_or_d = SorD_S | SorD_D
 

@@ -212,9 +212,9 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
       Pp.int (List.length cstr_caselabel_accessors_list)));
   let f j0 cstr_cfg =
     let consname = oneind_body.Declarations.mind_consnames.(j0) in
-    let p (cstr, caselabel, accessors) = Id.equal consname cstr in
+    let p { cstr_id } = Id.equal consname cstr_id in
     let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
-    let (cstr, caselabel, accessors) = (match cstr_caselabel_accessors_opt with
+    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = (match cstr_caselabel_accessors_opt with
       | None -> user_err (
         Pp.str "[codegen] inductive match: constructor not found:" +++
           Id.print consname);
@@ -271,7 +271,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
           List.init numargs
             (fun k -> s ^ "_get_member_" ^ string_of_int k)
         in
-        (consname, caselabel, accessors))
+        { cstr_id=consname; cstr_caselabel=caselabel; cstr_accessors=accessors })
   in
   let ind_cfg = register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list in
   Feedback.msg_info (Pp.v 2

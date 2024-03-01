@@ -140,8 +140,8 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 *)
 
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
-| [ "|" ident(coq_cstr) "=>" string(caselabel) string_list(accessors) ] ->
-  { (coq_cstr, caselabel, accessors) }
+| [ "|" ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
+  { { cstr_id; cstr_caselabel; cstr_accessors } }
 END
 
 VERNAC ARGUMENT EXTEND s_or_d

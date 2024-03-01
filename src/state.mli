@@ -34,7 +34,12 @@ type ind_config = {
   cstr_configs : cstr_config array;
   is_void_type : bool;
 }
-type ind_cstr_caselabel_accessors = Names.Id.t * string * string list
+type ind_cstr_caselabel_accessors = {
+  cstr_id: Names.Id.t;
+  cstr_caselabel: string;
+  cstr_accessors: string list;
+}
+
 type s_or_d = SorD_S | SorD_D
 type id_or_underscore = Names.Id.t option
 type constr_or_underscore = Constrexpr.constr_expr option
