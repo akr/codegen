@@ -507,15 +507,15 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let ind_names = generate_indimp_names env sigma coq_type in
   let env, ind_names = register_indimp env sigma ind_names in
   ignore env;
-  add_thunk "source_type_impls" (fun () -> gen_indimp_immediate_impl ind_names)
+  add_thunk "type_impls" (fun () -> gen_indimp_immediate_impl ind_names)
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
   let ind_names = generate_indimp_names env sigma coq_type in
   let env, ind_names = register_indimp env sigma ind_names in
   ignore env;
-  add_thunk "source_type_decls" (fun () -> gen_indimp_heap_decls ind_names);
-  add_thunk "source_type_impls" (fun () -> gen_indimp_heap_impls ind_names)
+  add_thunk "type_decls" (fun () -> gen_indimp_heap_decls ind_names);
+  add_thunk "type_impls" (fun () -> gen_indimp_heap_impls ind_names)
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in

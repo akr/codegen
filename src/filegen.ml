@@ -20,18 +20,12 @@ open State
 open Cgenutil
 
 let defined_sections = [
-  "header_prologue";
-  "header_type_decls";
-  "header_type_impls";
-  "header_func_decls";
-  "header_func_impls";
-  "header_epilogue";
-  "source_prologue";
-  "source_type_decls";
-  "source_type_impls";
-  "source_func_decls";
-  "source_func_impls";
-  "soruce_epilogue";
+  "prologue";
+  "type_decls";
+  "type_impls";
+  "func_decls";
+  "func_impls";
+  "epilogue";
 ]
 
 let codegen_add_generation (filename : string) (generation : code_generation) : unit =

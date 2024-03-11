@@ -289,7 +289,7 @@ let codegen_test_template
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
     "CodeGen SourceFile \"gen.c\".\n" ^
-    "CodeGen Snippet \"source_prologue\" " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
+    "CodeGen Snippet \"prologue\" " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
     delete_indent (expand_tab coq_commands) ^ "\n" ^
     "CodeGen GenerateFile" ^
     (if resolve_dependencies then "" else " DisableDependencyResolver") ^
@@ -368,7 +368,7 @@ let bool_src = {|
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       ".
 |}
@@ -380,7 +380,7 @@ let bool_paren_src = {|
       | false => "0".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       ".
 |}
@@ -393,7 +393,7 @@ let struct_bool_src = {|
       | false => "0".
       CodeGen Constant true => "struct_bool_true".
       CodeGen Constant false => "struct_bool_false".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       typedef struct { bool b; } struct_bool;
       static struct_bool struct_bool_true = { true };
@@ -410,7 +410,7 @@ let nat_src = {|
       CodeGen Constant O => "0".
       CodeGen Primitive S => "nat_succ".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdint.h>
       typedef uint64_t nat;
       #define nat_succ(n) ((n)+1)
@@ -434,7 +434,7 @@ let nat_src = {|
       CodeGen Primitive Nat.eqb => "nat_eqb".
       CodeGen Primitive Nat.leb => "nat_leb".
       CodeGen Primitive Nat.ltb => "nat_ltb".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #define nat_add(x,y) ((x) + (y))
       #define nat_sub(x,y) ((x) - (y))
       #define nat_mul(x,y) ((x) * (y))
@@ -463,7 +463,7 @@ let list_bool_src = {|
       CodeGen Constant nil bool => "((list_bool)NULL)".
       CodeGen Primitive cons bool => "list_bool_cons".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
 
       struct list_bool_struct;
@@ -503,7 +503,7 @@ let list_nat_src = {|
       CodeGen Constant nil nat => "((list_nat)NULL)".
       CodeGen Primitive cons nat => "list_nat_cons".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
       #include <stdbool.h> /* for bool */
       struct list_nat_struct;
@@ -556,7 +556,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
       | bpair => "" "bool_pair_fst" "bool_pair_snd".
       CodeGen Primitive bpair => "bpair".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int bool_pair;
       #define bpair(a,b) (((a) << 1) | (b))
       #define bool_pair_fst(x) ((x) >> 1)
@@ -575,7 +575,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
 let test_tail_constant_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       bool my_true(void) { return true; }
       bool my_false(void) { return false; }
       ".
@@ -597,7 +597,7 @@ let test_tail_constant_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       CodeGen Primitive negb.
-      CodeGen Snippet "source_prologue" "#define negb(b) (!(b))".
+      CodeGen Snippet "prologue" "#define negb(b) (!(b))".
       Definition call_negb (b : bool) : bool := negb b.
       CodeGen Func call_negb.
     |}) {|
@@ -640,7 +640,7 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
       CodeGen InductiveType singleton => "singleton".
       CodeGen InductiveMatch singleton => ""
       | C => "" "access".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef bool singleton;
       #define access(s) s
       ".
@@ -671,7 +671,7 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
       | myfalse => "0".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int mybool;
       #define mytrue 1
       #define myfalse 0
@@ -693,7 +693,7 @@ let test_mybool_true (ctx : test_ctxt) : unit =
       | myfalse => "0".
       CodeGen Constant mytrue => "mytrue".
       CodeGen Constant myfalse => "myfalse".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int mybool;
       #define mytrue 1
       #define myfalse 0
@@ -722,7 +722,7 @@ let test_pair_bool_bool (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "make_pair_bool_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef struct {
         bool fst;
         bool snd;
@@ -757,7 +757,7 @@ let test_pair_2bool_bool (ctx : test_ctxt) : unit =
       | pair => "" "pair_2bool_bool_fst" "pair_2bool_bool_snd".
       CodeGen Primitive pair (bool*bool) bool => "make_pair_2bool_bool".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef struct { bool fst; bool snd; } pair_bool_bool;
       #define make_pair_bool_bool(fst, snd) ((pair_bool_bool){ (fst), (snd) })
       #define pair_bool_bool_fst(x) ((x).fst)
@@ -993,7 +993,7 @@ let test_even_odd_count (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       static int even_count = 0;
       static int odd_count = 0;
       ".
@@ -1213,7 +1213,7 @@ let bool_matchcount_src = {|
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       static int bool_match_count = 0;
       #define sw_bool(x) ((bool_match_count++), (x))
@@ -1736,8 +1736,8 @@ let test_add_at_non_tail_position1 (ctx : test_ctxt) : unit =
     {|
       Require Import List.
       Definition checkaddr (n : nat) : nat := 0.
-      CodeGen Snippet "source_prologue" "static nat checkaddr_imp(nat *);".
-      CodeGen Snippet "source_prologue" "#define checkaddr(x) checkaddr_imp(&x)".
+      CodeGen Snippet "prologue" "static nat checkaddr_imp(nat *);".
+      CodeGen Snippet "prologue" "#define checkaddr(x) checkaddr_imp(&x)".
       Definition f a b c :=
         let ab :=
           (fix add1 x y :=
@@ -1927,7 +1927,7 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       /* mybool is incompatible with uint64_t unlike bool.*/
       typedef struct { int b; } mybool;
       #define mytrue ((mybool){ 1 })
@@ -1984,7 +1984,7 @@ let forest_src = {|
       | emptyf : forest
       | consf : tree -> forest -> forest.
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
 
       struct tree_st {
@@ -2062,7 +2062,7 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (nat_src ^ forest_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       static int sizet_count = 0;
       static int sizef_count = 0;
       ".
@@ -2107,7 +2107,7 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
     ~mutual_recursion_detection:false
     (nat_src ^ forest_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       static int sizet_count = 0;
       static int sizef_count = 0;
       ".
@@ -2161,10 +2161,10 @@ let test_mutual_static1 (ctx : test_ctxt) : unit =
         | O => O
         | S m => S (idnat1 m)
         end.
-      CodeGen Snippet "source_prologue" "extern nat idnat1(nat v1_n);".
+      CodeGen Snippet "prologue" "extern nat idnat1(nat v1_n);".
       CodeGen Func idnat1.
       CodeGen StaticFunc idnat2.
-      CodeGen Snippet "source_prologue" "static nat idnat2(nat v1_n);".
+      CodeGen Snippet "prologue" "static nat idnat2(nat v1_n);".
     |})
     {|
       assert(idnat1(3) == 3);
@@ -2185,10 +2185,10 @@ let test_mutual_static2 (ctx : test_ctxt) : unit =
         | O => O
         | S m => S (idnat1 m)
         end.
-      CodeGen Snippet "source_prologue" "extern nat idnat2(nat v1_n);".
+      CodeGen Snippet "prologue" "extern nat idnat2(nat v1_n);".
       CodeGen StaticFunc idnat1.
       CodeGen Func idnat2.
-      CodeGen Snippet "source_prologue" "static nat idnat1(nat v1_n);".
+      CodeGen Snippet "prologue" "static nat idnat1(nat v1_n);".
     |})
     {|
       assert(idnat1(3) == 3);
@@ -2587,7 +2587,7 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef struct { bool fst; bool snd; } bool_pair;
       #define make_bool_pair(fst, snd) ((bool_pair){ (fst), (snd) })
       #define bool_pair_fst(x) ((x).fst)
@@ -2623,7 +2623,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef struct { bool fst; bool snd; } bool_pair;
       #define make_bool_pair(fst, snd) ((bool_pair){ (fst), (snd) })
       #define bool_pair_fst(x) ((x).fst)
@@ -2737,7 +2737,7 @@ let test_auto_ind_type (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Snippet "source_prologue" "typedef bool mybool;".
+      CodeGen Snippet "prologue" "typedef bool mybool;".
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       Definition id_mybool (x : mybool) : mybool := x.
       CodeGen Func id_mybool.
@@ -2750,7 +2750,7 @@ let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef bool mybool;
       #define sw_mybool(x) (x)
       #define mytrue_tag true
@@ -2772,7 +2772,7 @@ let test_auto_ind_match_cstrmember (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int bool_pair;
       #define bpair(a,b) (((a) << 1) | (b))
       #define bpair_get_member_0(x) ((x) >> 1)
@@ -2794,7 +2794,7 @@ let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
     (bool_src ^
     {|
       CodeGen Primitive pair bool bool => "pair".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair(a,b) (((a) << 1) | (b))
       #define pair_get_member_0(x) ((x) >> 1)
@@ -2813,7 +2813,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int option_bool;
       enum option_bool_tag { None_bool_tag, Some_bool_tag };
       #define sw_option_bool(x) ((enum option_bool_tag)((x) & 1))
@@ -2837,7 +2837,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
 let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define bpair(a,b) (((a) << 1) | (b))
       enum { pair_bool_bool_tag };
@@ -2861,7 +2861,7 @@ let test_auto_const (ctx : test_ctxt) : unit =
     ~resolve_dependencies:false
     ctx
     (nat_src ^ {|
-      CodeGen Snippet "source_prologue" "#define one() 1".
+      CodeGen Snippet "prologue" "#define one() 1".
       Definition one := 1.
       Definition add1 x := x + one.
       CodeGen Func add1.
@@ -2874,7 +2874,7 @@ let test_auto_const (ctx : test_ctxt) : unit =
 let test_auto_construct (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     ({|
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int nat;
       #define O() 0
       #define S(x) ((x)+1)
@@ -2926,7 +2926,7 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
       | Some => "option_bool_Some" "option_bool_Some_member1".
       CodeGen Primitive None bool => "None_bool".
       CodeGen Primitive Some bool => "Some_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       enum enum_option_bool { option_bool_None, option_bool_Some };
       typedef struct {
         enum enum_option_bool tag;
@@ -3046,7 +3046,7 @@ let test_indimp_bool_pair (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
       #define pair_bool_bool_fst(x) ((x) >> 1)
@@ -3089,7 +3089,7 @@ let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
       #define pair_bool_bool_fst(x) ((x) >> 1)
@@ -3131,7 +3131,7 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
       | None => "0".
       CodeGen Primitive Some bool => "some_bool".
       CodeGen Constant None bool => "none_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int option_bool;
       #define sw_option_bool(x) ((x) & 1)
       #define option_bool_get_some(x) ((bool)((x) >> 1))
@@ -3172,7 +3172,7 @@ let test_indimp_record (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch bool*bool => ""
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Primitive pair bool bool => "pair_bool_bool".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
       #define pair_bool_bool_fst(x) ((x) >> 1)
@@ -3380,8 +3380,8 @@ let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
       CodeGen HeaderFile "foo.h".
-      CodeGen HeaderSnippet "header_prologue" "static void foo(void) {}".
-      CodeGen Snippet "source_prologue" "#include ""foo.h""".
+      CodeGen HeaderSnippet "prologue" "static void foo(void) {}".
+      CodeGen Snippet "prologue" "#include ""foo.h""".
     |} {|
       foo();
     |}
@@ -3395,8 +3395,8 @@ let test_prototype (ctx : test_ctxt) : unit =
     (bool_src ^
     {|
       CodeGen HeaderFile "foo.h".
-      CodeGen Snippet "source_prologue" "#include ""foo.h""".
-      CodeGen Snippet "source_prologue" "void f(void) { id_bool(true); }".
+      CodeGen Snippet "prologue" "#include ""foo.h""".
+      CodeGen Snippet "prologue" "void f(void) { id_bool(true); }".
       CodeGen Func id bool => "id_bool".
     |}) {|
     |}
@@ -3422,7 +3422,7 @@ let boolbox_src = {|
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef bool *boolbox;
 
       static char boolbox_log_buffer[1000];
@@ -3570,7 +3570,7 @@ let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch boolbox*boolbox => ""
       | pair => "" "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
       CodeGen Primitive pair boolbox boolbox => "make_pair_boolbox_boolbox".
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
       typedef struct {
         boolbox fst;
         boolbox snd;
@@ -3645,7 +3645,7 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
     (bool_src ^ {|
       Inductive T := C1 : T | C2 : (T*T) -> T.
       Definition f (x : T)  := x.
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
         typedef struct T_struct *T;
         typedef struct prod_T_T_struct {
           T member1;
@@ -3825,7 +3825,7 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
         | BC2 _ => false
         end.
       CodeGen BorrowFunc borrow.
-      CodeGen Snippet "source_prologue" "
+      CodeGen Snippet "prologue" "
         typedef struct L_struct *L;
         typedef struct prod_L_L_struct {
           L member1;
@@ -4160,7 +4160,7 @@ let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
 let test_void_tail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ {|
-      CodeGen Snippet "source_prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) : unit := tt.
       CodeGen Func f.
     |})
@@ -4169,7 +4169,7 @@ let test_void_tail (ctx : test_ctxt) : unit =
 let test_void_head (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ {|
-      CodeGen Snippet "source_prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) : unit :=
 	let x := tt in
 	match b with
@@ -4183,9 +4183,9 @@ let test_void_head (ctx : test_ctxt) : unit =
 let test_void_mutual (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ nat_src ^ {|
-      CodeGen Snippet "source_prologue" "void f(nat);".
-      CodeGen Snippet "source_prologue" "static nat constant_zero(void) { return 0; }".
-      CodeGen Snippet "source_prologue" "static void ignore_nat(nat v1_x) { return; }".
+      CodeGen Snippet "prologue" "void f(nat);".
+      CodeGen Snippet "prologue" "static nat constant_zero(void) { return 0; }".
+      CodeGen Snippet "prologue" "static void ignore_nat(nat v1_x) { return; }".
       Definition ignore_nat (x : nat) : unit := tt.
       Definition constant_zero (x : unit) : nat := 0.
       Fixpoint f (n : nat) : unit :=
@@ -4227,7 +4227,7 @@ let test_void_empty_args (ctx : test_ctxt) : unit =
 let test_void_head_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ nat_src ^ {|
-      CodeGen Snippet "source_prologue" "nat f(bool);".
+      CodeGen Snippet "prologue" "nat f(bool);".
       Definition constant_zero (x : unit) : nat := 0.
       Definition f (b : bool) (u0 : unit) : nat :=
         let u :=
@@ -4244,7 +4244,7 @@ let test_void_head_tt_var (ctx : test_ctxt) : unit =
 let test_void_tail_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (unit_src ^ bool_src ^ nat_src ^ {|
-      CodeGen Snippet "source_prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) (u0 : unit) : unit :=
         match b with
         | true => tt (* We don't define tt in C but tt is usable because codegen omit void constructor *)
@@ -4268,12 +4268,12 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
       CodeGen Deallocator TestRecord => "dealloc_TestRecord".
-      CodeGen Snippet "source_prologue" "typedef int TestRecord;".
-      CodeGen Snippet "source_prologue" "int dealloc_called = 0;".
-      CodeGen Snippet "source_prologue" "#define TestRecord_umem(x) (abort(x))".
-      CodeGen Snippet "source_prologue" "#define TestRecord_nmem(x) (x)".
-      CodeGen Snippet "source_prologue" "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
-      CodeGen Snippet "source_prologue" "static nat constant_zero(void) { return 0; }".
+      CodeGen Snippet "prologue" "typedef int TestRecord;".
+      CodeGen Snippet "prologue" "int dealloc_called = 0;".
+      CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
+      CodeGen Snippet "prologue" "#define TestRecord_nmem(x) (x)".
+      CodeGen Snippet "prologue" "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
+      CodeGen Snippet "prologue" "static nat constant_zero(void) { return 0; }".
       CodeGen Primitive constant_zero.
       CodeGen Func f.
     |})
@@ -4293,11 +4293,11 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
       CodeGen Deallocator TestRecord => "dealloc_TestRecord".
-      CodeGen Snippet "source_prologue" "typedef int TestRecord;".
-      CodeGen Snippet "source_prologue" "int dealloc_called = 0;".
-      CodeGen Snippet "source_prologue" "#define TestRecord_umem(x) (abort(x))".
-      CodeGen Snippet "source_prologue" "#define TestRecord_nmem(x) (x)".
-      CodeGen Snippet "source_prologue" "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
+      CodeGen Snippet "prologue" "typedef int TestRecord;".
+      CodeGen Snippet "prologue" "int dealloc_called = 0;".
+      CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
+      CodeGen Snippet "prologue" "#define TestRecord_nmem(x) (x)".
+      CodeGen Snippet "prologue" "#define dealloc_TestRecord(x) ((void)(dealloc_called++))".
       CodeGen Func f.
     |})
     {|

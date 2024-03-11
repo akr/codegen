@@ -2627,7 +2627,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
   in
   let pp = pp_sjoinmap_list (fun (decl, impl) -> decl ++ Pp.fnl ()) code_pairs +++
            pp_sjoinmap_list (fun (decl, impl) -> impl ++ Pp.fnl ()) code_pairs in
-  [("source_func_impls", pp)]
+  [("func_impls", pp)]
 
 let detect_stubs (env : Environ.env) (sigma : Evd.evar_map) (cfunc_ty_term_list : (cfunc_t * Constr.types * Constr.t) list) :
     (*cfunc_term_list*) (cfunc_t * Constr.t) list *
@@ -2682,7 +2682,7 @@ let gen_stub_function (cfunc_to_define, cfunc_name_to_call, formal_arguments_wit
       Pp.str ");"))
 
 let gen_stub_functions (stub_entries : (cfunc_t * string * (string * c_typedata) list * c_typedata) list) : (string * Pp.t) list =
-  [("source_func_impls", pp_sjoinmap_list gen_stub_function stub_entries)]
+  [("func_impls", pp_sjoinmap_list gen_stub_function stub_entries)]
 
 let gen_function (cfunc_names : string list) : (string * Pp.t) list =
   match cfunc_names with
@@ -2707,7 +2707,7 @@ let gen_prototype (cfunc_name : string) : (string * Pp.t) list =
   let sigma = Evd.from_env env in
   let whole_ty = Reductionops.nf_all env sigma (EConstr.of_constr ty) in
   let (formal_arguments_without_void, return_type) = c_args_without_void_and_ret_type env sigma whole_ty in
-  [("source_func_decls", gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";")]
+  [("func_decls", gen_function_header cfunc return_type formal_arguments_without_void ++ Pp.str ";")]
 
 let common_key_for_siblings (term : Constr.t) : (int * Constr.t) option =
   let (args, body) = Term.decompose_lambda term in
