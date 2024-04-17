@@ -333,13 +333,13 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
       ) ++ Pp.str (" " ^ ind_name ^ ";"))
   in
   let pp_swfunc =
-    Pp.h (
-      Pp.str "#define" +++
-      Pp.str ind_swfunc ++ Pp.str "(x)" +++
-      (if single_constructor then
-        Pp.str "0"
-      else
-        Pp.str "((x).tag)"))
+    if single_constructor then
+      Pp.mt ()
+    else
+      Pp.h (
+        Pp.str "#define" +++
+        Pp.str ind_swfunc ++ Pp.str "(x)" +++
+        Pp.str "((x).tag)")
   in
   let pp_accessors =
     ind_cstrs |> pp_sjoinmap_ary (fun { cstr_umember; cstr_members } ->
