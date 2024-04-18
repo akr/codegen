@@ -190,14 +190,14 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       let cstrterm = mkApp (mkConstructUi (pind, cstr_j), params) in
       (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
       let cstrtype = Retyping.get_type_of env sigma cstrterm in
-      let (args, result_type) = decompose_prod sigma cstrtype in
+      let (revargs, result_type) = decompose_prod sigma cstrtype in
       let j_suffix = "_" ^ Id.to_string cstr_id in
       let cstr_name = global_prefix ^ "_cstr" ^ j_suffix  in
       let cstr_enum_const = global_prefix ^ "_tag" ^ j_suffix in
       let cstr_struct_tag = global_prefix ^ "_cstruct" ^ j_suffix in
       let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
       let cstr_members =
-        (List.rev args) |> List.mapi (fun k (arg_name, arg_type) ->
+        (List.rev revargs) |> List.mapi (fun k (arg_name, arg_type) ->
           let k_suffix =
             string_of_int (k+1) ^ "_" ^ Id.to_string cstr_id ^
             match Context.binder_name arg_name with
