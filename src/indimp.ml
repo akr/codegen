@@ -170,7 +170,7 @@ let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * str
 
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names =
   let (f, args) = decompose_appvect sigma coq_type in
-  let params = array_rev args in (* xxx: args should be parameters of inductive type *)
+  let params = args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
   let ((mutind, i), u) = pind in
   let mutind_body = Environ.lookup_mind mutind env in
