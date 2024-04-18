@@ -116,6 +116,8 @@ val vbrace : Pp.t -> Pp.t
 val msg_info_hov : Pp.t -> unit
 val msg_debug_hov : Pp.t -> unit
 val user_err_hov : Pp.t -> 'a
+val msg_info_v : Pp.t -> unit
+val msg_debug_v : Pp.t -> unit
 val format_deep : Pp.t -> string
 val pr_deep : Pp.t -> Pp.t
 val env_push_assum : Environ.env  -> Names.Name.t Context.binder_annot -> EConstr.types -> Environ.env

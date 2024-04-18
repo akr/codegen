@@ -128,6 +128,40 @@ type ind_names = {
   ind_cstrs: cstr_names array;
 }
 
+let pr_member_names (member_names : member_names) : Pp.t =
+  Pp.v 2 (Pp.str "{" +++
+    Pp.hov 2 (Pp.str "member_type:" +++ (if Lazy.is_val member_names.member_type_lazy then
+        match member_names.member_type_lazy with
+        | lazy None -> Pp.str "void"
+        | lazy (Some c_type) -> pr_c_abstract_decl c_type
+      else
+        Pp.str "(lazy)")) +++
+    Pp.hov 2 (Pp.str "member_name:" +++ Pp.qstring member_names.member_name) +++
+    Pp.hov 2 (Pp.str "member_accessor:" +++ Pp.qstring member_names.member_accessor) ++ Pp.brk (0,-2) ++
+  Pp.str "}")
+
+let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : cstr_names) : Pp.t =
+  Pp.v 2 (Pp.str "{" +++
+    Pp.hov 2 (Pp.str "cstr_j:" +++ Pp.int cstr_names.cstr_j) +++
+    Pp.hov 2 (Pp.str "cstr_id:" +++ Id.print cstr_names.cstr_id) +++
+    Pp.hov 2 (Pp.str "cstr_name:" +++ Pp.qstring cstr_names.cstr_name) +++
+    Pp.hov 2 (Pp.str "cstr_enum_const:" +++ Pp.qstring cstr_names.cstr_enum_const) +++
+    Pp.hov 2 (Pp.str "cstr_struct_tag:" +++ Pp.qstring cstr_names.cstr_struct_tag) +++
+    Pp.hov 2 (Pp.str "cstr_umember:" +++ Pp.qstring cstr_names.cstr_umember) +++
+    pp_sjoinmap_list pr_member_names (cstr_names.cstr_members @ cstr_names.cstr_members) ++ Pp.brk (0,-2) ++
+  Pp.str "}")
+
+let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Pp.t =
+  Pp.v 2 (Pp.str "{" +++
+    Pp.hov 2 (Pp.str "ind_pind:" +++ Printer.pr_inductive env (fst ind_names.ind_pind)) +++
+    Pp.hov 2 (Pp.str "ind_params:" +++ pp_sjoinmap_ary (Printer.pr_econstr_env env sigma) ind_names.ind_params) +++
+    Pp.hov 2 (Pp.str "ind_name:" +++ Pp.qstring ind_names.ind_name) +++
+    Pp.hov 2 (Pp.str "ind_struct_tag:" +++ Pp.qstring ind_names.ind_struct_tag) +++
+    Pp.hov 2 (Pp.str "ind_enum_tag:" +++ Pp.qstring ind_names.ind_enum_tag) +++
+    Pp.hov 2 (Pp.str "ind_swfunc:" +++ Pp.qstring ind_names.ind_swfunc) +++
+    pp_sjoinmap_ary (pr_cstr_names env sigma) (Array.append ind_names.ind_cstrs ind_names.ind_cstrs) ++ Pp.brk (0,-2) ++
+  Pp.str "}")
+
 let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * string * string) list =
   cstr_members |> List.filter_map (fun { member_type_lazy; member_name; member_accessor } ->
     match member_type_lazy with
@@ -177,7 +211,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       in
       { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members; })
   in
-  { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs }
+  let result = { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } in
+  msg_info_v (pr_ind_names env sigma result);
+  result
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env * ind_names =
   let { ind_pind=pind; ind_params=params; ind_name; ind_swfunc; ind_cstrs } = ind_names in

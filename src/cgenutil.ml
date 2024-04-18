@@ -760,6 +760,12 @@ let msg_debug_hov pp =
 
 let user_err_hov pp = user_err (Pp.hov 2 pp)
 
+let msg_info_v pp =
+  Feedback.msg_info (Pp.v 2 pp)
+
+let msg_debug_v pp =
+  Feedback.msg_debug (Pp.v 2 pp)
+
 let format_deep (pp : Pp.t) : string =
   let buf = Buffer.create 0 in
   let fmt = Format.formatter_of_buffer buf in
