@@ -2600,7 +2600,7 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
       ~fixfunc_label_tbl
       sigma
   in
-  show_fixfunc_table env sigma fixfunc_tbl;
+  (*show_fixfunc_table env sigma fixfunc_tbl;*)
   let closure_bodyhead_tbl = make_closure_bodyhead_tbl genchunks in
   let closure_tbl =
     collect_closures

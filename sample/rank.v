@@ -145,6 +145,7 @@ CodeGen InductiveMatch MDArr*nat => ""
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
 CodeGen Deallocator prod MDArr nat => "dealloc_MDArr_nat".
+CodeGen IndImp (MDArr*nat).
 
 CodeGen InductiveType MDArr*MDArr*nat => "pair_2MDArr_nat".
 CodeGen InductiveMatch MDArr*MDArr*nat => ""

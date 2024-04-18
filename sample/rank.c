@@ -150,34 +150,6 @@ DArr pushD(DArr d, nat n)
 #define lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
 #define sizeD(d) (bsize(d) / (d).w)
 
-typedef struct {
-  MDArr D1;
-  MDArr D2;
-} pair_MDArr_MDArr;
-#define make_pair_MDArr_MDArr(D1, D2) ((pair_MDArr_MDArr){ (D1), (D2) })
-#define pair_MDArr_MDArr_D1(x) ((x).D1)
-#define pair_MDArr_MDArr_D2(x) ((x).D2)
-#define dealloc_MDArr_MDArr(x)
-
-typedef struct {
-  MDArr D;
-  nat n;
-} pair_MDArr_nat;
-#define make_pair_MDArr_nat(D, n) ((pair_MDArr_nat){ (D), (n) })
-#define pair_MDArr_nat_D(x) ((x).D)
-#define pair_MDArr_nat_n(x) ((x).n)
-#define dealloc_MDArr_nat(x)
-
-typedef struct {
-  pair_MDArr_MDArr D12;
-  nat n;
-} pair_2MDArr_nat;
-#define make_pair_2MDArr_nat(D12, n) \
-  ((pair_2MDArr_nat){ (D12), (n) })
-#define pair_2MDArr_nat_D12(x) ((x).D12)
-#define pair_2MDArr_nat_n(x) ((x).n)
-#define dealloc_2MDArr_nat(x)
-
 static inline nat
 bitlen(nat n)
 {
@@ -185,41 +157,6 @@ bitlen(nat n)
   assert(64 <= sizeof(long) * CHAR_BIT);
   return 64 - __builtin_clzl(n);
 }
-
-typedef struct {
-  bool query_bit;
-  bits input_bits;
-  nat ratio;
-  nat blksz2;
-  DArr dir1;
-  DArr dir2;
-} *Aux;
-
-static Aux mkAux(
-  bool query_bit,
-  bits input_bits,
-  nat ratio,
-  nat blksz2,
-  DArr dir1,
-  DArr dir2)
-{
-  Aux aux;
-  aux = malloc(sizeof(*aux));
-  aux->query_bit = query_bit;
-  aux->input_bits = input_bits;
-  aux->ratio = ratio;
-  aux->blksz2 = blksz2;
-  aux->dir1 = dir1;
-  aux->dir2 = dir2;
-  return aux;
-}
-
-#define aux_query_bit(aux) ((aux)->query_bit)
-#define aux_input_bits(aux) ((aux)->input_bits)
-#define aux_blksz2(aux) ((aux)->blksz2)
-#define aux_ratio(aux) ((aux)->ratio)
-#define aux_dir1(aux) ((aux)->dir1)
-#define aux_dir2(aux) ((aux)->dir2)
 
 #include "rank_generated.c"
 

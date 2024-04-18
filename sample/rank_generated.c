@@ -1,3 +1,22 @@
+/* section-start: prologue */
+/* section-end: prologue */
+/* section-start: type_decls */
+/* section-end: type_decls */
+/* section-start: type_impls */
+typedef struct
+g0_istruct_prod
+{
+  nat g0_member1_pair;
+  MDArr g0_member2_pair;
+} g0_type_prod;
+#define g0_get1_pair(x) ((x).g0_member1_pair)
+#define g0_get2_pair(x) ((x).g0_member2_pair)
+#define g0_cstr_pair(g0_member1_pair, g0_member2_pair) ((g0_type_prod){ g0_member1_pair, g0_member2_pair })
+
+/* section-end: type_impls */
+/* section-start: func_decls */
+/* section-end: func_decls */
+/* section-start: func_impls */
 static pair_MDArr_nat
 buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
          nat v7_m2);
@@ -29,6 +48,7 @@ buildDir2(bool v1_b, bits v2_s, nat v3_sz2, nat v4_c, nat v5_i, MDArr v6_D2,
       goto entry_buildDir2;
   }
 }
+
 
 static pair_2MDArr_nat
 buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
@@ -71,6 +91,7 @@ buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
       goto entry_buildDir1;
   }
 }
+
 
 static pair_MDArr_MDArr
 buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2);
@@ -127,6 +148,7 @@ buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
   return make_pair_MDArr_MDArr(v26_m, v27_m);
 }
 
+
 static nat pred(nat v1_n);
 
 static nat pred(nat v1_n)
@@ -142,6 +164,7 @@ static nat pred(nat v1_n)
   }
 }
 
+
 static nat neq0(nat v1_n);
 
 static nat neq0(nat v1_n)
@@ -150,6 +173,7 @@ static nat neq0(nat v1_n)
   v2_n = pred(v1_n);
   return succn(v2_n);
 }
+
 
 static Aux rank_init(bool v1_b, bits v2_s);
 
@@ -195,6 +219,7 @@ static Aux rank_init(bool v1_b, bits v2_s)
   return mkAux(v1_b, v2_s, v5_k, v7_sz2, v19_d, v20_d);
 }
 
+
 static nat rank_lookup(Aux v1_aux, nat v2_i);
 
 static nat rank_lookup(Aux v1_aux, nat v2_i)
@@ -230,3 +255,7 @@ static nat rank_lookup(Aux v1_aux, nat v2_i)
   return addn(v14_n, v16_n);
 }
 
+
+/* section-end: func_impls */
+/* section-start: epilogue */
+/* section-end: epilogue */
