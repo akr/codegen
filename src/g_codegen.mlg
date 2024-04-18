@@ -95,6 +95,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen HeaderRawSnippet "...".       (* same as CodeGen Header Snippet but it does not strip indent *)
 
   CodeGen IndImp COQ_TYPE.
+  CodeGen IndImpHeap COQ_TYPE.
 
   CodeGen GenerateFile "FILENAME".
   CodeGen GenerateTest.
@@ -232,8 +233,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "RawSnippet" string(section) string(str) ] -> { command_rawsnippet section str }
     | [ "CodeGen" "HeaderRawSnippet" string(section) string(str) ] -> { command_header_rawsnippet section str }
 
-    | [ "CodeGen" "IndImp" constr(coq_type) ] ->
-      { command_indimp coq_type }
+    | [ "CodeGen" "IndImp" constr(coq_type) ] -> { command_indimp coq_type }
+    | [ "CodeGen" "IndImpHeap" constr(coq_type) ] -> { command_indimp ~force_heap:true coq_type }
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 

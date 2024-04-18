@@ -1,1 +1,1 @@
-val command_indimp : Constrexpr.constr_expr -> unit
+val command_indimp : ?force_heap:bool -> Constrexpr.constr_expr -> unit

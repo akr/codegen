@@ -3407,6 +3407,25 @@ let test_indimp_named_mynat (ctx : test_ctxt) : unit =
       assert(nat_of_mynat(mynat_of_nat(5)) == 5);
     |}
 
+let test_indimp_force_heap (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Inductive nat4 := mkNat4 : nat -> nat -> nat -> nat -> nat4.
+      CodeGen InductiveType nat4 => "nat4".
+      CodeGen InductiveMatch nat4 => "sw_nat4"
+      | mkNat4 => "" "get_nat1" "get_nat2" "get_nat3" "get_nat4".
+      CodeGen Primitive mkNat4 => "mkNat4".
+      CodeGen IndImpHeap nat4.
+    |}) {|
+      nat4 x = mkNat4(11,12,13,14);
+      assert(get_nat1(x) == 11);
+      assert(get_nat2(x) == 12);
+      assert(get_nat3(x) == 13);
+      assert(get_nat4(x) == 14);
+      assert(sizeof(x) <= sizeof(void*)); /* check nat4 is a pointer */
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4685,6 +4704,7 @@ let suite : OUnit2.test =
     "test_indimp_unit_in_member" >:: test_indimp_unit_in_member;
     "test_indimp_named_mybool" >:: test_indimp_named_mybool;
     "test_indimp_named_mynat" >:: test_indimp_named_mynat;
+    "test_indimp_force_heap" >:: test_indimp_force_heap;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

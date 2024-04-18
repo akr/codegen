@@ -444,7 +444,76 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
   let pp_decls = Pp.v 0 pp_ind_types in
   Pp.string_of_ppcmds pp_decls
 
-let gen_indimp_heap_impls (ind_names : ind_names) : string =
+let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
+  let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
+  let ind_cstr = ind_cstrs.(0) in
+  let pp_ind_impls =
+    let member_decl =
+      let { cstr_members } = ind_cstr in
+      pp_sjoinmap_list
+        (fun (member_type, member_name, member_accessor) ->
+          Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
+        (non_void_cstr_members cstr_members)
+    in
+    let pp_ind_struct_def =
+      Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag) +++
+      vbrace member_decl ++
+      Pp.str ";"
+    in
+    let pp_accessors =
+      (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
+      let { cstr_members } = ind_cstr in
+        pp_sjoinmap_list
+          (fun (member_type, member_name, member_accessor) ->
+            Pp.h (Pp.str "#define" +++
+                  Pp.str member_accessor ++
+                  Pp.str "(x)" +++
+                  Pp.str ("(((struct " ^ ind_struct_tag ^ " *)(x))->" ^ member_name ^ ")")))
+          (non_void_cstr_members cstr_members)
+    in
+    let pp_cstr =
+      (*
+        static list_t list_cons(bool head, list_t tail) {
+          struct list_cons_struct *p;
+          if (!(p = malloc(sizeof(struct list_cons_struct)))) abort();
+          p->tag = list_cons_tag;
+          p->head = head;
+          p->tail = tail;
+          return (list_t)p;
+        }
+      *)
+      let { cstr_name; cstr_enum_const; cstr_members } = ind_cstr in
+      let fargs =
+        if CList.is_empty cstr_members then
+          Pp.str "void"
+        else
+          pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+            (fun (member_type, member_name, member_accessor) ->
+              Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
+            (non_void_cstr_members cstr_members)
+      in
+      Pp.v 0 (Pp.hov 2 (
+                Pp.str "static" +++
+                Pp.str ind_name +++
+                Pp.str cstr_name ++
+                Pp.str "(" ++ fargs ++ Pp.str ")") +++
+              vbrace (
+                Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag +++ Pp.str "*p;") +++
+                Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
+                pp_sjoinmap_list
+                  (fun (member_type, member_name, member_accessor) ->
+                    Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
+                  (non_void_cstr_members cstr_members) +++
+                Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")p;"))))
+    in
+    pp_ind_struct_def +++ pp_accessors +++ pp_cstr
+  in
+  let pp_impls = Pp.v 0 pp_ind_impls in
+  (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
+  (*msg_info_hov pp;*)
+  Pp.string_of_ppcmds pp_impls
+
+let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
   let pp_ind_impls =
     let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
     let pp_enum_decl =
@@ -538,6 +607,15 @@ let gen_indimp_heap_impls (ind_names : ind_names) : string =
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp_impls
 
+let gen_indimp_heap_impls (ind_names : ind_names) : string =
+  let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
+  (*let constant_constructor_only = ind_cstrs |> Array.for_all (fun { cstr_members } -> CList.is_empty cstr_members) in*)
+  let single_constructor = Array.length ind_cstrs = 1 in
+  if single_constructor then
+    gen_indimp_heap_impls_single_constructor ind_names
+  else
+    gen_indimp_heap_impls_generic ind_names
+
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
   let ind_names = generate_indimp_names env sigma coq_type in
@@ -553,14 +631,14 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   add_thunk "type_decls" (fun () -> gen_indimp_heap_decls ind_names);
   add_thunk "type_impls" (fun () -> gen_indimp_heap_impls ind_names)
 
-let command_indimp (user_coq_type : Constrexpr.constr_expr) : unit =
+let command_indimp ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   (* (if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_constr_env env sigma coq_type)); *)
   let coq_type = EConstr.of_constr coq_type in
-  if ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
+  if force_heap || ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
     generate_indimp_heap env sigma coq_type
   else
     generate_indimp_immediate env sigma coq_type
