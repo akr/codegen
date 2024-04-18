@@ -148,7 +148,7 @@ let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : cstr_
     Pp.hov 2 (Pp.str "cstr_enum_const:" +++ Pp.qstring cstr_names.cstr_enum_const) +++
     Pp.hov 2 (Pp.str "cstr_struct_tag:" +++ Pp.qstring cstr_names.cstr_struct_tag) +++
     Pp.hov 2 (Pp.str "cstr_umember:" +++ Pp.qstring cstr_names.cstr_umember) +++
-    pp_sjoinmap_list pr_member_names (cstr_names.cstr_members @ cstr_names.cstr_members) ++ Pp.brk (0,-2) ++
+    pp_sjoinmap_list pr_member_names cstr_names.cstr_members ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
 let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Pp.t =
@@ -159,7 +159,7 @@ let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_nam
     Pp.hov 2 (Pp.str "ind_struct_tag:" +++ Pp.qstring ind_names.ind_struct_tag) +++
     Pp.hov 2 (Pp.str "ind_enum_tag:" +++ Pp.qstring ind_names.ind_enum_tag) +++
     Pp.hov 2 (Pp.str "ind_swfunc:" +++ Pp.qstring ind_names.ind_swfunc) +++
-    pp_sjoinmap_ary (pr_cstr_names env sigma) (Array.append ind_names.ind_cstrs ind_names.ind_cstrs) ++ Pp.brk (0,-2) ++
+    pp_sjoinmap_ary (pr_cstr_names env sigma) ind_names.ind_cstrs ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
 let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * string * string) list =
