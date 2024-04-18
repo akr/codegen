@@ -150,6 +150,10 @@ DArr pushD(DArr d, nat n)
 #define lookupD(d, i) get_bits((d).s, (d).w, (i) * (d).w)
 #define sizeD(d) (bsize(d) / (d).w)
 
+#define dealloc_MDArr_MDArr(x)
+#define dealloc_MDArr_nat(x)
+#define dealloc_2MDArr_nat(x)
+
 static inline nat
 bitlen(nat n)
 {

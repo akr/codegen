@@ -139,6 +139,7 @@ CodeGen InductiveMatch MDArr*MDArr => ""
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
 CodeGen Deallocator prod MDArr MDArr => "dealloc_MDArr_MDArr".
+CodeGen IndImp (MDArr*MDArr).
 
 CodeGen InductiveType MDArr*nat => "pair_MDArr_nat".
 CodeGen InductiveMatch MDArr*nat => ""
@@ -152,6 +153,7 @@ CodeGen InductiveMatch MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
 CodeGen Deallocator prod (prod MDArr MDArr) nat => "dealloc_2MDArr_nat".
+CodeGen IndImp (MDArr*MDArr*nat).
 
 CodeGen InductiveType Aux => "Aux".
 CodeGen InductiveMatch Aux => ""
@@ -165,6 +167,7 @@ CodeGen Primitive blksz2 => "aux_blksz2".
 CodeGen Primitive ratio => "aux_ratio".
 CodeGen Primitive dir1 => "aux_dir1".
 CodeGen Primitive dir2 => "aux_dir2".
+CodeGen IndImpHeap Aux.
 
 CodeGen Primitive bsize.
 CodeGen Primitive freezeD.

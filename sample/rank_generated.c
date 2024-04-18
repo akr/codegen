@@ -1,17 +1,70 @@
 /* section-start: prologue */
 /* section-end: prologue */
 /* section-start: type_decls */
+typedef struct g3_istruct_Aux *Aux;
+
 /* section-end: type_decls */
 /* section-start: type_impls */
 typedef struct
 g0_istruct_prod
 {
-  nat g0_member1_pair;
+  MDArr g0_member1_pair;
   MDArr g0_member2_pair;
-} g0_type_prod;
-#define g0_get1_pair(x) ((x).g0_member1_pair)
-#define g0_get2_pair(x) ((x).g0_member2_pair)
-#define g0_cstr_pair(g0_member1_pair, g0_member2_pair) ((g0_type_prod){ g0_member1_pair, g0_member2_pair })
+} pair_MDArr_MDArr;
+#define pair_MDArr_MDArr_D1(x) ((x).g0_member1_pair)
+#define pair_MDArr_MDArr_D2(x) ((x).g0_member2_pair)
+#define make_pair_MDArr_MDArr(g0_member1_pair, g0_member2_pair) ((pair_MDArr_MDArr){ g0_member1_pair, g0_member2_pair })
+
+typedef struct
+g1_istruct_prod
+{
+  MDArr g1_member1_pair;
+  nat g1_member2_pair;
+} pair_MDArr_nat;
+#define pair_MDArr_nat_D(x) ((x).g1_member1_pair)
+#define pair_MDArr_nat_n(x) ((x).g1_member2_pair)
+#define make_pair_MDArr_nat(g1_member1_pair, g1_member2_pair) ((pair_MDArr_nat){ g1_member1_pair, g1_member2_pair })
+
+typedef struct
+g2_istruct_prod
+{
+  pair_MDArr_MDArr g2_member1_pair;
+  nat g2_member2_pair;
+} pair_2MDArr_nat;
+#define pair_2MDArr_nat_D12(x) ((x).g2_member1_pair)
+#define pair_2MDArr_nat_n(x) ((x).g2_member2_pair)
+#define make_pair_2MDArr_nat(g2_member1_pair, g2_member2_pair) ((pair_2MDArr_nat){ g2_member1_pair, g2_member2_pair })
+
+struct g3_istruct_Aux
+{
+  bool g3_member1_mkAux_query_bit;
+  bits g3_member2_mkAux_input_bits;
+  nat g3_member3_mkAux_ratio;
+  nat g3_member4_mkAux_blksz2;
+  DArr g3_member5_mkAux_dir1;
+  DArr g3_member6_mkAux_dir2;
+};
+#define aux_query_bit(x) (((struct g3_istruct_Aux *)(x))->g3_member1_mkAux_query_bit)
+#define aux_input_bits(x) (((struct g3_istruct_Aux *)(x))->g3_member2_mkAux_input_bits)
+#define aux_blksz2(x) (((struct g3_istruct_Aux *)(x))->g3_member3_mkAux_ratio)
+#define aux_ratio(x) (((struct g3_istruct_Aux *)(x))->g3_member4_mkAux_blksz2)
+#define aux_dir1(x) (((struct g3_istruct_Aux *)(x))->g3_member5_mkAux_dir1)
+#define aux_dir2(x) (((struct g3_istruct_Aux *)(x))->g3_member6_mkAux_dir2)
+static Aux mkAux(bool g3_member1_mkAux_query_bit,
+  bits g3_member2_mkAux_input_bits, nat g3_member3_mkAux_ratio,
+  nat g3_member4_mkAux_blksz2, DArr g3_member5_mkAux_dir1,
+  DArr g3_member6_mkAux_dir2)
+{
+  struct g3_istruct_Aux *p;
+  if (!(p = malloc(sizeof(*p)))) abort();
+  p->g3_member1_mkAux_query_bit = g3_member1_mkAux_query_bit;
+  p->g3_member2_mkAux_input_bits = g3_member2_mkAux_input_bits;
+  p->g3_member3_mkAux_ratio = g3_member3_mkAux_ratio;
+  p->g3_member4_mkAux_blksz2 = g3_member4_mkAux_blksz2;
+  p->g3_member5_mkAux_dir1 = g3_member5_mkAux_dir1;
+  p->g3_member6_mkAux_dir2 = g3_member6_mkAux_dir2;
+  return (Aux)p;
+}
 
 /* section-end: type_impls */
 /* section-start: func_decls */
