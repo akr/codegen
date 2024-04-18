@@ -3064,6 +3064,37 @@ let test_indimp_bool_pair (ctx : test_ctxt) : unit =
       assert(id_boolpair(3) == 3);
     |}
 
+let test_indimp_bool_nat_pair (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ {|
+      Definition fst_nb (nb : nat * bool) :=
+        match nb with (n, b) => n end.
+      Definition snd_nb (nb : nat * bool) :=
+        match nb with (n, b) => b end.
+      CodeGen InductiveType nat*bool => "prod_nat_bool".
+      CodeGen InductiveMatch nat*bool => ""
+      | pair => "" "pair_nat_bool_fst" "pair_nat_bool_snd".
+      CodeGen Primitive pair nat bool => "pair_nat_bool".
+      CodeGen Snippet "prologue" "
+      ".
+      CodeGen IndImp (nat*bool).
+      CodeGen Func fst_nb.
+      CodeGen Func snd_nb.
+    |}) {|
+      assert(fst_nb(pair_nat_bool(0,true)) == 0);
+      assert(fst_nb(pair_nat_bool(1,true)) == 1);
+      assert(fst_nb(pair_nat_bool(2,true)) == 2);
+      assert(snd_nb(pair_nat_bool(0,true)) == true);
+      assert(snd_nb(pair_nat_bool(1,true)) == true);
+      assert(snd_nb(pair_nat_bool(2,true)) == true);
+      assert(fst_nb(pair_nat_bool(0,false)) == 0);
+      assert(fst_nb(pair_nat_bool(1,false)) == 1);
+      assert(fst_nb(pair_nat_bool(2,false)) == 2);
+      assert(snd_nb(pair_nat_bool(0,false)) == false);
+      assert(snd_nb(pair_nat_bool(1,false)) == false);
+      assert(snd_nb(pair_nat_bool(2,false)) == false);
+    |}
+
 let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -4644,6 +4675,7 @@ let suite : OUnit2.test =
     "test_multiple_primitives_shares_cfunc" >:: test_multiple_primitives_shares_cfunc;
     "test_indimp_bool" >:: test_indimp_bool;
     "test_indimp_bool_pair" >:: test_indimp_bool_pair;
+    "test_indimp_bool_nat_pair" >:: test_indimp_bool_nat_pair;
     "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;
     "test_indimp_option_bool" >:: test_indimp_option_bool;
     "test_indimp_record" >:: test_indimp_record;
