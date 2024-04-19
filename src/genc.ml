@@ -2159,6 +2159,7 @@ let gen_func_single
     ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table)
     ~(entfunc : entry_func_t)
     ~(genchunks : genchunk_t list)
+    ~(no_prototype : bool)
     (sigma : Evd.evar_map)
     (used_vars : Id.Set.t) : Pp.t * Pp.t =
   let bodyhead = entfunc.entryfunc_body in
@@ -2224,7 +2225,7 @@ let gen_func_single
   in
   let decl =
     pp_struct_closure +++
-    gen_function_header cfunc return_type c_fargs ++ Pp.str ";"
+    (if no_prototype then Pp.mt () else (gen_function_header cfunc return_type c_fargs ++ Pp.str ";"))
   in
   let impl =
     Pp.v 0 (
@@ -2620,13 +2621,20 @@ let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (
       sigma closure_terms
   in
   let used_vars = make_used_variables env sigma primary_term in
+  let no_prototype =
+    (* If only one gen_func_single call, no prototype declaration is required.
+       This is conservative condition.  *)
+    match genchunks_list, entry_funcs_list with
+    | [_], [[entfunc]] -> true
+    | _, _ -> false
+  in
   let code_pairs = List.map2
     (fun genchunks entry_funcs ->
       let (decl, impl) =
         match entry_funcs with
         | [] -> (Pp.mt (), Pp.mt ())
         | [entfunc] ->
-            gen_func_single ~fixfunc_tbl ~closure_tbl ~entfunc ~genchunks sigma used_vars
+            gen_func_single ~fixfunc_tbl ~closure_tbl ~entfunc ~genchunks ~no_prototype sigma used_vars
         | _ ->
             gen_func_multi ~fixfunc_tbl ~closure_tbl ~entry_funcs ~genchunks sigma used_vars
       in
