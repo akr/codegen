@@ -1,3 +1,4 @@
+/* section-start: prologue */
 
 #include <stdbool.h> /* for bool, true and false */
 
@@ -15,7 +16,15 @@ typedef uint64_t nat;
  * because uphalf' is applied to k' which is k-1.  */
 #define uphalf(n) (((n)+1)>>1)
 
-static nat fastpow_iter(nat v1_a, nat v2_k, nat v3_x);
+/* section-end: prologue */
+/* section-start: type_decls */
+/* section-end: type_decls */
+/* section-start: type_impls */
+/* section-end: type_impls */
+/* section-start: func_decls */
+/* section-end: func_decls */
+/* section-start: func_impls */
+
 
 static nat fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
 {
@@ -49,7 +58,8 @@ static nat fastpow_iter(nat v1_a, nat v2_k, nat v3_x)
   }
 }
 
-static nat fastpow(nat v1_a, nat v2_k);
+
+
 
 static nat fastpow(nat v1_a, nat v2_k)
 {
@@ -60,3 +70,7 @@ static nat fastpow(nat v1_a, nat v2_k)
   return fastpow_iter(v1_a, v2_k, v4_n);
 }
 
+
+/* section-end: func_impls */
+/* section-start: epilogue */
+/* section-end: epilogue */

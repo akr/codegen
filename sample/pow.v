@@ -31,7 +31,7 @@ CodeGen Constant false => "false".
 
 CodeGen SourceFile "sample/pow_generated.c".
 
-CodeGen Snippet "
+CodeGen Snippet "prologue" "
 #include <stdbool.h> /* for bool, true and false */
 ".
 
@@ -42,7 +42,7 @@ CodeGen InductiveMatch nat => ""
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 
-CodeGen Snippet "
+CodeGen Snippet "prologue" "
 #include <stdint.h>
 typedef uint64_t nat;
 #define nat_succ(n) ((n)+1)
@@ -52,7 +52,7 @@ typedef uint64_t nat;
 CodeGen Primitive muln => "muln".
 CodeGen Primitive odd => "odd".
 CodeGen Primitive uphalf' => "uphalf".
-CodeGen Snippet "
+CodeGen Snippet "prologue" "
 #define muln(x,y) ((x) * (y))
 #define odd(n) ((n)&1)
 

@@ -1,4 +1,13 @@
-static buffer codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n);
+/* section-start: prologue */
+/* section-end: prologue */
+/* section-start: type_decls */
+/* section-end: type_decls */
+/* section-start: type_impls */
+/* section-end: type_impls */
+/* section-start: func_decls */
+/* section-end: func_decls */
+/* section-start: func_impls */
+
 
 static buffer codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
 {
@@ -151,7 +160,8 @@ static buffer codegen_p0_sprintf(buffer v1_buf, nat v2_n, nat v3_n, nat v4_n)
   return v77_b;
 }
 
-static buffer add_mesg(nat v1_a, nat v2_b);
+
+
 
 static buffer add_mesg(nat v1_a, nat v2_b)
 {
@@ -164,3 +174,7 @@ static buffer add_mesg(nat v1_a, nat v2_b)
   return codegen_p0_sprintf(v4_b, v1_a, v2_b, v5_n);
 }
 
+
+/* section-end: func_impls */
+/* section-start: epilogue */
+/* section-end: epilogue */
