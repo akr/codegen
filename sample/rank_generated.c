@@ -44,12 +44,12 @@ struct g3_istruct_Aux
   DArr g3_member5_mkAux_dir1;
   DArr g3_member6_mkAux_dir2;
 };
-#define aux_query_bit(x) (((struct g3_istruct_Aux *)(x))->g3_member1_mkAux_query_bit)
-#define aux_input_bits(x) (((struct g3_istruct_Aux *)(x))->g3_member2_mkAux_input_bits)
-#define aux_blksz2(x) (((struct g3_istruct_Aux *)(x))->g3_member3_mkAux_ratio)
-#define aux_ratio(x) (((struct g3_istruct_Aux *)(x))->g3_member4_mkAux_blksz2)
-#define aux_dir1(x) (((struct g3_istruct_Aux *)(x))->g3_member5_mkAux_dir1)
-#define aux_dir2(x) (((struct g3_istruct_Aux *)(x))->g3_member6_mkAux_dir2)
+#define aux_query_bit(x) ((x)->g3_member1_mkAux_query_bit)
+#define aux_input_bits(x) ((x)->g3_member2_mkAux_input_bits)
+#define aux_blksz2(x) ((x)->g3_member3_mkAux_ratio)
+#define aux_ratio(x) ((x)->g3_member4_mkAux_blksz2)
+#define aux_dir1(x) ((x)->g3_member5_mkAux_dir1)
+#define aux_dir2(x) ((x)->g3_member6_mkAux_dir2)
 static Aux mkAux(bool g3_member1_mkAux_query_bit,
   bits g3_member2_mkAux_input_bits, nat g3_member3_mkAux_ratio,
   nat g3_member4_mkAux_blksz2, DArr g3_member5_mkAux_dir1,
@@ -63,7 +63,7 @@ static Aux mkAux(bool g3_member1_mkAux_query_bit,
   p->g3_member4_mkAux_blksz2 = g3_member4_mkAux_blksz2;
   p->g3_member5_mkAux_dir1 = g3_member5_mkAux_dir1;
   p->g3_member6_mkAux_dir2 = g3_member6_mkAux_dir2;
-  return (Aux)p;
+  return p;
 }
 
 /* section-end: type_impls */

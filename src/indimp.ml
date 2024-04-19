@@ -468,7 +468,7 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
             Pp.h (Pp.str "#define" +++
                   Pp.str member_accessor ++
                   Pp.str "(x)" +++
-                  Pp.str ("(((struct " ^ ind_struct_tag ^ " *)(x))->" ^ member_name ^ ")")))
+                  Pp.str ("((x)->" ^ member_name ^ ")")))
           (non_void_cstr_members cstr_members)
     in
     let pp_cstr =
@@ -504,7 +504,7 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
                   (fun (member_type, member_name, member_accessor) ->
                     Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
                   (non_void_cstr_members cstr_members) +++
-                Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")p;"))))
+                Pp.hov 0 (Pp.str "return p;")))
     in
     pp_ind_struct_def +++ pp_accessors +++ pp_cstr
   in
