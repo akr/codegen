@@ -2222,16 +2222,21 @@ let gen_func_single
       | None -> true)
     local_vars
   in
-  (pp_struct_closure +++
-   gen_function_header cfunc return_type c_fargs ++ Pp.str ";",
-   Pp.v 0 (
-   gen_function_header cfunc return_type c_fargs +++
-   vbrace (
-     pp_sjoinmap_list
-       (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
-       local_vars
-     +++
-     pp_body)))
+  let decl =
+    pp_struct_closure +++
+    gen_function_header cfunc return_type c_fargs ++ Pp.str ";"
+  in
+  let impl =
+    Pp.v 0 (
+    gen_function_header cfunc return_type c_fargs +++
+    vbrace (
+      pp_sjoinmap_list
+        (fun (c_ty, c_var) -> Pp.hov 0 (pr_c_decl c_ty (Pp.str c_var) ++ Pp.str ";"))
+        local_vars
+      +++
+      pp_body))
+  in
+  (decl, impl)
 
 let pr_entry_function (cfunc : cfunc_t) (func_enum_index : string)
     (args_struct_type : string) (formal_arguments : (string * c_typedata) list) (return_type : c_typedata)
@@ -2500,11 +2505,14 @@ let gen_func_multi
       pp_switch +++
       pp_body)
   in
-  (Pp.v 0 (
-     pp_enum +++
-     pp_forward_decl +++
-     pp_entry_defs),
-   Pp.v 0 (pp_body_function))
+  let decl =
+    Pp.v 0 (
+      pp_enum +++
+      pp_forward_decl +++
+      pp_entry_defs)
+  in
+  let impl = Pp.v 0 (pp_body_function) in
+  (decl, impl)
 
 let is_static_function_icommand (icommand : instance_command) : bool =
   match icommand with
