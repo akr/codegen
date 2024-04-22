@@ -498,7 +498,7 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
                 Pp.str cstr_name ++
                 Pp.str "(" ++ fargs ++ Pp.str ")") +++
               vbrace (
-                Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag +++ Pp.str "*p;") +++
+                Pp.hov 0 (Pp.str ind_name +++ Pp.str "p;") +++
                 Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                 pp_sjoinmap_list
                   (fun (member_type, member_name, member_accessor) ->

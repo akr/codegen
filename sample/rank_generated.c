@@ -55,7 +55,7 @@ static Aux mkAux(bool g3_member1_mkAux_query_bit,
   nat g3_member4_mkAux_blksz2, DArr g3_member5_mkAux_dir1,
   DArr g3_member6_mkAux_dir2)
 {
-  struct g3_istruct_Aux *p;
+  Aux p;
   if (!(p = malloc(sizeof(*p)))) abort();
   p->g3_member1_mkAux_query_bit = g3_member1_mkAux_query_bit;
   p->g3_member2_mkAux_input_bits = g3_member2_mkAux_input_bits;
