@@ -1643,12 +1643,6 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
   (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
   let c_deallocations =
     if Linear.is_linear env sigma (EConstr.of_constr item_type) then
-      let deallocator_for_type =
-        lazy (match ConstrMap.find_opt item_type !deallocator_cfunc_map with
-              | None -> Pp.mt () (* some linear type, such as immediate struct containing linear type member, don't need deallocator. *)
-              | Some dealloc_cfunc ->
-                  Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")
-      in
       (* all arguments to an inductive type are parameters because we don't support indexed types *)
       let params = if Constr.isApp item_type then snd (Constr.destApp item_type) else [||] in
       Array.map
@@ -1657,7 +1651,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
           let cstr_exp = Constr.mkApp (Constr.mkConstructU (cstr, u), params) in
           (*msg_debug_hov (Pp.str "[codegen:gen_match] cstr_exp:" +++ Printer.pr_constr_env env sigma cstr_exp);*)
           match ConstrMap.find_opt cstr_exp !deallocator_cfunc_map with
-          | None -> Lazy.force deallocator_for_type
+          | None -> Pp.mt ()
           | Some dealloc_cfunc ->
               Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")
         (iota_ary 0 h)
