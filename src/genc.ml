@@ -1650,7 +1650,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
           let cstr = (ind, i+1) in
           let cstr_exp = Constr.mkApp (Constr.mkConstructU (cstr, u), params) in
           (*msg_debug_hov (Pp.str "[codegen:gen_match] cstr_exp:" +++ Printer.pr_constr_env env sigma cstr_exp);*)
-          match ConstrMap.find_opt cstr_exp !deallocator_cfunc_map with
+          match ConstrMap.find_opt cstr_exp !cstr_deallocator_cfunc_map with
           | None -> Pp.mt ()
           | Some dealloc_cfunc ->
               Pp.str dealloc_cfunc ++ Pp.str "(" ++ Pp.str item_cvar ++ Pp.str ");")

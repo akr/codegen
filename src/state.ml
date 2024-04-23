@@ -182,8 +182,8 @@ let linearity_type_set = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet
 (*
   key is (ind args...) or (cstr args...).
 *)
-let deallocator_cfunc_map = Summary.ref
-  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenDeallocatorCfuncMap"
+let cstr_deallocator_cfunc_map = Summary.ref
+  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenConstructorDeallocatorCfuncMap"
 
 let downward_type_set = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"

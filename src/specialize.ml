@@ -2545,4 +2545,4 @@ let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let t = Constr.mkApp (func, Array.of_list args) in
   (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
-  deallocator_cfunc_map := ConstrMap.add t cfunc !deallocator_cfunc_map
+  cstr_deallocator_cfunc_map := ConstrMap.add t cfunc !cstr_deallocator_cfunc_map
