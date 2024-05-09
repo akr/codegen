@@ -39,4 +39,3 @@ val codegen_resolve_dependencies :
 val command_resolve_dependencies : unit -> unit
 val command_print_generation_list : State.code_generation list -> unit
 val command_print_generation_map : unit -> unit
-val command_deallocator : Constrexpr.constr_expr -> string -> unit

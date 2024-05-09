@@ -23,3 +23,4 @@ val case_cstrmember :
 val command_ind_match :
   Constrexpr.constr_expr ->
   string -> State.ind_cstr_caselabel_accessors list -> unit
+val command_deallocator : Constrexpr.constr_expr -> string -> unit
