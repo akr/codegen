@@ -100,8 +100,6 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
  * - ...
  *)
 let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
   let (mutind, mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
@@ -115,9 +113,7 @@ let ind_coq_type_registered_p (sigma : Evd.evar_map) (coq_type : EConstr.t) : bo
   | Some _ -> true
   | None -> false
 
-let check_ind_coq_type_not_registered (coq_type : EConstr.t) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
+let check_ind_coq_type_not_registered (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : unit =
   if ind_coq_type_registered_p sigma coq_type then
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_econstr_env env sigma coq_type)
@@ -145,7 +141,7 @@ let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Decl
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
   let (mutind, mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
-  check_ind_coq_type_not_registered coq_type;
+  check_ind_coq_type_not_registered env sigma coq_type;
   check_ind_coq_type env sigma coq_type;
   let is_void_type = c_type_is_void c_type in
   (if is_void_type then
