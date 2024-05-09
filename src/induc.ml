@@ -79,14 +79,14 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
           Printer.pr_constr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * Constr.constr array * UVars.Instance.t =
+let get_ind_coq_type (env : Environ.env) (coq_type : EConstr.t) : MutInd.t * Declarations.mutual_inductive_body * int * Declarations.one_inductive_body * EConstr.constr array * EConstr.EInstance.t =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (f, args) = Constr.decompose_app coq_type in
-  (if not (Constr.isInd f) then
+  let (f, args) = decompose_appvect sigma coq_type in
+  (if not (EConstr.isInd sigma f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
-    Printer.pr_constr_env env sigma coq_type));
-  let ind, u = Constr.destInd f in
+    Printer.pr_econstr_env env sigma coq_type));
+  let ind, u = EConstr.destInd sigma f in
   let (mutind, i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.Declarations.mind_packets.(i) in
@@ -100,50 +100,51 @@ let get_ind_coq_type (env : Environ.env) (coq_type : Constr.t) : MutInd.t * Decl
  * - f has no arguments
  * - ...
  *)
-let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) : unit =
+let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
       mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
         user_err (Pp.str "[codegen] coinductive type not supported:" +++
-                 Printer.pr_constr_env env sigma coq_type));
+                 Printer.pr_econstr_env env sigma coq_type));
   ignore oneind_body
 
-let ind_coq_type_registered_p (coq_type : Constr.t) : bool =
+let ind_coq_type_registered_p (sigma : Evd.evar_map) (coq_type : EConstr.t) : bool =
+  let coq_type = EConstr.to_constr sigma coq_type in
   match ConstrMap.find_opt coq_type !ind_config_map with
   | Some _ -> true
   | None -> false
 
-let check_ind_coq_type_not_registered (coq_type : Constr.t) : unit =
+let check_ind_coq_type_not_registered (coq_type : EConstr.t) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  if ind_coq_type_registered_p coq_type then
+  if ind_coq_type_registered_p sigma coq_type then
     user_err (Pp.str "[codegen] inductive type already registered:" +++
-              Printer.pr_constr_env env sigma coq_type)
+              Printer.pr_econstr_env env sigma coq_type)
 
-let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Declarations.mutual_inductive_body) (ty : Constr.types) : unit =
+let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Declarations.mutual_inductive_body) (ty : EConstr.types) : unit =
   let open Declarations in
   (if Array.length mind_body.mind_packets <> 1 then
-    user_err (Pp.str "[codegen] non-mutual inductive type expected for void type:" +++ Printer.pr_constr_env env sigma ty));
+    user_err (Pp.str "[codegen] non-mutual inductive type expected for void type:" +++ Printer.pr_econstr_env env sigma ty));
   (if mind_body.mind_nparams <> 0 then
     (* This "no parameters" constraint is not mandatory.
        However it makes us easy to determine constructor invocation in code generation
        because constructor with parameters is wrapped as a constant.  *)
-    user_err (Pp.str "[codegen] void type must not have no inductive type parameters:" +++ Printer.pr_constr_env env sigma ty));
+    user_err (Pp.str "[codegen] void type must not have no inductive type parameters:" +++ Printer.pr_econstr_env env sigma ty));
   let oind_body = mind_body.mind_packets.(0) in
   (if oind_body.mind_nrealargs <> 0 then
-    user_err (Pp.str "[codegen] non-indexed type expected for void type:" +++ Printer.pr_constr_env env sigma ty));
+    user_err (Pp.str "[codegen] non-indexed type expected for void type:" +++ Printer.pr_econstr_env env sigma ty));
   (if Array.length oind_body.mind_consnames <> 1 then
-    user_err (Pp.str "[codegen] single constructor inductive type expected for void type:" +++ Printer.pr_constr_env env sigma ty +++
+    user_err (Pp.str "[codegen] single constructor inductive type expected for void type:" +++ Printer.pr_econstr_env env sigma ty +++
     Pp.str "has" +++ Pp.int (Array.length oind_body.mind_consnames) +++ Pp.str "constructors"));
   (if oind_body.mind_consnrealargs.(0) <> 0 then
     user_err (Pp.str "[codegen] no-argument constructor expected for void type:" +++
       Id.print oind_body.mind_consnames.(0) +++
       Pp.str "of" +++
-      Printer.pr_constr_env env sigma ty))
+      Printer.pr_econstr_env env sigma ty))
 
-let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t) (c_type : c_typedata) : ind_config =
+let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
   check_ind_coq_type_not_registered coq_type;
   check_ind_coq_type env sigma coq_type;
@@ -155,6 +156,7 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
       coq_cstr = cstrname;
       c_caselabel = "";
       c_accessors = [||] }) in
+  let coq_type=EConstr.to_constr sigma coq_type in
   let ind_cfg = {
     coq_type=coq_type;
     c_type=c_type;
@@ -168,18 +170,18 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Con
 let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let printed_type = mangle_term env sigma t in
   let c_name = c_id (squeeze_white_spaces printed_type) in
-  let ind_cfg = register_ind_type env sigma (EConstr.to_constr sigma t) (simple_c_type c_name) in
+  let ind_cfg = register_ind_type env sigma t (simple_c_type c_name) in
   Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] inductive type translation automatically configured:" +++
      (Pp.hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
      Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
   ind_cfg
 
-let lookup_ind_config (t : Constr.types) : ind_config option =
-  ConstrMap.find_opt t !ind_config_map
+let lookup_ind_config (sigma : Evd.evar_map) (t : EConstr.types) : ind_config option =
+  ConstrMap.find_opt (EConstr.to_constr sigma t) !ind_config_map
 
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  match lookup_ind_config (EConstr.to_constr sigma t) with
+  match lookup_ind_config sigma t with
   | Some ind_cfg -> ind_cfg
   | None -> generate_ind_config env sigma t
 
@@ -187,6 +189,7 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typeda
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  let coq_type = EConstr.of_constr coq_type in
   ignore (register_ind_type env sigma coq_type c_type)
 
 let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a -> Id.t) (s : 'a list) : 'a array =
@@ -203,14 +206,14 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a 
         Id.print consname);
     | Some v -> v)
 
-let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
+let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
-  let ind_cfg = get_ind_config env sigma (EConstr.of_constr coq_type) in
+  let ind_cfg = get_ind_config env sigma coq_type in
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (
       Pp.str "[codegen] inductive match configuration already registered:" +++
-      Printer.pr_constr_env env sigma coq_type)
+      Printer.pr_econstr_env env sigma coq_type)
   | None -> ());
   let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
   let f j0 cstr_cfg cstr_caselabel_accessors =
@@ -224,7 +227,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
         Pp.str "for" +++
         Id.print cstr_cfg.coq_cstr +++
         Pp.str "of" +++
-        Printer.pr_constr_env env sigma coq_type));
+        Printer.pr_econstr_env env sigma coq_type));
     let caselabel =
       (* delete "default" and "case " for backward compatibility. *)
       if caselabel = "default" then
@@ -241,12 +244,11 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
       c_swfunc = Some swfunc;
       cstr_configs = CArray.map2_i f ind_cfg.cstr_configs cstr_caselabel_accessors_ary }
   in
-  ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
+  ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type) ind_cfg !ind_config_map;
   ind_cfg
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env (EConstr.to_constr sigma t) in
-  let u' = EInstance.make u in
+  let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env t in
   let printed_type = mangle_term env sigma t in
   let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
@@ -255,8 +257,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
       (fun j0 ->
         let j = j0 + 1 in
         let consname = oneind_body.Declarations.mind_consnames.(j0) in
-        let cstr = mkConstructU (((mutind, i), j), u') in
-        let args = Array.map EConstr.of_constr args in
+        let cstr = mkConstructU (((mutind, i), j), u) in
         let consterm = mkApp (cstr, args) in
         let s = mangle_term env sigma consterm in
         let caselabel =
@@ -269,7 +270,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         in
         { cstr_id=consname; cstr_caselabel=caselabel; cstr_accessors=accessors })
   in
-  let ind_cfg = register_ind_match env sigma (EConstr.to_constr sigma t) swfunc cstr_caselabel_accessors_list in
+  let ind_cfg = register_ind_match env sigma t swfunc cstr_caselabel_accessors_list in
   Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
      Pp.hv 0 (pr_inductive_match env sigma ind_cfg)));
@@ -315,7 +316,7 @@ let coq_type_is_void (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   match EConstr.kind sigma t with
   | Prod _ -> false
   | _ ->
-      match lookup_ind_config (EConstr.to_constr sigma t) with
+      match lookup_ind_config sigma t with
       | Some ind_cfg -> c_type_is_void ind_cfg.c_type
       | None -> false (* The Coq type is not registered (yet).  We consider it non-void.  It may be registed as void later, though. *)
 
@@ -351,6 +352,7 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  let coq_type = EConstr.of_constr coq_type in
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
 
 let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocator : string) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
@@ -362,7 +364,7 @@ let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocato
   let (func, params) = decompose_appvect sigma coq_type in
   let (mutind, i, pind) =
     match EConstr.kind sigma func with
-    | Ind ((mutind, i), u) -> (mutind, i, ((mutind, i), u))
+    | Ind (((mutind, i), u) as pind) -> (mutind, i, pind)
     | _ -> user_err (Pp.str "[codegen] inductive expected:" +++ Ppconstr.pr_lconstr_expr env sigma user_coq_type)
   in
   let mutind_body = Environ.lookup_mind mutind env in

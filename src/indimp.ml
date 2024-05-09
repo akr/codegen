@@ -217,9 +217,9 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
 
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env * ind_names =
   let { ind_pind=pind; ind_params=params; ind_name; ind_swfunc; ind_cstrs } = ind_names in
-  let coq_type_i = EConstr.to_constr sigma (mkApp (mkIndU pind, params)) in
+  let coq_type_i = mkApp (mkIndU pind, params) in
   let c_type = simple_c_type ind_name in
-  let ind_cfg_opt = lookup_ind_config coq_type_i in
+  let ind_cfg_opt = lookup_ind_config sigma coq_type_i in
   let ind_name =
     match ind_cfg_opt with
     | Some ind_cfg ->
