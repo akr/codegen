@@ -360,19 +360,13 @@ let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocato
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
   let coq_type = EConstr.of_constr coq_type in
-  let (func, params) = decompose_appvect sigma coq_type in
-  let (mutind, i, pind) =
-    match EConstr.kind sigma func with
-    | Ind (((mutind, i), u) as pind) -> (mutind, i, pind)
-    | _ -> user_err (Pp.str "[codegen] inductive expected:" +++ Ppconstr.pr_lconstr_expr env sigma user_coq_type)
-  in
-  let mutind_body = Environ.lookup_mind mutind env in
+  let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
   (if mutind_body.mind_nparams <> Array.length params then
+    let (ind, u) = pind in
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
       Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
       Pp.int (Array.length params) +++ Pp.str "given for" +++
-      Printer.pr_econstr_env env sigma func));
-  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      Printer.pr_inductive env ind));
   let dealloc_cstr_deallocator_ary = reorder_cstrs oneind_body (fun { dealloc_cstr_id } -> dealloc_cstr_id) dealloc_cstr_deallocator_list in
   dealloc_cstr_deallocator_ary |> Array.iteri (fun j0 { dealloc_cstr_id; dealloc_cstr_deallocator } ->
     let j = j0 + 1 in
