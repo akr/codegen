@@ -637,7 +637,6 @@ let command_indimp ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   (* (if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_constr_env env sigma coq_type)); *)
-  let coq_type = EConstr.of_constr coq_type in
   if force_heap || ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
     generate_indimp_heap env sigma coq_type
   else

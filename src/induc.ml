@@ -74,9 +74,9 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
   else
     coq_type_list |> List.iter (fun user_coq_type ->
       let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-      match ConstrMap.find_opt coq_type !ind_config_map with
+      match ConstrMap.find_opt (EConstr.to_constr sigma coq_type) !ind_config_map with
       | None -> user_err (Pp.str "[codegen] inductive type not registered:" +++
-          Printer.pr_constr_env env sigma coq_type)
+          Printer.pr_econstr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
 let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : MutInd.t * Declarations.mutual_inductive_body * Declarations.one_inductive_body * (Names.inductive * EInstance.t) * EConstr.constr array =
@@ -188,7 +188,6 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typeda
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  let coq_type = EConstr.of_constr coq_type in
   ignore (register_ind_type env sigma coq_type c_type)
 
 let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a -> Id.t) (s : 'a list) : 'a array =
@@ -351,7 +350,6 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  let coq_type = EConstr.of_constr coq_type in
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
 
 let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocator : string) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
@@ -359,7 +357,6 @@ let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocato
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
-  let coq_type = EConstr.of_constr coq_type in
   let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
   (if mutind_body.mind_nparams <> Array.length params then
     let (ind, u) = pind in
