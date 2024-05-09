@@ -366,13 +366,12 @@ let command_deallocator (user_coq_type_or_cstr : Constrexpr.constr_expr) (cfunc 
     | Construct (((mutind, i), j), u) -> mutind
     | _ -> user_err (Pp.str "[codegen] inductive or constructor expected:" +++ Ppconstr.pr_lconstr_expr env sigma user_coq_type_or_cstr)
   in
-  let func = EConstr.to_constr sigma func in
   let mind_body = Environ.lookup_mind mutind env in
   (if mind_body.mind_nparams <> Array.length args then
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
       Pp.int mind_body.mind_nparams +++ Pp.str "expected but" +++
       Pp.int (Array.length args) +++ Pp.str "given for" +++
-      Printer.pr_constr_env env sigma func));
+      Printer.pr_econstr_env env sigma func));
   let t = EConstr.to_constr sigma coq_type_or_cstr in
   (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
   cstr_deallocator_cfunc_map := ConstrMap.add t cfunc !cstr_deallocator_cfunc_map
