@@ -80,6 +80,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
 let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : MutInd.t * Declarations.mutual_inductive_body * Declarations.one_inductive_body * (Names.inductive * EInstance.t) * EConstr.constr array =
+  let open Declarations in
   let (f, args) = decompose_appvect sigma coq_type in
   (if not (EConstr.isInd sigma f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
@@ -88,7 +89,17 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
   let ind, u = pind in
   let (mutind, i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
-  let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+  let oneind_body = mutind_body.mind_packets.(i) in
+  (if mutind_body.mind_nparams <> Array.length args then
+    let (ind, u) = pind in
+    user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
+      Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
+      Pp.int (Array.length args) +++ Pp.str "given for" +++
+      Printer.pr_inductive env ind));
+  (if oneind_body.mind_nrealargs <> 0 then
+    let (ind, u) = pind in
+    user_err (Pp.str "[codegen] indexed inductive type given:" +++
+      Printer.pr_inductive env ind));
   (mutind, mutind_body, oneind_body, pind, args)
 
 (* check
@@ -349,17 +360,10 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
 
 let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocator : string) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
-  let open Declarations in
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
   let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
-  (if mutind_body.mind_nparams <> Array.length params then
-    let (ind, u) = pind in
-    user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
-      Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
-      Pp.int (Array.length params) +++ Pp.str "given for" +++
-      Printer.pr_inductive env ind));
   let dealloc_cstr_deallocator_ary = reorder_cstrs oneind_body (fun { dealloc_cstr_id } -> dealloc_cstr_id) dealloc_cstr_deallocator_list in
   dealloc_cstr_deallocator_ary |> Array.iteri (fun j0 { dealloc_cstr_id; dealloc_cstr_deallocator } ->
     let j = j0 + 1 in
