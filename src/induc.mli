@@ -1,6 +1,3 @@
-val nf_interp_type :
-  Environ.env ->
-  Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * Constr.t
 val command_print_inductive : Constrexpr.constr_expr list -> unit
 val ind_coq_type_registered_p : Constr.t -> bool
 val lookup_ind_config : Constr.types -> State.ind_config option

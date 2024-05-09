@@ -2514,12 +2514,6 @@ let command_print_generation_map () =
       msg_info_hov (Pp.str filename);
       command_print_generation_list gen_list)
 
-let nf_interp_constr (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
-  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
-  let t = Reductionops.nf_all env sigma t in
-  let t = EConstr.to_constr sigma t in
-  (sigma, t)
-
 let command_deallocator (user_coq_type_or_cstr : Constrexpr.constr_expr) (cfunc : string) : unit =
   let open Declarations in
   let env = Global.env () in

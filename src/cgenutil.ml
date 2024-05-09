@@ -917,6 +917,18 @@ let numargs_of_exp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_exp t=" ++ Printer.pr_econstr_env env sigma t);*)
   numargs_of_type env sigma t
 
+let nf_interp_constr (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+  let t = Reductionops.nf_all env sigma t in
+  let t = EConstr.to_constr sigma t in
+  (sigma, t)
+
+let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
+  let (sigma, t) = Constrintern.interp_type_evars env sigma t in
+  let t = Reductionops.nf_all env sigma t in
+  let t = EConstr.to_constr sigma t in
+  (sigma, t)
+
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
 let inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc (ntypes : int) (mutind : MutInd.t) (nf_lc : Constr.rel_context * Constr.types) : Constr.rel_context * Constr.types =

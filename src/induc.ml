@@ -26,12 +26,6 @@ open Cgenutil
 open State
 (*open Linear*)
 
-let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
-  let (sigma, t) = Constrintern.interp_type_evars env sigma t in
-  let t = Reductionops.nf_all env sigma t in
-  let t = EConstr.to_constr sigma t in
-  (sigma, t)
-
 let c_type_void = { c_type_left = "void"; c_type_right = "" }
 let c_type_is_void (c_type : c_typedata) : bool = (c_type = c_type_void)
 

@@ -135,6 +135,8 @@ val decompose_lets : Evd.evar_map -> EConstr.t -> (Names.Name.t Context.binder_a
 val compose_lets : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list -> EConstr.t -> EConstr.t
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
+val nf_interp_constr : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * Constr.t
+val nf_interp_type : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * Constr.t
 val out_punivs : 'a EConstr.puniverses -> 'a
 val inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc : int -> Names.MutInd.t -> (Constr.rel_context * Constr.types) -> (Constr.rel_context * Constr.types)
 val mangle_term_buf :
