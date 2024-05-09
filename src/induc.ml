@@ -195,6 +195,20 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typeda
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_type env sigma coq_type c_type)
 
+let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a -> Id.t) (s : 'a list) : 'a array =
+  (if List.length s <> Array.length oneind_body.Declarations.mind_consnames then
+    user_err (Pp.str "[codegen] invalid number of constructors:" +++
+      Pp.str "needs" +++
+      Pp.int (Array.length oneind_body.Declarations.mind_consnames) +++
+      Pp.str "but" +++
+      Pp.int (List.length s)));
+  oneind_body.Declarations.mind_consnames |> Array.map (fun consname ->
+    match List.find_opt (fun v -> Id.equal consname (cstr_of v)) s with
+    | None -> user_err (
+      Pp.str "[codegen] constructor not found:" +++
+        Id.print consname);
+    | Some v -> v)
+
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Constr.t)
      (swfunc : string) (cstr_caselabel_accessors_list : ind_cstr_caselabel_accessors list) : ind_config =
   let (mutind, mutind_body, i, oneind_body, args, u) = get_ind_coq_type env coq_type in
@@ -204,21 +218,9 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
       Pp.str "[codegen] inductive match configuration already registered:" +++
       Printer.pr_constr_env env sigma coq_type)
   | None -> ());
-  (if List.length cstr_caselabel_accessors_list <> Array.length oneind_body.Declarations.mind_consnames then
-    user_err (Pp.str "[codegen] inductive match: invalid number of constructors:" +++
-      Pp.str "needs" +++
-      Pp.int (Array.length oneind_body.Declarations.mind_consnames) +++
-      Pp.str "but" +++
-      Pp.int (List.length cstr_caselabel_accessors_list)));
-  let f j0 cstr_cfg =
-    let consname = oneind_body.Declarations.mind_consnames.(j0) in
-    let p { cstr_id } = Id.equal consname cstr_id in
-    let cstr_caselabel_accessors_opt = List.find_opt p cstr_caselabel_accessors_list in
-    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = (match cstr_caselabel_accessors_opt with
-      | None -> user_err (
-        Pp.str "[codegen] inductive match: constructor not found:" +++
-          Id.print consname);
-      | Some cstr_caselabel_accessors -> cstr_caselabel_accessors) in
+  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
+  let f j0 cstr_cfg cstr_caselabel_accessors =
+    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = cstr_caselabel_accessors in
     (if oneind_body.Declarations.mind_consnrealdecls.(j0) <> List.length accessors then
       user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" +++
         Pp.str "needs" +++
@@ -243,7 +245,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : Co
   let ind_cfg =
     { ind_cfg with
       c_swfunc = Some swfunc;
-      cstr_configs = Array.mapi f ind_cfg.cstr_configs }
+      cstr_configs = CArray.map2_i f ind_cfg.cstr_configs cstr_caselabel_accessors_ary }
   in
   ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
   ind_cfg
