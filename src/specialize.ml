@@ -2514,35 +2514,32 @@ let command_print_generation_map () =
       msg_info_hov (Pp.str filename);
       command_print_generation_list gen_list)
 
-let command_deallocator (func : Libnames.qualid) (user_args : Constrexpr.constr_expr list) (cfunc : string) : unit =
+let nf_interp_constr (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.constr_expr) : Evd.evar_map * Constr.t =
+  let (sigma, t) = Constrintern.interp_constr_evars env sigma t in
+  let t = Reductionops.nf_all env sigma t in
+  let t = EConstr.to_constr sigma t in
+  (sigma, t)
+
+let command_deallocator (user_coq_type_or_cstr : Constrexpr.constr_expr) (cfunc : string) : unit =
   let open Declarations in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let gref = Smartlocate.global_with_alias func in
+  let (sigma, coq_type_or_cstr) = nf_interp_constr env sigma user_coq_type_or_cstr in
+  let coq_type_or_cstr = EConstr.of_constr coq_type_or_cstr in
+  let (func, args) = decompose_appvect sigma coq_type_or_cstr in
   let mutind =
-    match gref with
-    | IndRef ind ->
-        let (mutind,_) = ind in
-        mutind
-    | ConstructRef cstr ->
-        let ((mutind,_),_) = cstr in
-        mutind
-    | _ -> user_err (Pp.str "[codegen] inductive or constructor expected:" +++ Printer.pr_global gref)
+    match EConstr.kind sigma func with
+    | Ind ((mutind, i), u) -> mutind
+    | Construct (((mutind, i), j), u) -> mutind
+    | _ -> user_err (Pp.str "[codegen] inductive or constructor expected:" +++ Ppconstr.pr_lconstr_expr env sigma user_coq_type_or_cstr)
   in
-  let sigma, func = fresh_global env sigma gref in
   let func = EConstr.to_constr sigma func in
   let mind_body = Environ.lookup_mind mutind env in
-  (if mind_body.mind_nparams <> List.length user_args then
+  (if mind_body.mind_nparams <> Array.length args then
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
       Pp.int mind_body.mind_nparams +++ Pp.str "expected but" +++
-      Pp.int (List.length user_args) +++ Pp.str "given for" +++
+      Pp.int (Array.length args) +++ Pp.str "given for" +++
       Printer.pr_constr_env env sigma func));
-  let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
-  let func_istypearg_list = determine_type_arguments env sigma func_type in
-  let func_istypearg_list = CList.firstn (List.length user_args) func_istypearg_list in
-  let (sigma, args) = interp_args env sigma func_istypearg_list user_args in
-  let args = List.map (Reductionops.nf_all env sigma) args in
-  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  let t = Constr.mkApp (func, Array.of_list args) in
+  let t = EConstr.to_constr sigma coq_type_or_cstr in
   (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
   cstr_deallocator_cfunc_map := ConstrMap.add t cfunc !cstr_deallocator_cfunc_map
