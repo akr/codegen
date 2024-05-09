@@ -179,9 +179,16 @@ let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~nam
 
 let linearity_type_set = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 
-(*
-  key is (ind args...) or (cstr args...).
-*)
+type dealloc_cstr_deallocator = {
+  dealloc_cstr_id: Names.Id.t;
+  dealloc_cstr_deallocator: string;
+}
+
+(* key is (cstr args...).  *)
+let ind_deallocator_cfunc_map = Summary.ref
+  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenInductiveDeallocatorCfuncMap"
+
+(* key is (cstr args...).  *)
 let cstr_deallocator_cfunc_map = Summary.ref
   (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenConstructorDeallocatorCfuncMap"
 

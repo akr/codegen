@@ -3468,7 +3468,8 @@ let boolbox_src = {|
       CodeGen InductiveType boolbox => "boolbox".
       CodeGen InductiveMatch boolbox => ""
       | BoolBox => "" "boolbox_get".
-      CodeGen Deallocator BoolBox => "boolbox_dealloc".
+      CodeGen Deallocator boolbox => "boolbox_dealloc"
+      | BoolBox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
@@ -4317,7 +4318,8 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen Deallocator mk => "dealloc_TestRecord".
+      CodeGen Deallocator TestRecord => "dealloc_TestRecord"
+      | mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
@@ -4342,7 +4344,8 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen Deallocator mk => "dealloc_TestRecord".
+      CodeGen Deallocator TestRecord => "dealloc_TestRecord"
+      | mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".

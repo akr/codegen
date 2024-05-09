@@ -48,6 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT.
   CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
+  CodeGen Deallocator COQ_TYPE => "C_IND_DEALLOCATOR" ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -143,6 +144,11 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
 | [ "|" ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
   { { cstr_id; cstr_caselabel; cstr_accessors } }
+END
+
+VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator
+| [ "|" ident(dealloc_cstr_id) "=>" string(dealloc_cstr_deallocator) ] ->
+  { { dealloc_cstr_id; dealloc_cstr_deallocator } }
 END
 
 VERNAC ARGUMENT EXTEND s_or_d
@@ -264,8 +270,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "TestUnrestrictedType" lconstr(t) ] ->
       { command_test_unrestricted t }
 
-    | [ "CodeGen" "Deallocator" lconstr(coq_type_or_cstr) "=>" string(cfunc) ] ->
-      { command_deallocator coq_type_or_cstr cfunc }
+    | [ "CodeGen" "Deallocator" lconstr(coq_type_or_cstr) "=>" string(cfunc) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
+      { command_deallocator coq_type_or_cstr cfunc dealloc_cstr_deallocator_list }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
     | [ "CodeGen" "BorrowFunc" ref(f) ] -> { command_borrow_function f }
