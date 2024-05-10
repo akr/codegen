@@ -362,7 +362,7 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
 let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocator : string) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
   let dealloc_cstr_deallocator_list =
     if CList.is_empty dealloc_cstr_deallocator_list then
