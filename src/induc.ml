@@ -366,6 +366,13 @@ let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocato
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_constr env sigma user_coq_type in
   let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
+  let dealloc_cstr_deallocator_list =
+    if CList.is_empty dealloc_cstr_deallocator_list then
+      let dealloc_cstr_deallocator = ind_deallocator in
+      oneind_body.mind_consnames |> CArray.map_to_list (fun dealloc_cstr_id -> { dealloc_cstr_id; dealloc_cstr_deallocator })
+    else
+      dealloc_cstr_deallocator_list
+  in
   let dealloc_cstr_deallocator_ary = reorder_cstrs oneind_body (fun { dealloc_cstr_id } -> dealloc_cstr_id) dealloc_cstr_deallocator_list in
   dealloc_cstr_deallocator_ary |> Array.iteri (fun j0 { dealloc_cstr_id; dealloc_cstr_deallocator } ->
     let j = j0 + 1 in
