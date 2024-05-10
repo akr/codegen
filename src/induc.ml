@@ -91,7 +91,6 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
   let mutind_body = Environ.lookup_mind mutind env in
   let oneind_body = mutind_body.mind_packets.(i) in
   (if mutind_body.mind_nparams <> Array.length args then
-    let (ind, u) = pind in
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
       Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
       Pp.int (Array.length args) +++ Pp.str "given for" +++
@@ -99,7 +98,6 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
   (if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
     user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Printer.pr_inductive env ind));
   (if oneind_body.mind_nrealargs <> 0 then
-    let (ind, u) = pind in
     user_err (Pp.str "[codegen] indexed inductive type given:" +++
       Printer.pr_inductive env ind));
   (mutind, mutind_body, oneind_body, pind, args)
