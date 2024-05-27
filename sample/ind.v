@@ -1,23 +1,23 @@
 From codegen Require Import codegen.
 
-CodeGen Inductive Type bool => "bool".
-CodeGen Inductive Match bool => ""
+CodeGen InductiveType bool => "bool".
+CodeGen InductiveMatch bool => ""
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 Print CodeGen Inductive bool.
 
-CodeGen Inductive Type nat => "nat".
-CodeGen Inductive Match nat => ""
+CodeGen InductiveType nat => "nat".
+CodeGen InductiveMatch nat => ""
 | O => "case 0"
 | S => "default" "predn".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "succn".
 Print CodeGen Inductive nat.
 
-CodeGen Inductive Type (option bool) => "int".
-CodeGen Inductive Match (option bool) => ""
+CodeGen InductiveType (option bool) => "int".
+CodeGen InductiveMatch (option bool) => ""
 | None => "case -1"
 | Some => "default" "".
 CodeGen Constant None bool => "(-1)".
@@ -29,5 +29,5 @@ Print CodeGen Inductive (option bool).
 
 Print CodeGen Inductive.
 
-CodeGen Function Nat.add.
+CodeGen Func Nat.add.
 CodeGen Gen "add".

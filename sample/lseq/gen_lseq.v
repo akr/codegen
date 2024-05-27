@@ -2,42 +2,42 @@ Require Import lseq.
 
 Require Import codegen.codegen.
 
-CodeGen BorrowFunction borrow_lseq_bool.
+CodeGen BorrowFunc borrow_lseq_bool.
 
-CodeGen Source File "lseq.c".
-CodeGen Header File "lseq.h".
+CodeGen SourceFile "lseq.c".
+CodeGen HeaderFile "lseq.h".
 
-CodeGen Header Snippet "#ifndef LSEQ_H".
-CodeGen Header Snippet "#define LSEQ_H".
+CodeGen HeaderSnippet "prologue" "#ifndef LSEQ_H".
+CodeGen HeaderSnippet "prologue" "#define LSEQ_H".
 
-CodeGen Snippet "#include ""lseq.h""".
+CodeGen Snippet "prologue" "#include ""lseq.h""".
 
-CodeGen Inductive Type unit => "void".
+CodeGen InductiveType unit => "void".
 
-CodeGen Inductive Type bool => "bool".
-CodeGen Inductive Match bool => ""
+CodeGen InductiveType bool => "bool".
+CodeGen InductiveMatch bool => ""
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen Header Snippet "
+CodeGen HeaderSnippet "prologue" "
 #include <stdbool.h> /* for bool, true and false */
 ".
 
-CodeGen Inductive Type nat => "nat".
-CodeGen Inductive Match nat => ""
+CodeGen InductiveType nat => "nat".
+CodeGen InductiveMatch nat => ""
 | O => "case 0"
 | S => "default" "nat_pred".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 
-CodeGen Header Snippet "
+CodeGen HeaderSnippet "prologue" "
 #include <stdint.h>
 typedef uint64_t nat;
 ".
 
-CodeGen Snippet "
+CodeGen Snippet "prologue" "
 #define nat_succ(n) ((n)+1)
 #define nat_pred(n) ((n)-1)
 ".
@@ -60,7 +60,7 @@ CodeGen Primitive Nat.eqb => "nat_eqb".
 CodeGen Primitive Nat.leb => "nat_leb".
 CodeGen Primitive Nat.ltb => "nat_ltb".
 
-CodeGen Snippet "
+CodeGen Snippet "prologue" "
 #define nat_add(x,y) ((x) + (y))
 #define nat_sub(x,y) ((x) - (y))
 #define nat_mul(x,y) ((x) * (y))
@@ -80,15 +80,15 @@ CodeGen Snippet "
 #define nat_ltb(x,y) ((x) < (y))
 ".
 
-CodeGen Inductive Type lseq bool => "lseq_bool".
-CodeGen Inductive Match lseq bool => "lseq_bool_is_nil"
+CodeGen InductiveType lseq bool => "lseq_bool".
+CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil"
 | lnil => "default"
 | lcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
 CodeGen Constant lnil bool => "((lseq_bool)NULL)".
 CodeGen Primitive lcons bool => "lseq_bool_cons".
-CodeGen Deallocator lcons bool => "free".
+CodeGen InductiveDeallocator lseq bool => "" | lnil => "" | lcons => "free".
 
-CodeGen Header Snippet "
+CodeGen HeaderSnippet "prologue" "
 #include <stdlib.h> /* for NULL, malloc(), abort() */
 
 typedef struct lseq_bool_struct *lseq_bool;
@@ -117,44 +117,44 @@ static inline bool lseq_bool_eq(lseq_bool s1, lseq_bool s2) {
 }
 ".
 
-CodeGen Function lseq_consume bool => "lseq_consume_bool".
+CodeGen Func lseq_consume bool => "lseq_consume_bool".
 
-CodeGen Inductive Type bseq bool => "lseq_bool".
-CodeGen Inductive Match bseq bool => "lseq_bool_is_nil"
+CodeGen InductiveType bseq bool => "lseq_bool".
+CodeGen InductiveMatch bseq bool => "lseq_bool_is_nil"
 | bnil => "default"
 | bcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
 
 
-CodeGen Function lncons bool => "lncons_bool".
-CodeGen Function lnseq bool => "lnseq_bool".
+CodeGen Func lncons bool => "lncons_bool".
+CodeGen Func lnseq bool => "lnseq_bool".
 
-CodeGen Function bhead bool => "bhead_bool".
-CodeGen Function lbehead bool => "lbehead_bool".
-CodeGen Function blast bool => "blast_bool".
-CodeGen Function lbelast bool => "lbelast_bool".
+CodeGen Func bhead bool => "bhead_bool".
+CodeGen Func lbehead bool => "lbehead_bool".
+CodeGen Func blast bool => "blast_bool".
+CodeGen Func lbelast bool => "lbelast_bool".
 
-CodeGen Function bsize bool => "bsize_bool".
+CodeGen Func bsize bool => "bsize_bool".
 
-CodeGen Function bnth bool => "bnth_bool".
-CodeGen Function lset_nth bool => "lset_nth_bool".
+CodeGen Func bnth bool => "bnth_bool".
+CodeGen Func lset_nth bool => "lset_nth_bool".
 
-CodeGen Function bnilp bool => "bnilp_bool".
+CodeGen Func bnilp bool => "bnilp_bool".
 
-CodeGen Function lmask bool => "lmask_bool".
-CodeGen Function lcat bool => "lcat_bool".
-CodeGen Function blcat bool => "blcat_bool".
+CodeGen Func lmask bool => "lmask_bool".
+CodeGen Func lcat bool => "lcat_bool".
+CodeGen Func blcat bool => "blcat_bool".
 
-CodeGen Function ltake bool => "ltake_bool".
-CodeGen Function ldrop bool => "ldrop_bool".
-CodeGen Function bdrop bool => "bdrop_bool".
-CodeGen Function lrot bool => "lrot_bool".
-CodeGen Function lrotr bool => "lrotr_bool".
+CodeGen Func ltake bool => "ltake_bool".
+CodeGen Func ldrop bool => "ldrop_bool".
+CodeGen Func bdrop bool => "bdrop_bool".
+CodeGen Func lrot bool => "lrot_bool".
+CodeGen Func lrotr bool => "lrotr_bool".
 
-CodeGen Function lcatrev bool => "lcatrev_bool".
-CodeGen Function lrev bool => "lrev_bool".
-CodeGen Function bcatrev bool => "bcatrev_bool".
-CodeGen Function brev bool => "brev_bool".
+CodeGen Func lcatrev bool => "lcatrev_bool".
+CodeGen Func lrev bool => "lrev_bool".
+CodeGen Func bcatrev bool => "bcatrev_bool".
+CodeGen Func brev bool => "brev_bool".
 
-CodeGen Header Snippet "#endif /* LSEQ_H */".
+CodeGen HeaderSnippet "epilogue" "#endif /* LSEQ_H */".
 
 CodeGen GenerateFile.

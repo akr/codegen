@@ -132,27 +132,27 @@ CodeGen Primitive eqn => "eqn".
 CodeGen InductiveType bits => "bits".
 CodeGen InductiveType DArr => "DArr".
 CodeGen InductiveType MDArr => "MDArr".
-CodeGen Deallocator MDArr => "dealloc_MDArr".
+CodeGen InductiveDeallocator MDArr => "dealloc_MDArr".
 
 CodeGen InductiveType MDArr*MDArr => "pair_MDArr_MDArr".
 CodeGen InductiveMatch MDArr*MDArr => ""
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
-CodeGen Deallocator prod MDArr MDArr => "dealloc_MDArr_MDArr".
+CodeGen InductiveDeallocator prod MDArr MDArr => "dealloc_MDArr_MDArr".
 CodeGen IndImp (MDArr*MDArr).
 
 CodeGen InductiveType MDArr*nat => "pair_MDArr_nat".
 CodeGen InductiveMatch MDArr*nat => ""
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
-CodeGen Deallocator prod MDArr nat => "dealloc_MDArr_nat".
+CodeGen InductiveDeallocator prod MDArr nat => "dealloc_MDArr_nat".
 CodeGen IndImp (MDArr*nat).
 
 CodeGen InductiveType MDArr*MDArr*nat => "pair_2MDArr_nat".
 CodeGen InductiveMatch MDArr*MDArr*nat => ""
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
-CodeGen Deallocator prod (prod MDArr MDArr) nat => "dealloc_2MDArr_nat".
+CodeGen InductiveDeallocator prod (prod MDArr MDArr) nat => "dealloc_2MDArr_nat".
 CodeGen IndImp (MDArr*MDArr*nat).
 
 CodeGen InductiveType Aux => "Aux".
