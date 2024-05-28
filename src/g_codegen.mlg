@@ -46,7 +46,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
 (*
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
-  CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT.
+  CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
   CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
   CodeGen InductiveDeallocator COQ_TYPE => "C_IND_DEALLOCATOR" ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
