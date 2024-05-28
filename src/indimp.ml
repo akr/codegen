@@ -221,6 +221,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
   let { ind_pind=pind; ind_params=params } = ind_names in
   let coq_type_i = mkApp (mkIndU pind, params) in
   let ind_cfg_opt = lookup_ind_config sigma coq_type_i in
+  (* Merge information from CodeGen InductiveType COQ_TYPE => "C_TYPE" *)
   let ind_names =
     let ind_name =
       match ind_cfg_opt with
@@ -236,6 +237,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
     in
     { ind_names with ind_name }
   in
+  (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )* *)
   let ind_names =
     match ind_cfg_opt with
     | Some { c_swfunc=Some swfunc; cstr_configs=cstr_cfgs } ->
@@ -265,42 +267,46 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
         ignore (register_ind_match env sigma coq_type_i ind_names.ind_swfunc cstr_caselabel_accessors_list);
         ind_names
   in
-  let (env, ind_cstrs) =
-    let params0 = CArray.map_to_list (EConstr.to_constr sigma) params in
-    CArray.fold_left_map
-      (fun env cstr_names ->
-        let { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_members } = cstr_names in
-        let cstrterm = mkConstructUi (pind, cstr_j) in
-        let cstrterm0 = EConstr.to_constr sigma cstrterm in
-        ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
-        let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
-        match ConstrMap.find_opt presimp !gallina_instance_map with
-        | None ->
-            let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
-            let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 params0 (Some spi) in
-            (env, cstr_names)
-        | Some (sp_cfg, { sp_cfunc_name = cstr_name; sp_icommand }) ->
-            (* xxx: check name is valid identifier for C *)
-            if sp_icommand <> CodeGenPrimitive then
-              user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive:" +++ Id.print cstr_id);
-            let (cstr_enum_const, cstr_members) =
-              match ind_cfg_opt with
-              | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
-                  (match array_find_opt (fun { coq_cstr } -> Id.equal coq_cstr cstr_id ) cstr_cfgs with
-                  | Some { c_caselabel; c_accessors } ->
-                      let cstr_members =
-                        List.map2 (fun member_names c_accessor -> { member_names with member_accessor=c_accessor })
-                          cstr_members (Array.to_list c_accessors)
-                      in
-                      (c_caselabel, cstr_members)
-                  | None -> (cstr_enum_const, cstr_members))
-              | _ -> (cstr_enum_const, cstr_members)
-            in
-            let cstr_names = { cstr_names with cstr_name; cstr_enum_const; cstr_members } in
-            (env, cstr_names))
-      env ind_names.ind_cstrs
+  (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
+  let (env, ind_names) =
+    let (env, ind_cstrs) =
+      let params0 = CArray.map_to_list (EConstr.to_constr sigma) params in
+      CArray.fold_left_map
+        (fun env cstr_names ->
+          let { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_members } = cstr_names in
+          let cstrterm = mkConstructUi (pind, cstr_j) in
+          let cstrterm0 = EConstr.to_constr sigma cstrterm in
+          ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
+          let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
+          match ConstrMap.find_opt presimp !gallina_instance_map with
+          | None ->
+              let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
+              let (env, sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 params0 (Some spi) in
+              (env, cstr_names)
+          | Some (sp_cfg, { sp_cfunc_name = cstr_name; sp_icommand }) ->
+              (* xxx: check name is valid identifier for C *)
+              if sp_icommand <> CodeGenPrimitive then
+                user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive:" +++ Id.print cstr_id);
+              let (cstr_enum_const, cstr_members) =
+                match ind_cfg_opt with
+                | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
+                    (match array_find_opt (fun { coq_cstr } -> Id.equal coq_cstr cstr_id ) cstr_cfgs with
+                    | Some { c_caselabel; c_accessors } ->
+                        let cstr_members =
+                          List.map2 (fun member_names c_accessor -> { member_names with member_accessor=c_accessor })
+                            cstr_members (Array.to_list c_accessors)
+                        in
+                        (c_caselabel, cstr_members)
+                    | None -> (cstr_enum_const, cstr_members))
+                | _ -> (cstr_enum_const, cstr_members)
+              in
+              let cstr_names = { cstr_names with cstr_name; cstr_enum_const; cstr_members } in
+              (env, cstr_names))
+        env ind_names.ind_cstrs
+    in
+    (env, { ind_names with ind_cstrs })
   in
-  (env, { ind_names with ind_cstrs })
+  (env, ind_names)
 
 let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
