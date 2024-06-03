@@ -162,11 +162,19 @@ let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_nam
     pp_sjoinmap_ary (pr_cstr_names env sigma) ind_names.ind_cstrs ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
-let non_void_cstr_members (cstr_members : member_names list) : (c_typedata * string * string) list =
+type nvmember_names = {
+  nvmember_type: c_typedata;
+  nvmember_name: string;
+  nvmember_accessor: string;
+}
+
+let non_void_cstr_members (cstr_members : member_names list) : nvmember_names list =
   cstr_members |> List.filter_map (fun { member_type_lazy; member_name; member_accessor } ->
     match member_type_lazy with
     | lazy None -> None
-    | lazy (Some member_type) -> Some (member_type, member_name, member_accessor))
+    | lazy (Some member_type) -> Some {nvmember_type=member_type;
+                                       nvmember_name=member_name;
+                                       nvmember_accessor=member_accessor})
 
 (* Generate automatic generated names.  No user configuration considered. *)
 let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names =
@@ -327,8 +335,8 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let member_decls =
     ind_cstrs |> Array.map (fun { cstr_members } ->
-      (non_void_cstr_members cstr_members) |> pp_sjoinmap_list (fun (member_type, member_name, member_accessor) ->
-        Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";")))
+      (non_void_cstr_members cstr_members) |> pp_sjoinmap_list (fun {nvmember_type; nvmember_name} ->
+        Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";")))
   in
   let ind_cstrs_with_decls =
     Array.map2
@@ -391,20 +399,20 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   in
   let pp_accessors =
     ind_cstrs |> pp_sjoinmap_ary (fun { cstr_umember; cstr_members } ->
-      (non_void_cstr_members cstr_members) |> pp_sjoinmap_list (fun (member_type, member_name, member_accessor) ->
+      (non_void_cstr_members cstr_members) |> pp_sjoinmap_list (fun {nvmember_name; nvmember_accessor} ->
         Pp.h (Pp.str "#define" +++
-              Pp.str member_accessor ++
+              Pp.str nvmember_accessor ++
               Pp.str "(x)" +++
               (if single_constructor then
-                Pp.str ("((x)." ^ member_name ^ ")")
+                Pp.str ("((x)." ^ nvmember_name ^ ")")
               else
-                Pp.str ("((x).as." ^ cstr_umember ^ "." ^ member_name ^ ")")))))
+                Pp.str ("((x).as." ^ cstr_umember ^ "." ^ nvmember_name ^ ")")))))
   in
   let pp_cstr =
     ind_cstrs |> pp_sjoinmap_ary (fun { cstr_name; cstr_enum_const; cstr_umember; cstr_members } ->
       let args =
         pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-          (fun (member_type, member_name, member_accessor) -> Pp.str member_name)
+          (fun {nvmember_name} -> Pp.str nvmember_name)
           (non_void_cstr_members cstr_members)
       in
       Pp.h (Pp.str "#define" +++
@@ -463,8 +471,8 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
     let member_decl =
       let { cstr_members } = ind_cstr in
       pp_sjoinmap_list
-        (fun (member_type, member_name, member_accessor) ->
-          Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
+        (fun {nvmember_type; nvmember_name} ->
+          Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";"))
         (non_void_cstr_members cstr_members)
     in
     let pp_ind_struct_def =
@@ -476,11 +484,11 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
       (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
       let { cstr_members } = ind_cstr in
         pp_sjoinmap_list
-          (fun (member_type, member_name, member_accessor) ->
+          (fun {nvmember_name; nvmember_accessor} ->
             Pp.h (Pp.str "#define" +++
-                  Pp.str member_accessor ++
+                  Pp.str nvmember_accessor ++
                   Pp.str "(x)" +++
-                  Pp.str ("((x)->" ^ member_name ^ ")")))
+                  Pp.str ("((x)->" ^ nvmember_name ^ ")")))
           (non_void_cstr_members cstr_members)
     in
     let pp_cstr =
@@ -500,8 +508,8 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
           Pp.str "void"
         else
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-            (fun (member_type, member_name, member_accessor) ->
-              Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
+            (fun {nvmember_type; nvmember_name} ->
+              Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name)))
             (non_void_cstr_members cstr_members)
       in
       Pp.v 0 (Pp.hov 2 (
@@ -513,8 +521,8 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) : string =
                 Pp.hov 0 (Pp.str ind_name +++ Pp.str "p;") +++
                 Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                 pp_sjoinmap_list
-                  (fun (member_type, member_name, member_accessor) ->
-                    Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
+                  (fun {nvmember_name} ->
+                    Pp.hov 0 (Pp.str "p->" ++ Pp.str nvmember_name +++ Pp.str "=" +++ Pp.str nvmember_name ++ Pp.str ";"))
                   (non_void_cstr_members cstr_members) +++
                 Pp.hov 0 (Pp.str "return p;")))
     in
@@ -550,8 +558,8 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
       ind_cstrs |> Array.map (fun { cstr_members } ->
         Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;") +++
         pp_sjoinmap_list
-          (fun (member_type, member_name, member_accessor) ->
-            Pp.hov 0 (pr_c_decl member_type (Pp.str member_name) ++ Pp.str ";"))
+          (fun {nvmember_type; nvmember_name} ->
+            Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";"))
           (non_void_cstr_members cstr_members))
     in
     let ind_cstrs_with_decls =
@@ -569,11 +577,11 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
       (* #define list_cons_get1(x) (((struct list_cons_struct * )(x))->head) *)
       ind_cstrs |> pp_sjoinmap_ary (fun { cstr_struct_tag; cstr_members } ->
           pp_sjoinmap_list
-            (fun (member_type, member_name, member_accessor) ->
+            (fun {nvmember_name; nvmember_accessor} ->
               Pp.h (Pp.str "#define" +++
-                    Pp.str member_accessor ++
+                    Pp.str nvmember_accessor ++
                     Pp.str "(x)" +++
-                    Pp.str ("(((struct " ^ cstr_struct_tag ^ " *)(x))->" ^ member_name ^ ")")))
+                    Pp.str ("(((struct " ^ cstr_struct_tag ^ " *)(x))->" ^ nvmember_name ^ ")")))
             (non_void_cstr_members cstr_members))
     in
     let pp_cstr =
@@ -593,8 +601,8 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
             Pp.str "void"
           else
             pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-              (fun (member_type, member_name, member_accessor) ->
-                Pp.hov 0 (pr_c_decl member_type (Pp.str member_name)))
+              (fun {nvmember_type; nvmember_name} ->
+                Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name)))
               (non_void_cstr_members cstr_members)
         in
         Pp.v 0 (Pp.hov 2 (
@@ -607,8 +615,8 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
                   Pp.hov 0 (Pp.str ("if (!(p = malloc(sizeof(*p)))) abort();")) +++
                   Pp.hov 0 (Pp.str "p->tag =" +++ Pp.str cstr_enum_const ++ Pp.str ";") +++
                   pp_sjoinmap_list
-                    (fun (member_type, member_name, member_accessor) ->
-                      Pp.hov 0 (Pp.str "p->" ++ Pp.str member_name +++ Pp.str "=" +++ Pp.str member_name ++ Pp.str ";"))
+                    (fun {nvmember_name} ->
+                      Pp.hov 0 (Pp.str "p->" ++ Pp.str nvmember_name +++ Pp.str "=" +++ Pp.str nvmember_name ++ Pp.str ";"))
                     (non_void_cstr_members cstr_members) +++
                   Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")p;")))))
     in
