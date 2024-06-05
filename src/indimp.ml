@@ -128,7 +128,7 @@ type ind_names = {
   ind_cstrs: cstr_names array;
 }
 
-let pr_member_names (member_names : member_names) : Pp.t =
+let pr_member_names (env : Environ.env) (sigma : Evd.evar_map) (member_names : member_names) : Pp.t =
   Pp.v 2 (Pp.str "{" +++
     Pp.hov 2 (Pp.str "member_type:" +++ (if Lazy.is_val member_names.member_type_lazy then
         match member_names.member_type_lazy with
@@ -148,7 +148,7 @@ let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : cstr_
     Pp.hov 2 (Pp.str "cstr_enum_const:" +++ Pp.qstring cstr_names.cstr_enum_const) +++
     Pp.hov 2 (Pp.str "cstr_struct_tag:" +++ Pp.qstring cstr_names.cstr_struct_tag) +++
     Pp.hov 2 (Pp.str "cstr_umember:" +++ Pp.qstring cstr_names.cstr_umember) +++
-    pp_sjoinmap_list pr_member_names cstr_names.cstr_members ++ Pp.brk (0,-2) ++
+    pp_sjoinmap_list (pr_member_names env sigma) cstr_names.cstr_members ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
 let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Pp.t =
@@ -198,7 +198,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       (*msg_debug_hov (Printer.pr_econstr_env env sigma coq_type);*)
       let cstrterm = mkApp (mkConstructUi (pind, cstr_j), params) in
       (*msg_debug_hov (Printer.pr_econstr_env env sigma cstrterm);*)
-      let cstrtype = Retyping.get_type_of env sigma cstrterm in
+      let cstrtype = Reductionops.nf_all env sigma (Retyping.get_type_of env sigma cstrterm) in
       let (revargs, result_type) = decompose_prod sigma cstrtype in
       let j_suffix = "_" ^ Id.to_string cstr_id in
       let cstr_name = global_prefix ^ "_cstr" ^ j_suffix  in
@@ -207,6 +207,11 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       let cstr_umember = global_prefix ^ "_umember" ^ j_suffix in
       let cstr_members =
         (List.rev revargs) |> List.mapi (fun k (arg_name, arg_type) ->
+          (if not (EConstr.Vars.closed0 sigma arg_type) then
+            user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++
+              Pp.pr_nth (k+1) +++ Pp.str "argument of" +++
+              Printer.pr_econstr_env env sigma cstrterm +++ Pp.str "is" +++
+              Printer.pr_econstr_env env sigma arg_type));
           let k_suffix =
             string_of_int (k+1) ^ "_" ^ Id.to_string cstr_id ^
             match Context.binder_name arg_name with
@@ -218,7 +223,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
           let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
           { member_type_lazy; member_name; member_accessor })
       in
-      { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members; })
+      { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members })
   in
   let result = { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } in
   msg_info_v (pr_ind_names env sigma result);
@@ -628,7 +633,12 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) : string =
   Pp.string_of_ppcmds pp_impls
 
 let gen_indimp_heap_impls (ind_names : ind_names) : string =
-  let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
+  ind_cstrs |> Array.iter (fun cstr_names ->
+    let cstr_key = EConstr.to_constr sigma (mkApp (mkConstructUi (ind_pind, cstr_names.cstr_j), ind_params)) in
+    cstr_deallocator_cfunc_map := ConstrMap.add cstr_key "free" !cstr_deallocator_cfunc_map);
   (*let constant_constructor_only = ind_cstrs |> Array.for_all (fun { cstr_members } -> CList.is_empty cstr_members) in*)
   let single_constructor = Array.length ind_cstrs = 1 in
   if single_constructor then

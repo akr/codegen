@@ -3426,6 +3426,28 @@ let test_indimp_force_heap (ctx : test_ctxt) : unit =
       assert(sizeof(x) <= sizeof(void*)); /* check nat4 is a pointer */
     |}
 
+let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mylist := mynil : mylist | mycons : bool -> mylist -> mylist.
+      Fixpoint mylen (s : mylist) : nat :=
+        match s with
+        | mynil => 0
+        | mycons _ s' => S (mylen s')
+        end.
+      CodeGen InductiveType mylist => "mylist".
+      CodeGen Primitive mynil => "mynil".
+      CodeGen Primitive mycons => "mycons".
+      (*CodeGen InductiveDeallocator mylist | mynil => "mynil_dealloc" | mycons => "mycons_dealloc".*)
+      CodeGen Linear mylist.
+      CodeGen IndImp mylist.
+      CodeGen Func mylen.
+    |}) {|
+      mylist l = mycons(true, mycons(false, mycons(true, mynil())));
+      assert(mylen(l) == 3);
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -3468,7 +3490,7 @@ let boolbox_src = {|
       CodeGen InductiveType boolbox => "boolbox".
       CodeGen InductiveMatch boolbox => ""
       | BoolBox => "" "boolbox_get".
-      CodeGen InductiveDeallocator boolbox => "boolbox_dealloc".
+      CodeGen InductiveDeallocator boolbox | BoolBox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
@@ -4317,7 +4339,7 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord => "dealloc_TestRecord".
+      CodeGen InductiveDeallocator TestRecord | mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
@@ -4342,7 +4364,7 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => ""
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord => "dealloc_TestRecord".
+      CodeGen InductiveDeallocator TestRecord | mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
@@ -4705,6 +4727,7 @@ let suite : OUnit2.test =
     "test_indimp_named_mybool" >:: test_indimp_named_mybool;
     "test_indimp_named_mynat" >:: test_indimp_named_mynat;
     "test_indimp_force_heap" >:: test_indimp_force_heap;
+    "test_indimp_dealloc_list" >:: test_indimp_dealloc_list;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

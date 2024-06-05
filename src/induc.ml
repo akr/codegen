@@ -359,23 +359,13 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
 
-let command_deallocator (user_coq_type : Constrexpr.constr_expr) (ind_deallocator : string) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
+let command_deallocator (user_coq_type : Constrexpr.constr_expr) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   let (mutind, mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
-  let dealloc_cstr_deallocator_list =
-    if CList.is_empty dealloc_cstr_deallocator_list then
-      let dealloc_cstr_deallocator = ind_deallocator in
-      oneind_body.mind_consnames |> CArray.map_to_list (fun dealloc_cstr_id -> { dealloc_cstr_id; dealloc_cstr_deallocator })
-    else
-      dealloc_cstr_deallocator_list
-  in
   let dealloc_cstr_deallocator_ary = reorder_cstrs oneind_body (fun { dealloc_cstr_id } -> dealloc_cstr_id) dealloc_cstr_deallocator_list in
   dealloc_cstr_deallocator_ary |> Array.iteri (fun j0 { dealloc_cstr_id; dealloc_cstr_deallocator } ->
     let j = j0 + 1 in
     let cstr_term = EConstr.to_constr sigma (mkApp (mkConstructUi (pind, j), params)) in
-    cstr_deallocator_cfunc_map := ConstrMap.add cstr_term dealloc_cstr_deallocator !cstr_deallocator_cfunc_map);
-  let t = EConstr.to_constr sigma coq_type in
-  (*msg_debug_hov (Pp.str "[codegen] command_deallocator_type:" +++ Printer.pr_econstr_env env sigma t);*)
-  ind_deallocator_cfunc_map := ConstrMap.add t ind_deallocator !cstr_deallocator_cfunc_map
+    cstr_deallocator_cfunc_map := ConstrMap.add cstr_term dealloc_cstr_deallocator !cstr_deallocator_cfunc_map)

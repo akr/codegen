@@ -48,7 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
   CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
-  CodeGen InductiveDeallocator COQ_TYPE => "C_IND_DEALLOCATOR" ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
+  CodeGen InductiveDeallocator COQ_TYPE ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -270,8 +270,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "TestUnrestrictedType" lconstr(t) ] ->
       { command_test_unrestricted t }
 
-    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) "=>" string(cfunc) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
-      { command_deallocator coq_type_or_cstr cfunc dealloc_cstr_deallocator_list }
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
+      { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
     | [ "CodeGen" "BorrowFunc" ref(f) ] -> { command_borrow_function f }
