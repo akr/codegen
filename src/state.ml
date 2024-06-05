@@ -185,10 +185,6 @@ type dealloc_cstr_deallocator = {
 }
 
 (* key is (cstr args...).  *)
-let ind_deallocator_cfunc_map = Summary.ref
-  (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenInductiveDeallocatorCfuncMap"
-
-(* key is (cstr args...).  *)
 let cstr_deallocator_cfunc_map = Summary.ref
   (ConstrMap.empty : string ConstrMap.t) ~name:"CodeGenConstructorDeallocatorCfuncMap"
 

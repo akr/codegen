@@ -57,7 +57,6 @@ type dealloc_cstr_deallocator = {
   dealloc_cstr_deallocator: string;
 }
 val cstr_deallocator_cfunc_map : string ConstrMap.t ref
-val ind_deallocator_cfunc_map : string ConstrMap.t ref
 
 val downward_type_set : ConstrSet.t ref
 val borrow_function_set : Names.Cset.t ref
