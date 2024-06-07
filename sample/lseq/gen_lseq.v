@@ -86,7 +86,7 @@ CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil"
 | lcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
 CodeGen Constant lnil bool => "((lseq_bool)NULL)".
 CodeGen Primitive lcons bool => "lseq_bool_cons".
-CodeGen InductiveDeallocator lseq bool => "" | lnil => "" | lcons => "free".
+CodeGen InductiveDeallocator lseq bool | lnil => "" | lcons => "free".
 
 CodeGen HeaderSnippet "prologue" "
 #include <stdlib.h> /* for NULL, malloc(), abort() */

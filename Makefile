@@ -49,6 +49,18 @@ Makefile.coq : _CoqProject
 check checker:
 	cd test; $(MAKE) $@
 
+run-sample:
+	coqc -Q theories codegen -I src sample/pow.v
+	gcc -g -Wall sample/pow.c -o sample/pow
+	sample/pow
+	coqc -Q theories codegen -I src sample/rank.v
+	gcc -g -Wall sample/rank.c -o sample/rank
+	sample/rank 11011110001010101111
+	coqc -Q theories codegen -I src sample/sprintf.v
+	gcc -g -Wall sample/sprintf.c -o sample/sprintf
+	sample/sprintf
+	(cd sample/lseq; make)
+
 clean :
 	rm -f \
 	  .Makefile.coq.d \
