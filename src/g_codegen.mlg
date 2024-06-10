@@ -218,6 +218,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_ind_type coq_type (simple_c_type c_type) }
     | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
       { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
+      { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
@@ -269,9 +271,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_test_linear t }
     | [ "CodeGen" "TestUnrestrictedType" lconstr(t) ] ->
       { command_test_unrestricted t }
-
-    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
-      { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
 
     | [ "CodeGen" "Downward" lconstr(ty) ] -> { command_downward ty }
     | [ "CodeGen" "BorrowFunc" ref(f) ] -> { command_borrow_function f }
