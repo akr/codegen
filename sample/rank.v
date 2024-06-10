@@ -106,14 +106,14 @@ CodeGen SourceFile "sample/rank_generated.c".
 CodeGen Linear MDArr.
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => ""
+CodeGen InductiveMatch bool => "" with
 | true => ""
 | false => "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => ""
+CodeGen InductiveMatch nat => "" with
 | O => "0"
 | S => "" "predn".
 CodeGen Constant O => "0".
@@ -135,28 +135,28 @@ CodeGen InductiveType MDArr => "MDArr".
 CodeGen InductiveDeallocator MDArr | mdarr => "dealloc_MDArr".
 
 CodeGen InductiveType MDArr*MDArr => "pair_MDArr_MDArr".
-CodeGen InductiveMatch MDArr*MDArr => ""
+CodeGen InductiveMatch MDArr*MDArr => "" with
 | pair => "" "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive pair MDArr MDArr => "make_pair_MDArr_MDArr".
 CodeGen InductiveDeallocator prod MDArr MDArr | pair => "dealloc_MDArr_MDArr".
 CodeGen IndImp (MDArr*MDArr).
 
 CodeGen InductiveType MDArr*nat => "pair_MDArr_nat".
-CodeGen InductiveMatch MDArr*nat => ""
+CodeGen InductiveMatch MDArr*nat => "" with
 | pair => "" "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive pair MDArr nat => "make_pair_MDArr_nat".
 CodeGen InductiveDeallocator prod MDArr nat | pair => "dealloc_MDArr_nat".
 CodeGen IndImp (MDArr*nat).
 
 CodeGen InductiveType MDArr*MDArr*nat => "pair_2MDArr_nat".
-CodeGen InductiveMatch MDArr*MDArr*nat => ""
+CodeGen InductiveMatch MDArr*MDArr*nat => "" with
 | pair => "" "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
 CodeGen InductiveDeallocator prod (prod MDArr MDArr) nat | pair => "dealloc_2MDArr_nat".
 CodeGen IndImp (MDArr*MDArr*nat).
 
 CodeGen InductiveType Aux => "Aux".
-CodeGen InductiveMatch Aux => ""
+CodeGen InductiveMatch Aux => "" with
 | mkAux => ""
   "aux_query_bit" "aux_input_bits" "aux_blksz2"
   "aux_ratio" "aux_dir1" "aux_dir2".

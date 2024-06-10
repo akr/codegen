@@ -47,7 +47,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
-  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )*.
+  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( with ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )* )?.
   CodeGen InductiveDeallocator COQ_TYPE ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
@@ -142,7 +142,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 *)
 
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
-| [ "|" ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
+| [ ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
   { { cstr_id; cstr_caselabel; cstr_accessors } }
 END
 
@@ -216,8 +216,16 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_ind_type coq_type { c_type_left; c_type_right } }
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
       { command_ind_type coq_type (simple_c_type c_type) }
-    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ind_cstr_caselabel_accessors_list(cstr_caselabel_accesors_list) ] ->
+
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) "with" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] ->
       { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) "with" "|" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] ->
+      { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) "with" ] ->
+      { command_ind_match coq_type swfunc [] }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ] ->
+      { command_ind_match coq_type swfunc [] }
+
     | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
       { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
 

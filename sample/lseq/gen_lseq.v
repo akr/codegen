@@ -15,7 +15,7 @@ CodeGen Snippet "prologue" "#include ""lseq.h""".
 CodeGen InductiveType unit => "void".
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => ""
+CodeGen InductiveMatch bool => "" with
 | true => "default"
 | false => "case 0".
 CodeGen Constant true => "true".
@@ -26,7 +26,7 @@ CodeGen HeaderSnippet "prologue" "
 ".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => ""
+CodeGen InductiveMatch nat => "" with
 | O => "case 0"
 | S => "default" "nat_pred".
 CodeGen Constant O => "0".
@@ -81,7 +81,7 @@ CodeGen Snippet "prologue" "
 ".
 
 CodeGen InductiveType lseq bool => "lseq_bool".
-CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil"
+CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil" with
 | lnil => "default"
 | lcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
 CodeGen Constant lnil bool => "((lseq_bool)NULL)".
@@ -120,7 +120,7 @@ static inline bool lseq_bool_eq(lseq_bool s1, lseq_bool s2) {
 CodeGen Func lseq_consume bool => "lseq_consume_bool".
 
 CodeGen InductiveType bseq bool => "lseq_bool".
-CodeGen InductiveMatch bseq bool => "lseq_bool_is_nil"
+CodeGen InductiveMatch bseq bool => "lseq_bool_is_nil" with
 | bnil => "default"
 | bcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
 
