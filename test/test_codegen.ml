@@ -3439,7 +3439,7 @@ let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
       CodeGen InductiveType mylist => "mylist".
       CodeGen Primitive mynil => "mynil".
       CodeGen Primitive mycons => "mycons".
-      (*CodeGen InductiveDeallocator mylist | mynil => "mynil_dealloc" | mycons => "mycons_dealloc".*)
+      (*CodeGen InductiveDeallocator mylist with mynil => "mynil_dealloc" | mycons => "mycons_dealloc".*)
       CodeGen Linear mylist.
       CodeGen IndImp mylist.
       CodeGen Func mylen.
@@ -3490,7 +3490,7 @@ let boolbox_src = {|
       CodeGen InductiveType boolbox => "boolbox".
       CodeGen InductiveMatch boolbox => "" with
       | BoolBox => "" "boolbox_get".
-      CodeGen InductiveDeallocator boolbox | BoolBox => "boolbox_dealloc".
+      CodeGen InductiveDeallocator boolbox with BoolBox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
@@ -4339,7 +4339,7 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => "" with
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord | mk => "dealloc_TestRecord".
+      CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
@@ -4364,7 +4364,7 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch TestRecord => "" with
       | mk => "" "TestRecord_umem" "TestRecord_nmem".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord | mk => "dealloc_TestRecord".
+      CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".

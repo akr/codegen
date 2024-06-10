@@ -48,7 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
   CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( with ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )* )?.
-  CodeGen InductiveDeallocator COQ_TYPE ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )*.
+  CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -147,7 +147,7 @@ VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator
-| [ "|" ident(dealloc_cstr_id) "=>" string(dealloc_cstr_deallocator) ] ->
+| [ ident(dealloc_cstr_id) "=>" string(dealloc_cstr_deallocator) ] ->
   { { dealloc_cstr_id; dealloc_cstr_deallocator } }
 END
 
@@ -226,8 +226,14 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) ] ->
       { command_ind_match coq_type swfunc [] }
 
-    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) dealloc_cstr_deallocator_list(dealloc_cstr_deallocator_list) ] ->
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) "with" ne_dealloc_cstr_deallocator_list_sep(dealloc_cstr_deallocator_list, "|") ] ->
       { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) "with" "|" ne_dealloc_cstr_deallocator_list_sep(dealloc_cstr_deallocator_list, "|") ] ->
+      { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) "with" ] ->
+      { command_deallocator coq_type_or_cstr [] }
+    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) ] ->
+      { command_deallocator coq_type_or_cstr [] }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
