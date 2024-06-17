@@ -708,6 +708,7 @@ let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : C
     begin
       if ind_recursive_p env sigma coq_type then
         user_err (Pp.str "[codegen] IndImpImm is used for recursive type:" +++ Printer.pr_econstr_env env sigma coq_type);
+      (* mutual inductive types are forbidden because mostly they are used for recursive types. *)
       if ind_mutual_p env sigma coq_type then
         user_err (Pp.str "[codegen] IndImpImm is used for mutually defined type:" +++ Printer.pr_econstr_env env sigma coq_type);
       generate_indimp_immediate env sigma coq_type
