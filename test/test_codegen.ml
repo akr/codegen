@@ -3426,6 +3426,42 @@ let test_indimp_force_heap (ctx : test_ctxt) : unit =
       assert(sizeof(x) <= sizeof(void*)); /* check nat4 is a pointer */
     |}
 
+let test_indimp_force_imm (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (nat_src ^
+    {|
+      Inductive nat4 := mkNat4 : nat -> nat -> nat -> nat -> nat4.
+      CodeGen InductiveType nat4 => "nat4".
+      CodeGen InductiveMatch nat4 => "sw_nat4" with
+      | mkNat4 => "" "get_nat1" "get_nat2" "get_nat3" "get_nat4".
+      CodeGen Primitive mkNat4 => "mkNat4".
+      CodeGen IndImpImm nat4.
+    |}) {|
+      nat4 x = mkNat4(11,12,13,14);
+      assert(get_nat1(x) == 11);
+      assert(get_nat2(x) == 12);
+      assert(get_nat3(x) == 13);
+      assert(get_nat4(x) == 14);
+      assert(sizeof(void*) < sizeof(x)); /* check nat4 is not a pointer */
+    |}
+
+let test_indimp_force_imm_fail_rec (ctx : test_ctxt) : unit =
+  template_coq_success ctx
+    (nat_src ^
+    {|
+      Inductive mylist := mynil : mylist | mycons : nat -> mylist -> mylist.
+      Fail CodeGen IndImpImm nat4.
+    |})
+
+let test_indimp_force_imm_fail_mut (ctx : test_ctxt) : unit =
+  template_coq_success ctx
+    (nat_src ^
+    {|
+      Inductive mytype1 := C1
+      with mytype2 := C2.
+      Fail CodeGen IndImpImm mytype1.
+    |})
+
 let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ nat_src ^
@@ -4727,6 +4763,9 @@ let suite : OUnit2.test =
     "test_indimp_named_mybool" >:: test_indimp_named_mybool;
     "test_indimp_named_mynat" >:: test_indimp_named_mynat;
     "test_indimp_force_heap" >:: test_indimp_force_heap;
+    "test_indimp_force_imm" >:: test_indimp_force_imm;
+    "test_indimp_force_imm_fail_rec" >:: test_indimp_force_imm_fail_rec;
+    "test_indimp_force_imm_fail_mut" >:: test_indimp_force_imm_fail_mut;
     "test_indimp_dealloc_list" >:: test_indimp_dealloc_list;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;

@@ -694,13 +694,25 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   add_thunk "type_decls" (fun () -> gen_indimp_heap_decls ind_names);
   add_thunk "type_impls" (fun () -> gen_indimp_heap_impls env sigma ind_names)
 
-let command_indimp ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) : unit =
+let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) : unit =
+  (if force_imm && force_heap then
+    user_err (Pp.str "[codegen] both force_imm and force_heap are true"));
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   (* (if ind_coq_type_registered_p coq_type then
-    user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_constr_env env sigma coq_type)); *)
-  if force_heap || ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
+    user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_econstr_env env sigma coq_type)); *)
+  if force_heap then
+    generate_indimp_heap env sigma coq_type
+  else if force_imm then
+    begin
+      if ind_recursive_p env sigma coq_type then
+        user_err (Pp.str "[codegen] IndImpImm is used for recursive type:" +++ Printer.pr_econstr_env env sigma coq_type);
+      if ind_mutual_p env sigma coq_type then
+        user_err (Pp.str "[codegen] IndImpImm is used for mutually defined type:" +++ Printer.pr_econstr_env env sigma coq_type);
+      generate_indimp_immediate env sigma coq_type
+    end
+  else if ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
     generate_indimp_heap env sigma coq_type
   else
     generate_indimp_immediate env sigma coq_type
