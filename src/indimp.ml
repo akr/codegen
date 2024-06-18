@@ -690,6 +690,8 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
   let ind_names = generate_indimp_names env sigma coq_type in
   let env, ind_names = register_indimp env sigma ind_names in
+  if !opt_indimp_auto_linear then
+    Linear.add_linear_type ~msg_new:true env sigma coq_type;
   ignore env;
   add_thunk "type_decls" (fun () -> gen_indimp_heap_decls ind_names);
   add_thunk "type_impls" (fun () -> gen_indimp_heap_impls env sigma ind_names)

@@ -3484,6 +3484,28 @@ let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
       assert(mylen(l) == 3);
     |}
 
+let test_indimp_auto_linear (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mylist := mynil : mylist | mycons : bool -> mylist -> mylist.
+      Fixpoint mylen (s : mylist) : nat :=
+        match s with
+        | mynil => 0
+        | mycons _ s' => S (mylen s')
+        end.
+      Set CodeGen IndImpAutoLinear.
+      CodeGen InductiveType mylist => "mylist".
+      CodeGen Primitive mynil => "mynil".
+      CodeGen Primitive mycons => "mycons".
+      CodeGen IndImp mylist.
+      Fail CodeGen TestBorrowCheck fun (x : mylist) => 0.
+      CodeGen Func mylen.
+    |}) {|
+      mylist l = mycons(true, mycons(false, mycons(true, mynil())));
+      assert(mylen(l) == 3);
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4767,6 +4789,7 @@ let suite : OUnit2.test =
     "test_indimp_force_imm_fail_rec" >:: test_indimp_force_imm_fail_rec;
     "test_indimp_force_imm_fail_mut" >:: test_indimp_force_imm_fail_mut;
     "test_indimp_dealloc_list" >:: test_indimp_dealloc_list;
+    "test_indimp_auto_linear" >:: test_indimp_auto_linear;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;

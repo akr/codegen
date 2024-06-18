@@ -22,6 +22,15 @@ module ConstrMap = HMap.Make(Constr)
 module ConstrSet = CSet.Make(Constr)
 module StringSet = CSet.Make(String)
 
+(* Unset/Set CodeGen IndImpAutoLinear. *)
+let opt_indimp_auto_linear = ref false
+let () = let open Goptions in declare_bool_option
+        { optstage = Summary.Stage.Interp;
+          optdepr  = None;
+          optkey   = ["CodeGen";"IndImpAutoLinear"];
+          optread  = (fun () -> !opt_indimp_auto_linear);
+          optwrite = (:=) opt_indimp_auto_linear }
+
 (* Unset/Set Debug CodeGen Simplification. *)
 let opt_debug_simplification = ref false
 let () = let open Goptions in declare_bool_option

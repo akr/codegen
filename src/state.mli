@@ -2,6 +2,7 @@ module ConstrMap : CMap.ExtS with type key = Constr.t
 module ConstrSet : CSet.S with type elt = Constr.t
 module StringSet : CSet.S with type elt = String.t
 
+val opt_indimp_auto_linear : bool ref
 val opt_debug_simplification : bool ref
 val opt_debug_normalizeV : bool ref
 val opt_debug_reduction : bool ref
@@ -14,6 +15,7 @@ val opt_debug_expand_eta : bool ref
 val opt_debug_delete_let : bool ref
 val opt_debug_borrowcheck : bool ref
 val opt_debug_matchapp : bool ref
+
 val gensym_id : int ref
 type string_or_qualid =
     StrOrQid_Str of string
