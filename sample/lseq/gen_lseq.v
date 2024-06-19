@@ -16,8 +16,8 @@ CodeGen InductiveType unit => "void".
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => "" with
-| true => "default"
-| false => "case 0".
+| true => ""
+| false => "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
@@ -27,8 +27,8 @@ CodeGen HeaderSnippet "prologue" "
 
 CodeGen InductiveType nat => "nat".
 CodeGen InductiveMatch nat => "" with
-| O => "case 0"
-| S => "default" "nat_pred".
+| O => "0"
+| S => "" "nat_pred".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 
@@ -82,11 +82,11 @@ CodeGen Snippet "prologue" "
 
 CodeGen InductiveType lseq bool => "lseq_bool".
 CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil" with
-| lnil => "default"
-| lcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
+| lnil => ""
+| lcons => "0" "lseq_bool_head" "lseq_bool_tail".
 CodeGen Constant lnil bool => "((lseq_bool)NULL)".
 CodeGen Primitive lcons bool => "lseq_bool_cons".
-CodeGen InductiveDeallocator lseq bool | lnil => "" | lcons => "free".
+CodeGen InductiveDeallocator lseq bool with lnil => "" | lcons => "free".
 
 CodeGen HeaderSnippet "prologue" "
 #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -121,8 +121,8 @@ CodeGen Func lseq_consume bool => "lseq_consume_bool".
 
 CodeGen InductiveType bseq bool => "lseq_bool".
 CodeGen InductiveMatch bseq bool => "lseq_bool_is_nil" with
-| bnil => "default"
-| bcons => "case 0" "lseq_bool_head" "lseq_bool_tail".
+| bnil => ""
+| bcons => "0" "lseq_bool_head" "lseq_bool_tail".
 
 
 CodeGen Func lncons bool => "lncons_bool".
