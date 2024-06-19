@@ -59,7 +59,7 @@ run-sample:
 	coqc -Q theories codegen -I src sample/sprintf.v
 	gcc -g -Wall sample/sprintf.c -o sample/sprintf
 	sample/sprintf
-	(cd sample/lseq; make)
+	(cd sample/lseq; make; ./test_lseq)
 
 clean :
 	rm -f \
