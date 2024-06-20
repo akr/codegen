@@ -1677,3 +1677,10 @@ let pr_c_decl (c_type : c_typedata) (declarator : Pp.t) : Pp.t =
 
 let pr_c_abstract_decl (c_type : c_typedata) : Pp.t =
   compose_c_pps [Pp.str c_type.c_type_left; Pp.str c_type.c_type_right]
+
+let str_instance_command (icommand : instance_command) : string =
+  match icommand with
+  | CodeGenFunc -> "Func"
+  | CodeGenStaticFunc -> "StaticFunc"
+  | CodeGenPrimitive -> "Primitive"
+  | CodeGenConstant -> "Constant"

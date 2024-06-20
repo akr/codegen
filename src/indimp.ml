@@ -299,7 +299,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
           | Some (sp_cfg, { sp_cfunc_name = cstr_name; sp_icommand }) ->
               (* xxx: check name is valid identifier for C *)
               if sp_icommand <> CodeGenPrimitive then
-                user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive:" +++ Id.print cstr_id);
+                user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cstr_id);
               let (cstr_enum_const, cstr_members) =
                 match ind_cfg_opt with
                 | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
