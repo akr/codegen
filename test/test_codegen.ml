@@ -3077,7 +3077,7 @@ let test_indimp_bool_nat_pair (ctx : test_ctxt) : unit =
       CodeGen Primitive pair nat bool => "pair_nat_bool".
       CodeGen Snippet "prologue" "
       ".
-      CodeGen IndImp (nat*bool).
+      CodeGen IndImp nat*bool.
       CodeGen Func fst_nb.
       CodeGen Func snd_nb.
     |}) {|
@@ -3127,7 +3127,7 @@ let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
       #define pair_bool_bool_snd(x) ((x) & 1)
       ".
       CodeGen IndImp yn.
-      CodeGen IndImp (ynpair bool bool).
+      CodeGen IndImp ynpair bool bool.
       CodeGen Func ynpair_of_boolpair.
       CodeGen Func boolpair_of_ynpair.
       CodeGen Func id_boolpair.
@@ -3169,7 +3169,7 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
       #define some_bool(x) (((x) << 1) | 1)
       #define none_bool 0
       ".
-      CodeGen IndImp (myoption bool).
+      CodeGen IndImp myoption bool.
       CodeGen Func myopt_of_opt.
       CodeGen Func opt_of_myopt.
       CodeGen Func id_option_bool.
@@ -3320,8 +3320,8 @@ let test_indimp_rosetree (ctx : test_ctxt) : unit =
       Definition nd (b : bool) (s : list (tree bool)) : tree bool := node b s.
       Definition nl : list (tree bool) := nil.
       Definition cns (t : tree bool) (s : list (tree bool)) : list (tree bool) := cons t s.
-      CodeGen IndImp (list (tree bool)).
-      CodeGen IndImp (tree bool).
+      CodeGen IndImp list (tree bool).
+      CodeGen IndImp tree bool.
       CodeGen Func nd.
       CodeGen Func nl.
       CodeGen Func cns.
