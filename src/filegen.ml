@@ -28,6 +28,12 @@ let defined_sections = [
   "epilogue";
 ]
 
+let codegen_set_headerfile (filename : string) : unit =
+  current_header_filename := filename
+
+let codegen_set_sourcefile (filename : string) : unit =
+  current_source_filename := filename
+
 let codegen_add_generation (filename : string) (generation : code_generation) : unit =
   generation_map := !generation_map |> CString.Map.update filename
     (fun generation_list_opt ->

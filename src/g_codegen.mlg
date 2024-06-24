@@ -32,6 +32,7 @@ open Genc
 open Snippet
 open Indimp
 open Induc
+open Filegen
 
 open Stdarg (* for wit_string *)
 
@@ -262,8 +263,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
-    | [ "CodeGen" "HeaderFile" string(fn) ] -> { current_header_filename := fn }
-    | [ "CodeGen" "SourceFile" string(fn) ] -> { current_source_filename := fn }
+    | [ "CodeGen" "HeaderFile" string(fn) ] -> { codegen_set_headerfile fn }
+    | [ "CodeGen" "SourceFile" string(fn) ] -> { codegen_set_sourcefile fn }
 
     | [ "CodeGen" "GenerateFile" genflag_list(gflist) ] -> { command_generate_file gflist }
     | [ "CodeGen" "GenerateTest" genflag_list(gflist) ] -> { command_generate_test gflist }
