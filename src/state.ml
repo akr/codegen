@@ -267,8 +267,8 @@ let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
 
 type string_or_none = string option
 
-let dummy_header_filename = "//dummy//.h"
-let dummy_source_filename = "//dummy//.c"
+let dummy_header_filename = "//dummy.h//"
+let dummy_source_filename = "//dummy.c//"
 
 let current_header_filename = Summary.ref ~name:"CodegenCurrentHeaderFilename"
   dummy_header_filename
