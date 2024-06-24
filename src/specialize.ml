@@ -2503,12 +2503,8 @@ let command_print_generation_list gen_list =
     (List.rev_append gen_list [])
 
 let command_print_generation_map () =
-  (match !current_header_filename with
-  | None -> msg_info_hov (Pp.str "current_header_filename = None")
-  | Some fn -> msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string fn)));
-  (match !current_source_filename with
-  | None -> msg_info_hov (Pp.str "current_source_filename = None")
-  | Some fn -> msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string fn)));
+  msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string (!current_header_filename)));
+  msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string (!current_source_filename)));
   !generation_map |> CString.Map.iter
     (fun filename gen_list ->
       msg_info_hov (Pp.str filename);

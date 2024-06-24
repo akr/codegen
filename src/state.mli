@@ -97,8 +97,10 @@ type cfunc_usage =
 val cfunc_instance_map :
   cfunc_usage CString.Map.t ref
 type string_or_none = string option
-val current_header_filename : string option ref
-val current_source_filename : string option ref
+val dummy_header_filename : string
+val dummy_source_filename : string
+val current_header_filename : string ref
+val current_source_filename : string ref
 type code_generation =
     GenFunc of string
   | GenMutual of string list

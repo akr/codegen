@@ -2836,14 +2836,21 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
 
 let gen_file (fn : string) (gen_list : code_generation list) : unit =
   (* open in the standard permission, 0o666, which will be masked by umask. *)
-  (let (temp_fn, ch) = Filename.open_temp_file
-    ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
-  let fmt = Format.formatter_of_out_channel ch in
-  gen_pp_iter (Pp.pp_with fmt) gen_list;
-  Format.pp_print_flush fmt ();
-  close_out ch;
-  Sys.rename temp_fn fn;
-  msg_info_hov (Pp.str ("[codegen] file generated: " ^ fn)))
+  if String.equal fn dummy_header_filename then
+    ()
+  else if String.equal fn dummy_source_filename then
+    Feedback.msg_warning (Pp.str "[codegen] [warning] Some code are generated before CodeGen SourceFile.")
+  else
+    begin
+      let (temp_fn, ch) = Filename.open_temp_file
+        ~perms:0o666 ~temp_dir:(Filename.dirname fn) (Filename.basename fn) ".c" in
+      let fmt = Format.formatter_of_out_channel ch in
+      gen_pp_iter (Pp.pp_with fmt) gen_list;
+      Format.pp_print_flush fmt ();
+      close_out ch;
+      Sys.rename temp_fn fn;
+      msg_info_hov (Pp.str ("[codegen] file generated: " ^ fn))
+    end
 
 let command_generate_file (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist !generation_map in

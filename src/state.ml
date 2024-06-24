@@ -267,11 +267,14 @@ let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
 
 type string_or_none = string option
 
+let dummy_header_filename = "//dummy//.h"
+let dummy_source_filename = "//dummy//.c"
+
 let current_header_filename = Summary.ref ~name:"CodegenCurrentHeaderFilename"
-  (None : string option)
+  dummy_header_filename
 
 let current_source_filename = Summary.ref ~name:"CodegenCurrentImplementationFilename"
-  (None : string option)
+  dummy_source_filename
 
 type code_generation =
   GenFunc of string     (* C function name *)

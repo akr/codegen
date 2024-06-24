@@ -36,16 +36,10 @@ let codegen_add_generation (filename : string) (generation : code_generation) : 
       | Some generation_list -> Some (generation :: generation_list))
 
 let codegen_add_source_generation (generation : code_generation) : unit =
-  match !current_source_filename with
-  | None -> Feedback.msg_warning (Pp.str "[codegen] no code will be generated because no CodeGen Source File.")
-  | Some filename ->
-      codegen_add_generation filename generation
+  codegen_add_generation (!current_source_filename) generation
 
 let codegen_add_header_generation (generation : code_generation) : unit =
-  match !current_header_filename with
-  | None -> ()
-  | Some filename ->
-      codegen_add_generation filename generation
+  codegen_add_generation (!current_header_filename) generation
 
 let check_section (section : string) : unit =
   (if not (List.mem section defined_sections) then
