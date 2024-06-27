@@ -2,6 +2,8 @@ Require Import lseq.
 
 Require Import codegen.codegen.
 
+Set CodeGen IndImpAutoLinear.
+
 CodeGen BorrowFunc borrow_lseq_bool.
 
 CodeGen SourceFile "lseq.c".
@@ -81,48 +83,26 @@ CodeGen Snippet "prologue" "
 ".
 
 CodeGen InductiveType lseq bool => "lseq_bool".
-CodeGen InductiveMatch lseq bool => "lseq_bool_is_nil" with
-| lnil => ""
-| lcons => "0" "lseq_bool_head" "lseq_bool_tail".
-CodeGen Constant lnil bool => "((lseq_bool)NULL)".
+CodeGen InductiveMatch lseq bool => "lseq_bool_sw" with
+| lnil => "lseq_bool_nil_tag"
+| lcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
+CodeGen Primitive lnil bool => "lseq_bool_nil".
 CodeGen Primitive lcons bool => "lseq_bool_cons".
-CodeGen InductiveDeallocator lseq bool with lnil => "" | lcons => "free".
+CodeGen IndImpHeap lseq bool
+  where output_type current_header
+  where output_impl current_header
+  where prefix "lseqbool".
 
 CodeGen HeaderSnippet "prologue" "
 #include <stdlib.h> /* for NULL, malloc(), abort() */
-
-typedef struct lseq_bool_struct *lseq_bool;
-struct lseq_bool_struct {
-  bool head;
-  lseq_bool tail;
-};
-
-static inline bool lseq_bool_is_nil(lseq_bool s) { return s == NULL; }
-static inline bool lseq_bool_head(lseq_bool s) { return s->head; }
-static inline lseq_bool lseq_bool_tail(lseq_bool s) { return s->tail; }
-static inline lseq_bool lseq_bool_cons(bool v, lseq_bool s) {
-  lseq_bool ret = malloc(sizeof(struct lseq_bool_struct));
-  if (ret == NULL) abort();
-  ret->head = v;
-  ret->tail = s;
-  return ret;
-}
-static inline bool lseq_bool_eq(lseq_bool s1, lseq_bool s2) {
-  while (s1 && s2) {
-    if (s1->head != s2->head) return false;
-    s1 = s1->tail;
-    s2 = s2->tail;
-  }
-  return !(s1 || s2);
-}
 ".
 
 CodeGen Func lseq_consume bool => "lseq_consume_bool".
 
 CodeGen InductiveType bseq bool => "lseq_bool".
-CodeGen InductiveMatch bseq bool => "lseq_bool_is_nil" with
-| bnil => ""
-| bcons => "0" "lseq_bool_head" "lseq_bool_tail".
+CodeGen InductiveMatch bseq bool => "lseq_bool_sw" with
+| bnil => "lseq_bool_nil_tag"
+| bcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
 
 
 CodeGen Func lncons bool => "lncons_bool".
@@ -156,5 +136,7 @@ CodeGen Func bcatrev bool => "bcatrev_bool".
 CodeGen Func brev bool => "brev_bool".
 
 CodeGen HeaderSnippet "epilogue" "#endif /* LSEQ_H */".
+
+(* Print CodeGen Inductive. *)
 
 CodeGen GenerateFile.

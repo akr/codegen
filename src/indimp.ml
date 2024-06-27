@@ -21,10 +21,37 @@ open CErrors
 open EConstr
 
 open Cgenutil
+open Filegen
 open State
 open Induc
 open Specialize
-open Snippet
+
+type indimp_mods = {
+  indimp_mods_output_type : (string * string) option;
+  indimp_mods_output_impl : (string * string) option;
+  indimp_mods_prefix : string option;
+}
+
+let indimp_mods_empty = {
+  indimp_mods_output_type = None;
+  indimp_mods_output_impl = None;
+  indimp_mods_prefix = None;
+}
+
+let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
+  match o1, o2 with
+  | None, None -> None
+  | Some _, None -> o1
+  | None, Some _ -> o2
+  | Some _, Some _ ->
+      user_err (Pp.str "[codegen] CodeGen IndImp: duplicated option:" +++ Pp.str name)
+
+let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods =
+  {
+    indimp_mods_output_type = optmerge "output_type" mods1.indimp_mods_output_type mods2.indimp_mods_output_type;
+    indimp_mods_output_impl = optmerge "output_impl" mods1.indimp_mods_output_impl mods2.indimp_mods_output_impl;
+    indimp_mods_prefix = optmerge "prefix" mods1.indimp_mods_prefix mods2.indimp_mods_prefix;
+  }
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
@@ -177,7 +204,7 @@ let non_void_cstr_members (cstr_members : member_names list) : nvmember_names li
                                        nvmember_accessor=member_accessor})
 
 (* Generate automatic generated names.  No user configuration considered. *)
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : ind_names =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) ~(global_prefix : string option) : ind_names =
   let (f, args) = decompose_appvect sigma coq_type in
   let params = args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
@@ -186,7 +213,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   check_ind_id_conflict mutind_body;
   let open Declarations in
   let oneind_body = mutind_body.mind_packets.(i) in
-  let global_prefix = global_gensym () in
+  let global_prefix = match global_prefix with Some prefix -> prefix | None -> global_gensym () in
   let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
   let ind_name = global_prefix ^ "_type" ^ i_suffix in
   let ind_struct_tag = global_prefix ^ "_istruct" ^ i_suffix in
@@ -479,8 +506,6 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
 let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : string =
   let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
-  (let cstr_key = EConstr.to_constr sigma (mkApp (mkConstructUi (ind_pind, ind_cstr.cstr_j), ind_params)) in
-  cstr_deallocator_cfunc_map := ConstrMap.add cstr_key "free" !cstr_deallocator_cfunc_map);
   let pp_ind_impls =
     let member_decl =
       (* nvmember_type1 nvmember_name1; ... *)
@@ -629,8 +654,6 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
                       hbrace (Pp.str cstr_enum_const) ++ Pp.str ";") +++
                     Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")&s;"))))
         else
-          (let cstr_key = EConstr.to_constr sigma (mkApp (mkConstructUi (ind_pind, cstr_j), ind_params)) in
-          cstr_deallocator_cfunc_map := ConstrMap.add cstr_key "free" !cstr_deallocator_cfunc_map;
           (* nv_cstr_members is not empty:
             static ind_name cstr_name(nvmember_type1 nvmember_name1, ...) {
               struct cstr_struct_tag *p;
@@ -641,7 +664,7 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
               return (ind_name)p;
             }
           *)
-          let fargs =
+          (let fargs =
             pp_joinmap_list (Pp.str "," ++ Pp.spc ())
               (fun {nvmember_type; nvmember_name} ->
                 Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name)))
@@ -679,24 +702,39 @@ let gen_indimp_heap_impls (env : Environ.env) (sigma : Evd.evar_map) (ind_names 
   else
     gen_indimp_heap_impls_generic env sigma ind_names
 
-let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
+let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let ind_names = generate_indimp_names env sigma coq_type in
+  let ind_names = generate_indimp_names env sigma coq_type ~global_prefix:indimp_mods.indimp_mods_prefix in
   let env, ind_names = register_indimp env sigma ind_names in
   ignore env;
-  add_thunk "type_impls" (fun () -> gen_indimp_immediate_impl ind_names)
+  let (filename, section) = Stdlib.Option.value indimp_mods.indimp_mods_output_impl ~default:(!current_source_filename, "type_impls") in
+  let f () = gen_indimp_immediate_impl ind_names in
+  codegen_add_generation filename (GenThunk (section, f))
 
-let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
+let register_deallocators (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (coq_type : EConstr.types) : unit =
+  let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
+  ind_cstrs |> Array.iter (fun { cstr_j; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_members } ->
+    let nv_cstr_members = non_void_cstr_members cstr_members in
+    if not (CList.is_empty nv_cstr_members) then
+      let cstr_key = EConstr.to_constr sigma (mkApp (mkConstructUi (ind_pind, cstr_j), ind_params)) in
+      cstr_deallocator_cfunc_map := ConstrMap.add cstr_key "free" !cstr_deallocator_cfunc_map)
+
+let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
-  let ind_names = generate_indimp_names env sigma coq_type in
+  let ind_names = generate_indimp_names env sigma coq_type ~global_prefix:indimp_mods.indimp_mods_prefix in
   let env, ind_names = register_indimp env sigma ind_names in
   if !opt_indimp_auto_linear then
     Linear.add_linear_type ~msg_new:true env sigma coq_type;
+  register_deallocators env sigma ind_names coq_type;
   ignore env;
-  add_thunk "type_decls" (fun () -> gen_indimp_heap_decls ind_names);
-  add_thunk "type_impls" (fun () -> gen_indimp_heap_impls env sigma ind_names)
+  let (decl_filename, decl_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type ~default:(!current_source_filename, "type_decls") in
+  let (impl_filename, impl_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_impl ~default:(!current_source_filename, "type_impls") in
+  let f_decl () = gen_indimp_heap_decls ind_names in
+  let f_impl () = gen_indimp_heap_impls env sigma ind_names in
+  codegen_add_generation decl_filename (GenThunk (decl_section, f_decl));
+  codegen_add_generation impl_filename (GenThunk (impl_section, f_impl))
 
-let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) : unit =
+let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) (indimp_mods : indimp_mods) : unit =
   (if force_imm && force_heap then
     user_err (Pp.str "[codegen] both force_imm and force_heap are true"));
   let env = Global.env () in
@@ -705,7 +743,7 @@ let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : C
   (* (if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_econstr_env env sigma coq_type)); *)
   if force_heap then
-    generate_indimp_heap env sigma coq_type
+    generate_indimp_heap env sigma coq_type indimp_mods
   else if force_imm then
     begin
       if ind_recursive_p env sigma coq_type then
@@ -713,10 +751,10 @@ let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : C
       (* mutual inductive types are forbidden because mostly they are used for recursive types. *)
       if ind_mutual_p env sigma coq_type then
         user_err (Pp.str "[codegen] IndImpImm is used for mutually defined type:" +++ Printer.pr_econstr_env env sigma coq_type);
-      generate_indimp_immediate env sigma coq_type
+      generate_indimp_immediate env sigma coq_type indimp_mods
     end
   else if ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
-    generate_indimp_heap env sigma coq_type
+    generate_indimp_heap env sigma coq_type indimp_mods
   else
-    generate_indimp_immediate env sigma coq_type
+    generate_indimp_immediate env sigma coq_type indimp_mods
 

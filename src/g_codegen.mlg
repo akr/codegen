@@ -143,6 +143,11 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen IndImp COQ_TYPE.
 *)
 
+VERNAC ARGUMENT EXTEND where_or_and
+| [ "where" ] -> { () }
+| [ "and" ] -> { () }
+END
+
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
 | [ ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
   { { cstr_id; cstr_caselabel; cstr_accessors } }
@@ -227,6 +232,30 @@ VERNAC ARGUMENT EXTEND indimp_cstrs
 | [] -> { [] }
 END
 
+VERNAC ARGUMENT EXTEND filename_and_sectionopt
+| [ string(filename) ":" string(section) ] -> { (filename, Some section) }
+| [ "current_source" ":" string(section) ] -> { (!current_source_filename, Some section) }
+| [ "current_header" ":" string(section) ] -> { (!current_header_filename, Some section) }
+| [ string(filename) ] -> { (filename, None) }
+| [ "current_source" ] -> { (!current_source_filename, None) }
+| [ "current_header" ] -> { (!current_header_filename, None) }
+END
+
+VERNAC ARGUMENT EXTEND indimp_mod
+| [ "output_type" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_type = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_decls" (snd fn_and_secopt)) } }
+| [ "output_impl" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_impl = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_impls" (snd fn_and_secopt)) } }
+| [ "prefix" string(prefix) ] -> { { indimp_mods_empty with indimp_mods_prefix = Some prefix } }
+END
+
+VERNAC ARGUMENT EXTEND where_indimp_mod
+| [ where_or_and indimp_mod(indimp_mod) ] -> { indimp_mod }
+END
+
+VERNAC ARGUMENT EXTEND indimp_mods
+| [ where_indimp_mod(indimp_mod) indimp_mods(indimp_mods) ] -> { merge_indimp_mods indimp_mod indimp_mods }
+| [] -> { indimp_mods_empty }
+END
+
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type_left) string(c_type_right) ] ->
       { command_ind_type coq_type { c_type_left; c_type_right } }
@@ -259,9 +288,9 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "RawSnippet" string(section) string(str) ] -> { command_rawsnippet section str }
     | [ "CodeGen" "HeaderRawSnippet" string(section) string(str) ] -> { command_header_rawsnippet section str }
 
-    | [ "CodeGen" "IndImp" lconstr(coq_type) ] -> { command_indimp coq_type }
-    | [ "CodeGen" "IndImpImm" lconstr(coq_type) ] -> { command_indimp ~force_imm:true coq_type }
-    | [ "CodeGen" "IndImpHeap" lconstr(coq_type) ] -> { command_indimp ~force_heap:true coq_type }
+    | [ "CodeGen" "IndImp" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp coq_type indimp_mods }
+    | [ "CodeGen" "IndImpImm" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp ~force_imm:true coq_type indimp_mods }
+    | [ "CodeGen" "IndImpHeap" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp ~force_heap:true coq_type indimp_mods }
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 

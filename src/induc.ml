@@ -62,9 +62,35 @@ let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (in
   | Some c_swfunc -> Feedback.msg_info (pr_inductive_match env sigma ind_cfg)
   | None -> ()
 
+let codegen_print_inductive_deallocator (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
+  let (f, params) = decompose_appvect sigma (EConstr.of_constr ind_cfg.coq_type) in
+  let pind = EConstr.destInd sigma f in
+  let deallocs =
+    ind_cfg.cstr_configs |> Array.mapi (fun j0 cstr_cfg ->
+      let cstr_id = cstr_cfg.coq_cstr in
+      let cstr_j = j0 + 1 in
+      let cstrterm = mkApp (mkConstructUi (pind, cstr_j), params) in
+      let dealloc_opt = ConstrMap.find_opt (EConstr.to_constr sigma cstrterm) !cstr_deallocator_cfunc_map in
+      (cstr_id, dealloc_opt))
+  in
+  (* CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?. *)
+  let deallocs = Array.to_list deallocs |>
+    List.filter_map (fun (cstr_id, dealloc_opt) -> match dealloc_opt with None -> None | Some dealloc -> Some (cstr_id, dealloc))
+  in
+  if not (CList.is_empty deallocs) then
+    msg_info_hov (
+      Pp.str "CodeGen InductiveDeallocator" +++
+      Printer.pr_constr_env env sigma ind_cfg.coq_type +++
+      (deallocs |> List.mapi (fun k (cstr_id, dealloc) -> (k, cstr_id, dealloc)) |>
+       pp_sjoinmap_list (fun (k, cstr_id, dealloc) ->
+         Pp.str (if k = 0 then "with" else "|") +++
+         Id.print cstr_id +++ Pp.str "=>" +++ Pp.str (quote_coq_string dealloc))) ++
+      Pp.str ".")
+
 let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   codegen_print_inductive_type env sigma ind_cfg;
-  codegen_print_inductive_match env sigma ind_cfg
+  codegen_print_inductive_match env sigma ind_cfg;
+  codegen_print_inductive_deallocator env sigma ind_cfg
 
 let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit =
   let env = Global.env () in
