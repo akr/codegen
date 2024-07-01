@@ -143,6 +143,11 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen IndImp COQ_TYPE.
 *)
 
+VERNAC ARGUMENT EXTEND onoff
+| [ "on" ] -> { true }
+| [ "off" ] -> { false }
+END
+
 VERNAC ARGUMENT EXTEND where_or_and
 | [ "where" ] -> { () }
 | [ "and" ] -> { () }
@@ -245,6 +250,7 @@ VERNAC ARGUMENT EXTEND indimp_mod
 | [ "output_type" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_type = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_decls" (snd fn_and_secopt)) } }
 | [ "output_impl" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_impl = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_impls" (snd fn_and_secopt)) } }
 | [ "prefix" string(prefix) ] -> { { indimp_mods_empty with indimp_mods_prefix = Some prefix } }
+| [ "static" onoff(onoff) ] -> { { indimp_mods_empty with indimp_mods_static = Some onoff } }
 END
 
 VERNAC ARGUMENT EXTEND where_indimp_mod

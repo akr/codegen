@@ -30,12 +30,14 @@ type indimp_mods = {
   indimp_mods_output_type : (string * string) option;
   indimp_mods_output_impl : (string * string) option;
   indimp_mods_prefix : string option;
+  indimp_mods_static : bool option;
 }
 
 let indimp_mods_empty = {
   indimp_mods_output_type = None;
   indimp_mods_output_impl = None;
   indimp_mods_prefix = None;
+  indimp_mods_static = None;
 }
 
 let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
@@ -51,6 +53,7 @@ let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods 
     indimp_mods_output_type = optmerge "output_type" mods1.indimp_mods_output_type mods2.indimp_mods_output_type;
     indimp_mods_output_impl = optmerge "output_impl" mods1.indimp_mods_output_impl mods2.indimp_mods_output_impl;
     indimp_mods_prefix = optmerge "prefix" mods1.indimp_mods_prefix mods2.indimp_mods_prefix;
+    indimp_mods_static = optmerge "static" mods1.indimp_mods_static mods2.indimp_mods_static;
   }
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
@@ -348,7 +351,12 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_
   in
   (env, ind_names)
 
-let gen_indimp_immediate_impl (ind_names : ind_names) : string =
+let pr_static (static : bool option) : Pp.t =
+  match static with
+  | None | Some true -> Pp.str "static"
+  | Some false -> Pp.mt ()
+
+let gen_indimp_immediate_impl (ind_names : ind_names) (indimp_mods : indimp_mods) : string =
   let { ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
   let constant_constructor_only =
     ind_cstrs |> Array.for_all (fun { cstr_members } ->
@@ -424,13 +432,14 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
                   Pp.str " as;"))
       ) ++ Pp.str (" " ^ ind_name ^ ";"))
   in
+  let pp_static = pr_static indimp_mods.indimp_mods_static in
   let pp_swfunc =
     if single_constructor then
       Pp.mt ()
     else
       Pp.v 0 (
         Pp.hov 0 (
-          Pp.str "static int" +++
+          pp_static +++ Pp.str "int" +++
           Pp.str ind_swfunc ++ Pp.str "(" ++ Pp.str ind_name +++ Pp.str "x)") +++
         vbrace (
           Pp.hov 0 (Pp.str "return x.tag;")
@@ -448,7 +457,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
         in
         Pp.v 0 (
           Pp.hov 0 (
-            Pp.str "static" +++
+            pp_static +++
             Pp.str (compose_c_decl nvmember_type (nvmember_accessor ^ "(" ^ ind_name ^ " x)"))) +++
           vbrace (
             Pp.hov 0 (Pp.str "return" +++ Pp.str return_exp ++ Pp.str ";")))))
@@ -468,7 +477,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
       in
       Pp.v 0 (
         Pp.hov 0 (
-          Pp.str "static" +++
+          pp_static +++
           Pp.str ind_name +++
           Pp.str cstr_name ++
           Pp.str "(" ++ fargs ++ Pp.str ")") +++
@@ -509,7 +518,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) : string =
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp
 
-let gen_indimp_heap_decls (ind_names : ind_names) : string =
+let gen_indimp_heap_decls (ind_names : ind_names) (indimp_mods : indimp_mods) : string =
   let pp_ind_types =
     (* typedef struct ind_struct_tag *ind_name; *)
     let { ind_name; ind_struct_tag } = ind_names in
@@ -524,7 +533,7 @@ let gen_indimp_heap_decls (ind_names : ind_names) : string =
   let pp_decls = Pp.v 0 pp_ind_types in
   Pp.string_of_ppcmds pp_decls
 
-let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : string =
+let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : string =
   let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   let pp_ind_impls =
@@ -543,6 +552,7 @@ let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.ev
       vbrace member_decl ++
       Pp.str ";"
     in
+    let pp_static = pr_static indimp_mods.indimp_mods_static in
     let pp_accessors =
       let { cstr_members } = ind_cstr in
       let nv_cstr_members = non_void_cstr_members cstr_members in
@@ -551,7 +561,7 @@ let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.ev
           (* static nvmember_type nvmember_accessor(ind_name x) { return x->nvmember_name; } *)
           Pp.v 0 (
             Pp.hov 0 (
-              Pp.str "static" +++
+              pp_static +++
               Pp.str (compose_c_decl nvmember_type (nvmember_accessor ^ "(" ^ ind_name ^ " x)"))) +++
           vbrace (
             Pp.hov 0 (Pp.str "return" +++ Pp.str ("(x->" ^ nvmember_name ^ ")")) ++ Pp.str ";")))
@@ -579,7 +589,7 @@ let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.ev
             nv_cstr_members
       in
       Pp.v 0 (Pp.hov 2 (
-                Pp.str "static" +++
+                pp_static +++
                 Pp.str ind_name +++
                 Pp.str cstr_name ++
                 Pp.str "(" ++ fargs ++ Pp.str ")") +++
@@ -599,7 +609,7 @@ let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.ev
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp_impls
 
-let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : string =
+let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : string =
   let pp_ind_impls =
     let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
     let pp_enum_decl =
@@ -616,11 +626,13 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
         vbrace (Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;")) ++
         Pp.str ";"
     in
+    let pp_static = pr_static indimp_mods.indimp_mods_static in
     let pp_swfunc =
       (* static int ind_swfunc(ind_name x) { return x->tag; } *)
       Pp.v 0 (
         Pp.hov 0 (
-          Pp.str "static int" +++
+          pp_static +++
+          Pp.str "int" +++
           Pp.str ind_swfunc ++ Pp.str "(" ++ Pp.str ind_name +++ Pp.str "x)") +++
         vbrace (
           Pp.hov 0 (Pp.str "return x->tag;")
@@ -656,7 +668,7 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
               (* static nvmember_type nvmember_accessor(ind_name x) { return ((struct cstr_struct_tag * )(x))->nvmember_name; } *)
               Pp.v 0 (
                 Pp.hov 0 (
-                  Pp.str "static" +++
+                  pp_static +++
                   Pp.str (compose_c_decl nvmember_type (nvmember_accessor ^ "(" ^ ind_name ^ " x)"))) +++
               vbrace (
                 Pp.hov 0 (Pp.str "return" +++ Pp.str ("(((struct " ^ cstr_struct_tag ^ " *)(x))->" ^ nvmember_name ^ ")")) ++ Pp.str ";")))
@@ -673,7 +685,7 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
             }
           *)
           Pp.v 0 (Pp.hov 2 (
-                    Pp.str "static" +++
+                    pp_static +++
                     Pp.str ind_name +++
                     Pp.str cstr_name ++
                     Pp.str "(void)") +++
@@ -699,7 +711,7 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
               nv_cstr_members
           in
           Pp.v 0 (Pp.hov 2 (
-                    Pp.str "static" +++
+                    pp_static +++
                     Pp.str ind_name +++
                     Pp.str cstr_name ++
                     Pp.str "(" ++ fargs ++ Pp.str ")") +++
@@ -720,15 +732,15 @@ let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (in
   (*msg_info_hov pp;*)
   Pp.string_of_ppcmds pp_impls
 
-let gen_indimp_heap_impls (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : string =
+let gen_indimp_heap_impls (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : string =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let { ind_pind; ind_params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } = ind_names in
   let single_constructor = Array.length ind_cstrs = 1 in
   if single_constructor then
-    gen_indimp_heap_impls_single_constructor env sigma ind_names
+    gen_indimp_heap_impls_single_constructor env sigma ind_names indimp_mods
   else
-    gen_indimp_heap_impls_generic env sigma ind_names
+    gen_indimp_heap_impls_generic env sigma ind_names indimp_mods
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
@@ -736,7 +748,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let env, ind_names = register_indimp env sigma ind_names in
   ignore env;
   let (filename, section) = Stdlib.Option.value indimp_mods.indimp_mods_output_impl ~default:(!current_source_filename, "type_impls") in
-  let f () = gen_indimp_immediate_impl ind_names in
+  let f () = gen_indimp_immediate_impl ind_names indimp_mods in
   codegen_add_generation filename (GenThunk (section, f))
 
 let register_deallocators (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (coq_type : EConstr.types) : unit =
@@ -757,8 +769,8 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   ignore env;
   let (decl_filename, decl_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type ~default:(!current_source_filename, "type_decls") in
   let (impl_filename, impl_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_impl ~default:(!current_source_filename, "type_impls") in
-  let f_decl () = gen_indimp_heap_decls ind_names in
-  let f_impl () = gen_indimp_heap_impls env sigma ind_names in
+  let f_decl () = gen_indimp_heap_decls ind_names indimp_mods in
+  let f_impl () = gen_indimp_heap_impls env sigma ind_names indimp_mods in
   codegen_add_generation decl_filename (GenThunk (decl_section, f_decl));
   codegen_add_generation impl_filename (GenThunk (impl_section, f_impl))
 
