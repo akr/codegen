@@ -3506,6 +3506,41 @@ let test_indimp_auto_linear (ctx : test_ctxt) : unit =
       assert(mylen(l) == 3);
     |}
 
+let test_indimp_cstr_fargs_void (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCC ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mybool := mytrue | myfalse.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen IndImp mybool where prefix "mybool".
+      CodeGen Snippet "epilogue" "static mybool mybool_cstr_mytrue(void);". (* check IndImp generates (void) as the formal argument. *)
+    |}) {|
+    |}
+
+let test_indimp_static_off (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCC ~cc_exit_code:(Unix.WEXITED 1) ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mybool := mytrue | myfalse.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen IndImpHeap mybool where static off and prefix "mybool".
+      (* IndImp generated non-static definition and the static prototype causes compilation error. *)
+      CodeGen Snippet "epilogue" "static mybool mybool_cstr_mytrue(void);".
+    |}) {|
+    |}
+
+let test_indimp_static_on (ctx : test_ctxt) : unit =
+  codegen_test_template ~goal:UntilCC ~cc_exit_code:(Unix.WEXITED 1) ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mybool := mytrue | myfalse.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen IndImpHeap mybool where static on and prefix "mybool".
+      (* the extern prototype and IndImp generated static definition causes compilation error. *)
+      CodeGen Snippet "type_decls" "extern mybool mybool_cstr_mytrue(void);".
+    |}) {|
+    |}
+
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -4790,6 +4825,9 @@ let suite : OUnit2.test =
     "test_indimp_force_imm_fail_mut" >:: test_indimp_force_imm_fail_mut;
     "test_indimp_dealloc_list" >:: test_indimp_dealloc_list;
     "test_indimp_auto_linear" >:: test_indimp_auto_linear;
+    "test_indimp_cstr_fargs_void" >:: test_indimp_cstr_fargs_void;
+    "test_indimp_static_off" >:: test_indimp_static_off;
+    "test_indimp_static_on" >:: test_indimp_static_on;
     "test_header_snippet" >:: test_header_snippet;
     "test_prototype" >:: test_prototype;
     "test_monocheck_failure" >:: test_monocheck_failure;
