@@ -466,9 +466,12 @@ let gen_indimp_immediate_impl (ind_names : ind_names) (indimp_mods : indimp_mods
     ind_cstrs |> pp_sjoinmap_ary (fun { cstr_name; cstr_enum_const; cstr_umember; cstr_members } ->
       let nv_cstr_members = non_void_cstr_members cstr_members in
       let fargs =
-        pp_joinmap_list (Pp.str "," ++ Pp.spc ())
-          (fun {nvmember_type; nvmember_name} -> Pp.str (compose_c_decl nvmember_type nvmember_name))
-          nv_cstr_members
+        if CList.is_empty nv_cstr_members then
+          Pp.str "void"
+        else
+          pp_joinmap_list (Pp.str "," ++ Pp.spc ())
+            (fun {nvmember_type; nvmember_name} -> Pp.str (compose_c_decl nvmember_type nvmember_name))
+            nv_cstr_members
       in
       let args =
         pp_joinmap_list (Pp.str "," ++ Pp.spc ())
