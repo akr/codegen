@@ -3416,7 +3416,7 @@ let test_indimp_force_heap (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch nat4 => "sw_nat4" with
       | mkNat4 => "" "get_nat1" "get_nat2" "get_nat3" "get_nat4".
       CodeGen Primitive mkNat4 => "mkNat4".
-      CodeGen IndImpHeap nat4.
+      CodeGen IndImp nat4 where heap on.
     |}) {|
       nat4 x = mkNat4(11,12,13,14);
       assert(get_nat1(x) == 11);
@@ -3435,7 +3435,7 @@ let test_indimp_force_imm (ctx : test_ctxt) : unit =
       CodeGen InductiveMatch nat4 => "sw_nat4" with
       | mkNat4 => "" "get_nat1" "get_nat2" "get_nat3" "get_nat4".
       CodeGen Primitive mkNat4 => "mkNat4".
-      CodeGen IndImpImm nat4.
+      CodeGen IndImp nat4 where heap off.
     |}) {|
       nat4 x = mkNat4(11,12,13,14);
       assert(get_nat1(x) == 11);
@@ -3450,7 +3450,7 @@ let test_indimp_force_imm_fail_rec (ctx : test_ctxt) : unit =
     (nat_src ^
     {|
       Inductive mylist := mynil : mylist | mycons : nat -> mylist -> mylist.
-      Fail CodeGen IndImpImm nat4.
+      Fail CodeGen IndImp nat4 where heap off.
     |})
 
 let test_indimp_force_imm_fail_mut (ctx : test_ctxt) : unit =
@@ -3459,7 +3459,7 @@ let test_indimp_force_imm_fail_mut (ctx : test_ctxt) : unit =
     {|
       Inductive mytype1 := C1
       with mytype2 := C2.
-      Fail CodeGen IndImpImm mytype1.
+      Fail CodeGen IndImp mytype1 where heap off.
     |})
 
 let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
@@ -3523,7 +3523,7 @@ let test_indimp_static_off (ctx : test_ctxt) : unit =
     {|
       Inductive mybool := mytrue | myfalse.
       CodeGen InductiveType mybool => "mybool".
-      CodeGen IndImpHeap mybool where static off and prefix "mybool".
+      CodeGen IndImp mybool where heap on and static off and prefix "mybool".
       (* IndImp generated non-static definition and the static prototype causes compilation error. *)
       CodeGen Snippet "epilogue" "static mybool mybool_cstr_mytrue(void);".
     |}) {|
@@ -3535,7 +3535,7 @@ let test_indimp_static_on (ctx : test_ctxt) : unit =
     {|
       Inductive mybool := mytrue | myfalse.
       CodeGen InductiveType mybool => "mybool".
-      CodeGen IndImpHeap mybool where static on and prefix "mybool".
+      CodeGen IndImp mybool where heap on and static on and prefix "mybool".
       (* the extern prototype and IndImp generated static definition causes compilation error. *)
       CodeGen Snippet "type_decls" "extern mybool mybool_cstr_mytrue(void);".
     |}) {|

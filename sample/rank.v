@@ -167,7 +167,7 @@ CodeGen Primitive blksz2 => "aux_blksz2".
 CodeGen Primitive ratio => "aux_ratio".
 CodeGen Primitive dir1 => "aux_dir1".
 CodeGen Primitive dir2 => "aux_dir2".
-CodeGen IndImpHeap Aux.
+CodeGen IndImp Aux where heap on.
 
 CodeGen Primitive bsize.
 CodeGen Primitive freezeD.

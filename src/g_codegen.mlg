@@ -96,9 +96,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   CodeGen HeaderSnippet "SECTION" "CODE".          (* append the string into the header file *)
   CodeGen HeaderRawSnippet "SECTION" "CODE".       (* same as CodeGen Header Snippet but it does not strip indent *)
 
-  CodeGen IndImp COQ_TYPE.
-  CodeGen IndImpImm COQ_TYPE.
-  CodeGen IndImpHeap COQ_TYPE.
+  CodeGen IndImp COQ_TYPE ( ( where | and ) OPTION_KEY OPTION_VALUE )* .
 
   CodeGen GenerateFile "FILENAME".
   CodeGen GenerateTest.
@@ -247,6 +245,7 @@ VERNAC ARGUMENT EXTEND filename_and_sectionopt
 END
 
 VERNAC ARGUMENT EXTEND indimp_mod
+| [ "heap" onoff(onoff) ] -> { { indimp_mods_empty with indimp_mods_heap = Some onoff } }
 | [ "output_type" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_type = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_decls" (snd fn_and_secopt)) } }
 | [ "output_impl" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_impl = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_impls" (snd fn_and_secopt)) } }
 | [ "prefix" string(prefix) ] -> { { indimp_mods_empty with indimp_mods_prefix = Some prefix } }
@@ -295,8 +294,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "HeaderRawSnippet" string(section) string(str) ] -> { command_header_rawsnippet section str }
 
     | [ "CodeGen" "IndImp" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp coq_type indimp_mods }
-    | [ "CodeGen" "IndImpImm" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp ~force_imm:true coq_type indimp_mods }
-    | [ "CodeGen" "IndImpHeap" lconstr(coq_type) indimp_mods(indimp_mods) ] -> { command_indimp ~force_heap:true coq_type indimp_mods }
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 

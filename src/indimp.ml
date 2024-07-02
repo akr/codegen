@@ -27,6 +27,7 @@ open Induc
 open Specialize
 
 type indimp_mods = {
+  indimp_mods_heap : bool option;
   indimp_mods_output_type : (string * string) option;
   indimp_mods_output_impl : (string * string) option;
   indimp_mods_prefix : string option;
@@ -34,6 +35,7 @@ type indimp_mods = {
 }
 
 let indimp_mods_empty = {
+  indimp_mods_heap = None;
   indimp_mods_output_type = None;
   indimp_mods_output_impl = None;
   indimp_mods_prefix = None;
@@ -50,6 +52,7 @@ let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
 
 let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods =
   {
+    indimp_mods_heap = optmerge "heap" mods1.indimp_mods_heap mods2.indimp_mods_heap;
     indimp_mods_output_type = optmerge "output_type" mods1.indimp_mods_output_type mods2.indimp_mods_output_type;
     indimp_mods_output_impl = optmerge "output_impl" mods1.indimp_mods_output_impl mods2.indimp_mods_output_impl;
     indimp_mods_prefix = optmerge "prefix" mods1.indimp_mods_prefix mods2.indimp_mods_prefix;
@@ -777,27 +780,27 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   codegen_add_generation decl_filename (GenThunk (decl_section, f_decl));
   codegen_add_generation impl_filename (GenThunk (impl_section, f_impl))
 
-let command_indimp ?(force_imm = false) ?(force_heap = false) (user_coq_type : Constrexpr.constr_expr) (indimp_mods : indimp_mods) : unit =
-  (if force_imm && force_heap then
-    user_err (Pp.str "[codegen] both force_imm and force_heap are true"));
+let command_indimp (user_coq_type : Constrexpr.constr_expr) (indimp_mods : indimp_mods) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   (* (if ind_coq_type_registered_p coq_type then
     user_err (Pp.str "[codegen] inductive type already configured:" +++ Printer.pr_econstr_env env sigma coq_type)); *)
-  if force_heap then
-    generate_indimp_heap env sigma coq_type indimp_mods
-  else if force_imm then
-    begin
-      if ind_recursive_p env sigma coq_type then
-        user_err (Pp.str "[codegen] IndImpImm is used for recursive type:" +++ Printer.pr_econstr_env env sigma coq_type);
-      (* mutual inductive types are forbidden because mostly they are used for recursive types. *)
-      if ind_mutual_p env sigma coq_type then
-        user_err (Pp.str "[codegen] IndImpImm is used for mutually defined type:" +++ Printer.pr_econstr_env env sigma coq_type);
-      generate_indimp_immediate env sigma coq_type indimp_mods
-    end
-  else if ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
-    generate_indimp_heap env sigma coq_type indimp_mods
-  else
-    generate_indimp_immediate env sigma coq_type indimp_mods
+  match indimp_mods.indimp_mods_heap with
+  | Some true ->
+      generate_indimp_heap env sigma coq_type indimp_mods
+  | Some false ->
+      begin
+        if ind_recursive_p env sigma coq_type then
+          user_err (Pp.str "[codegen] IndImp(heap off) is used for recursive type:" +++ Printer.pr_econstr_env env sigma coq_type);
+        (* mutual inductive types are forbidden because mostly they are used for recursive types. *)
+        if ind_mutual_p env sigma coq_type then
+          user_err (Pp.str "[codegen] IndImp(heap off) is used for mutually defined type:" +++ Printer.pr_econstr_env env sigma coq_type);
+        generate_indimp_immediate env sigma coq_type indimp_mods
+      end
+  | None ->
+      if ind_recursive_p env sigma coq_type || ind_mutual_p env sigma coq_type then
+        generate_indimp_heap env sigma coq_type indimp_mods
+      else
+        generate_indimp_immediate env sigma coq_type indimp_mods
 
