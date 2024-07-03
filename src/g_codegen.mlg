@@ -247,6 +247,7 @@ END
 VERNAC ARGUMENT EXTEND indimp_mod
 | [ "heap" onoff(onoff) ] -> { { indimp_mods_empty with indimp_mods_heap = Some onoff } }
 | [ "output_type" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_type = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_decls" (snd fn_and_secopt)) } }
+| [ "output_prototype" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_prototype = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_impls" (snd fn_and_secopt)) } }
 | [ "output_impl" filename_and_sectionopt(fn_and_secopt) ] -> { { indimp_mods_empty with indimp_mods_output_impl = Some (fst fn_and_secopt, Stdlib.Option.value ~default:"type_impls" (snd fn_and_secopt)) } }
 | [ "prefix" string(prefix) ] -> { { indimp_mods_empty with indimp_mods_prefix = Some prefix } }
 | [ "static" onoff(onoff) ] -> { { indimp_mods_empty with indimp_mods_static = Some onoff } }
