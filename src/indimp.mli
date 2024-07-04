@@ -1,8 +1,9 @@
 type indimp_mods = {
   indimp_mods_heap : bool option;
-  indimp_mods_output_type : (string * string) option;
-  indimp_mods_output_prototype : (string * string) option;
-  indimp_mods_output_impl : (string * string) option;
+  indimp_mods_output_type_decls : (string * string) option;
+  indimp_mods_output_type_impls : (string * string) option;
+  indimp_mods_output_func_decls : (string * string) option;
+  indimp_mods_output_func_impls : (string * string) option;
   indimp_mods_prefix : string option;
   indimp_mods_static : bool option;
 }

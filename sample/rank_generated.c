@@ -11,20 +11,6 @@ g0_istruct_prod
   MDArr g0_member1_pair;
   MDArr g0_member2_pair;
 } pair_MDArr_MDArr;
-static MDArr pair_MDArr_MDArr_D1(pair_MDArr_MDArr x)
-{
-  return x.g0_member1_pair;
-}
-static MDArr pair_MDArr_MDArr_D2(pair_MDArr_MDArr x)
-{
-  return x.g0_member2_pair;
-}
-static pair_MDArr_MDArr make_pair_MDArr_MDArr(MDArr g0_member1_pair,
-MDArr g0_member2_pair)
-{
-  pair_MDArr_MDArr ret = { g0_member1_pair, g0_member2_pair };
-  return ret;
-}
 
 typedef struct
 g1_istruct_prod
@@ -32,20 +18,6 @@ g1_istruct_prod
   MDArr g1_member1_pair;
   nat g1_member2_pair;
 } pair_MDArr_nat;
-static MDArr pair_MDArr_nat_D(pair_MDArr_nat x)
-{
-  return x.g1_member1_pair;
-}
-static nat pair_MDArr_nat_n(pair_MDArr_nat x)
-{
-  return x.g1_member2_pair;
-}
-static pair_MDArr_nat make_pair_MDArr_nat(MDArr g1_member1_pair,
-nat g1_member2_pair)
-{
-  pair_MDArr_nat ret = { g1_member1_pair, g1_member2_pair };
-  return ret;
-}
 
 typedef struct
 g2_istruct_prod
@@ -53,20 +25,6 @@ g2_istruct_prod
   pair_MDArr_MDArr g2_member1_pair;
   nat g2_member2_pair;
 } pair_2MDArr_nat;
-static pair_MDArr_MDArr pair_2MDArr_nat_D12(pair_2MDArr_nat x)
-{
-  return x.g2_member1_pair;
-}
-static nat pair_2MDArr_nat_n(pair_2MDArr_nat x)
-{
-  return x.g2_member2_pair;
-}
-static pair_2MDArr_nat make_pair_2MDArr_nat(pair_MDArr_MDArr g2_member1_pair,
-nat g2_member2_pair)
-{
-  pair_2MDArr_nat ret = { g2_member1_pair, g2_member2_pair };
-  return ret;
-}
 
 struct g3_istruct_Aux
 {
@@ -77,6 +35,82 @@ struct g3_istruct_Aux
   DArr g3_member5_mkAux_dir1;
   DArr g3_member6_mkAux_dir2;
 };
+
+/* section-end: type_impls */
+/* section-start: func_decls */
+static MDArr pair_MDArr_MDArr_D1(pair_MDArr_MDArr x);
+static MDArr pair_MDArr_MDArr_D2(pair_MDArr_MDArr x);
+static pair_MDArr_MDArr make_pair_MDArr_MDArr(MDArr g0_member1_pair,
+  MDArr g0_member2_pair);
+
+static MDArr pair_MDArr_nat_D(pair_MDArr_nat x);
+static nat pair_MDArr_nat_n(pair_MDArr_nat x);
+static pair_MDArr_nat make_pair_MDArr_nat(MDArr g1_member1_pair,
+  nat g1_member2_pair);
+
+static pair_MDArr_MDArr pair_2MDArr_nat_D12(pair_2MDArr_nat x);
+static nat pair_2MDArr_nat_n(pair_2MDArr_nat x);
+static pair_2MDArr_nat make_pair_2MDArr_nat(pair_MDArr_MDArr g2_member1_pair,
+  nat g2_member2_pair);
+
+static bool aux_query_bit(Aux x);
+static bits aux_input_bits(Aux x);
+static nat aux_blksz2(Aux x);
+static nat aux_ratio(Aux x);
+static DArr aux_dir1(Aux x);
+static DArr aux_dir2(Aux x);
+static Aux mkAux(bool g3_member1_mkAux_query_bit,
+  bits g3_member2_mkAux_input_bits, nat g3_member3_mkAux_ratio,
+  nat g3_member4_mkAux_blksz2, DArr g3_member5_mkAux_dir1,
+  DArr g3_member6_mkAux_dir2);
+
+/* section-end: func_decls */
+/* section-start: func_impls */
+static MDArr pair_MDArr_MDArr_D1(pair_MDArr_MDArr x)
+{
+  return x.g0_member1_pair;
+}
+static MDArr pair_MDArr_MDArr_D2(pair_MDArr_MDArr x)
+{
+  return x.g0_member2_pair;
+}
+static pair_MDArr_MDArr make_pair_MDArr_MDArr(MDArr g0_member1_pair,
+  MDArr g0_member2_pair)
+{
+  pair_MDArr_MDArr ret = { g0_member1_pair, g0_member2_pair };
+  return ret;
+}
+
+static MDArr pair_MDArr_nat_D(pair_MDArr_nat x)
+{
+  return x.g1_member1_pair;
+}
+static nat pair_MDArr_nat_n(pair_MDArr_nat x)
+{
+  return x.g1_member2_pair;
+}
+static pair_MDArr_nat make_pair_MDArr_nat(MDArr g1_member1_pair,
+  nat g1_member2_pair)
+{
+  pair_MDArr_nat ret = { g1_member1_pair, g1_member2_pair };
+  return ret;
+}
+
+static pair_MDArr_MDArr pair_2MDArr_nat_D12(pair_2MDArr_nat x)
+{
+  return x.g2_member1_pair;
+}
+static nat pair_2MDArr_nat_n(pair_2MDArr_nat x)
+{
+  return x.g2_member2_pair;
+}
+static pair_2MDArr_nat make_pair_2MDArr_nat(pair_MDArr_MDArr g2_member1_pair,
+  nat g2_member2_pair)
+{
+  pair_2MDArr_nat ret = { g2_member1_pair, g2_member2_pair };
+  return ret;
+}
+
 static bool aux_query_bit(Aux x)
 {
   return (x->g3_member1_mkAux_query_bit);
@@ -117,10 +151,6 @@ static Aux mkAux(bool g3_member1_mkAux_query_bit,
   return p;
 }
 
-/* section-end: type_impls */
-/* section-start: func_decls */
-/* section-end: func_decls */
-/* section-start: func_impls */
 
 
 static pair_MDArr_nat
