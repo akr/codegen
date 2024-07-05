@@ -265,7 +265,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
           in
           let member_name = global_prefix ^ "_member" ^ k_suffix in
           let member_accessor = global_prefix ^ "_get" ^ k_suffix in
-          let member_type_lazy = lazy (if coq_type_is_void env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
+          let member_type_lazy = lazy (if ind_is_void_type env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
           { member_type_lazy; member_name; member_accessor })
       in
       { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_struct_tag; cstr_umember; cstr_members })
