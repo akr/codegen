@@ -147,24 +147,24 @@ type member_names = {
   member_accessor: string;
 }
 
-type cstr_names = {
+type 't cstr_names = {
   cstr_j: int;
   cstr_id: Id.t;
   cstr_name: string;
   cstr_enum_const: string;
   cstr_struct_tag: string;
   cstr_umember: string; (* union member name *)
-  cstr_members: member_names list;
+  cstr_members: 't list;
 }
 
-type ind_names = {
+type 't ind_names = {
   ind_pind: inductive * EInstance.t;
   ind_params: EConstr.t array;
   ind_name: string;
   ind_struct_tag: string;
   ind_enum_tag: string;
   ind_swfunc: string;
-  ind_cstrs: cstr_names array;
+  ind_cstrs: 't cstr_names array;
 }
 
 let pr_member_names (_env : Environ.env) (_sigma : Evd.evar_map) (member_names : member_names) : Pp.t =
@@ -179,7 +179,7 @@ let pr_member_names (_env : Environ.env) (_sigma : Evd.evar_map) (member_names :
     Pp.hov 2 (Pp.str "member_accessor:" +++ Pp.qstring member_names.member_accessor) ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
-let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : cstr_names) : Pp.t =
+let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : member_names cstr_names) : Pp.t =
   Pp.v 2 (Pp.str "{" +++
     Pp.hov 2 (Pp.str "cstr_j:" +++ Pp.int cstr_names.cstr_j) +++
     Pp.hov 2 (Pp.str "cstr_id:" +++ Id.print cstr_names.cstr_id) +++
@@ -190,7 +190,7 @@ let pr_cstr_names (env : Environ.env) (sigma : Evd.evar_map) (cstr_names : cstr_
     pp_sjoinmap_list (pr_member_names env sigma) cstr_names.cstr_members ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
-let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Pp.t =
+let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : Pp.t =
   Pp.v 2 (Pp.str "{" +++
     Pp.hov 2 (Pp.str "ind_pind:" +++ Printer.pr_inductive env (fst ind_names.ind_pind)) +++
     Pp.hov 2 (Pp.str "ind_params:" +++ pp_sjoinmap_ary (Printer.pr_econstr_env env sigma) ind_names.ind_params) +++
@@ -215,8 +215,14 @@ let non_void_cstr_members (cstr_members : member_names list) : nvmember_names li
                                        nvmember_name=member_name;
                                        nvmember_accessor=member_accessor})
 
+let non_void_cstr_names (cstr_names : member_names cstr_names) : nvmember_names cstr_names =
+  { cstr_names with cstr_members = non_void_cstr_members cstr_names.cstr_members }
+
+let non_void_ind_names (ind_names : member_names ind_names) : nvmember_names ind_names =
+  { ind_names with ind_cstrs = Array.map non_void_cstr_names ind_names.ind_cstrs }
+
 (* Generate automatic generated names.  No user configuration considered. *)
-let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) ~(global_prefix : string option) : ind_names =
+let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) ~(global_prefix : string option) : member_names ind_names =
   let (f, args) = decompose_appvect sigma coq_type in
   let params = args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
@@ -269,7 +275,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   result
 
 (* Merge generated names and user configuration.  Register generated names if no user configuration. *)
-let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : Environ.env * ind_names =
+let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : Environ.env * member_names ind_names =
   let { ind_pind=pind; ind_params=params } = ind_names in
   let coq_type_i = mkApp (mkIndU pind, params) in
   let ind_cfg_opt = lookup_ind_config sigma coq_type_i in
@@ -365,7 +371,7 @@ let pr_static (static : bool option) : Pp.t =
   | None | Some true -> Pp.str "static"
   | Some false -> Pp.mt ()
 
-let imm_enum_decl (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) : Pp.t =
+let imm_enum_decl (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) : Pp.t =
   let { ind_enum_tag; ind_cstrs } = ind_names in
   if single_constructor then
     Pp.mt ()
@@ -376,12 +382,11 @@ let imm_enum_decl (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_c
         pp_joinmap_ary (Pp.str "," ++ Pp.spc ()) (fun { cstr_enum_const } -> Pp.str cstr_enum_const) ind_cstrs) ++
         Pp.str ";"))
 
-let imm_typedef (ind_names : ind_names) (_indimp_mods : indimp_mods) (constant_constructor_only : bool) (single_constructor : bool) : Pp.t =
+let imm_typedef (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (constant_constructor_only : bool) (single_constructor : bool) : Pp.t =
   let { ind_name; ind_struct_tag; ind_enum_tag; ind_cstrs } = ind_names in
   let member_decls =
     ind_cstrs |> Array.map (fun { cstr_members } ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
-      nv_cstr_members |> pp_sjoinmap_list (fun {nvmember_type; nvmember_name} ->
+      cstr_members |> pp_sjoinmap_list (fun {nvmember_type; nvmember_name} ->
         Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";")))
   in
   let ind_cstrs_with_decls =
@@ -396,8 +401,7 @@ let imm_typedef (ind_names : ind_names) (_indimp_mods : indimp_mods) (constant_c
     else
       pp_sjoin_list
         (ind_cstrs_with_decls |> List.filter_map (fun ({ cstr_struct_tag; cstr_members }, member_decl) ->
-          let nv_cstr_members = non_void_cstr_members cstr_members in
-          if CList.is_empty nv_cstr_members then
+          if CList.is_empty cstr_members then
             None
           else
             Some (
@@ -424,8 +428,7 @@ let imm_typedef (ind_names : ind_names) (_indimp_mods : indimp_mods) (constant_c
                   vbrace (
                     pp_sjoin_list
                       (ind_cstrs_with_decls |> List.filter_map (fun ({ cstr_struct_tag; cstr_umember; cstr_members }, _member_decl) ->
-                        let nv_cstr_members = non_void_cstr_members cstr_members in
-                        if CList.is_empty nv_cstr_members then
+                        if CList.is_empty cstr_members then
                           None
                         else
                           Some (
@@ -438,7 +441,7 @@ let imm_typedef (ind_names : ind_names) (_indimp_mods : indimp_mods) (constant_c
   in
   pp_cstr_struct_defs +++ pp_typedef
 
-let imm_swfunc (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
+let imm_swfunc (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_swfunc } = ind_names in
   if single_constructor then
     (Pp.mt (), Pp.mt ())
@@ -449,12 +452,11 @@ let imm_swfunc (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_cons
     let pp_definition = Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt) in
     (pp_prototype, pp_definition)
 
-let imm_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
+let imm_accessors (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun {cstr_umember; cstr_members} ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
-      nv_cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
+      cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
         let return_exp =
           if single_constructor then
             "x." ^ nvmember_name
@@ -469,23 +471,22 @@ let imm_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_c
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let imm_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
+let imm_cstr (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (single_constructor : bool) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun {cstr_name; cstr_enum_const; cstr_umember; cstr_members} ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
       let fargs =
-        if CList.is_empty nv_cstr_members then
+        if CList.is_empty cstr_members then
           Pp.str "void"
         else
           pp_joinmap_list (Pp.str "," ++ Pp.spc ())
             (fun {nvmember_type; nvmember_name} -> Pp.str (compose_c_decl nvmember_type nvmember_name))
-            nv_cstr_members
+            cstr_members
       in
       let args =
         pp_joinmap_list (Pp.str "," ++ Pp.spc ())
           (fun {nvmember_name} -> Pp.str nvmember_name)
-          nv_cstr_members
+          cstr_members
       in
       let pp_declaration = pp_static +++ Pp.str ind_name +++ Pp.str cstr_name ++ Pp.str "(" ++ fargs ++ Pp.str ")" in
       let pp_compstmt =
@@ -501,7 +502,7 @@ let imm_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constr
                   Pp.str "=" +++
                   hbrace args
                 in
-                if CList.is_empty nv_cstr_members then
+                if CList.is_empty cstr_members then
                   Pp.str cstr_enum_const
                 else
                   (Pp.str cstr_enum_const ++ Pp.str "," +++ hbrace union_init)) ++
@@ -515,12 +516,11 @@ let imm_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (single_constr
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let gen_indimp_immediate_impl (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+let gen_indimp_immediate_impl (ind_names : nvmember_names ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
   let { ind_cstrs } = ind_names in
   let constant_constructor_only =
     ind_cstrs |> Array.for_all (fun { cstr_members } ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
-      CList.is_empty nv_cstr_members)
+      CList.is_empty cstr_members)
   in
   let single_constructor = Array.length ind_cstrs = 1 in
   let pp_enum_decl = imm_enum_decl ind_names indimp_mods single_constructor in
@@ -533,7 +533,7 @@ let gen_indimp_immediate_impl (ind_names : ind_names) (indimp_mods : indimp_mods
    pp_swfunc_prototype +++ pp_accessors_prototype +++ pp_cstr_prototype,
    pp_swfunc +++ pp_accessors +++ pp_cstr)
 
-let gen_indimp_heap_decls (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let gen_indimp_heap_decls (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let pp_ind_types =
     (* typedef struct ind_struct_tag *ind_name; *)
     let { ind_name; ind_struct_tag } = ind_names in
@@ -547,30 +547,28 @@ let gen_indimp_heap_decls (ind_names : ind_names) (_indimp_mods : indimp_mods) :
   in
   pp_ind_types
 
-let heaps_ind_struct_def (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heaps_ind_struct_def (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let { ind_struct_tag; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   let member_decl =
     (* nvmember_type1 nvmember_name1; ... *)
     let { cstr_members } = ind_cstr in
-    let nv_cstr_members = non_void_cstr_members cstr_members in
     pp_sjoinmap_list
       (fun {nvmember_type; nvmember_name} ->
         Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";"))
-      nv_cstr_members
+      cstr_members
   in
   (* struct ind_struct_tag { member_decl } *)
   Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag) +++
   vbrace member_decl ++
   Pp.str ";"
 
-let heaps_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heaps_accessors (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   let { cstr_members } = ind_cstr in
-  let nv_cstr_members = non_void_cstr_members cstr_members in
   let declaration_compstmt_pairs =
-    nv_cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
+    cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
       (* pp_static nvmember_type nvmember_accessor(ind_name x) { return x->nvmember_name; } *)
       (pp_static +++ Pp.str (compose_c_decl nvmember_type (nvmember_accessor ^ "(" ^ ind_name ^ " x)")),
        vbrace (Pp.hov 0 (Pp.str "return" +++ Pp.str ("(x->" ^ nvmember_name ^ ")")) ++ Pp.str ";")))
@@ -579,7 +577,7 @@ let heaps_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_sta
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let heaps_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heaps_cstr (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   (*
@@ -592,15 +590,14 @@ let heaps_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static :
     }
   *)
   let { cstr_name; cstr_members } = ind_cstr in
-  let nv_cstr_members = non_void_cstr_members cstr_members in
   let fargs =
-    if CList.is_empty nv_cstr_members then
+    if CList.is_empty cstr_members then
       Pp.str "void"
     else
       pp_joinmap_list (Pp.str "," ++ Pp.spc ())
         (fun {nvmember_type; nvmember_name} ->
           Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name)))
-        nv_cstr_members
+        cstr_members
   in
   let pp_declaration = pp_static +++ Pp.str ind_name +++ Pp.str cstr_name ++ Pp.str "(" ++ fargs ++ Pp.str ")" in
   let pp_compstmt =
@@ -610,14 +607,14 @@ let heaps_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static :
       pp_sjoinmap_list
         (fun {nvmember_name} ->
           Pp.hov 0 (Pp.str "p->" ++ Pp.str nvmember_name +++ Pp.str "=" +++ Pp.str nvmember_name ++ Pp.str ";"))
-        nv_cstr_members +++
+        cstr_members +++
       Pp.hov 0 (Pp.str "return p;"))
   in
   let pp_prototype = Pp.v 0 (Pp.hov 2 (pp_declaration ++ Pp.str ";")) in
   let pp_definition = Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt) in
   (pp_prototype, pp_definition)
 
-let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+let gen_indimp_heap_impls_single_constructor (ind_names : nvmember_names ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
   let pp_ind_struct_def = heaps_ind_struct_def ind_names indimp_mods in
   let pp_static = pr_static indimp_mods.indimp_mods_static in
   let (pp_accessors_prototype, pp_accessors) = heaps_accessors ind_names indimp_mods pp_static in
@@ -628,7 +625,7 @@ let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) (indimp_mod
    pp_accessors_prototype +++ pp_cstr_prototype,
    pp_accessors +++ pp_cstr)
 
-let heapg_enum_decl (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_enum_decl (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let {ind_enum_tag; ind_cstrs} = ind_names in
   (* enum ind_enum_tag { cstr_enum_const1, ... }; *)
   Pp.hov 0 (
@@ -637,14 +634,14 @@ let heapg_enum_decl (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t 
       pp_joinmap_ary (Pp.str "," ++ Pp.spc ()) (fun { cstr_enum_const } -> Pp.str cstr_enum_const) ind_cstrs) ++
       Pp.str ";"))
 
-let heapg_ind_struct_def (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_ind_struct_def (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let {ind_struct_tag; ind_enum_tag} = ind_names in
   (* struct ind_struct_tag { enum ind_enum_tag tag; }; *)
   Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag) +++
     vbrace (Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;")) ++
     Pp.str ";"
 
-let heapg_swfunc (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heapg_swfunc (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_swfunc } = ind_names in
   let pp_swfunc_declaration = pp_static +++ Pp.str "int" +++ Pp.str ind_swfunc ++ Pp.str "(" ++ Pp.str ind_name +++ Pp.str "x)" in
   let pp_swfunc_compstmt = vbrace (Pp.hov 0 (Pp.str "return x->tag;")) in
@@ -653,17 +650,16 @@ let heapg_swfunc (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static
   let pp_swfunc = Pp.v 0 (Pp.hov 2 pp_swfunc_declaration +++ pp_swfunc_compstmt) in
   (pp_swfunc_prototype, pp_swfunc)
 
-let heapg_cstr_struct_defs (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_cstr_struct_defs (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let { ind_enum_tag; ind_cstrs } = ind_names in
   let member_decls =
     (* enum ind_enum_tag tag; nvmember_type1 nvmember_name1; ... *)
     ind_cstrs |> Array.map (fun { cstr_members } ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
       Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;") +++
       pp_sjoinmap_list
         (fun {nvmember_type; nvmember_name} ->
           Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name) ++ Pp.str ";"))
-        nv_cstr_members)
+        cstr_members)
   in
   let ind_cstrs_with_decls =
     Array.map2
@@ -676,12 +672,11 @@ let heapg_cstr_struct_defs (ind_names : ind_names) (_indimp_mods : indimp_mods) 
     vbrace member_decl ++
     Pp.str ";")
 
-let heapg_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heapg_accessors (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun {cstr_struct_tag; cstr_members} ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
-      nv_cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
+      cstr_members |> List.map (fun {nvmember_type; nvmember_name; nvmember_accessor} ->
         (pp_static +++ Pp.str (compose_c_decl nvmember_type (nvmember_accessor ^ "(" ^ ind_name ^ " x)")),
          vbrace (Pp.hov 0 (Pp.str "return" +++ Pp.str ("(((struct " ^ cstr_struct_tag ^ " *" ^ ")(x))->" ^ nvmember_name ^ ")")) ++ Pp.str ";"))))
     |> List.concat
@@ -690,14 +685,13 @@ let heapg_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_sta
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: Pp.t) : Pp.t * Pp.t =
+let heapg_cstr (ind_names : nvmember_names ind_names) (_indimp_mods : indimp_mods) (pp_static: Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun { cstr_name; cstr_enum_const; cstr_struct_tag; cstr_members } ->
-      let nv_cstr_members = non_void_cstr_members cstr_members in
-      if CList.is_empty nv_cstr_members then
+      if CList.is_empty cstr_members then
         begin
-          (* nv_cstr_members is empty:
+          (* cstr_members is empty:
             static ind_name cstr_name(void) {
               static struct cstr_struct_tag s = { cstr_enum_const };
               return (ind_name)&s;
@@ -714,7 +708,7 @@ let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: 
         end
       else
         begin
-        (* nv_cstr_members is not empty:
+        (* cstr_members is not empty:
           static ind_name cstr_name(nvmember_type1 nvmember_name1, ...) {
             struct cstr_struct_tag *p;
             if (!(p = malloc(sizeof( *p)))) abort();
@@ -728,7 +722,7 @@ let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: 
             pp_joinmap_list (Pp.str "," ++ Pp.spc ())
               (fun {nvmember_type; nvmember_name} ->
                 Pp.hov 0 (pr_c_decl nvmember_type (Pp.str nvmember_name)))
-              nv_cstr_members
+              cstr_members
           in
           let pp_cstr_declaration = pp_static +++ Pp.str ind_name +++ Pp.str cstr_name ++ Pp.str "(" ++ fargs ++ Pp.str ")" in
           let pp_cstr_compstmt =
@@ -739,7 +733,7 @@ let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: 
               pp_sjoinmap_list
                 (fun {nvmember_name} ->
                   Pp.hov 0 (Pp.str "p->" ++ Pp.str nvmember_name +++ Pp.str "=" +++ Pp.str nvmember_name ++ Pp.str ";"))
-                nv_cstr_members +++
+                cstr_members +++
               Pp.hov 0 (Pp.str "return" +++ Pp.str ("(" ^ ind_name ^ ")p;")))
           in
           (pp_cstr_declaration, pp_cstr_compstmt)
@@ -749,7 +743,7 @@ let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: 
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let gen_indimp_heap_impls_generic (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+let gen_indimp_heap_impls_generic (ind_names : nvmember_names ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
   let pp_enum_decl = heapg_enum_decl ind_names indimp_mods in
   let pp_ind_struct_def = heapg_ind_struct_def ind_names indimp_mods in
   let pp_static = pr_static indimp_mods.indimp_mods_static in
@@ -763,7 +757,7 @@ let gen_indimp_heap_impls_generic (ind_names : ind_names) (indimp_mods : indimp_
    pp_swfunc_prototype +++ pp_accessors_prototype +++ pp_cstr_prototype,
    pp_swfunc +++ pp_accessors +++ pp_cstr)
 
-let gen_indimp_heap_impls (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+let gen_indimp_heap_impls (ind_names : nvmember_names ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
   let { ind_cstrs } = ind_names in
   let single_constructor = Array.length ind_cstrs = 1 in
   if single_constructor then
@@ -780,7 +774,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(!current_source_filename, "type_impls") in
   let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(!current_source_filename, "func_decls") in
   let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(!current_source_filename, "func_impls") in
-  let lazy_code = lazy (gen_indimp_immediate_impl ind_names indimp_mods) in
+  let lazy_code = lazy (gen_indimp_immediate_impl (non_void_ind_names ind_names) indimp_mods) in
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
   let func_impls () = let (_type_impls, _func_decls, func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_impls) in
@@ -789,7 +783,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   codegen_add_generation func_impls_filename (GenThunk (func_impls_section, func_impls));
   ()
 
-let register_deallocators (_env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) : unit =
+let register_deallocators (_env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : unit =
   let { ind_pind; ind_params; ind_cstrs } = ind_names in
   ind_cstrs |> Array.iter (fun { cstr_j; cstr_members } ->
     let nv_cstr_members = non_void_cstr_members cstr_members in
@@ -809,8 +803,8 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(!current_source_filename, "type_impls") in
   let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(!current_source_filename, "func_decls") in
   let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(!current_source_filename, "func_impls") in
-  let lazy_type = lazy (gen_indimp_heap_decls ind_names indimp_mods) in
-  let lazy_code = lazy (gen_indimp_heap_impls ind_names indimp_mods) in
+  let lazy_type = lazy (gen_indimp_heap_decls (non_void_ind_names ind_names) indimp_mods) in
+  let lazy_code = lazy (gen_indimp_heap_impls (non_void_ind_names ind_names) indimp_mods) in
   let type_decls () = let type_decl = Lazy.force lazy_type in Pp.string_of_ppcmds (Pp.v 0 type_decl) in
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
