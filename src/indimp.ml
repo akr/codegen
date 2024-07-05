@@ -547,7 +547,7 @@ let gen_indimp_heap_decls (ind_names : ind_names) (_indimp_mods : indimp_mods) :
   in
   pp_ind_types
 
-let heaps_ind_struct_def (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heaps_ind_struct_def (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let { ind_struct_tag; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   let member_decl =
@@ -564,7 +564,7 @@ let heaps_ind_struct_def (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names
   vbrace member_decl ++
   Pp.str ";"
 
-let heaps_accessors (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heaps_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   let { cstr_members } = ind_cstr in
@@ -579,7 +579,7 @@ let heaps_accessors (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : in
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let heaps_cstr (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heaps_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let ind_cstr = ind_cstrs.(0) in
   (*
@@ -617,18 +617,18 @@ let heaps_cstr (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_nam
   let pp_definition = Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt) in
   (pp_prototype, pp_definition)
 
-let gen_indimp_heap_impls_single_constructor (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
-  let pp_ind_struct_def = heaps_ind_struct_def env sigma ind_names indimp_mods in
+let gen_indimp_heap_impls_single_constructor (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+  let pp_ind_struct_def = heaps_ind_struct_def ind_names indimp_mods in
   let pp_static = pr_static indimp_mods.indimp_mods_static in
-  let (pp_accessors_prototype, pp_accessors) = heaps_accessors env sigma ind_names indimp_mods pp_static in
-  let (pp_cstr_prototype, pp_cstr) = heaps_cstr env sigma ind_names indimp_mods pp_static in
+  let (pp_accessors_prototype, pp_accessors) = heaps_accessors ind_names indimp_mods pp_static in
+  let (pp_cstr_prototype, pp_cstr) = heaps_cstr ind_names indimp_mods pp_static in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
   (*msg_info_hov pp;*)
   (pp_ind_struct_def,
    pp_accessors_prototype +++ pp_cstr_prototype,
    pp_accessors +++ pp_cstr)
 
-let heapg_enum_decl (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_enum_decl (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let {ind_enum_tag; ind_cstrs} = ind_names in
   (* enum ind_enum_tag { cstr_enum_const1, ... }; *)
   Pp.hov 0 (
@@ -637,14 +637,14 @@ let heapg_enum_decl (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : in
       pp_joinmap_ary (Pp.str "," ++ Pp.spc ()) (fun { cstr_enum_const } -> Pp.str cstr_enum_const) ind_cstrs) ++
       Pp.str ";"))
 
-let heapg_ind_struct_def (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_ind_struct_def (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let {ind_struct_tag; ind_enum_tag} = ind_names in
   (* struct ind_struct_tag { enum ind_enum_tag tag; }; *)
   Pp.hov 0 (Pp.str "struct" +++ Pp.str ind_struct_tag) +++
     vbrace (Pp.hov 0 (Pp.str ("enum " ^ ind_enum_tag) +++ Pp.str "tag;")) ++
     Pp.str ";"
 
-let heapg_swfunc (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heapg_swfunc (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_swfunc } = ind_names in
   let pp_swfunc_declaration = pp_static +++ Pp.str "int" +++ Pp.str ind_swfunc ++ Pp.str "(" ++ Pp.str ind_name +++ Pp.str "x)" in
   let pp_swfunc_compstmt = vbrace (Pp.hov 0 (Pp.str "return x->tag;")) in
@@ -653,7 +653,7 @@ let heapg_swfunc (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_n
   let pp_swfunc = Pp.v 0 (Pp.hov 2 pp_swfunc_declaration +++ pp_swfunc_compstmt) in
   (pp_swfunc_prototype, pp_swfunc)
 
-let heapg_cstr_struct_defs (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
+let heapg_cstr_struct_defs (ind_names : ind_names) (_indimp_mods : indimp_mods) : Pp.t =
   let { ind_enum_tag; ind_cstrs } = ind_names in
   let member_decls =
     (* enum ind_enum_tag tag; nvmember_type1 nvmember_name1; ... *)
@@ -676,7 +676,7 @@ let heapg_cstr_struct_defs (_env : Environ.env) (_sigma : Evd.evar_map) (ind_nam
     vbrace member_decl ++
     Pp.str ";")
 
-let heapg_accessors (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
+let heapg_accessors (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static : Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun {cstr_struct_tag; cstr_members} ->
@@ -690,7 +690,7 @@ let heapg_accessors (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : in
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let heapg_cstr (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: Pp.t) : Pp.t * Pp.t =
+let heapg_cstr (ind_names : ind_names) (_indimp_mods : indimp_mods) (pp_static: Pp.t) : Pp.t * Pp.t =
   let { ind_name; ind_cstrs } = ind_names in
   let declaration_compstmt_pairs =
     ind_cstrs |> CArray.map_to_list (fun { cstr_name; cstr_enum_const; cstr_struct_tag; cstr_members } ->
@@ -749,29 +749,27 @@ let heapg_cstr (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_nam
   let pp_definitions = declaration_compstmt_pairs |> List.map (fun (pp_declaration, pp_compstmt) -> Pp.v 0 (Pp.hov 2 pp_declaration +++ pp_compstmt)) |> pp_sjoin_list in
   (pp_prototypes, pp_definitions)
 
-let gen_indimp_heap_impls_generic (env : Environ.env) (sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
-  let pp_enum_decl = heapg_enum_decl env sigma ind_names indimp_mods in
-  let pp_ind_struct_def = heapg_ind_struct_def env sigma ind_names indimp_mods in
+let gen_indimp_heap_impls_generic (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
+  let pp_enum_decl = heapg_enum_decl ind_names indimp_mods in
+  let pp_ind_struct_def = heapg_ind_struct_def ind_names indimp_mods in
   let pp_static = pr_static indimp_mods.indimp_mods_static in
-  let (pp_swfunc_prototype, pp_swfunc) = heapg_swfunc env sigma ind_names indimp_mods pp_static in
-  let pp_cstr_struct_defs = heapg_cstr_struct_defs env sigma ind_names indimp_mods in
-  let (pp_accessors_prototype, pp_accessors) = heapg_accessors env sigma ind_names indimp_mods pp_static in
-  let (pp_cstr_prototype, pp_cstr) = heapg_cstr env sigma ind_names indimp_mods pp_static in
+  let (pp_swfunc_prototype, pp_swfunc) = heapg_swfunc ind_names indimp_mods pp_static in
+  let pp_cstr_struct_defs = heapg_cstr_struct_defs ind_names indimp_mods in
+  let (pp_accessors_prototype, pp_accessors) = heapg_accessors ind_names indimp_mods pp_static in
+  let (pp_cstr_prototype, pp_cstr) = heapg_cstr ind_names indimp_mods pp_static in
   (*msg_debug_hov (Pp.str (Pp.db_string_of_pp pp));*)
   (*msg_info_hov pp;*)
   (pp_enum_decl +++ pp_ind_struct_def +++ pp_cstr_struct_defs,
    pp_swfunc_prototype +++ pp_accessors_prototype +++ pp_cstr_prototype,
    pp_swfunc +++ pp_accessors +++ pp_cstr)
 
-let gen_indimp_heap_impls (_env : Environ.env) (_sigma : Evd.evar_map) (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
+let gen_indimp_heap_impls (ind_names : ind_names) (indimp_mods : indimp_mods) : Pp.t * Pp.t * Pp.t =
   let { ind_cstrs } = ind_names in
   let single_constructor = Array.length ind_cstrs = 1 in
   if single_constructor then
-    gen_indimp_heap_impls_single_constructor env sigma ind_names indimp_mods
+    gen_indimp_heap_impls_single_constructor ind_names indimp_mods
   else
-    gen_indimp_heap_impls_generic env sigma ind_names indimp_mods
+    gen_indimp_heap_impls_generic ind_names indimp_mods
 
 let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
   msg_info_hov (Pp.str "[codegen] generate_indimp_immediate:" +++ Printer.pr_econstr_env env sigma coq_type);
@@ -812,7 +810,7 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(!current_source_filename, "func_decls") in
   let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(!current_source_filename, "func_impls") in
   let lazy_type = lazy (gen_indimp_heap_decls ind_names indimp_mods) in
-  let lazy_code = lazy (gen_indimp_heap_impls env sigma ind_names indimp_mods) in
+  let lazy_code = lazy (gen_indimp_heap_impls ind_names indimp_mods) in
   let type_decls () = let type_decl = Lazy.force lazy_type in Pp.string_of_ppcmds (Pp.v 0 type_decl) in
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
