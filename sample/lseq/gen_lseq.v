@@ -14,8 +14,6 @@ CodeGen HeaderSnippet "prologue" "#define LSEQ_H".
 
 CodeGen Snippet "prologue" "#include ""lseq.h""".
 
-CodeGen InductiveType unit => "void".
-
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => "" with
 | true => ""

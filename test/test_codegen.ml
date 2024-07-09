@@ -356,10 +356,6 @@ let template_coq_success
     ?coq_output_regexp
     ctx coq_commands ""
 
-let unit_src = {|
-      CodeGen InductiveType unit => "void".
-|}
-
 let bool_src = {|
       CodeGen InductiveType bool => "bool".
       CodeGen InductiveMatch bool => "" with
@@ -2658,7 +2654,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
 
 let test_matchapp_twoarg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       Definition n_of_bn (b : bool) (n : nat) : nat := n.
       Definition f (c : bool) (b : bool) (n : nat) :=
         match c with
@@ -3336,7 +3332,7 @@ let test_indimp_rosetree (ctx : test_ctxt) : unit =
 
 let test_indimp_unit_in_member (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^
+    (bool_src ^
     {|
       Inductive bool_and_unit := cstr : bool -> unit -> bool_and_unit.
       Definition mk b := cstr b tt.
@@ -3634,7 +3630,7 @@ let test_linear_types (ctx : test_ctxt) : unit =
 let test_linear_novar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument not consumed:") ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := tt.
       CodeGen Func f.
@@ -3643,7 +3639,7 @@ let test_linear_novar (ctx : test_ctxt) : unit =
 let test_linear_twovar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] linear variables used multiply in arguments:") ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) := (x,x).
       CodeGen Func f.
@@ -3652,7 +3648,7 @@ let test_linear_twovar (ctx : test_ctxt) : unit =
 let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] match-branches uses linear variables inconsistently:") ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) (b : bool) :=
         match b with
@@ -3665,7 +3661,7 @@ let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
 let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
     ~coq_output_regexp:(Str.regexp_string "[codegen] linear argument outside of fix-term:") ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) :=
         fix g (n : nat) := x.
@@ -3674,7 +3670,7 @@ let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
 
 let test_linear_dellet (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) :=
         let unused := boolbox_dealloc x in
@@ -3691,7 +3687,7 @@ let test_linear_dellet (ctx : test_ctxt) : unit =
 
 let test_linear_dellet_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) (u : unit) :=
         let unused := match u with tt => boolbox_dealloc x end in
@@ -3708,7 +3704,7 @@ let test_linear_dellet_match (ctx : test_ctxt) : unit =
 
 let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       Definition f (x : boolbox) : bool :=
         match x with
@@ -3729,7 +3725,7 @@ let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
 
 let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ boolbox_src ^
+    (bool_src ^ boolbox_src ^
     {|
       CodeGen InductiveType boolbox*boolbox => "pair_boolbox_boolbox".
       CodeGen InductiveMatch boolbox*boolbox => "" with
@@ -4324,7 +4320,7 @@ let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
 
 let test_void_tail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ {|
+    (bool_src ^ {|
       CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) : unit := tt.
       CodeGen Func f.
@@ -4333,7 +4329,7 @@ let test_void_tail (ctx : test_ctxt) : unit =
 
 let test_void_head (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ {|
+    (bool_src ^ {|
       CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) : unit :=
 	let x := tt in
@@ -4347,7 +4343,7 @@ let test_void_head (ctx : test_ctxt) : unit =
 
 let test_void_mutual (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       CodeGen Snippet "prologue" "void f(nat);".
       CodeGen Snippet "prologue" "static nat constant_zero(void) { return 0; }".
       CodeGen Snippet "prologue" "static void ignore_nat(nat v1_x) { return; }".
@@ -4371,7 +4367,7 @@ let test_void_mutual (ctx : test_ctxt) : unit =
 
 let test_void_empty_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ nat_src ^ {|
+    (nat_src ^ {|
       Definition f (u : unit) : nat :=
         let z := O in
         let n := match u with
@@ -4391,7 +4387,7 @@ let test_void_empty_args (ctx : test_ctxt) : unit =
 
 let test_void_head_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       CodeGen Snippet "prologue" "nat f(bool);".
       Definition constant_zero (x : unit) : nat := 0.
       Definition f (b : bool) (u0 : unit) : nat :=
@@ -4408,7 +4404,7 @@ let test_void_head_tt_var (ctx : test_ctxt) : unit =
 
 let test_void_tail_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       CodeGen Snippet "prologue" "void f(bool);".
       Definition f (b : bool) (u0 : unit) : unit :=
         match b with
@@ -4421,7 +4417,7 @@ let test_void_tail_tt_var (ctx : test_ctxt) : unit =
 
 let test_void_head_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       Set Primitive Projections.
       Record TestRecord : Set := mk { umem : unit; nmem : nat }.
       Definition constant_zero (x : unit) : nat := 0.
@@ -4449,7 +4445,7 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
 
 let test_void_tail_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
-    (unit_src ^ bool_src ^ nat_src ^ {|
+    (bool_src ^ nat_src ^ {|
       Set Primitive Projections.
       Record TestRecord : Set := mk { umem : unit; nmem : nat }.
       Definition f (x : TestRecord) : unit := umem x.

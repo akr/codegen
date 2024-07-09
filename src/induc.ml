@@ -155,49 +155,68 @@ let check_ind_coq_type_not_registered (env : Environ.env) (sigma : Evd.evar_map)
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_econstr_env env sigma coq_type)
 
-let check_void_type (env : Environ.env) (sigma : Evd.evar_map) (mind_body : Declarations.mutual_inductive_body) (ty : EConstr.types) : unit =
+let coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
+  let coq_type = Reductionops.nf_all env sigma coq_type in
   let open Declarations in
-  (if Array.length mind_body.mind_packets <> 1 then
-    user_err (Pp.str "[codegen] non-mutual inductive type expected for void type:" +++ Printer.pr_econstr_env env sigma ty));
-  (if mind_body.mind_nparams <> 0 then
-    (* This "no parameters" constraint is not mandatory.
-       However it makes us easy to determine constructor invocation in code generation
-       because constructor with parameters is wrapped as a constant.  *)
-    user_err (Pp.str "[codegen] void type must not have no inductive type parameters:" +++ Printer.pr_econstr_env env sigma ty));
-  let oind_body = mind_body.mind_packets.(0) in
-  (if oind_body.mind_nrealargs <> 0 then
-    user_err (Pp.str "[codegen] non-indexed type expected for void type:" +++ Printer.pr_econstr_env env sigma ty));
-  (if Array.length oind_body.mind_consnames <> 1 then
-    user_err (Pp.str "[codegen] single constructor inductive type expected for void type:" +++ Printer.pr_econstr_env env sigma ty +++
-    Pp.str "has" +++ Pp.int (Array.length oind_body.mind_consnames) +++ Pp.str "constructors"));
-  (if oind_body.mind_consnrealargs.(0) <> 0 then
-    user_err (Pp.str "[codegen] no-argument constructor expected for void type:" +++
-      Id.print oind_body.mind_consnames.(0) +++
-      Pp.str "of" +++
-      Printer.pr_econstr_env env sigma ty))
+  let (f, args) = decompose_appvect sigma coq_type in
+  if not (EConstr.isInd sigma f) then
+    false (* inductive type expected *)
+  else
+  let pind = EConstr.destInd sigma f in
+  let ind, u = pind in
+  let (mutind, i) = ind in
+  let mutind_body = Environ.lookup_mind mutind env in
+  let oneind_body = mutind_body.mind_packets.(i) in
+  if mutind_body.mind_nparams <> Array.length args then
+    false (* unexpected number of inductive type parameters *)
+  else if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
+    false (* inductive type has non-uniform parameters *)
+  else if oneind_body.mind_nrealargs <> 0 then
+    false (* indexed inductive type *)
+  else if Array.length oneind_body.mind_consnames <> 1 then
+    false (* single constructor inductive type expected *)
+  else if oneind_body.mind_consnrealargs.(0) <> 0 then
+    false (* no-argument constructor expected *)
+  else
+    true
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
   let (mutind, mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   check_ind_coq_type_not_registered env sigma coq_type;
   check_ind_coq_type env sigma coq_type;
-  let is_void_type = c_type_is_void c_type in
-  (if is_void_type then
-    check_void_type env sigma mutind_body coq_type);
-  let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
-    Array.map (fun cstrname -> {
-      coq_cstr = cstrname;
-      c_caselabel = "";
-      c_accessors = [||] }) in
-  let coq_type=EConstr.to_constr sigma coq_type in
-  let ind_cfg = {
-    coq_type=coq_type;
-    c_type=c_type;
-    c_swfunc=None;
-    cstr_configs=cstr_cfgs;
-    is_void_type=is_void_type;
-  } in
-  ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
-  ind_cfg
+  if coq_type_is_void_type env sigma coq_type then
+    begin
+      let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
+        Array.map (fun cstrname -> {
+          coq_cstr = cstrname;
+          c_caselabel = "";
+          c_accessors = [||] }) in
+      {
+        coq_type=EConstr.to_constr sigma coq_type;
+        c_type=c_type_void;
+        c_swfunc=None;
+        cstr_configs=cstr_cfgs;
+        is_void_type=true;
+      }
+    end
+  else
+    begin
+      let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
+        Array.map (fun cstrname -> {
+          coq_cstr = cstrname;
+          c_caselabel = "";
+          c_accessors = [||] }) in
+      let coq_type=EConstr.to_constr sigma coq_type in
+      let ind_cfg = {
+        coq_type=coq_type;
+        c_type=c_type;
+        c_swfunc=None;
+        cstr_configs=cstr_cfgs;
+        is_void_type=false;
+      } in
+      ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
+      ind_cfg
+    end
 
 let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let printed_type = mangle_term env sigma t in
