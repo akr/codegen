@@ -98,11 +98,11 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
   let (_,ind_ary) = make_ind_ary env sigma mutind u in
   Array.map (fun ind -> nf_all env sigma (mkApp (ind, ty_args))) ind_ary
 
-let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (ind : inductive) (u : EInstance.t) (params : EConstr.t array)
+let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductive * EInstance.t) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let open Context.Rel.Declaration in
-  let (mutind, i) = ind in
+  let ((mutind, i), u) = pind in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind u in
   (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
     pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
@@ -153,9 +153,9 @@ let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd
     match EConstr.kind sigma ty_f with
     | Sort _ -> has_sort_ref := true
     | Prod _ -> has_func_ref := true
-    | Ind (ind, u) ->
+    | Ind pind ->
         ty_set_ref := (ConstrSet.add (EConstr.to_constr sigma ty) !ty_set_ref);
-        ind_cstrarg_iter env sigma ind u ty_args
+        ind_cstrarg_iter env sigma pind ty_args
           (fun ind_id cons_id argty ->
             traverse_constructor_argument_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
