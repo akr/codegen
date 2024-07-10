@@ -155,7 +155,7 @@ let check_ind_coq_type_not_registered (env : Environ.env) (sigma : Evd.evar_map)
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_econstr_env env sigma coq_type)
 
-let coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
+let rec coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let coq_type = Reductionops.nf_all env sigma coq_type in
   let open Declarations in
   let (f, args) = decompose_appvect sigma coq_type in
@@ -175,10 +175,21 @@ let coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
     false (* indexed inductive type *)
   else if Array.length oneind_body.mind_consnames <> 1 then
     false (* single constructor inductive type expected *)
-  else if oneind_body.mind_consnrealargs.(0) <> 0 then
-    false (* no-argument constructor expected *)
+  else if not (oneind_body.mind_nf_lc |> Array.for_all (fun (rel_ctx, ret_type) -> cstr_args_are_void_types env sigma rel_ctx args)) then
+    false
   else
     true
+and cstr_args_are_void_types (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : Constr.rel_context) (args : EConstr.t array) : bool =
+  try
+    ind_nf_lc_iter env sigma nf_lc_ctx (Array.to_list args)
+      (fun env2 arg_ty ->
+        if coq_type_is_void_type env2 sigma arg_ty then
+          ()
+        else
+          raise Exit;
+        None);
+    true
+  with Exit -> false
 
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
   let (mutind, mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
