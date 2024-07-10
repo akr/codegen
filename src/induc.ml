@@ -170,7 +170,6 @@ let rec coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
         b
   else
     coq_type_is_void_type1 env sigma coq_type
-
 and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let open Declarations in
   let (f, args) = decompose_appvect sigma coq_type in
