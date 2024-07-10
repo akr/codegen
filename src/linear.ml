@@ -101,7 +101,6 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
 let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductive * EInstance.t) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
-  let open Context.Rel.Declaration in
   let ((mutind, i), u) = pind in
   let (mind_body,ind_ary) = make_ind_ary env sigma mutind u in
   (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
@@ -119,30 +118,13 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductiv
                      Pp.str "consname=" ++ Id.print cons_id +++
                      Pp.str "nf_lc_ctx=[" ++ Printer.pr_rel_context env sigma ctx ++ Pp.str "]" +++
                      Pp.str "nf_lc_t=" ++ Printer.pr_constr_env (Environ.push_rel_context ctx env) sigma t);*)
-      let rev_ctx = array_rev (Array.of_list ctx) in
-      let env2 = ref env in
-      let params = ref (Array.to_list params) in
-      let h = Array.length rev_ctx in
-      for j = 0 to h - 1 do
-        (* msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] j=" ++ Pp.int j +++ Printer.pr_rel_context_of !env2 sigma); *)
-        let decl = rev_ctx.(j) in
-        match decl with
-        | LocalDef (x,e,ty) ->
-            env2 := Environ.push_rel decl !env2
-        | LocalAssum (x,ty) ->
-            let ty = EConstr.of_constr ty in
-            (match !params with
-            | param :: rest ->
-                params := rest;
-                env2 := env_push_def !env2 x param ty
-            | [] ->
-                let ty' = nf_all !env2 sigma ty in
-                (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] normalize_argtype" +++ Printer.pr_econstr_env !env2 sigma ty +++ Pp.str "to" +++ Printer.pr_econstr_env !env2 sigma ty');*)
-                if not (Vars.closed0 sigma ty') then
-                  user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env !env2 sigma ty');
-                f ind_id cons_id ty';
-                env2 := Environ.push_rel decl !env2)
-      done)
+      ind_nf_lc_iter env sigma ctx (Array.to_list params)
+        (fun env2 ty ->
+          let ty' = nf_all env2 sigma ty in
+          if not (Vars.closed0 sigma ty') then
+            user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cons_id +++ Printer.pr_econstr_env env2 sigma ty');
+          f ind_id cons_id ty';
+          None))
     oind_body.mind_consnames oind_body.mind_nf_lc
 
 let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
