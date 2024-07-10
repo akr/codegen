@@ -4477,6 +4477,20 @@ let test_void_indtype_contains_unit (ctx : test_ctxt) : unit =
       f();
     |}
 
+let test_void_indtype_contains_infrec (ctx : test_ctxt) : unit =
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ {|
+      Inductive infrec := infrec_cstr : infrec -> infrec.
+      Inductive unit2 := u2 : infrec -> unit2.
+      Definition f (x : unit2) : unit2 := x.
+      CodeGen InductiveType unit2 => "unit2".
+      CodeGen Snippet "prologue" "typedef int unit2;".
+      CodeGen Func f.
+    |})
+    {|
+      assert(f(1) == 1);
+    |}
+
 let test_inductivetype_twoarg_bool_paren (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_paren_src ^ {|
@@ -4888,6 +4902,7 @@ let suite : OUnit2.test =
     "test_void_head_proj" >:: test_void_head_proj;
     "test_void_tail_proj" >:: test_void_tail_proj;
     "test_void_indtype_contains_unit" >:: test_void_indtype_contains_unit;
+    "test_void_indtype_contains_infrec" >:: test_void_indtype_contains_infrec;
     "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
     "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
     "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;

@@ -155,8 +155,23 @@ let check_ind_coq_type_not_registered (env : Environ.env) (sigma : Evd.evar_map)
     user_err (Pp.str "[codegen] inductive type already registered:" +++
               Printer.pr_econstr_env env sigma coq_type)
 
+let codegen_void_type_memo = Summary.ref (ConstrMap.empty : bool ConstrMap.t) ~name:"CodegenVoidTypeMemo"
+
 let rec coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let coq_type = Reductionops.nf_all env sigma coq_type in
+  if EConstr.Vars.closed0 sigma coq_type then
+    let key = EConstr.to_constr sigma coq_type in
+    match ConstrMap.find_opt key !codegen_void_type_memo with
+    | Some b -> b
+    | None ->
+        codegen_void_type_memo := ConstrMap.add key false !codegen_void_type_memo; (* recursive occurences are considered to be non-void *)
+        let b = coq_type_is_void_type1 env sigma coq_type in
+        codegen_void_type_memo := ConstrMap.add key b !codegen_void_type_memo;
+        b
+  else
+    coq_type_is_void_type1 env sigma coq_type
+
+and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let open Declarations in
   let (f, args) = decompose_appvect sigma coq_type in
   if not (EConstr.isInd sigma f) then
