@@ -521,6 +521,8 @@ let list_nat_src = {|
       ".
 |}
 
+let test_list = []
+
 let test_tail_rel (ctx : test_ctxt) : unit =
   codegen_test_template ctx
     (bool_src ^ {|
@@ -530,6 +532,7 @@ let test_tail_rel (ctx : test_ctxt) : unit =
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
+let test_list = ("test_tail_rel" >:: test_tail_rel) :: test_list
 
 let test_tail_constructor_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -542,6 +545,7 @@ let test_tail_constructor_bool (ctx : test_ctxt) : unit =
       assert(constructor_true() == true);
       assert(constructor_false() == false);
     |}
+let test_list = ("test_tail_constructor_bool" >:: test_tail_constructor_bool) :: test_list
 
 let test_tail_constructor_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -567,6 +571,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
       assert(call_bpair(true, false) == 2);
       assert(call_bpair(true, true) == 3);
     |}
+let test_list = ("test_tail_constructor_args" >:: test_tail_constructor_args) :: test_list
 
 let test_tail_constant_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -588,6 +593,7 @@ let test_tail_constant_bool (ctx : test_ctxt) : unit =
       assert(constant_true() == true);
       assert(constant_false() == false);
     |}
+let test_list = ("test_tail_constant_bool" >:: test_tail_constant_bool) :: test_list
 
 let test_tail_constant_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -600,6 +606,7 @@ let test_tail_constant_args (ctx : test_ctxt) : unit =
       assert(call_negb(false) == true);
       assert(call_negb(true) == false);
     |}
+let test_list = ("test_tail_constant_args" >:: test_tail_constant_args) :: test_list
 
 let test_tail_match_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -614,6 +621,7 @@ let test_tail_match_bool (ctx : test_ctxt) : unit =
       assert(f(true) == false);
       assert(f(false) == true);
     |}
+let test_list = ("test_tail_match_bool" >:: test_tail_match_bool) :: test_list
 
 let test_tail_match_nat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -628,6 +636,7 @@ let test_tail_match_nat (ctx : test_ctxt) : unit =
       assert(f(0) == false);
       assert(f(1) == true);
     |}
+let test_list = ("test_tail_match_nat" >:: test_tail_match_nat) :: test_list
 
 let test_tail_match_singleton (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -646,6 +655,7 @@ let test_tail_match_singleton (ctx : test_ctxt) : unit =
       assert(f(true) == true);
       assert(f(false) == false);
     |}
+let test_list = ("test_tail_match_singleton" >:: test_tail_match_singleton) :: test_list
 
 let test_mono_id_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -656,6 +666,7 @@ let test_mono_id_bool (ctx : test_ctxt) : unit =
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
+let test_list = ("test_mono_id_bool" >:: test_mono_id_bool) :: test_list
 
 let test_mono_id_mybool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -678,6 +689,7 @@ let test_mono_id_mybool (ctx : test_ctxt) : unit =
       assert(mono_id_mybool(mytrue) == mytrue);
       assert(mono_id_mybool(myfalse) == myfalse);
     |}
+let test_list = ("test_mono_id_mybool" >:: test_mono_id_mybool) :: test_list
 
 let test_mybool_true (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -700,6 +712,7 @@ let test_mybool_true (ctx : test_ctxt) : unit =
       assert(mybool_true(mytrue) == mytrue);
       assert(mybool_true(myfalse) == mytrue);
     |}
+let test_list = ("test_mybool_true" >:: test_mybool_true) :: test_list
 
 let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -710,6 +723,7 @@ let test_mono_id_bool_omit_cfunc_name (ctx : test_ctxt) : unit =
       assert(mono_id_bool(true) == true);
       assert(mono_id_bool(false) == false);
     |}
+let test_list = ("test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name) :: test_list
 
 let test_pair_bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -739,6 +753,7 @@ let test_pair_bool_bool (ctx : test_ctxt) : unit =
       assert(fst_pair(v) == false);
       assert(snd_pair(v) == true);
     |}
+let test_list = ("test_pair_bool_bool" >:: test_pair_bool_bool) :: test_list
 
 let test_pair_2bool_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -778,6 +793,7 @@ let test_pair_2bool_bool (ctx : test_ctxt) : unit =
       assert(fst_pair(v).snd == true);
       assert(snd_pair(v) == false);
     |}
+let test_list = ("test_pair_2bool_bool" >:: test_pair_2bool_bool) :: test_list
 
 let test_nat_add_rec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -791,6 +807,7 @@ let test_nat_add_rec (ctx : test_ctxt) : unit =
     |}) {|
       assert(my_add_rec(2,3) == 5);
     |}
+let test_list = ("test_nat_add_rec" >:: test_nat_add_rec) :: test_list
 
 let test_nat_add_iter (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -804,6 +821,7 @@ let test_nat_add_iter (ctx : test_ctxt) : unit =
     |}) {|
       assert(my_add_iter(2,3) == 5);
     |}
+let test_list = ("test_nat_add_iter" >:: test_nat_add_iter) :: test_list
 
 let test_list_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -819,6 +837,7 @@ let test_list_bool (ctx : test_ctxt) : unit =
       assert(is_nil(NULL));
       assert(!is_nil(cons(true, NULL)));
     |}
+let test_list = ("test_list_bool" >:: test_list_bool) :: test_list
 
 let test_list_bool_length (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -836,6 +855,7 @@ let test_list_bool_length (ctx : test_ctxt) : unit =
       assert(length(cons(1, NULL)) == 1);
       assert(length(cons(1, cons(2, NULL))) == 2);
     |}
+let test_list = ("test_list_bool_length" >:: test_list_bool_length) :: test_list
 
 let test_sum (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -853,6 +873,7 @@ let test_sum (ctx : test_ctxt) : unit =
       assert(sum(cons(1, NULL)) == 1);
       assert(sum(cons(1, cons(2, NULL))) == 3);
     |}
+let test_list = ("test_sum" >:: test_sum) :: test_list
 
 let test_nil_nat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -864,6 +885,7 @@ let test_nil_nat (ctx : test_ctxt) : unit =
       list_nat s = nil_nat();
       assert(s == NULL);
     |}
+let test_list = ("test_nil_nat" >:: test_nil_nat) :: test_list
 
 let test_singleton_list (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -881,6 +903,7 @@ let test_singleton_list (ctx : test_ctxt) : unit =
       assert(head(s) == 42);
       assert(is_nil(tail(s)));
     |}
+let test_list = ("test_singleton_list" >:: test_singleton_list) :: test_list
 
 let test_add3 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -892,6 +915,7 @@ let test_add3 (ctx : test_ctxt) : unit =
     |}) {|
       assert(add3(4) == 7);
     |}
+let test_list = ("test_add3" >:: test_add3) :: test_list
 
 let test_mul3 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -903,6 +927,7 @@ let test_mul3 (ctx : test_ctxt) : unit =
     |}) {|
       assert(mul3(4) == 12);
     |}
+let test_list = ("test_mul3" >:: test_mul3) :: test_list
 
 let test_even_odd (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -936,6 +961,7 @@ let test_even_odd (ctx : test_ctxt) : unit =
       assert(odd(4) == false);
       assert(even3() == false);
     |}
+let test_list = ("test_even_odd" >:: test_even_odd) :: test_list
 
 let test_even_odd_label_primary (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -960,6 +986,7 @@ let test_even_odd_label_primary (ctx : test_ctxt) : unit =
       assert(odd(0) == false);
       assert(odd(1) == true);
     |}
+let test_list = ("test_even_odd_label_primary" >:: test_even_odd_label_primary) :: test_list
 
 let test_even_odd_label_sibling (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -984,6 +1011,7 @@ let test_even_odd_label_sibling (ctx : test_ctxt) : unit =
       assert(odd(0) == false);
       assert(odd(1) == true);
     |}
+let test_list = ("test_even_odd_label_sibling" >:: test_even_odd_label_sibling) :: test_list
 
 let test_even_odd_count (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1027,6 +1055,7 @@ let test_even_odd_count (ctx : test_ctxt) : unit =
       assert(even_count == 1);
       assert(odd_count == 0);
     |}
+let test_list = ("test_even_odd_count" >:: test_even_odd_count) :: test_list
 
 let test_inner_fix_even_odd_1 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1052,6 +1081,7 @@ let test_inner_fix_even_odd_1 (ctx : test_ctxt) : unit =
       assert(even(3) == false);
       assert(even(4) == true);
     |}
+let test_list = ("test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1) :: test_list
 
 let test_inner_fix_even_odd_2 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1077,6 +1107,7 @@ let test_inner_fix_even_odd_2 (ctx : test_ctxt) : unit =
       assert(even(3) == false);
       assert(even(4) == true);
     |}
+let test_list = ("test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2) :: test_list
 
 let test_two_even (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1108,6 +1139,7 @@ let test_two_even (ctx : test_ctxt) : unit =
       assert(even2(3) == false);
       assert(even2(4) == true);
     |}
+let test_list = ("test_two_even" >:: test_two_even) :: test_list
 
 let test_two_even_two_odd (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1147,6 +1179,7 @@ let test_two_even_two_odd (ctx : test_ctxt) : unit =
       assert(odd2(3) == true);
       assert(odd2(4) == false);
     |}
+let test_list = ("test_two_even_two_odd" >:: test_two_even_two_odd) :: test_list
 
 let test_app_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1157,6 +1190,7 @@ let test_app_let (ctx : test_ctxt) : unit =
     |}) {|
       assert(foo() == 3);
     |}
+let test_list = ("test_app_let" >:: test_app_let) :: test_list
 
 let test_app_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1174,6 +1208,7 @@ let test_app_match (ctx : test_ctxt) : unit =
       assert(add_or_sub(false, 1) == 9);
       assert(add_or_sub(false, 2) == 8);
     |}
+let test_list = ("test_app_match" >:: test_app_match) :: test_list
 
 let test_let_app_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1190,6 +1225,7 @@ let test_let_app_match (ctx : test_ctxt) : unit =
       assert(f(1, 1) == 2);
       assert(f(4, 7) == 11);
     |}
+let test_list = ("test_let_app_match" >:: test_let_app_match) :: test_list
 
 let test_cast (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1200,6 +1236,7 @@ let test_cast (ctx : test_ctxt) : unit =
     |}) {|
       assert(nat_id(4) == 4);
     |}
+let test_list = ("test_cast" >:: test_cast) :: test_list
 
 let bool_matchcount_src = {|
       CodeGen InductiveType bool => "bool".
@@ -1230,6 +1267,7 @@ let test_beta_var_presimp (ctx : test_ctxt) : unit =
       assert(f(false) == 0);
       assert(bool_match_count == 4);
     |}
+let test_list = ("test_beta_var_presimp" >:: test_beta_var_presimp) :: test_list
 
 let test_matchapp_before_reduction (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1249,6 +1287,7 @@ let test_matchapp_before_reduction (ctx : test_ctxt) : unit =
       assert(f(false) == 2);
       assert(bool_match_count == 2);
     |}
+let test_list = ("test_matchapp_before_reduction" >:: test_matchapp_before_reduction) :: test_list
 
 let test_delta_fun_constant (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1259,6 +1298,7 @@ let test_delta_fun_constant (ctx : test_ctxt) : unit =
     |}) {|
       assert(add(2,3) == 5);
     |}
+let test_list = ("test_delta_fun_constant" >:: test_delta_fun_constant) :: test_list
 
 let test_delta_fun_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1269,6 +1309,7 @@ let test_delta_fun_constructor (ctx : test_ctxt) : unit =
     |}) {|
       assert(succ(2) == 3);
     |}
+let test_list = ("test_delta_fun_constructor" >:: test_delta_fun_constructor) :: test_list
 
 let test_delta_fun_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1279,6 +1320,7 @@ let test_delta_fun_lambda (ctx : test_ctxt) : unit =
     |}) {|
       assert(succ(2) == 3);
     |}
+let test_list = ("test_delta_fun_lambda" >:: test_delta_fun_lambda) :: test_list
 
 let test_delta_fun_nested_let (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1295,6 +1337,7 @@ let test_delta_fun_nested_let (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(0) == true);
     |}
+let test_list = ("test_delta_fun_nested_let" >:: test_delta_fun_nested_let) :: test_list
 
 (* test_delta_fun_rel *)
 (* test_delta_fun_fix *)
@@ -1315,6 +1358,7 @@ let test_reduce_proj (ctx : test_ctxt) : unit =
       assert(f0_mk(7, 8) == 7);
       assert(f1_mk(7, 8) == 8);
     |}
+let test_list = ("test_reduce_proj" >:: test_reduce_proj) :: test_list
 
 let test_deeply_nested_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1333,6 +1377,7 @@ let test_deeply_nested_match (ctx : test_ctxt) : unit =
       assert(f0() == 0);
       assert(f10() == 0);
     |}
+let test_list = ("test_deeply_nested_match" >:: test_deeply_nested_match) :: test_list
 
 let test_let_add (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1345,6 +1390,7 @@ let test_let_add (ctx : test_ctxt) : unit =
     |}) {|
       assert(add3(1,2,3) == 6);
     |}
+let test_list = ("test_let_add" >:: test_let_add) :: test_list
 
 (* gen_head Case *)
 let test_let_match (ctx : test_ctxt) : unit =
@@ -1359,6 +1405,7 @@ let test_let_match (ctx : test_ctxt) : unit =
       assert(tst(true) == true);
       assert(tst(false) == false);
     |}
+let test_list = ("test_let_match" >:: test_let_match) :: test_list
 
 (* gen_head LetIn *)
 let test_let_match_let (ctx : test_ctxt) : unit =
@@ -1373,6 +1420,7 @@ let test_let_match_let (ctx : test_ctxt) : unit =
       assert(tst(false) == 1);
       assert(tst(true) == 2);
     |}
+let test_list = ("test_let_match_let" >:: test_let_match_let) :: test_list
 
 (* gen_head LetIn, cargs != [] *)
 let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
@@ -1392,6 +1440,7 @@ let test_let_match_let_nonempty_cargs (ctx : test_ctxt) : unit =
       assert(f(true, 3) == 4);
       assert(f(false, 3) == 5);
     |}
+let test_list = ("test_let_match_let_nonempty_cargs" >:: test_let_match_let_nonempty_cargs) :: test_list
 
 let test_let_unused_is_not_specialized (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1400,6 +1449,7 @@ let test_let_unused_is_not_specialized (ctx : test_ctxt) : unit =
       CodeGen Gen f.
       Fail Print CodeGen Specialization Nat.pow.
     |}
+let test_list = ("test_let_unused_is_not_specialized" >:: test_let_unused_is_not_specialized) :: test_list
 
 let test_let_only_used_in_static_is_not_specialized (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1411,6 +1461,7 @@ let test_let_only_used_in_static_is_not_specialized (ctx : test_ctxt) : unit =
       CodeGen Gen f.
       Fail Print CodeGen Specialization Nat.mul.
     |}
+let test_list = ("test_let_only_used_in_static_is_not_specialized" >:: test_let_only_used_in_static_is_not_specialized) :: test_list
 
 let test_add_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1428,6 +1479,7 @@ let test_add_tailrec (ctx : test_ctxt) : unit =
       assert(add(1,0) == 1);
       assert(add(1,1) == 2);
     |}
+let test_list = ("test_add_tailrec" >:: test_add_tailrec) :: test_list
 
 let test_add_nontailrec (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1440,6 +1492,7 @@ let test_add_nontailrec (ctx : test_ctxt) : unit =
         end.
       CodeGen Func add.
     |})
+let test_list = ("test_add_nontailrec" >:: test_add_nontailrec) :: test_list
 
 let test_tail_fix_double (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1456,6 +1509,7 @@ let test_tail_fix_double (ctx : test_ctxt) : unit =
       assert(dbl(0) == 0);
       assert(dbl(1) == 2);
     |}
+let test_list = ("test_tail_fix_double" >:: test_tail_fix_double) :: test_list
 
 let test_nth (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1475,6 +1529,7 @@ let test_nth (ctx : test_ctxt) : unit =
       assert(nth(2, s, 999) == 3);
       assert(nth(3, s, 999) == 999);
     |}
+let test_list = ("test_nth" >:: test_nth) :: test_list
 
 let test_rev_append (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1500,6 +1555,7 @@ let test_rev_append (ctx : test_ctxt) : unit =
       assert(nth(5, s3, 999) == 6);
       assert(nth(6, s3, 999) == 999);
     |}
+let test_list = ("test_rev_append" >:: test_rev_append) :: test_list
 
 (* nested fix-term *)
 let test_merge (ctx : test_ctxt) : unit =
@@ -1545,6 +1601,7 @@ let test_merge (ctx : test_ctxt) : unit =
       assert(nth(7, s3, 999) == 0);
       assert(nth(8, s3, 999) == 999);
     |}
+let test_list = ("test_merge" >:: test_merge) :: test_list
 
 let test_merge_nontailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1587,6 +1644,7 @@ let test_merge_nontailrec (ctx : test_ctxt) : unit =
       assert(nth(7, s3, 999) == 20);
       assert(nth(8, s3, 999) == 999);
     |}
+let test_list = ("test_merge_nontailrec" >:: test_merge_nontailrec) :: test_list
 
 let test_ackermann (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1621,6 +1679,7 @@ let test_ackermann (ctx : test_ctxt) : unit =
       assert(ack(3, 2) == 29);
       assert(ack(3, 3) == 61);
     |}
+let test_list = ("test_ackermann" >:: test_ackermann) :: test_list
 
 let test_ackermann_plus1 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1657,6 +1716,7 @@ let test_ackermann_plus1 (ctx : test_ctxt) : unit =
       assert(f(3, 2) == 30);
       assert(f(3, 3) == 62);
     |}
+let test_list = ("test_ackermann_plus1" >:: test_ackermann_plus1) :: test_list
 
 let test_uphalf (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1688,6 +1748,7 @@ let test_uphalf (ctx : test_ctxt) : unit =
       assert(uphalf(8) == 4);
       assert(uphalf(9) == 5);
     |}
+let test_list = ("test_uphalf" >:: test_uphalf) :: test_list
 
 (* nested fix-term *)
 let test_sum_nested_fix (ctx : test_ctxt) : unit =
@@ -1718,6 +1779,7 @@ let test_sum_nested_fix (ctx : test_ctxt) : unit =
       list_nat s = list4(1,2,3,4);
       assert(sum(s, 0) == 10);
     |}
+let test_list = ("test_sum_nested_fix" >:: test_sum_nested_fix) :: test_list
 
 (* gen_head Fix, single tail recursive loop *)
 (* The fix-term must be translated to a loop.
@@ -1759,6 +1821,7 @@ let test_add_at_non_tail_position1 (ctx : test_ctxt) : unit =
     {|
       assert(f(1, 2, 3) == 6);
     |}
+let test_list = ("test_add_at_non_tail_position1" >:: test_add_at_non_tail_position1) :: test_list
 
 (* gen_head Fix, multiple loops *)
 let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
@@ -1783,6 +1846,7 @@ let test_add_at_non_tail_position (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(1, 2, 3) == 6);
     |}
+let test_list = ("test_add_at_non_tail_position" >:: test_add_at_non_tail_position) :: test_list
 
 let test_map_succ (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1801,6 +1865,7 @@ let test_map_succ (ctx : test_ctxt) : unit =
       assert(is_nil(map_succ(NULL)));
       assert(head(map_succ(cons(1, NULL))) == 2);
     |}
+let test_list = ("test_map_succ" >:: test_map_succ) :: test_list
 
 let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1813,6 +1878,7 @@ let test_fully_dynamic_func_with_presimp_name (ctx : test_ctxt) : unit =
       CodeGen SimplifyFunction "add1".
       Print add1_s.
     |})
+let test_list = ("test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name) :: test_list
 
 let test_specialized_func_with_presimp_name (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1825,6 +1891,7 @@ let test_specialized_func_with_presimp_name (ctx : test_ctxt) : unit =
       CodeGen SimplifyFunction "myadd1".
       Print myadd1_s.
     |})
+let test_list = ("test_specialized_func_with_presimp_name" >:: test_specialized_func_with_presimp_name) :: test_list
 
 let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1838,6 +1905,7 @@ let test_specialization_at_get_ctnt_type_body_from_cfunc (ctx : test_ctxt) : uni
       CodeGen Func swap_bb.
       CodeGen Gen "swap_bb".
     |})
+let test_list = ("test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc) :: test_list
 
 let test_letin_in_constructor_type (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -1851,6 +1919,7 @@ let test_letin_in_constructor_type (ctx : test_ctxt) : unit =
         end.
       CodeGen Gen f. (* should fail *)
     |} {| |}
+let test_list = ("test_letin_in_constructor_type" >:: test_letin_in_constructor_type) :: test_list
 
 let test_arguments_contain_sort (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1861,6 +1930,7 @@ let test_arguments_contain_sort (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(10) == 0);
     |}
+let test_list = ("test_arguments_contain_sort" >:: test_arguments_contain_sort) :: test_list
 
 let test_arguments_contain_prod (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1871,6 +1941,7 @@ let test_arguments_contain_prod (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(10) == 0);
     |}
+let test_list = ("test_arguments_contain_prod" >:: test_arguments_contain_prod) :: test_list
 
 let test_arguments_contain_ind (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1881,6 +1952,7 @@ let test_arguments_contain_ind (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(10) == 0);
     |}
+let test_list = ("test_arguments_contain_ind" >:: test_arguments_contain_ind) :: test_list
 
 let test_command_gen_qualid (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -1889,6 +1961,7 @@ let test_command_gen_qualid (ctx : test_ctxt) : unit =
       Definition id_bool (x : bool) : bool := x.
       CodeGen Gen id_bool.
     |})
+let test_list = ("test_command_gen_qualid" >:: test_command_gen_qualid) :: test_list
 
 let test_mftest (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1918,6 +1991,7 @@ let test_mftest (ctx : test_ctxt) : unit =
       assert(mftest(4) == 1);
       assert(mftest(5) == 2);
     |}
+let test_list = ("test_mftest" >:: test_mftest) :: test_list
 
 let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1951,6 +2025,7 @@ let test_multifunc_different_return_types (ctx : test_ctxt) : unit =
       assert(f(1).b == 1);
       assert(f(2).b == 1);
     |}
+let test_list = ("test_multifunc_different_return_types" >:: test_multifunc_different_return_types) :: test_list
 
 let test_multifunc_noargument (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -1971,6 +2046,7 @@ let test_multifunc_noargument (ctx : test_ctxt) : unit =
       assert(f0() == 0);
       assert(f1() == 1);
     |}
+let test_list = ("test_multifunc_noargument" >:: test_multifunc_noargument) :: test_list
 
 let forest_src = {|
       (* This example is taken from Coq reference manual *)
@@ -2048,6 +2124,7 @@ let test_mutual_sizet_sizef (ctx : test_ctxt) : unit =
       assert(sizef(f1) == 1);
       assert(sizef(f2) == 2);
     |}
+let test_list = ("test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef) :: test_list
 
 (*
   test dedup by counting calls of sizet and sizef.
@@ -2097,6 +2174,7 @@ let test_mutual_sizet_sizef_dedup (ctx : test_ctxt) : unit =
       assert(sizet_count == 2);
       assert(sizef_count == 5);
     |}
+let test_list = ("test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup) :: test_list
 
 let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2142,6 +2220,7 @@ let test_mutual_sizet_sizef_nodedup (ctx : test_ctxt) : unit =
       assert(sizet_count == 0); /* sizet is not called because a private version of sizet is generated for sizef. */
       assert(sizef_count == 5);
     |}
+let test_list = ("test_mutual_sizet_sizef_nodedup" >:: test_mutual_sizet_sizef_nodedup) :: test_list
 
 let test_mutual_static1 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2166,6 +2245,7 @@ let test_mutual_static1 (ctx : test_ctxt) : unit =
       assert(idnat1(3) == 3);
       assert(idnat2(4) == 4);
     |}
+let test_list = ("test_mutual_static1" >:: test_mutual_static1) :: test_list
 
 let test_mutual_static2 (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2190,6 +2270,7 @@ let test_mutual_static2 (ctx : test_ctxt) : unit =
       assert(idnat1(3) == 3);
       assert(idnat2(4) == 4);
     |}
+let test_list = ("test_mutual_static2" >:: test_mutual_static2) :: test_list
 
 let test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2212,6 +2293,7 @@ let test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable (ctx : test_ctxt
       assert(f(20,1) == 22);
       assert(f(30,2) == 33);
     |}
+let test_list = ("test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable" >:: test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable) :: test_list
 
 let test_nested_fix_must_have_consistent_arguments (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2234,6 +2316,7 @@ let test_nested_fix_must_have_consistent_arguments (ctx : test_ctxt) : unit =
       assert(f(20,1) == 2);
       assert(f(30,2) == 3);
     |}
+let test_list = ("test_nested_fix_must_have_consistent_arguments" >:: test_nested_fix_must_have_consistent_arguments) :: test_list
 
 let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2257,6 +2340,7 @@ let test_nongoto_fixterm_at_nontail (ctx : test_ctxt) : unit =
       assert(f(4) == 17);
       assert(f(5) == 26);
     |}
+let test_list = ("test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail) :: test_list
 
 let test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2283,6 +2367,7 @@ let test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail (ctx : test_ctxt) : unit
       assert(f(4,5,6) == 16);
       assert(f(7,8,9) == 25);
     |}
+let test_list = ("test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail) :: test_list
 
 let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2298,6 +2383,7 @@ let test_useless_fixterm_at_nontail (ctx : test_ctxt) : unit =
       assert(f(0) == 1);
       assert(f(1) == 1);
     |}
+let test_list = ("test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail) :: test_list
 
 let test_extra_arguments (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2316,6 +2402,7 @@ let test_extra_arguments (ctx : test_ctxt) : unit =
     |}) {|
       assert(test_extra_arguments(1,2,3,4,5) == 10);
     |}
+let test_list = ("test_extra_arguments" >:: test_extra_arguments) :: test_list
 
 let test_extra_arguments_nested_exarg_used (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2342,6 +2429,7 @@ let test_extra_arguments_nested_exarg_used (ctx : test_ctxt) : unit =
     |}) {|
       assert(test_extra_arguments_nested_exarg_used(1,2,3,4,5) == 24);
     |}
+let test_list = ("test_extra_arguments_nested_exarg_used" >:: test_extra_arguments_nested_exarg_used) :: test_list
 
 let test_extra_arguments_nested_exarg_unused (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2368,6 +2456,7 @@ let test_extra_arguments_nested_exarg_unused (ctx : test_ctxt) : unit =
     |}) {|
       assert(test_extra_arguments_nested_exarg_unused(1,2,3,4,5) == 15);
     |}
+let test_list = ("test_extra_arguments_nested_exarg_unused" >:: test_extra_arguments_nested_exarg_unused) :: test_list
 
 let test_unused_argument (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2387,6 +2476,7 @@ let test_unused_argument (ctx : test_ctxt) : unit =
       assert(f(100, 2) == 2);
       assert(f(100, 3) == 3);
     |}
+let test_list = ("test_unused_argument" >:: test_unused_argument) :: test_list
 
 let test_inner_fixfunc_goto_exarg_fixfunc (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2412,6 +2502,7 @@ let test_inner_fixfunc_goto_exarg_fixfunc (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(1, 2, 3) == 9);
     |}
+let test_list = ("test_inner_fixfunc_goto_exarg_fixfunc" >:: test_inner_fixfunc_goto_exarg_fixfunc) :: test_list
 
 let test_parallel_assignment (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2431,6 +2522,7 @@ let test_parallel_assignment (ctx : test_ctxt) : unit =
       assert(f(4, 1, 2) == 1);
       assert(f(5, 1, 2) == 2);
     |}
+let test_list = ("test_parallel_assignment" >:: test_parallel_assignment) :: test_list
 
 let test_toplevel_nonrecursive_fixpoint (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2444,6 +2536,7 @@ let test_toplevel_nonrecursive_fixpoint (ctx : test_ctxt) : unit =
       assert(f(0) == true);
       assert(g(0) == false);
     |}
+let test_list = ("test_toplevel_nonrecursive_fixpoint" >:: test_toplevel_nonrecursive_fixpoint) :: test_list
 
 let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2455,6 +2548,7 @@ let test_unused_fixfunc_in_internal_fixterm (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(0) == 0);
     |}
+let test_list = ("test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm) :: test_list
 
 let test_unused_fixfunc_in_external_fixterm (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2483,6 +2577,7 @@ let test_unused_fixfunc_in_external_fixterm (ctx : test_ctxt) : unit =
       assert(f(3) == 10);
       assert(f(4) == 15);
     |}
+let test_list = ("test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm) :: test_list
 
 let test_delete_unreachable_fixfuncs_drop_last (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2504,6 +2599,7 @@ let test_delete_unreachable_fixfuncs_drop_last (ctx : test_ctxt) : unit =
       assert(f(0) == 1);
       assert(f(1) == 1);
     |}
+let test_list = ("test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last) :: test_list
 
 let test_delete_unreachable_fixfuncs_drop_middle (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2530,6 +2626,7 @@ let test_delete_unreachable_fixfuncs_drop_middle (ctx : test_ctxt) : unit =
       assert(f(0) == 1);
       assert(f(1) == 1);
     |}
+let test_list = ("test_delete_unreachable_fixfuncs_drop_middle" >:: test_delete_unreachable_fixfuncs_drop_middle) :: test_list
 
 let test_delete_unreachable_fixfuncs_drop_first (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2551,6 +2648,7 @@ let test_delete_unreachable_fixfuncs_drop_first (ctx : test_ctxt) : unit =
       assert(f(0) == 1);
       assert(f(1) == 1);
     |}
+let test_list = ("test_delete_unreachable_fixfuncs_drop_first" >:: test_delete_unreachable_fixfuncs_drop_first) :: test_list
 
 let test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2578,6 +2676,7 @@ let test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc (ctx : t
       assert(f(0) == 0);
       assert(f(1) == 1);
     |}
+let test_list = ("test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc" >:: test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc) :: test_list
 
 let test_primitive_projection (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2614,6 +2713,7 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
+let test_list = ("test_primitive_projection" >:: test_primitive_projection) :: test_list
 
 let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2651,6 +2751,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
+let test_list = ("test_primitive_projection_nontail" >:: test_primitive_projection_nontail) :: test_list
 
 let test_matchapp_twoarg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2666,6 +2767,7 @@ let test_matchapp_twoarg (ctx : test_ctxt) : unit =
     assert(f(true, true, 10) == 11);
     assert(f(false, false, 20) == 22);
     |}
+let test_list = ("test_matchapp_twoarg" >:: test_matchapp_twoarg) :: test_list
 
 (*
 "Move Match Argument" transformation must be applied multiply.
@@ -2698,6 +2800,7 @@ let test_matchapp_multiple_phases (ctx : test_ctxt) : unit =
     assert(f(false, true, 100, 19, 1, 2, 3, 4) == 123);
     assert(f(false, false, 100, 19, 1, 2, 3, 4) == 124);
     |}
+let test_list = ("test_matchapp_multiple_phases" >:: test_matchapp_multiple_phases) :: test_list
 
 (*
 This test needs to transform
@@ -2728,6 +2831,7 @@ let test_matchapp_and_fix (ctx : test_ctxt) : unit =
     |}) {|
     assert(f(10, 5) == 10);
     |}
+let test_list = ("test_matchapp_and_fix" >:: test_matchapp_and_fix) :: test_list
 
 let test_auto_ind_type (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2741,6 +2845,7 @@ let test_auto_ind_type (ctx : test_ctxt) : unit =
       assert(id_mybool(true) == true);
       assert(id_mybool(false) == false);
     |}
+let test_list = ("test_auto_ind_type" >:: test_auto_ind_type) :: test_list
 
 let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2763,6 +2868,7 @@ let test_auto_ind_match_cstrlabel (ctx : test_ctxt) : unit =
       assert(bool_of_mybool(true) == true);
       assert(bool_of_mybool(false) == false);
     |}
+let test_list = ("test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel) :: test_list
 
 let test_auto_ind_match_cstrmember (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2784,6 +2890,7 @@ let test_auto_ind_match_cstrmember (ctx : test_ctxt) : unit =
       assert(bbfst(2) == 1); assert(bbsnd(2) == 0);
       assert(bbfst(3) == 1); assert(bbsnd(3) == 1);
     |}
+let test_list = ("test_auto_ind_match_cstrmember" >:: test_auto_ind_match_cstrmember) :: test_list
 
 let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2804,6 +2911,7 @@ let test_auto_ind_type_with_arg (ctx : test_ctxt) : unit =
       assert(mypair(true, false) == 2);
       assert(mypair(true, true) == 3);
     |}
+let test_list = ("test_auto_ind_type_with_arg" >:: test_auto_ind_type_with_arg) :: test_list
 
 let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2829,6 +2937,7 @@ let test_auto_ind_match_cstrlabel_with_arg (ctx : test_ctxt) : unit =
       assert(value_of_optionbool(false, 1) == false);
       assert(value_of_optionbool(false, 3) == true);
     |}
+let test_list = ("test_auto_ind_match_cstrlabel_with_arg" >:: test_auto_ind_match_cstrlabel_with_arg) :: test_list
 
 let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2851,6 +2960,7 @@ let test_auto_ind_match_cstrmember_with_arg (ctx : test_ctxt) : unit =
       assert(bbfst(2) == 1); assert(bbsnd(2) == 0);
       assert(bbfst(3) == 1); assert(bbsnd(3) == 1);
     |}
+let test_list = ("test_auto_ind_match_cstrmember_with_arg" >:: test_auto_ind_match_cstrmember_with_arg) :: test_list
 
 let test_auto_const (ctx : test_ctxt) : unit =
   codegen_test_template
@@ -2866,6 +2976,7 @@ let test_auto_const (ctx : test_ctxt) : unit =
       assert(add1(1) == 2);
       assert(add1(2) == 3);
     |}
+let test_list = ("test_auto_const" >:: test_auto_const) :: test_list
 
 let test_auto_construct (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2880,6 +2991,7 @@ let test_auto_construct (ctx : test_ctxt) : unit =
     |}) {|
       assert(one() == 1);
     |}
+let test_list = ("test_auto_construct" >:: test_auto_construct) :: test_list
 
 let test_auto_nat_fold (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2899,6 +3011,7 @@ let test_auto_nat_fold (ctx : test_ctxt) : unit =
     |}) {|
       assert(sum_plus_one(3) == 4);
     |}
+let test_list = ("test_auto_nat_fold" >:: test_auto_nat_fold) :: test_list
 
 let test_auto_polymorphic_argument_is_static (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2911,6 +3024,7 @@ let test_auto_polymorphic_argument_is_static (ctx : test_ctxt) : unit =
     |}) {|
       assert(f(3) == 3);
     |}
+let test_list = ("test_auto_polymorphic_argument_is_static" >:: test_auto_polymorphic_argument_is_static) :: test_list
 
 let test_option_bool_struct (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2951,6 +3065,7 @@ let test_option_bool_struct (ctx : test_ctxt) : unit =
       assert(value_of_optionbool(false, Some_bool(false)) == false);
       assert(value_of_optionbool(false, Some_bool(true)) == true);
     |}
+let test_list = ("test_option_bool_struct" >:: test_option_bool_struct) :: test_list
 
 let test_reduceeta_makes_single_function (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2971,6 +3086,7 @@ let test_reduceeta_makes_single_function (ctx : test_ctxt) : unit =
       list_bool s3 = cons(true,(cons(false,cons(false,(cons(true,NULL))))));
       assert(list_bool_eq(s3, mycat_bool(s1,s2)));
     |}
+let test_list = ("test_reduceeta_makes_single_function" >:: test_reduceeta_makes_single_function) :: test_list
 
 let test_multiple_primitives_shares_cfunc (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -2991,6 +3107,7 @@ let test_multiple_primitives_shares_cfunc (ctx : test_ctxt) : unit =
       assert(f(2,3) == 5);
       assert(g(2,3) == 5);
     |}
+let test_list = ("test_multiple_primitives_shares_cfunc" >:: test_multiple_primitives_shares_cfunc) :: test_list
 
 let test_indimp_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3016,6 +3133,7 @@ let test_indimp_bool (ctx : test_ctxt) : unit =
       assert(id_bool(true) == true);
       assert(id_bool(false) == false);
     |}
+let test_list = ("test_indimp_bool" >:: test_indimp_bool) :: test_list
 
 let test_indimp_bool_pair (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3059,6 +3177,7 @@ let test_indimp_bool_pair (ctx : test_ctxt) : unit =
       assert(id_boolpair(2) == 2);
       assert(id_boolpair(3) == 3);
     |}
+let test_list = ("test_indimp_bool_pair" >:: test_indimp_bool_pair) :: test_list
 
 let test_indimp_bool_nat_pair (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3090,6 +3209,7 @@ let test_indimp_bool_nat_pair (ctx : test_ctxt) : unit =
       assert(snd_nb(pair_nat_bool(1,false)) == false);
       assert(snd_nb(pair_nat_bool(2,false)) == false);
     |}
+let test_list = ("test_indimp_bool_nat_pair" >:: test_indimp_bool_nat_pair) :: test_list
 
 let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3133,6 +3253,7 @@ let test_indimp_parametric_pair (ctx : test_ctxt) : unit =
       assert(id_boolpair(2) == 2);
       assert(id_boolpair(3) == 3);
     |}
+let test_list = ("test_indimp_parametric_pair" >:: test_indimp_parametric_pair) :: test_list
 
 let test_indimp_option_bool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3174,6 +3295,7 @@ let test_indimp_option_bool (ctx : test_ctxt) : unit =
       assert(id_option_bool(1) == 1);
       assert(id_option_bool(3) == 3);
     |}
+let test_list = ("test_indimp_option_bool" >:: test_indimp_option_bool) :: test_list
 
 let test_indimp_record (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3215,6 +3337,7 @@ let test_indimp_record (ctx : test_ctxt) : unit =
       assert(id_boolpair(2) == 2);
       assert(id_boolpair(3) == 3);
     |}
+let test_list = ("test_indimp_record" >:: test_indimp_record) :: test_list
 
 let test_indimp_nat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3241,6 +3364,7 @@ let test_indimp_nat (ctx : test_ctxt) : unit =
       assert(id_nat(2) == 2);
       assert(id_nat(3) == 3);
     |}
+let test_list = ("test_indimp_nat" >:: test_indimp_nat) :: test_list
 
 let test_indimp_mutual (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3295,6 +3419,7 @@ let test_indimp_mutual (ctx : test_ctxt) : unit =
       s = cons(true, s);
       assert(list_bool_eq(s, id_list_odd(s)));
     |}
+let test_list = ("test_indimp_mutual" >:: test_indimp_mutual) :: test_list
 
 let test_indimp_rosetree (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3329,6 +3454,7 @@ let test_indimp_rosetree (ctx : test_ctxt) : unit =
       assert(count(nd(true, cns(nd(true, nl()), nl()))) == 2);
       assert(count(nd(false, cns(nd(true, nl()), nl()))) == 1);
     |}
+let test_list = ("test_indimp_rosetree" >:: test_indimp_rosetree) :: test_list
 
 let test_indimp_unit_in_member (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3344,6 +3470,7 @@ let test_indimp_unit_in_member (ctx : test_ctxt) : unit =
       assert(get(mk(false)) == false);
       assert(get(mk(true)) == true);
     |}
+let test_list = ("test_indimp_unit_in_member" >:: test_indimp_unit_in_member) :: test_list
 
 let test_indimp_named_mybool (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3373,6 +3500,7 @@ let test_indimp_named_mybool (ctx : test_ctxt) : unit =
       assert(bool_of_mybool(mybool_of_bool(true)) == true);
       assert(bool_of_mybool(mybool_of_bool(false)) == false);
     |}
+let test_list = ("test_indimp_named_mybool" >:: test_indimp_named_mybool) :: test_list
 
 let test_indimp_named_mynat (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3402,6 +3530,7 @@ let test_indimp_named_mynat (ctx : test_ctxt) : unit =
       assert(nat_of_mynat(mynat_of_nat(3)) == 3);
       assert(nat_of_mynat(mynat_of_nat(5)) == 5);
     |}
+let test_list = ("test_indimp_named_mynat" >:: test_indimp_named_mynat) :: test_list
 
 let test_indimp_force_heap (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3421,6 +3550,7 @@ let test_indimp_force_heap (ctx : test_ctxt) : unit =
       assert(get_nat4(x) == 14);
       assert(sizeof(x) <= sizeof(void*)); /* check nat4 is a pointer */
     |}
+let test_list = ("test_indimp_force_heap" >:: test_indimp_force_heap) :: test_list
 
 let test_indimp_force_imm (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3440,6 +3570,7 @@ let test_indimp_force_imm (ctx : test_ctxt) : unit =
       assert(get_nat4(x) == 14);
       assert(sizeof(void*) < sizeof(x)); /* check nat4 is not a pointer */
     |}
+let test_list = ("test_indimp_force_imm" >:: test_indimp_force_imm) :: test_list
 
 let test_indimp_force_imm_fail_rec (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -3448,6 +3579,7 @@ let test_indimp_force_imm_fail_rec (ctx : test_ctxt) : unit =
       Inductive mylist := mynil : mylist | mycons : nat -> mylist -> mylist.
       Fail CodeGen IndImp nat4 where heap off.
     |})
+let test_list = ("test_indimp_force_imm_fail_rec" >:: test_indimp_force_imm_fail_rec) :: test_list
 
 let test_indimp_force_imm_fail_mut (ctx : test_ctxt) : unit =
   template_coq_success ctx
@@ -3457,6 +3589,7 @@ let test_indimp_force_imm_fail_mut (ctx : test_ctxt) : unit =
       with mytype2 := C2.
       Fail CodeGen IndImp mytype1 where heap off.
     |})
+let test_list = ("test_indimp_force_imm_fail_mut" >:: test_indimp_force_imm_fail_mut) :: test_list
 
 let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3479,6 +3612,7 @@ let test_indimp_dealloc_list (ctx : test_ctxt) : unit =
       mylist l = mycons(true, mycons(false, mycons(true, mynil())));
       assert(mylen(l) == 3);
     |}
+let test_list = ("test_indimp_dealloc_list" >:: test_indimp_dealloc_list) :: test_list
 
 let test_indimp_auto_linear (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3501,6 +3635,7 @@ let test_indimp_auto_linear (ctx : test_ctxt) : unit =
       mylist l = mycons(true, mycons(false, mycons(true, mynil())));
       assert(mylen(l) == 3);
     |}
+let test_list = ("test_indimp_auto_linear" >:: test_indimp_auto_linear) :: test_list
 
 let test_indimp_cstr_fargs_void (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
@@ -3512,6 +3647,7 @@ let test_indimp_cstr_fargs_void (ctx : test_ctxt) : unit =
       CodeGen Snippet "epilogue" "static mybool mybool_cstr_mytrue(void);". (* check IndImp generates (void) as the formal argument. *)
     |}) {|
     |}
+let test_list = ("test_indimp_cstr_fargs_void" >:: test_indimp_cstr_fargs_void) :: test_list
 
 let test_indimp_static_off (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ~cc_exit_code:(Unix.WEXITED 1) ctx
@@ -3524,6 +3660,7 @@ let test_indimp_static_off (ctx : test_ctxt) : unit =
       CodeGen Snippet "epilogue" "static mybool mybool_cstr_mytrue(void);".
     |}) {|
     |}
+let test_list = ("test_indimp_static_off" >:: test_indimp_static_off) :: test_list
 
 let test_indimp_static_on (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ~cc_exit_code:(Unix.WEXITED 1) ctx
@@ -3536,6 +3673,7 @@ let test_indimp_static_on (ctx : test_ctxt) : unit =
       CodeGen Snippet "type_decls" "extern mybool mybool_cstr_mytrue(void);".
     |}) {|
     |}
+let test_list = ("test_indimp_static_on" >:: test_indimp_static_on) :: test_list
 
 let test_header_snippet (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
@@ -3546,6 +3684,7 @@ let test_header_snippet (ctx : test_ctxt) : unit =
     |} {|
       foo();
     |}
+let test_list = ("test_header_snippet" >:: test_header_snippet) :: test_list
 
 let test_prototype (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCC ctx
@@ -3561,6 +3700,7 @@ let test_prototype (ctx : test_ctxt) : unit =
       CodeGen Func id bool => "id_bool".
     |}) {|
     |}
+let test_list = ("test_prototype" >:: test_prototype) :: test_list
 
 let test_monocheck_failure (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3571,6 +3711,7 @@ let test_monocheck_failure (ctx : test_ctxt) : unit =
         (fix h (T : Type) (n : nat) := n) T n.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_monocheck_failure" >:: test_monocheck_failure) :: test_list
 
 let boolbox_src = {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
@@ -3626,6 +3767,7 @@ let test_linear_types (ctx : test_ctxt) : unit =
       CodeGen TestLinearType M.
       CodeGen TestLinearType list L.
     |}) {| |}
+let test_list = ("test_linear_types" >:: test_linear_types) :: test_list
 
 let test_linear_novar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3635,6 +3777,7 @@ let test_linear_novar (ctx : test_ctxt) : unit =
       Definition f (x : boolbox) := tt.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_linear_novar" >:: test_linear_novar) :: test_list
 
 let test_linear_twovar (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3644,6 +3787,7 @@ let test_linear_twovar (ctx : test_ctxt) : unit =
       Definition f (x : boolbox) := (x,x).
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_linear_twovar" >:: test_linear_twovar) :: test_list
 
 let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3657,6 +3801,7 @@ let test_linear_inconsistent_reference_in_match (ctx : test_ctxt) : unit =
         end.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_linear_inconsistent_reference_in_match" >:: test_linear_inconsistent_reference_in_match) :: test_list
 
 let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3667,6 +3812,7 @@ let test_linear_reference_in_fix (ctx : test_ctxt) : unit =
         fix g (n : nat) := x.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_linear_reference_in_fix" >:: test_linear_reference_in_fix) :: test_list
 
 let test_linear_dellet (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3684,6 +3830,7 @@ let test_linear_dellet (ctx : test_ctxt) : unit =
       assert(boolbox_log_buffer[1] == 'd');
       assert(boolbox_log_next - boolbox_log_buffer == 2);
     |}
+let test_list = ("test_linear_dellet" >:: test_linear_dellet) :: test_list
 
 let test_linear_dellet_match (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3701,6 +3848,7 @@ let test_linear_dellet_match (ctx : test_ctxt) : unit =
       assert(boolbox_log_buffer[1] == 'd');
       assert(boolbox_log_next - boolbox_log_buffer == 2);
     |}
+let test_list = ("test_linear_dellet_match" >:: test_linear_dellet_match) :: test_list
 
 let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3722,6 +3870,7 @@ let test_linear_match_with_deallocator (ctx : test_ctxt) : unit =
       assert(boolbox_log_next - boolbox_log_buffer > 5); assert(boolbox_log_buffer[5] == 'd');
       assert(boolbox_log_next - boolbox_log_buffer == 6);
     |}
+let test_list = ("test_linear_match_with_deallocator" >:: test_linear_match_with_deallocator) :: test_list
 
 let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3757,6 +3906,7 @@ let test_linear_match_without_deallocator (ctx : test_ctxt) : unit =
       assert(boolbox_log_buffer[3] == 'd');
       assert(boolbox_log_buffer[4] == 'd');
     |}
+let test_list = ("test_linear_match_without_deallocator" >:: test_linear_match_without_deallocator) :: test_list
 
 let test_downward_simple (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3768,6 +3918,7 @@ let test_downward_simple (ctx : test_ctxt) : unit =
       CodeGen Downward D.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_downward_simple" >:: test_downward_simple) :: test_list
 
 let test_downward_in_pair (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3779,6 +3930,7 @@ let test_downward_in_pair (ctx : test_ctxt) : unit =
       CodeGen Downward D.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_downward_in_pair" >:: test_downward_in_pair) :: test_list
 
 let test_downward_fixfunc (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3800,6 +3952,7 @@ let test_downward_fixfunc (ctx : test_ctxt) : unit =
       CodeGen Downward D.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_downward_fixfunc" >:: test_downward_fixfunc) :: test_list
 
 let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -3832,12 +3985,14 @@ let test_downward_indirect_cycle (ctx : test_ctxt) : unit =
       assert(f(x1) == x1);
       assert(f(x2) == x2);
     |}
+let test_list = ("test_downward_indirect_cycle" >:: test_downward_indirect_cycle) :: test_list
 
 let test_borrowcheck_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
     ({|
       CodeGen TestBorrowCheck fun (x : nat) => 0.
     |}) {| |}
+let test_list = ("test_borrowcheck_constructor" >:: test_borrowcheck_constructor) :: test_list
 
 let test_borrowcheck_constant (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -3845,6 +4000,7 @@ let test_borrowcheck_constant (ctx : test_ctxt) : unit =
       Definition c := 0.
       CodeGen TestBorrowCheck fun (n : nat) => c.
     |}) {| |}
+let test_list = ("test_borrowcheck_constant" >:: test_borrowcheck_constant) :: test_list
 
 let test_borrowcheck_linear_id (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -3853,6 +4009,7 @@ let test_borrowcheck_linear_id (ctx : test_ctxt) : unit =
       CodeGen Linear L.
       CodeGen TestBorrowCheck fun (x : L) => x.
     |}) {| |}
+let test_list = ("test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id) :: test_list
 
 let test_borrowcheck_invalid_linearity_linear_arg_out_of_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3864,6 +4021,7 @@ let test_borrowcheck_invalid_linearity_linear_arg_out_of_fix (ctx : test_ctxt) :
 	fun (x : L) =>
         fix f (n : nat) := match n with O => O | S m => let x := f m in S x end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_linear_arg_out_of_fix" >:: test_borrowcheck_invalid_linearity_linear_arg_out_of_fix) :: test_list
 
 let test_borrowcheck_invalid_linearity_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3875,6 +4033,7 @@ let test_borrowcheck_invalid_linearity_lambda (ctx : test_ctxt) : unit =
 	fun (x : L) =>
 	0.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_lambda" >:: test_borrowcheck_invalid_linearity_lambda) :: test_list
 
 let test_borrowcheck_invalid_linearity_free_linear_var_in_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3887,6 +4046,7 @@ let test_borrowcheck_invalid_linearity_free_linear_var_in_lambda (ctx : test_ctx
 	  let f := fun (u : unit) => x in
 	  f u.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_free_linear_var_in_lambda" >:: test_borrowcheck_invalid_linearity_free_linear_var_in_lambda) :: test_list
 
 let test_borrowcheck_invalid_linearity_letin (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3899,6 +4059,7 @@ let test_borrowcheck_invalid_linearity_letin (ctx : test_ctxt) : unit =
 	let x := LC in
 	0.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_letin" >:: test_borrowcheck_invalid_linearity_letin) :: test_list
 
 let test_borrowcheck_invalid_linearity_dealloc_twice (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3913,6 +4074,7 @@ let test_borrowcheck_invalid_linearity_dealloc_twice (ctx : test_ctxt) : unit =
 	let z := dealloc x in
 	0.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_dealloc_twice" >:: test_borrowcheck_invalid_linearity_dealloc_twice) :: test_list
 
 let test_borrowcheck_invalid_linearity_arguments (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3924,6 +4086,7 @@ let test_borrowcheck_invalid_linearity_arguments (ctx : test_ctxt) : unit =
       CodeGen TestBorrowCheck
 	fun (x : L) => twoarg x x.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_arguments" >:: test_borrowcheck_invalid_linearity_arguments) :: test_list
 
 let test_borrowcheck_invalid_linearity_match_item (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3937,6 +4100,7 @@ let test_borrowcheck_invalid_linearity_match_item (ctx : test_ctxt) : unit =
 	| LC => x
 	end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_match_item" >:: test_borrowcheck_invalid_linearity_match_item) :: test_list
 
 let test_borrowcheck_invalid_linearity_match_branches (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3951,6 +4115,7 @@ let test_borrowcheck_invalid_linearity_match_branches (ctx : test_ctxt) : unit =
 	| false => LC
 	end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_match_branches" >:: test_borrowcheck_invalid_linearity_match_branches) :: test_list
 
 let test_borrowcheck_invalid_linearity_match_member (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -3969,6 +4134,7 @@ let test_borrowcheck_invalid_linearity_match_member (ctx : test_ctxt) : unit =
 	| lcons v y => 0
 	end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_linearity_match_member" >:: test_borrowcheck_invalid_linearity_match_member) :: test_list
 
 let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4015,6 +4181,7 @@ let test_borrowcheck_indirect_cycle (ctx : test_ctxt) : unit =
       assert(f(LC1()) == true);
       assert(f(LC2(pair_L_L(LC1(),LC1()))) == false);
     |}
+let test_list = ("test_borrowcheck_indirect_cycle" >:: test_borrowcheck_indirect_cycle) :: test_list
 
 let test_borrowcheck_simple_borrow (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -4030,6 +4197,7 @@ let test_borrowcheck_simple_borrow (ctx : test_ctxt) : unit =
         let _ := dealloc x in
         0.
     |}) {| |}
+let test_list = ("test_borrowcheck_simple_borrow" >:: test_borrowcheck_simple_borrow) :: test_list
 
 let test_borrowcheck_proj (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -4049,6 +4217,7 @@ let test_borrowcheck_proj (ctx : test_ctxt) : unit =
         let _ := dealloc x in
         e.
     |}) {| |}
+let test_list = ("test_borrowcheck_proj" >:: test_borrowcheck_proj) :: test_list
 
 let test_borrowcheck_lambda_out_of_fix (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -4067,6 +4236,7 @@ let test_borrowcheck_lambda_out_of_fix (ctx : test_ctxt) : unit =
         | lcons b l' => f l'
         end.
     |}) {| |}
+let test_list = ("test_borrowcheck_lambda_out_of_fix" >:: test_borrowcheck_lambda_out_of_fix) :: test_list
 
 let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4085,6 +4255,7 @@ let test_borrowcheck_lambda_closure (ctx : test_ctxt) : unit =
         let _ := dealloc x in
         r.
     |}) {| |}
+let test_list = ("test_borrowcheck_lambda_closure" >:: test_borrowcheck_lambda_closure) :: test_list
 
 let test_borrowcheck_fix_closure (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4103,6 +4274,7 @@ let test_borrowcheck_fix_closure (ctx : test_ctxt) : unit =
         let _ := dealloc x in
         r.
     |}) {| |}
+let test_list = ("test_borrowcheck_fix_closure" >:: test_borrowcheck_fix_closure) :: test_list
 
 let test_borrowcheck_invalid_borrow_used_after_dealloc (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4119,6 +4291,7 @@ let test_borrowcheck_invalid_borrow_used_after_dealloc (ctx : test_ctxt) : unit 
         let _ := dealloc x in
         b.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_used_after_dealloc" >:: test_borrowcheck_invalid_borrow_used_after_dealloc) :: test_list
 
 let test_borrowcheck_invalid_borrow_application (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4135,6 +4308,7 @@ let test_borrowcheck_invalid_borrow_application (ctx : test_ctxt) : unit =
 	  let b := borrow x in
 	  g x b.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_application" >:: test_borrowcheck_invalid_borrow_application) :: test_list
 
 let test_borrowcheck_invalid_borrow_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4152,6 +4326,7 @@ let test_borrowcheck_invalid_borrow_match (ctx : test_ctxt) : unit =
 	| LC => b
 	end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_match" >:: test_borrowcheck_invalid_borrow_match) :: test_list
 
 let test_borrowcheck_invalid_borrow_proj (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4172,6 +4347,7 @@ let test_borrowcheck_invalid_borrow_proj (ctx : test_ctxt) : unit =
         let _ := dealloc x in
         e.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_proj" >:: test_borrowcheck_invalid_borrow_proj) :: test_list
 
 let test_borrowcheck_list_bool_has_true (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ctx
@@ -4206,6 +4382,7 @@ let test_borrowcheck_list_bool_has_true (ctx : test_ctxt) : unit =
 	let _ := dealloc_lseq_bool l in
 	has_true.
     |}) {| |}
+let test_list = ("test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true) :: test_list
 
 let test_borrowcheck_invalid_borrow_in_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4222,6 +4399,7 @@ let test_borrowcheck_invalid_borrow_in_match (ctx : test_ctxt) : unit =
 	let _ := dealloc x in
 	b.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_in_match" >:: test_borrowcheck_invalid_borrow_in_match) :: test_list
 
 let test_borrowcheck_invalid_borrow_mutual (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4256,6 +4434,7 @@ let test_borrowcheck_invalid_borrow_mutual (ctx : test_ctxt) : unit =
         | bnode bf => let _ := dealloc_tree t in bf
         end.
     |}) {| |}
+let test_list = ("test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual) :: test_list
 
 let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4269,6 +4448,7 @@ let test_borrowcheck_borrow_constructor (ctx : test_ctxt) : unit =
       CodeGen TestBorrowCheck
 	fun (n : nat) => BC.
     |}) {| |}
+let test_list = ("test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor) :: test_list
 
 let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4297,6 +4477,7 @@ let test_borrowcheck_borrow_nested_match (ctx : test_ctxt) : unit =
       CodeGen BorrowFunc borrow.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_borrowcheck_borrow_nested_match" >:: test_borrowcheck_borrow_nested_match) :: test_list
 
 let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
@@ -4317,6 +4498,7 @@ let test_borrowcheck_borrow_and_linear (ctx : test_ctxt) : unit =
         consume n.
       CodeGen Func f.
     |}) {| |}
+let test_list = ("test_borrowcheck_borrow_and_linear" >:: test_borrowcheck_borrow_and_linear) :: test_list
 
 let test_void_tail (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4326,6 +4508,7 @@ let test_void_tail (ctx : test_ctxt) : unit =
       CodeGen Func f.
     |})
     {| |}
+let test_list = ("test_void_tail" >:: test_void_tail) :: test_list
 
 let test_void_head (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4340,6 +4523,7 @@ let test_void_head (ctx : test_ctxt) : unit =
       CodeGen Func f.
     |})
     {| |}
+let test_list = ("test_void_head" >:: test_void_head) :: test_list
 
 let test_void_mutual (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4364,6 +4548,7 @@ let test_void_mutual (ctx : test_ctxt) : unit =
       CodeGen Func f.
     |})
     {| |}
+let test_list = ("test_void_mutual" >:: test_void_mutual) :: test_list
 
 let test_void_empty_args (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4384,6 +4569,7 @@ let test_void_empty_args (ctx : test_ctxt) : unit =
     {|
       assert(f() == 0);
     |}
+let test_list = ("test_void_empty_args" >:: test_void_empty_args) :: test_list
 
 let test_void_head_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4401,6 +4587,7 @@ let test_void_head_tt_var (ctx : test_ctxt) : unit =
       CodeGen Func f.
     |})
     {| |}
+let test_list = ("test_void_head_tt_var" >:: test_void_head_tt_var) :: test_list
 
 let test_void_tail_tt_var (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4414,6 +4601,7 @@ let test_void_tail_tt_var (ctx : test_ctxt) : unit =
       CodeGen Func f.
     |})
     {| |}
+let test_list = ("test_void_tail_tt_var" >:: test_void_tail_tt_var) :: test_list
 
 let test_void_head_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4442,6 +4630,7 @@ let test_void_head_proj (ctx : test_ctxt) : unit =
       f(0);
       assert(dealloc_called == 1);
     |}
+let test_list = ("test_void_head_proj" >:: test_void_head_proj) :: test_list
 
 let test_void_tail_proj (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4465,6 +4654,7 @@ let test_void_tail_proj (ctx : test_ctxt) : unit =
       f(0);
       assert(dealloc_called == 1);
     |}
+let test_list = ("test_void_tail_proj" >:: test_void_tail_proj) :: test_list
 
 let test_void_indtype_contains_unit (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4476,6 +4666,7 @@ let test_void_indtype_contains_unit (ctx : test_ctxt) : unit =
     {|
       f();
     |}
+let test_list = ("test_void_indtype_contains_unit" >:: test_void_indtype_contains_unit) :: test_list
 
 let test_void_indtype_contains_infrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4490,6 +4681,7 @@ let test_void_indtype_contains_infrec (ctx : test_ctxt) : unit =
     {|
       assert(f(1) == 1);
     |}
+let test_list = ("test_void_indtype_contains_infrec" >:: test_void_indtype_contains_infrec) :: test_list
 
 let test_inductivetype_twoarg_bool_paren (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4500,6 +4692,7 @@ let test_inductivetype_twoarg_bool_paren (ctx : test_ctxt) : unit =
       assert(f(true) == true);
       assert(f(false) == false);
     |}
+let test_list = ("test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren) :: test_list
 
 let test_closure_call_at_tail_position (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4518,6 +4711,7 @@ let test_closure_call_at_tail_position (ctx : test_ctxt) : unit =
       struct closure_f_tag c = { g, 20 };
       assert(f(&c.func, 3) == 123);
     |}
+let test_list = ("test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position) :: test_list
 
 let test_closure_call_at_head_position (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4536,6 +4730,7 @@ let test_closure_call_at_head_position (ctx : test_ctxt) : unit =
       struct closure_f_tag c = { g, 70 };
       assert(f(&c.func, 3) == 174);
     |}
+let test_list = ("test_closure_call_at_head_position" >:: test_closure_call_at_tail_position) :: test_list
 
 let test_closure_generation_by_lambda (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4551,6 +4746,7 @@ let test_closure_generation_by_lambda (ctx : test_ctxt) : unit =
       assert(f(1,2,3,4) == 31);
       assert(f(4000,300,20,1) == 21263);
     |}
+let test_list = ("test_closure_generation_by_lambda" >:: test_closure_generation_by_lambda) :: test_list
 
 let test_closure_generation_by_fix_tailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4571,6 +4767,7 @@ let test_closure_generation_by_fix_tailrec (ctx : test_ctxt) : unit =
     {|
       assert(f(1,2) == 2);
     |}
+let test_list = ("test_closure_generation_by_fix_tailrec" >:: test_closure_generation_by_fix_tailrec) :: test_list
 
 let test_closure_generation_by_fix_nontailrec (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4591,6 +4788,7 @@ let test_closure_generation_by_fix_nontailrec (ctx : test_ctxt) : unit =
     {|
       assert(f(1,2) == 3);
     |}
+let test_list = ("test_closure_generation_by_fix_nontailrec" >:: test_closure_generation_by_fix_nontailrec) :: test_list
 
 let test_closure_generation_by_fix_tailrec_multi (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4617,6 +4815,7 @@ let test_closure_generation_by_fix_tailrec_multi (ctx : test_ctxt) : unit =
     {|
       assert(f(1,2) == 2);
     |}
+let test_list = ("test_closure_generation_by_fix_tailrec_multi" >:: test_closure_generation_by_fix_tailrec_multi) :: test_list
 
 let test_closure_generation_by_fix_nontailrec_multi (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4643,6 +4842,7 @@ let test_closure_generation_by_fix_nontailrec_multi (ctx : test_ctxt) : unit =
     {|
       assert(f(1,2) == 3);
     |}
+let test_list = ("test_closure_generation_by_fix_nontailrec_multi" >:: test_closure_generation_by_fix_nontailrec_multi) :: test_list
 
 (*
   The function body of g was generated twice.
@@ -4668,6 +4868,7 @@ let test_closure_generation_and_non_inlinable_fix_at_head_position (ctx : test_c
     {|
       assert(f(1,2) == 3);
     |}
+let test_list = ("test_closure_generation_and_non_inlinable_fix_at_head_position" >:: test_closure_generation_and_non_inlinable_fix_at_head_position) :: test_list
 
 let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4693,6 +4894,7 @@ let test_closure_argument_disables_tail_recursion_elimination (ctx : test_ctxt) 
       assert(f(2) == 7);
       assert(f(3) == 14);
     |}
+let test_list = ("test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination) :: test_list
 
 let test_closure_generated_from_fixfunc_argument (ctx : test_ctxt) : unit =
   codegen_test_template ctx
@@ -4710,211 +4912,10 @@ let test_closure_generated_from_fixfunc_argument (ctx : test_ctxt) : unit =
       assert(add(1,2) == 3);
       assert(add(7,1) == 8);
     |}
+let test_list = ("test_closure_generated_from_fixfunc_argument" >:: test_closure_generated_from_fixfunc_argument) :: test_list
 
 let suite : OUnit2.test =
-  "TestCodeGen" >::: [
-    "test_command_gen_qualid" >:: test_command_gen_qualid;
-    "test_tail_rel" >:: test_tail_rel;
-    "test_tail_constructor_bool" >:: test_tail_constructor_bool;
-    "test_tail_constructor_args" >:: test_tail_constructor_args;
-    "test_tail_constant_bool" >:: test_tail_constant_bool;
-    "test_tail_constant_args" >:: test_tail_constant_args;
-    "test_tail_match_bool" >:: test_tail_match_bool;
-    "test_tail_match_nat" >:: test_tail_match_nat;
-    "test_tail_match_singleton" >:: test_tail_match_singleton;
-    "test_mono_id_bool" >:: test_mono_id_bool;
-    "test_mono_id_bool_omit_cfunc_name" >:: test_mono_id_bool_omit_cfunc_name;
-    "test_mono_id_mybool" >:: test_mono_id_mybool;
-    "test_mybool_true" >:: test_mybool_true;
-    "test_pair_bool_bool" >:: test_pair_bool_bool;
-    "test_pair_2bool_bool" >:: test_pair_2bool_bool;
-    "test_nat_add_rec" >:: test_nat_add_rec;
-    "test_nat_add_iter" >:: test_nat_add_iter;
-    "test_list_bool" >:: test_list_bool;
-    "test_list_bool_length" >:: test_list_bool_length;
-    "test_sum" >:: test_sum;
-    "test_add3" >:: test_add3;
-    "test_mul3" >:: test_mul3;
-    "test_even_odd" >:: test_even_odd;
-    "test_even_odd_label_primary" >:: test_even_odd_label_primary;
-    "test_even_odd_label_sibling" >:: test_even_odd_label_sibling;
-    "test_even_odd_count" >:: test_even_odd_count;
-    "test_inner_fix_even_odd_1" >:: test_inner_fix_even_odd_1;
-    "test_inner_fix_even_odd_2" >:: test_inner_fix_even_odd_2;
-    "test_two_even" >:: test_two_even;
-    "test_two_even_two_odd" >:: test_two_even_two_odd;
-    "test_app_let" >:: test_app_let;
-    "test_app_match" >:: test_app_match;
-    "test_let_app_match" >:: test_let_app_match;
-    "test_cast" >:: test_cast;
-    "test_beta_var_presimp" >:: test_beta_var_presimp;
-    "test_matchapp_before_reduction" >:: test_matchapp_before_reduction;
-    "test_delta_fun_constant" >:: test_delta_fun_constant;
-    "test_delta_fun_constructor" >:: test_delta_fun_constructor;
-    "test_delta_fun_lambda" >:: test_delta_fun_lambda;
-    "test_delta_fun_nested_let" >:: test_delta_fun_nested_let;
-    "test_reduce_proj" >:: test_reduce_proj;
-    "test_nil_nat" >:: test_nil_nat;
-    "test_singleton_list" >:: test_singleton_list;
-    "test_deeply_nested_match" >:: test_deeply_nested_match;
-    "test_let_add" >:: test_let_add;
-    "test_let_match" >:: test_let_match;
-    "test_let_match_let" >:: test_let_match_let;
-    "test_let_match_let_nonempty_cargs" >:: test_let_match_let_nonempty_cargs;
-    "test_let_unused_is_not_specialized" >:: test_let_unused_is_not_specialized;
-    "test_let_only_used_in_static_is_not_specialized" >:: test_let_only_used_in_static_is_not_specialized;
-    "test_add_tailrec" >:: test_add_tailrec;
-    "test_add_nontailrec" >:: test_add_nontailrec;
-    "test_map_succ" >:: test_map_succ;
-    "test_tail_fix_double" >:: test_tail_fix_double;
-    "test_nth" >:: test_nth;
-    "test_rev_append" >:: test_rev_append;
-    "test_merge" >:: test_merge;
-    "test_merge_nontailrec" >:: test_merge_nontailrec;
-    "test_ackermann" >:: test_ackermann;
-    "test_ackermann_plus1" >:: test_ackermann_plus1;
-    "test_uphalf" >:: test_uphalf;
-    "test_sum_nested_fix" >:: test_sum_nested_fix;
-    "test_add_at_non_tail_position1" >:: test_add_at_non_tail_position1;
-    "test_add_at_non_tail_position" >:: test_add_at_non_tail_position;
-    "test_fully_dynamic_func_with_presimp_name" >:: test_fully_dynamic_func_with_presimp_name;
-    "test_specialized_func_with_presimp_name" >:: test_specialized_func_with_presimp_name;
-    "test_specialization_at_get_ctnt_type_body_from_cfunc" >:: test_specialization_at_get_ctnt_type_body_from_cfunc;
-    "test_letin_in_constructor_type" >:: test_letin_in_constructor_type;
-    "test_arguments_contain_sort" >:: test_arguments_contain_sort;
-    "test_arguments_contain_prod" >:: test_arguments_contain_prod;
-    "test_arguments_contain_ind" >:: test_arguments_contain_ind;
-    "test_mftest" >:: test_mftest;
-    "test_multifunc_different_return_types" >:: test_multifunc_different_return_types;
-    "test_multifunc_noargument" >:: test_multifunc_noargument;
-    "test_mutual_sizet_sizef" >:: test_mutual_sizet_sizef;
-    "test_mutual_sizet_sizef_dedup" >:: test_mutual_sizet_sizef_dedup;
-    "test_mutual_sizet_sizef_nodedup" >:: test_mutual_sizet_sizef_nodedup;
-    "test_mutual_static1" >:: test_mutual_static1;
-    "test_mutual_static2" >:: test_mutual_static2;
-    "test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable" >:: test_mutual_fix_outer_noninlinable_fix_must_be_noninlinable;
-    "test_nested_fix_must_have_consistent_arguments" >:: test_nested_fix_must_have_consistent_arguments;
-    "test_nongoto_fixterm_at_nontail" >:: test_nongoto_fixterm_at_nontail;
-    "test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail" >:: test_nongoto_fixterm_in_gotoonly_fixterm_at_nontail;
-    "test_useless_fixterm_at_nontail" >:: test_useless_fixterm_at_nontail;
-    "test_extra_arguments" >:: test_extra_arguments;
-    "test_extra_arguments_nested_exarg_used" >:: test_extra_arguments_nested_exarg_used;
-    "test_extra_arguments_nested_exarg_unused" >:: test_extra_arguments_nested_exarg_unused;
-    "test_unused_argument" >:: test_unused_argument;
-    "test_inner_fixfunc_goto_exarg_fixfunc" >:: test_inner_fixfunc_goto_exarg_fixfunc;
-    "test_parallel_assignment" >:: test_parallel_assignment;
-    "test_toplevel_nonrecursive_fixpoint" >:: test_toplevel_nonrecursive_fixpoint;
-    "test_unused_fixfunc_in_internal_fixterm" >:: test_unused_fixfunc_in_internal_fixterm;
-    "test_unused_fixfunc_in_external_fixterm" >:: test_unused_fixfunc_in_external_fixterm;
-    "test_delete_unreachable_fixfuncs_drop_last" >:: test_delete_unreachable_fixfuncs_drop_last;
-    "test_delete_unreachable_fixfuncs_drop_middle" >:: test_delete_unreachable_fixfuncs_drop_middle;
-    "test_delete_unreachable_fixfuncs_drop_first" >:: test_delete_unreachable_fixfuncs_drop_first;
-    "test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc" >:: test_delete_unreachable_fixfuncs_reference_in_nested_unused_fixfunc;
-    "test_primitive_projection" >:: test_primitive_projection;
-    "test_primitive_projection_nontail" >:: test_primitive_projection_nontail;
-    "test_matchapp_twoarg" >:: test_matchapp_twoarg;
-    "test_matchapp_multiple_phases" >:: test_matchapp_multiple_phases;
-    "test_matchapp_and_fix" >:: test_matchapp_and_fix;
-    "test_auto_ind_type" >:: test_auto_ind_type;
-    "test_auto_ind_match_cstrlabel" >:: test_auto_ind_match_cstrlabel;
-    "test_auto_ind_match_cstrmember" >:: test_auto_ind_match_cstrmember;
-    "test_auto_ind_type_with_arg" >:: test_auto_ind_type_with_arg;
-    "test_auto_ind_match_cstrlabel_with_arg" >:: test_auto_ind_match_cstrlabel_with_arg;
-    "test_auto_ind_match_cstrmember_with_arg" >:: test_auto_ind_match_cstrmember_with_arg;
-    "test_auto_const" >:: test_auto_const;
-    "test_auto_construct" >:: test_auto_construct;
-    "test_auto_nat_fold" >:: test_auto_nat_fold;
-    "test_auto_polymorphic_argument_is_static" >:: test_auto_polymorphic_argument_is_static;
-    "test_option_bool_struct" >:: test_option_bool_struct;
-    "test_reduceeta_makes_single_function" >:: test_reduceeta_makes_single_function;
-    "test_multiple_primitives_shares_cfunc" >:: test_multiple_primitives_shares_cfunc;
-    "test_indimp_bool" >:: test_indimp_bool;
-    "test_indimp_bool_pair" >:: test_indimp_bool_pair;
-    "test_indimp_bool_nat_pair" >:: test_indimp_bool_nat_pair;
-    "test_indimp_parametric_pair" >:: test_indimp_parametric_pair;
-    "test_indimp_option_bool" >:: test_indimp_option_bool;
-    "test_indimp_record" >:: test_indimp_record;
-    "test_indimp_nat" >:: test_indimp_nat;
-    "test_indimp_mutual" >:: test_indimp_mutual;
-    "test_indimp_rosetree" >:: test_indimp_rosetree;
-    "test_indimp_unit_in_member" >:: test_indimp_unit_in_member;
-    "test_indimp_named_mybool" >:: test_indimp_named_mybool;
-    "test_indimp_named_mynat" >:: test_indimp_named_mynat;
-    "test_indimp_force_heap" >:: test_indimp_force_heap;
-    "test_indimp_force_imm" >:: test_indimp_force_imm;
-    "test_indimp_force_imm_fail_rec" >:: test_indimp_force_imm_fail_rec;
-    "test_indimp_force_imm_fail_mut" >:: test_indimp_force_imm_fail_mut;
-    "test_indimp_dealloc_list" >:: test_indimp_dealloc_list;
-    "test_indimp_auto_linear" >:: test_indimp_auto_linear;
-    "test_indimp_cstr_fargs_void" >:: test_indimp_cstr_fargs_void;
-    "test_indimp_static_off" >:: test_indimp_static_off;
-    "test_indimp_static_on" >:: test_indimp_static_on;
-    "test_header_snippet" >:: test_header_snippet;
-    "test_prototype" >:: test_prototype;
-    "test_monocheck_failure" >:: test_monocheck_failure;
-    "test_linear_types" >:: test_linear_types;
-    "test_linear_novar" >:: test_linear_novar;
-    "test_linear_twovar" >:: test_linear_twovar;
-    "test_linear_inconsistent_reference_in_match" >:: test_linear_inconsistent_reference_in_match;
-    "test_linear_reference_in_fix" >:: test_linear_reference_in_fix;
-    "test_linear_dellet" >:: test_linear_dellet;
-    "test_linear_dellet_match" >:: test_linear_dellet_match;
-    "test_linear_match_with_deallocator" >:: test_linear_match_with_deallocator;
-    "test_linear_match_without_deallocator" >:: test_linear_match_without_deallocator;
-    "test_downward_simple" >:: test_downward_simple;
-    "test_downward_in_pair" >:: test_downward_in_pair;
-    "test_downward_fixfunc" >:: test_downward_fixfunc;
-    "test_downward_indirect_cycle" >:: test_downward_indirect_cycle;
-    "test_borrowcheck_constructor" >:: test_borrowcheck_constructor;
-    "test_borrowcheck_constant" >:: test_borrowcheck_constant;
-    "test_borrowcheck_linear_id" >:: test_borrowcheck_linear_id;
-    "test_borrowcheck_invalid_linearity_linear_arg_out_of_fix" >:: test_borrowcheck_invalid_linearity_linear_arg_out_of_fix;
-    "test_borrowcheck_invalid_linearity_lambda" >:: test_borrowcheck_invalid_linearity_lambda;
-    "test_borrowcheck_invalid_linearity_free_linear_var_in_lambda" >:: test_borrowcheck_invalid_linearity_free_linear_var_in_lambda;
-    "test_borrowcheck_invalid_linearity_letin" >:: test_borrowcheck_invalid_linearity_letin;
-    "test_borrowcheck_invalid_linearity_dealloc_twice" >:: test_borrowcheck_invalid_linearity_dealloc_twice;
-    "test_borrowcheck_invalid_linearity_arguments" >:: test_borrowcheck_invalid_linearity_arguments;
-    "test_borrowcheck_invalid_linearity_match_item" >:: test_borrowcheck_invalid_linearity_match_item;
-    "test_borrowcheck_invalid_linearity_match_branches" >:: test_borrowcheck_invalid_linearity_match_branches;
-    "test_borrowcheck_invalid_linearity_match_member" >:: test_borrowcheck_invalid_linearity_match_member;
-    "test_borrowcheck_indirect_cycle" >:: test_borrowcheck_indirect_cycle;
-    "test_borrowcheck_simple_borrow" >:: test_borrowcheck_simple_borrow;
-    "test_borrowcheck_proj" >:: test_borrowcheck_proj;
-    "test_borrowcheck_lambda_out_of_fix" >:: test_borrowcheck_lambda_out_of_fix;
-    "test_borrowcheck_lambda_closure" >:: test_borrowcheck_lambda_closure;
-    "test_borrowcheck_fix_closure" >:: test_borrowcheck_fix_closure;
-    "test_borrowcheck_invalid_borrow_used_after_dealloc" >:: test_borrowcheck_invalid_borrow_used_after_dealloc;
-    "test_borrowcheck_invalid_borrow_application" >:: test_borrowcheck_invalid_borrow_application;
-    "test_borrowcheck_invalid_borrow_match" >:: test_borrowcheck_invalid_borrow_match;
-    "test_borrowcheck_invalid_borrow_proj" >:: test_borrowcheck_invalid_borrow_proj;
-    "test_borrowcheck_list_bool_has_true" >:: test_borrowcheck_list_bool_has_true;
-    "test_borrowcheck_invalid_borrow_in_match" >:: test_borrowcheck_invalid_borrow_in_match;
-    "test_borrowcheck_invalid_borrow_mutual" >:: test_borrowcheck_invalid_borrow_mutual;
-    "test_borrowcheck_borrow_constructor" >:: test_borrowcheck_borrow_constructor;
-    "test_borrowcheck_borrow_nested_match" >:: test_borrowcheck_borrow_nested_match;
-    "test_borrowcheck_borrow_and_linear" >:: test_borrowcheck_borrow_and_linear;
-    "test_void_tail" >:: test_void_tail;
-    "test_void_head" >:: test_void_head;
-    "test_void_mutual" >:: test_void_mutual;
-    "test_void_empty_args" >:: test_void_empty_args;
-    "test_void_head_tt_var" >:: test_void_head_tt_var;
-    "test_void_tail_tt_var" >:: test_void_tail_tt_var;
-    "test_void_head_proj" >:: test_void_head_proj;
-    "test_void_tail_proj" >:: test_void_tail_proj;
-    "test_void_indtype_contains_unit" >:: test_void_indtype_contains_unit;
-    "test_void_indtype_contains_infrec" >:: test_void_indtype_contains_infrec;
-    "test_inductivetype_twoarg_bool_paren" >:: test_inductivetype_twoarg_bool_paren;
-    "test_closure_call_at_tail_position" >:: test_closure_call_at_tail_position;
-    "test_closure_call_at_head_position" >:: test_closure_call_at_tail_position;
-    "test_closure_generation_by_lambda" >:: test_closure_generation_by_lambda;
-    "test_closure_generation_by_fix_tailrec" >:: test_closure_generation_by_fix_tailrec;
-    "test_closure_generation_by_fix_nontailrec" >:: test_closure_generation_by_fix_nontailrec;
-    "test_closure_generation_by_fix_tailrec_multi" >:: test_closure_generation_by_fix_tailrec_multi;
-    "test_closure_generation_by_fix_nontailrec_multi" >:: test_closure_generation_by_fix_nontailrec_multi;
-    "test_closure_generation_and_non_inlinable_fix_at_head_position" >:: test_closure_generation_and_non_inlinable_fix_at_head_position;
-    "test_closure_argument_disables_tail_recursion_elimination" >:: test_closure_argument_disables_tail_recursion_elimination;
-    "test_closure_generated_from_fixfunc_argument" >:: test_closure_generated_from_fixfunc_argument;
-  ]
+  "TestCodeGen" >::: (List.rev test_list)
 
 let () =
   run_test_tt_main suite
