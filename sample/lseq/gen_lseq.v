@@ -88,10 +88,11 @@ CodeGen Primitive lnil bool => "lseq_bool_nil".
 CodeGen Primitive lcons bool => "lseq_bool_cons".
 CodeGen IndImp lseq bool
   where heap on
+  where static off
   where output_type_decls current_header
   where output_type_impls current_header
   where output_func_decls current_header
-  where output_func_impls current_header
+  where output_func_impls current_source
   where prefix "lseqbool".
 
 CodeGen HeaderSnippet "prologue" "
