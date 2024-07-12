@@ -3679,7 +3679,6 @@ end
 
 let test_list = add_test test_list "test_indimp_multifile_public_type_impl" begin fun (ctx : test_ctxt) ->
   codegen_test_template ~c_files:["mybool.c"] ctx
-    (bool_src ^ nat_src ^
     {|
       Inductive mybool := mytrue | myfalse.
       Definition mybool_neg (x : mybool) :=
@@ -3707,9 +3706,93 @@ let test_list = add_test test_list "test_indimp_multifile_public_type_impl" begi
       CodeGen SourceFile "gen.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
       CodeGen Func mybool_neg.
-    |}) {|
+    |} {|
       assert(mybool_sw(mybool_neg(mytrue())) == mybool_sw(myfalse()));
       assert(mybool_sw(mybool_neg(myfalse())) == mybool_sw(mytrue()));
+    |}
+end
+
+let test_list = add_test test_list "test_indimp_multifile_public_static_type_impl" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~c_files:["mybool.c"] ctx
+    {|
+      Inductive mybool := mytrue | myfalse.
+      Definition mybool_neg (x : mybool) :=
+        match x with
+        | mytrue => myfalse
+        | myfalse => mytrue
+        end.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => "mybool_sw" with
+      | mytrue => "mytrue_tag"
+      | myfalse => "myfalse_tag".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen HeaderFile "mybool.h".
+      CodeGen SourceFile "mybool.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+      CodeGen IndImp mybool
+        where static on
+        where output_type_decls current_header
+        where output_type_impls current_header
+        where output_func_decls current_header
+        where output_func_impls current_header
+        where prefix "mybool".
+      CodeGen HeaderFile "gen.h".
+      CodeGen SourceFile "gen.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+      CodeGen Func mybool_neg.
+    |} {|
+      assert(mybool_sw(mybool_neg(mytrue())) == mybool_sw(myfalse()));
+      assert(mybool_sw(mybool_neg(myfalse())) == mybool_sw(mytrue()));
+    |}
+end
+
+let test_list = add_test test_list "test_indimp_multifile_private_type_impl" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~c_files:["mybool.c"] ctx
+    {|
+      Inductive mybool := mytrue | myfalse.
+      Definition bool_of_mybool (x : mybool) :=
+        match x with
+        | mytrue => true
+        | myfalse => false
+        end.
+      Definition mybool_of_bool (b : bool) :=
+        match b with
+        | true => mytrue
+        | false => myfalse
+        end.
+      Set CodeGen IndImpAutoLinear.
+      CodeGen InductiveType bool => "int".
+      CodeGen InductiveMatch bool => "" with
+      | true => ""
+      | false => "0".
+      CodeGen Constant true => "1".
+      CodeGen Constant false => "0".
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => "mybool_sw" with
+      | mytrue => "mytrue_tag"
+      | myfalse => "myfalse_tag".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen HeaderFile "mybool.h".
+      CodeGen SourceFile "mybool.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+      CodeGen IndImp mybool
+        where heap on (* heap is required for output_type_decls *)
+        where static on
+        where output_type_decls current_header
+        where output_type_impls current_source
+        where output_func_decls current_source
+        where output_func_impls current_source
+        where prefix "mybool".
+      CodeGen Func bool_of_mybool.
+      CodeGen Func mybool_of_bool.
+      CodeGen HeaderFile "gen.h".
+      CodeGen SourceFile "gen.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+    |} {|
+      assert(bool_of_mybool(mybool_of_bool(0)) == 0);
+      assert(bool_of_mybool(mybool_of_bool(1)) == 1);
     |}
 end
 
