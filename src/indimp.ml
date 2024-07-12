@@ -46,14 +46,6 @@ let indimp_mods_empty = {
   indimp_mods_static = None;
 }
 
-let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
-  match o1, o2 with
-  | None, None -> None
-  | Some _, None -> o1
-  | None, Some _ -> o2
-  | Some _, Some _ ->
-      user_err (Pp.str "[codegen] CodeGen IndImp: duplicated option:" +++ Pp.str name)
-
 let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods =
   {
     indimp_mods_heap = optmerge "heap" mods1.indimp_mods_heap mods2.indimp_mods_heap;

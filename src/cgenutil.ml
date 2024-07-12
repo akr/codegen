@@ -1708,3 +1708,11 @@ let str_instance_command (icommand : instance_command) : string =
   | CodeGenStaticFunc -> "StaticFunc"
   | CodeGenPrimitive -> "Primitive"
   | CodeGenConstant -> "Constant"
+
+let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
+  match o1, o2 with
+  | None, None -> None
+  | Some _, None -> o1
+  | None, Some _ -> o2
+  | Some _, Some _ ->
+      user_err (Pp.str "[codegen] duplicated option:" +++ Pp.str name)

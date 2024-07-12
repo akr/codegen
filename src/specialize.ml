@@ -29,6 +29,18 @@ open Cgenutil
 open State
 open Filegen
 
+type func_mods = {
+  func_mods_static : bool option;
+}
+
+let func_mods_empty = {
+  func_mods_static = None;
+}
+
+let merge_func_mods (mods1 : func_mods) (mods2 : func_mods) : func_mods = {
+  func_mods_static = optmerge "static" mods1.func_mods_static mods2.func_mods_static;
+}
+
 let pr_s_or_d (sd : s_or_d) : Pp.t =
   match sd with
   | SorD_S -> Pp.str "s"
@@ -569,16 +581,11 @@ let codegen_instance_command
 let command_function
     (func : Libnames.qualid)
     (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) : unit =
-  let (env, sp_inst) = codegen_instance_command CodeGenFunc func user_args names in
+    (names : sp_instance_names)
+    (func_mods : func_mods) : unit =
+  let icommand = match func_mods.func_mods_static with None | Some false -> CodeGenFunc | _ -> CodeGenStaticFunc in
+  let (env, sp_inst) = codegen_instance_command icommand func user_args names in
   codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
-  codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
-
-let command_static_function
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr option list)
-    (names : sp_instance_names) : unit =
-  let (env, sp_inst) = codegen_instance_command CodeGenStaticFunc func user_args names in
   codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive

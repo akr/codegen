@@ -1,3 +1,9 @@
+type func_mods = {
+  func_mods_static : bool option;
+}
+val func_mods_empty : func_mods
+val merge_func_mods : func_mods -> func_mods -> func_mods
+
 val command_print_specialization : Libnames.qualid list -> unit
 val func_of_qualid : Environ.env -> Evd.evar_map -> Libnames.qualid -> Evd.evar_map * Constr.t
 val codegen_define_or_check_static_arguments : ?cfunc:string -> Environ.env -> Evd.evar_map -> Constr.t -> State.s_or_d list -> State.specialization_config
@@ -17,11 +23,8 @@ val codegen_define_instance :
   State.sp_instance_names option ->
   Environ.env * State.specialization_instance
 val command_function :
-  Libnames.qualid ->
-  Constrexpr.constr_expr option list -> State.sp_instance_names -> unit
-val command_static_function :
-  Libnames.qualid ->
-  Constrexpr.constr_expr option list -> State.sp_instance_names -> unit
+  Libnames.qualid -> Constrexpr.constr_expr option list ->
+  State.sp_instance_names -> func_mods -> unit
 val command_primitive :
   Libnames.qualid ->
   Constrexpr.constr_expr option list -> State.sp_instance_names -> unit

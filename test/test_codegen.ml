@@ -2240,7 +2240,7 @@ let test_list = add_test test_list "test_mutual_static1" begin fun (ctx : test_c
         end.
       CodeGen Snippet "prologue" "extern nat idnat1(nat v1_n);".
       CodeGen Func idnat1.
-      CodeGen StaticFunc idnat2.
+      CodeGen Func idnat2 where static on.
       CodeGen Snippet "prologue" "static nat idnat2(nat v1_n);".
     |})
     {|
@@ -2264,7 +2264,7 @@ let test_list = add_test test_list "test_mutual_static2" begin fun (ctx : test_c
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "prologue" "extern nat idnat2(nat v1_n);".
-      CodeGen StaticFunc idnat1.
+      CodeGen Func idnat1 where static on.
       CodeGen Func idnat2.
       CodeGen Snippet "prologue" "static nat idnat1(nat v1_n);".
     |})
@@ -3740,7 +3740,7 @@ let test_list = add_test test_list "test_indimp_multifile_public_static_type_imp
       CodeGen HeaderFile "gen.h".
       CodeGen SourceFile "gen.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
-      CodeGen Func mybool_neg.
+      CodeGen Func mybool_neg where static on.
     |} {|
       assert(mybool_sw(mybool_neg(mytrue())) == mybool_sw(myfalse()));
       assert(mybool_sw(mybool_neg(myfalse())) == mybool_sw(mytrue()));

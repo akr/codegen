@@ -61,7 +61,7 @@ CodeGen Snippet "prologue" "
 #define uphalf(n) (((n)+1)>>1)
 ".
 
-CodeGen StaticFunc fastpow_iter.
-CodeGen StaticFunc fastpow.
+CodeGen Func fastpow_iter where static on.
+CodeGen Func fastpow where static on.
 
 CodeGen GenerateFile.

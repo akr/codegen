@@ -176,15 +176,15 @@ CodeGen Primitive pushD.
 CodeGen Primitive lookupD.
 
 (*
-CodeGen StaticFunc Nat.pred.
-CodeGen StaticFunc neq0.
-CodeGen StaticFunc buildDir2.
-CodeGen StaticFunc buildDir1.
-CodeGen StaticFunc buildDir.
+CodeGen Func Nat.pred where static on.
+CodeGen Func neq0 where static on.
+CodeGen Func buildDir2 where static on.
+CodeGen Func buildDir1 where static on.
+CodeGen Func buildDir where static on.
 *)
 
-CodeGen StaticFunc rank_init.
-CodeGen StaticFunc rank_lookup.
+CodeGen Func rank_init where static on.
+CodeGen Func rank_lookup where static on.
 
 CodeGen ResolveDependencies.
 (*Print CodeGen Generation List.*)
