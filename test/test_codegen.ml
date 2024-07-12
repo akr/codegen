@@ -274,6 +274,7 @@ let codegen_test_template
     ?(modify_generated_source : (string -> string) option)
     ?(resolve_dependencies : bool = true)
     ?(mutual_recursion_detection : bool = true)
+    ?(c_files : string list = [])
     ?(cc_exit_code : Unix.process_status option)
     ?(main_toplevel_defs : string option)
     (ctx : test_ctxt)
@@ -342,10 +343,10 @@ let codegen_test_template
   match goal with
   | UntilCoq -> ()
   | UntilCC ->
-      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn]);
+      assert_command ~ctxt:ctx ~chdir:d ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn] @ c_files);
   | UntilExe ->
-      assert_command ~ctxt:ctx ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn]);
-      assert_command ~ctxt:ctx exe_fn []
+      assert_command ~ctxt:ctx ~chdir:d ?exit_code:cc_exit_code cc (cc_opts @ ["-o"; exe_fn; main_fn] @ c_files);
+      assert_command ~ctxt:ctx ~chdir:d exe_fn []
 
 let template_coq_success
     ?(coq_output_regexp : Str.regexp option)
@@ -3673,6 +3674,42 @@ let test_list = add_test test_list "test_indimp_static_on" begin fun (ctx : test
       (* the extern prototype and IndImp generated static definition causes compilation error. *)
       CodeGen Snippet "type_decls" "extern mybool mybool_cstr_mytrue(void);".
     |}) {|
+    |}
+end
+
+let test_list = add_test test_list "test_indimp_multifile_public_type_impl" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~c_files:["mybool.c"] ctx
+    (bool_src ^ nat_src ^
+    {|
+      Inductive mybool := mytrue | myfalse.
+      Definition mybool_neg (x : mybool) :=
+        match x with
+        | mytrue => myfalse
+        | myfalse => mytrue
+        end.
+      CodeGen InductiveType mybool => "mybool".
+      CodeGen InductiveMatch mybool => "mybool_sw" with
+      | mytrue => "mytrue_tag"
+      | myfalse => "myfalse_tag".
+      CodeGen Primitive mytrue => "mytrue".
+      CodeGen Primitive myfalse => "myfalse".
+      CodeGen HeaderFile "mybool.h".
+      CodeGen SourceFile "mybool.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+      CodeGen IndImp mybool
+        where static off
+        where output_type_decls current_header
+        where output_type_impls current_header
+        where output_func_decls current_header
+        where output_func_impls current_source
+        where prefix "mybool".
+      CodeGen HeaderFile "gen.h".
+      CodeGen SourceFile "gen.c".
+      CodeGen Snippet "prologue" "#include ""mybool.h""".
+      CodeGen Func mybool_neg.
+    |}) {|
+      assert(mybool_sw(mybool_neg(mytrue())) == mybool_sw(myfalse()));
+      assert(mybool_sw(mybool_neg(myfalse())) == mybool_sw(mytrue()));
     |}
 end
 
