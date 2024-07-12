@@ -583,7 +583,7 @@ let command_function
     (user_args : Constrexpr.constr_expr option list)
     (names : sp_instance_names)
     (func_mods : func_mods) : unit =
-  let icommand = match func_mods.func_mods_static with None | Some false -> CodeGenFunc | _ -> CodeGenStaticFunc in
+  let icommand = match func_mods.func_mods_static with Some false -> CodeGenFunc | _ -> CodeGenStaticFunc in
   let (env, sp_inst) = codegen_instance_command icommand func user_args names in
   codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)

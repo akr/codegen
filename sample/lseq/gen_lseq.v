@@ -99,7 +99,7 @@ CodeGen HeaderSnippet "prologue" "
 #include <stdlib.h> /* for NULL, malloc(), abort() */
 ".
 
-CodeGen Func lseq_consume bool => "lseq_consume_bool".
+CodeGen Func lseq_consume bool => "lseq_consume_bool" where static off.
 
 CodeGen InductiveType bseq bool => "lseq_bool".
 CodeGen InductiveMatch bseq bool => "lseq_bool_sw" with
@@ -107,35 +107,35 @@ CodeGen InductiveMatch bseq bool => "lseq_bool_sw" with
 | bcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
 
 
-CodeGen Func lncons bool => "lncons_bool".
-CodeGen Func lnseq bool => "lnseq_bool".
+CodeGen Func lncons bool => "lncons_bool" where static off.
+CodeGen Func lnseq bool => "lnseq_bool" where static off.
 
-CodeGen Func bhead bool => "bhead_bool".
-CodeGen Func lbehead bool => "lbehead_bool".
-CodeGen Func blast bool => "blast_bool".
-CodeGen Func lbelast bool => "lbelast_bool".
+CodeGen Func bhead bool => "bhead_bool" where static off.
+CodeGen Func lbehead bool => "lbehead_bool" where static off.
+CodeGen Func blast bool => "blast_bool" where static off.
+CodeGen Func lbelast bool => "lbelast_bool" where static off.
 
-CodeGen Func bsize bool => "bsize_bool".
+CodeGen Func bsize bool => "bsize_bool" where static off.
 
-CodeGen Func bnth bool => "bnth_bool".
-CodeGen Func lset_nth bool => "lset_nth_bool".
+CodeGen Func bnth bool => "bnth_bool" where static off.
+CodeGen Func lset_nth bool => "lset_nth_bool" where static off.
 
-CodeGen Func bnilp bool => "bnilp_bool".
+CodeGen Func bnilp bool => "bnilp_bool" where static off.
 
-CodeGen Func lmask bool => "lmask_bool".
-CodeGen Func lcat bool => "lcat_bool".
-CodeGen Func blcat bool => "blcat_bool".
+CodeGen Func lmask bool => "lmask_bool" where static off.
+CodeGen Func lcat bool => "lcat_bool" where static off.
+CodeGen Func blcat bool => "blcat_bool" where static off.
 
-CodeGen Func ltake bool => "ltake_bool".
-CodeGen Func ldrop bool => "ldrop_bool".
-CodeGen Func bdrop bool => "bdrop_bool".
-CodeGen Func lrot bool => "lrot_bool".
-CodeGen Func lrotr bool => "lrotr_bool".
+CodeGen Func ltake bool => "ltake_bool" where static off.
+CodeGen Func ldrop bool => "ldrop_bool" where static off.
+CodeGen Func bdrop bool => "bdrop_bool" where static off.
+CodeGen Func lrot bool => "lrot_bool" where static off.
+CodeGen Func lrotr bool => "lrotr_bool" where static off.
 
-CodeGen Func lcatrev bool => "lcatrev_bool".
-CodeGen Func lrev bool => "lrev_bool".
-CodeGen Func bcatrev bool => "bcatrev_bool".
-CodeGen Func brev bool => "brev_bool".
+CodeGen Func lcatrev bool => "lcatrev_bool" where static off.
+CodeGen Func lrev bool => "lrev_bool" where static off.
+CodeGen Func bcatrev bool => "bcatrev_bool" where static off.
+CodeGen Func brev bool => "brev_bool" where static off.
 
 CodeGen HeaderSnippet "epilogue" "#endif /* LSEQ_H */".
 

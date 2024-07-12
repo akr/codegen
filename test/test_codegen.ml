@@ -1039,13 +1039,13 @@ let test_list = add_test test_list "test_even_odd_count" begin fun (ctx : test_c
     ~modify_generated_source:
       (fun s ->
         let s = Str.replace_first
-          (regexp {|^bool[ \n]even\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static bool[ \n]even\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("bool tmp_even\\1" ^
            "bool even(nat n) { even_count++; return tmp_even(n); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^bool[ \n]odd\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static bool[ \n]odd\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("bool tmp_odd\\1" ^
            "bool odd(nat n) { odd_count++; return tmp_odd(n); }\n")
           s
@@ -2155,13 +2155,13 @@ let test_list = add_test test_list "test_mutual_sizet_sizef_dedup" begin fun (ct
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
@@ -2201,13 +2201,13 @@ let test_list = add_test test_list "test_mutual_sizet_sizef_nodedup" begin fun (
       (fun s ->
         (*print_string src;*)
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static nat[ \n]sizet\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizet\\1" ^
            "nat sizet(tree t) { sizet_count++; return tmp_sizet(t); }\n")
           s
         in
         let s = Str.replace_first
-          (regexp {|^nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
+          (regexp {|^static nat[ \n]sizef\(.*\n\(\([^}\n].*\)\n\)*}\n\)|})
           ("nat tmp_sizef\\1" ^
            "nat sizef(forest f) { sizef_count++; return tmp_sizef(f); }\n")
           s
@@ -2239,8 +2239,8 @@ let test_list = add_test test_list "test_mutual_static1" begin fun (ctx : test_c
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "prologue" "extern nat idnat1(nat v1_n);".
-      CodeGen Func idnat1.
-      CodeGen Func idnat2 where static on.
+      CodeGen Func idnat1 where static off.
+      CodeGen Func idnat2.
       CodeGen Snippet "prologue" "static nat idnat2(nat v1_n);".
     |})
     {|
@@ -2264,8 +2264,8 @@ let test_list = add_test test_list "test_mutual_static2" begin fun (ctx : test_c
         | S m => S (idnat1 m)
         end.
       CodeGen Snippet "prologue" "extern nat idnat2(nat v1_n);".
-      CodeGen Func idnat1 where static on.
-      CodeGen Func idnat2.
+      CodeGen Func idnat1.
+      CodeGen Func idnat2 where static off.
       CodeGen Snippet "prologue" "static nat idnat1(nat v1_n);".
     |})
     {|
@@ -3731,7 +3731,6 @@ let test_list = add_test test_list "test_indimp_multifile_public_static_type_imp
       CodeGen SourceFile "mybool.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
       CodeGen IndImp mybool
-        where static on
         where output_type_decls current_header
         where output_type_impls current_header
         where output_func_decls current_header
@@ -3740,7 +3739,7 @@ let test_list = add_test test_list "test_indimp_multifile_public_static_type_imp
       CodeGen HeaderFile "gen.h".
       CodeGen SourceFile "gen.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
-      CodeGen Func mybool_neg where static on.
+      CodeGen Func mybool_neg.
     |} {|
       assert(mybool_sw(mybool_neg(mytrue())) == mybool_sw(myfalse()));
       assert(mybool_sw(mybool_neg(myfalse())) == mybool_sw(mytrue()));
@@ -3779,14 +3778,13 @@ let test_list = add_test test_list "test_indimp_multifile_private_type_impl" beg
       CodeGen Snippet "prologue" "#include ""mybool.h""".
       CodeGen IndImp mybool
         where heap on (* heap is required for output_type_decls *)
-        where static on
         where output_type_decls current_header
         where output_type_impls current_source
         where output_func_decls current_source
         where output_func_impls current_source
         where prefix "mybool".
-      CodeGen Func bool_of_mybool.
-      CodeGen Func mybool_of_bool.
+      CodeGen Func bool_of_mybool where static off.
+      CodeGen Func mybool_of_bool where static off.
       CodeGen HeaderFile "gen.h".
       CodeGen SourceFile "gen.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
@@ -4624,7 +4622,7 @@ end
 let test_list = add_test test_list "test_void_tail" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Snippet "prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "static void f(bool);".
       Definition f (b : bool) : unit := tt.
       CodeGen Func f.
     |})
@@ -4634,7 +4632,7 @@ end
 let test_list = add_test test_list "test_void_head" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ {|
-      CodeGen Snippet "prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "static void f(bool);".
       Definition f (b : bool) : unit :=
 	let x := tt in
 	match b with
@@ -4649,7 +4647,7 @@ end
 let test_list = add_test test_list "test_void_mutual" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ nat_src ^ {|
-      CodeGen Snippet "prologue" "void f(nat);".
+      CodeGen Snippet "prologue" "static void f(nat);".
       CodeGen Snippet "prologue" "static nat constant_zero(void) { return 0; }".
       CodeGen Snippet "prologue" "static void ignore_nat(nat v1_x) { return; }".
       Definition ignore_nat (x : nat) : unit := tt.
@@ -4695,7 +4693,7 @@ end
 let test_list = add_test test_list "test_void_head_tt_var" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ nat_src ^ {|
-      CodeGen Snippet "prologue" "nat f(bool);".
+      CodeGen Snippet "prologue" "static nat f(bool);".
       Definition constant_zero (x : unit) : nat := 0.
       Definition f (b : bool) (u0 : unit) : nat :=
         let u :=
@@ -4713,7 +4711,7 @@ end
 let test_list = add_test test_list "test_void_tail_tt_var" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ nat_src ^ {|
-      CodeGen Snippet "prologue" "void f(bool);".
+      CodeGen Snippet "prologue" "static void f(bool);".
       Definition f (b : bool) (u0 : unit) : unit :=
         match b with
         | true => tt (* We don't define tt in C but tt is usable because codegen omit void constructor *)
