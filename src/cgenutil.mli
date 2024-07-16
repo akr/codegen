@@ -139,7 +139,9 @@ val nf_interp_constr : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> 
 val nf_interp_type : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
 val out_punivs : 'a EConstr.puniverses -> 'a
 val inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc : int -> Names.MutInd.t -> (Constr.rel_context * Constr.types) -> (Constr.rel_context * Constr.types)
-val ind_nf_lc_iter : Environ.env -> Evd.evar_map -> Constr.rel_context -> EConstr.t list -> (Environ.env -> EConstr.types -> EConstr.t option) -> unit
+val arities_of_constructors : Evd.evar_map -> Names.inductive EConstr.puniverses -> Declarations.mind_specif -> EConstr.t array
+val ind_nf_lc_iter : Environ.env -> Evd.evar_map -> EConstr.rel_context -> EConstr.t list -> (Environ.env -> EConstr.types -> EConstr.t option) -> unit
+val ind_nf_lc_iter0 : Environ.env -> Evd.evar_map -> Constr.rel_context -> EConstr.t list -> (Environ.env -> EConstr.types -> EConstr.t option) -> unit
 val mangle_term_buf :
   Environ.env -> Evd.evar_map -> Buffer.t -> EConstr.t -> unit
 val mangle_term : Environ.env -> Evd.evar_map -> EConstr.t -> string

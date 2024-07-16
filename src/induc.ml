@@ -176,7 +176,7 @@ and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type 
   else
   let pind = EConstr.destInd sigma f in
   let ind, u = pind in
-  let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+  let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   if mutind_body.mind_nparams <> Array.length args then
     false (* unexpected number of inductive type parameters *)
   else if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
@@ -185,11 +185,12 @@ and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type 
     false (* indexed inductive type *)
   else if Array.length oneind_body.mind_consnames <> 1 then
     false (* single constructor inductive type expected *)
-  else if not (oneind_body.mind_nf_lc |> Array.for_all (fun (rel_ctx, ret_type) -> cstr_args_are_void_types env sigma rel_ctx args)) then
+  else if not (arities_of_constructors sigma pind mind_specif |> Array.for_all (fun cstr_ty ->
+    let (rel_ctx, ret_type) = decompose_prod_decls sigma cstr_ty in cstr_args_are_void_types env sigma rel_ctx args)) then
     false
   else
     true
-and cstr_args_are_void_types (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : Constr.rel_context) (args : EConstr.t array) : bool =
+and cstr_args_are_void_types (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : EConstr.rel_context) (args : EConstr.t array) : bool =
   try
     ind_nf_lc_iter env sigma nf_lc_ctx (Array.to_list args)
       (fun env2 arg_ty ->

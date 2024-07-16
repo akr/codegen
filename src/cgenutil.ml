@@ -935,7 +935,37 @@ let inductive_abstract_constructor_type_relatively_to_inductive_types_context_nf
   let t = Inductive.abstract_constructor_type_relatively_to_inductive_types_context ntypes mutind t in
   Term.decompose_prod_decls t
 
-let ind_nf_lc_iter (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : Constr.rel_context) (args : EConstr.t list) (f : Environ.env -> EConstr.types -> EConstr.t option) : unit =
+let arities_of_constructors (sigma : Evd.evar_map) (pind : Names.inductive puniverses) (mind_specif : Declarations.mind_specif) : EConstr.t array =
+  let (ind, u) = pind in
+  let u = EInstance.kind sigma u in
+  let pind = (ind, u) in
+  let ty_ary = Inductive.arities_of_constructors pind mind_specif in
+  Array.map EConstr.of_constr ty_ary
+
+let ind_nf_lc_iter (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : EConstr.rel_context) (args : EConstr.t list) (f : Environ.env -> EConstr.types -> EConstr.t option) : unit =
+  let rev_ctx = array_rev (Array.of_list nf_lc_ctx) in
+  let env = ref env in
+  let args = ref args in
+  let h = Array.length rev_ctx in
+  for j = 0 to h - 1 do
+    let decl = rev_ctx.(j) in
+    match decl with
+    | LocalDef (x,e,ty) ->
+        env := push_rel decl !env
+    | LocalAssum (x,ty) ->
+        (match !args with
+        | term :: rest ->
+            args := rest;
+            env := env_push_def !env x (Vars.lift j term) ty
+        | [] ->
+            match f !env ty with
+            | None ->
+                env := push_rel decl !env
+            | Some term ->
+                env := env_push_def !env x term ty)
+  done
+
+let ind_nf_lc_iter0 (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : Constr.rel_context) (args : EConstr.t list) (f : Environ.env -> EConstr.types -> EConstr.t option) : unit =
   let rev_ctx = array_rev (Array.of_list nf_lc_ctx) in
   let env = ref env in
   let args = ref args in
