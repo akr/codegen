@@ -101,14 +101,12 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
 let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductive puniverses) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
-  let ((mutind, i), u) = pind in
-  let (mind_body,ind_ary) = make_ind_ary env sigma mutind u in
+  let (ind, _u) = pind in
+  let (mind_body, oind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
     pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
     Pp.str "params=[" ++
     pp_sjoinmap_ary (fun p -> Printer.pr_econstr_env env sigma p) params ++ Pp.str "]");*)
-  let oind_body = mind_body.mind_packets.(i) in
-  let mind_specif = (mind_body,oind_body) in
   let ind_id = oind_body.mind_typename in
   Array.iter2
     (fun cstr_id cstr_ty ->
