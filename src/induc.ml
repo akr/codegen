@@ -290,10 +290,10 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
   let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
   let f j0 cstr_cfg cstr_caselabel_accessors =
     let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = cstr_caselabel_accessors in
-    (if oneind_body.Declarations.mind_consnrealdecls.(j0) <> List.length accessors then
+    (if oneind_body.Declarations.mind_consnrealargs.(j0) <> List.length accessors then
       user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" +++
         Pp.str "needs" +++
-        Pp.int oneind_body.Declarations.mind_consnrealdecls.(j0) +++
+        Pp.int oneind_body.Declarations.mind_consnrealargs.(j0) +++
         Pp.str "but" +++
         Pp.int (List.length accessors) +++
         Pp.str "for" +++
