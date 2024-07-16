@@ -387,11 +387,10 @@ let interp_args (env : Environ.env) (sigma : Evd.evar_map)
 let label_name_of_constant_or_constructor (func : Constr.t) : string =
   match Constr.kind func with
   | Const (ctnt, _) -> Label.to_string (Constant.label ctnt)
-  | Construct (((mutind, i), j), _) ->
+  | Construct ((ind, j), _) ->
       let j0 = j - 1 in
       let env = Global.env () in
-      let mind_body = Environ.lookup_mind mutind env in
-      let oind_body = mind_body.Declarations.mind_packets.(i) in
+      let (mind_body, oind_body) = Inductive.lookup_mind_specif env ind in
       let cons_id = oind_body.Declarations.mind_consnames.(j0) in
       Id.to_string cons_id
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")

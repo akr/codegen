@@ -827,9 +827,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       if Array.exists (fun (br_lconsumed,_,_) -> not (IntSet.equal br0_lconsumed br_lconsumed)) branch_results then
         let union = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.union lconsumed br_lconsumed) IntSet.empty branch_results in
         let inter = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.inter lconsumed br_lconsumed) br0_lconsumed branch_results in
-        let (mutind, i) = ci.ci_ind in
-        let mind_body = Environ.lookup_mind mutind env in
-        let oind_body = mind_body.Declarations.mind_packets.(i) in
+        let (mind_body, oind_body) = Inductive.lookup_mind_specif env ci.ci_ind in
         let consnames = oind_body.Declarations.mind_consnames in
         let msgs =
           List.map

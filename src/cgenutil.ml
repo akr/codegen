@@ -963,14 +963,13 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   (*Feedback.msg_debug (Pp.str "mangle_term_buf:" +++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
   | Ind iu ->
-      let (mutind, i) = out_punivs iu in
-      let mutind_body = Environ.lookup_mind mutind env in
-      let s = Id.to_string mutind_body.Declarations.mind_packets.(i).Declarations.mind_typename in
+      let ind = out_punivs iu in
+      let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+      let s = Id.to_string oneind_body.Declarations.mind_typename in
       Buffer.add_string buf s
   | Construct cu ->
-      let ((mutind, i), j) = out_punivs cu in
-      let mutind_body = Environ.lookup_mind mutind env in
-      let oneind_body = mutind_body.Declarations.mind_packets.(i) in
+      let (ind, j) = out_punivs cu in
+      let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
       let j0 = j - 1 in
       (*(if j < 1 then user_err (Pp.str "[codegen] too small j=" ++ Pp.int j));
       (if Array.length oneind_body.Declarations.mind_consnames < j then user_err (Pp.str "[codegen] too big j=" ++ Pp.int j));*)
@@ -1256,18 +1255,14 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
           pp_sjoinmap_ary (aux relnames) args ++
           Pp.str ")")
     | Const (cnst, univ) -> Constant.print cnst
-    | Ind ((mutind, ind_index), univ) ->
-        let mind_body = Environ.lookup_mind mutind env0 in
-        let oind_body = mind_body.mind_packets.(ind_index) in
+    | Ind (ind, univ) ->
+        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
         Id.print oind_body.mind_typename
-    | Construct (((mutind, ind_index), cons_index), univ) ->
-        let mind_body = Environ.lookup_mind mutind env0 in
-        let oind_body = mind_body.mind_packets.(ind_index) in
+    | Construct ((ind, cons_index), univ) ->
+        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
         Id.print oind_body.mind_consnames.(cons_index-1)
     | Case (ci, u, pms, mpred, iv, item, bl) ->
-        let (mutind, ind_index) = ci.ci_ind in
-        let mind_body = Environ.lookup_mind mutind env0 in
-        let oind_body = mind_body.mind_packets.(ind_index) in
+        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ci.ci_ind in
         Pp.hov 2 (
           Pp.str "(match" +++
           aux relnames item +++

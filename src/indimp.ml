@@ -218,11 +218,10 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   let (f, args) = decompose_appvect sigma coq_type in
   let params = args in (* xxx: args should be parameters of inductive type *)
   let pind = destInd sigma f in
-  let ((mutind, i), _u) = pind in
-  let mutind_body = Environ.lookup_mind mutind env in
+  let (ind, _u) = pind in
+  let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
   check_ind_id_conflict mutind_body;
   let open Declarations in
-  let oneind_body = mutind_body.mind_packets.(i) in
   let global_prefix = match global_prefix with Some prefix -> prefix | None -> global_gensym () in
   let i_suffix = "_" ^ Id.to_string oneind_body.mind_typename in
   let ind_name = global_prefix ^ "_type" ^ i_suffix in
