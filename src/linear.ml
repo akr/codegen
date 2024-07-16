@@ -60,7 +60,7 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
   | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
   | Context.Rel.Declaration.LocalDef _ -> false
 
-let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (u : EInstance.t) : Declarations.mutual_inductive_body * EConstr.t array =
+let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (u : EInstance.t) : EConstr.t array =
   let open Declarations in
   let mind_body = Environ.lookup_mind mutind env in
   let pp_all_ind_names () =
@@ -85,7 +85,7 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
     user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
   let ind_ary = Array.map (fun j -> EConstr.mkIndU ((mutind, j), u))
     (iota_ary 0 mind_body.mind_ntypes) in
-  (mind_body,ind_ary)
+  ind_ary
 
 let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
   let (ty_f, ty_args) = decompose_appvect sigma ty in
@@ -95,7 +95,7 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
     | _ -> user_err_hov (Pp.str "[codegen:mutual_inductive_types] inductive type expected:" +++
                          Printer.pr_econstr_env env sigma ty)
   in
-  let (_,ind_ary) = make_ind_ary env sigma mutind u in
+  let ind_ary = make_ind_ary env sigma mutind u in
   Array.map (fun ind -> nf_all env sigma (mkApp (ind, ty_args))) ind_ary
 
 let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductive puniverses) (params : EConstr.t array)
