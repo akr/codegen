@@ -62,15 +62,11 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
   let (f, _params) = decompose_appvect sigma coq_type in
   let ((mutind0, _i), _u) = destInd sigma f in
   let mutind_body = Environ.lookup_mind mutind0 env in
-  let ntypes = mutind_body.mind_ntypes in
   let rec traverse f c = f c; Constr.iter (fun c' -> traverse f c') c in
   let exception RecursionFound in
   try
-    for i = 0 to ntypes - 1 do
-      let oneind_body = mutind_body.mind_packets.(i) in
-      let numcstr = Array.length oneind_body.mind_consnames in
-      for j0 = 0 to numcstr - 1 do
-        let (ctx, ret) = oneind_body.mind_nf_lc.(j0) in
+    mutind_body.mind_packets |> Array.iter (fun oneind_body ->
+      oneind_body.mind_nf_lc |> Array.iter (fun (ctx, ret) ->
         ctx |> List.iter (fun decl ->
           let cs =
             match decl with
@@ -79,12 +75,10 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
           in
           cs |> List.iter (traverse (fun c ->
             match Constr.kind c with
-            | Ind ((mutind, i), u) ->
+            | Ind ((mutind, _i), _u) ->
                 if MutInd.CanOrd.equal mutind0 mutind then
                   raise RecursionFound
-            | _ -> ())))
-      done
-    done;
+            | _ -> ())))));
     false
   with RecursionFound ->
     true
