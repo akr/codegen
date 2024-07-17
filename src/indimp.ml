@@ -58,50 +58,36 @@ let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods 
   }
 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
-  (*msg_info_hov (Pp.str "[codegen] ind_recursive_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
   let (f, _params) = decompose_appvect sigma coq_type in
   let (ind, _) = destInd sigma f in
-  let (mutind, _) = ind in
-  let mutind_body = Environ.lookup_mind mutind env in
+  let (mutind0, _) = ind in
+  let mutind_body = Environ.lookup_mind mutind0 env in
   let ntypes = mutind_body.mind_ntypes in
+  let rec iter f c = f c; Constr.iter (fun c' -> iter f c') c in
   let exception RecursionFound in
   try
     for i = 0 to ntypes - 1 do
       let oneind_body = mutind_body.mind_packets.(i) in
       let numcstr = Array.length oneind_body.mind_consnames in
       for j0 = 0 to numcstr - 1 do
-        (*msg_info_hov (Pp.str "[codegen] ind_recursive_p i=" ++
-                           Pp.int i ++
-                           Pp.str "(" ++ Id.print oneind_body.mind_typename ++ Pp.str ")" +++
-                           Pp.str "j0=" ++ Pp.int j0 ++
-                           Pp.str "(" ++ Id.print oneind_body.mind_consnames.(j0) ++ Pp.str ")");*)
-        let (ctxt, _rettype) = inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc
-          mutind_body.mind_ntypes mutind oneind_body.mind_nf_lc.(j0) in
-        ignore
-          (Context.Rel.fold_outside
-            (fun decl k ->
-              (match decl with
-              | Context.Rel.Declaration.LocalAssum (_name, ty) ->
-                  let ty = EConstr.of_constr ty in
-                  if Array.mem true (free_variables_without env sigma ntypes k ty) then
-                    raise RecursionFound
-              | Context.Rel.Declaration.LocalDef (_name, expr, ty) ->
-                  let expr = EConstr.of_constr expr in
-                  let ty = EConstr.of_constr ty in
-                  if Array.mem true (free_variables_without env sigma ntypes k expr) then
-                    raise RecursionFound;
-                  if Array.mem true (free_variables_without env sigma ntypes k ty) then
-                    raise RecursionFound);
-              k+1)
-            ctxt
-            ~init:0)
+        let (ctx, ret) = oneind_body.mind_nf_lc.(j0) in
+        ctx |> List.iter (fun decl ->
+          let cs =
+            match decl with
+            | Context.Rel.Declaration.LocalAssum (_name, ty) -> [ty]
+            | Context.Rel.Declaration.LocalDef (_name, expr, ty) -> [expr; ty]
+          in
+          cs |> List.iter (iter (fun c ->
+            match Constr.kind c with
+            | Ind ((mutind, i), u) ->
+                if MutInd.CanOrd.equal mutind0 mutind then
+                  raise RecursionFound
+            | _ -> ())))
       done
     done;
-    (*msg_info_hov (Pp.str "[codegen] ind_recursive_p: recursion not found");*)
     false
   with RecursionFound ->
-    (*msg_info_hov (Pp.str "[codegen] ind_recursive_p: recursion found");*)
     true
 
 let ind_mutual_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
