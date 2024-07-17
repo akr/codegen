@@ -113,34 +113,14 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
     Printer.pr_econstr_env env sigma coq_type));
   let pind = EConstr.destInd sigma f in
   let ind, u = pind in
-  let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+  let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   (if mutind_body.mind_nparams <> Array.length args then
     user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
       Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
       Pp.int (Array.length args) +++ Pp.str "given for" +++
       Printer.pr_inductive env ind));
-  (if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
-    user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Printer.pr_inductive env ind));
-  (if oneind_body.mind_nrealargs <> 0 then
-    user_err (Pp.str "[codegen] indexed inductive type given:" +++
-      Printer.pr_inductive env ind));
+  check_codegen_supported_ind mind_specif;
   (mutind_body, oneind_body, pind, args)
-
-(* check
- * - coq_type is f args1...argN
- * - f is Ind
- * - f is not conductive
- * - f has N parameters
- * - f has no arguments
- * - ...
- *)
-let check_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : unit =
-  let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
-  (if mutind_body.Declarations.mind_finite <> Declarations.Finite &&
-      mutind_body.Declarations.mind_finite <> Declarations.BiFinite then
-        user_err (Pp.str "[codegen] coinductive type not supported:" +++
-                 Printer.pr_econstr_env env sigma coq_type));
-  ignore oneind_body
 
 let ind_coq_type_registered_p (sigma : Evd.evar_map) (coq_type : EConstr.t) : bool =
   let coq_type = EConstr.to_constr sigma coq_type in
@@ -179,10 +159,8 @@ and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type 
   let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   if mutind_body.mind_nparams <> Array.length args then
     false (* unexpected number of inductive type parameters *)
-  else if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
-    false (* inductive type has non-uniform parameters *)
-  else if oneind_body.mind_nrealargs <> 0 then
-    false (* indexed inductive type *)
+  else if not (is_codegen_supported_ind mind_specif) then
+    false (* not supported by codegen *)
   else if Array.length oneind_body.mind_consnames <> 1 then
     false (* single constructor inductive type expected *)
   else if not (arities_of_constructors sigma pind mind_specif |> Array.for_all (fun cstr_ty ->
@@ -205,7 +183,6 @@ and cstr_args_are_void_types (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_c
 let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
   let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   check_ind_coq_type_not_registered env sigma coq_type;
-  check_ind_coq_type env sigma coq_type;
   if coq_type_is_void_type env sigma coq_type then
     begin
       let cstr_cfgs = oneind_body.Declarations.mind_consnames |>

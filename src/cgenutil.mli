@@ -179,3 +179,5 @@ val pr_c_decl : State.c_typedata -> Pp.t -> Pp.t
 val pr_c_abstract_decl : State.c_typedata -> Pp.t
 val str_instance_command : State.instance_command -> string
 val optmerge : string -> 'a option -> 'a option -> 'a option
+val check_codegen_supported_ind : Declarations.mind_specif -> unit
+val is_codegen_supported_ind : Declarations.mind_specif -> bool

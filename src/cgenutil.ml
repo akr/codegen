@@ -1741,3 +1741,26 @@ let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
   | None, Some _ -> o2
   | Some _, Some _ ->
       user_err (Pp.str "[codegen] duplicated option:" +++ Pp.str name)
+
+let check_codegen_supported_ind (mind_specif : Declarations.mind_specif) : unit =
+  let (mutind_body, oneind_body) = mind_specif in
+  let open Declarations in
+  (match mutind_body.mind_finite with
+  | Finite -> () (* Record *)
+  | BiFinite -> () (* Inductive *)
+  | CoFinite ->
+      user_err (Pp.str "[codegen] coinductive type not supported:" +++ Id.print oneind_body.mind_typename));
+  (if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
+    user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Id.print oneind_body.mind_typename));
+  (if oneind_body.mind_nrealargs <> 0 then
+    user_err (Pp.str "[codegen] indexed inductive type given:" +++ Id.print oneind_body.mind_typename))
+
+let is_codegen_supported_ind (mind_specif : Declarations.mind_specif) : bool =
+  let (mutind_body, oneind_body) = mind_specif in
+  let open Declarations in
+  (match mutind_body.mind_finite with
+  | Finite -> true (* Record *)
+  | BiFinite -> true (* Inductive *)
+  | CoFinite -> false (* CoInductive *)) &&
+  (mutind_body.mind_nparams = mutind_body.mind_nparams_rec) &&
+  (oneind_body.mind_nrealargs = 0)
