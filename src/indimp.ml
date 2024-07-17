@@ -60,11 +60,10 @@ let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let open Declarations in
   let (f, _params) = decompose_appvect sigma coq_type in
-  let (ind, _u) = destInd sigma f in
-  let (mutind0, _i) = ind in
+  let ((mutind0, _i), _u) = destInd sigma f in
   let mutind_body = Environ.lookup_mind mutind0 env in
   let ntypes = mutind_body.mind_ntypes in
-  let rec iter f c = f c; Constr.iter (fun c' -> iter f c') c in
+  let rec traverse f c = f c; Constr.iter (fun c' -> traverse f c') c in
   let exception RecursionFound in
   try
     for i = 0 to ntypes - 1 do
@@ -78,7 +77,7 @@ let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECons
             | Context.Rel.Declaration.LocalAssum (_name, ty) -> [ty]
             | Context.Rel.Declaration.LocalDef (_name, expr, ty) -> [expr; ty]
           in
-          cs |> List.iter (iter (fun c ->
+          cs |> List.iter (traverse (fun c ->
             match Constr.kind c with
             | Ind ((mutind, i), u) ->
                 if MutInd.CanOrd.equal mutind0 mutind then
