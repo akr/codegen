@@ -929,12 +929,6 @@ let nf_interp_type (env : Environ.env) (sigma : Evd.evar_map) (t : Constrexpr.co
 
 let out_punivs : 'a EConstr.puniverses -> 'a = fst
 
-let inductive_abstract_constructor_type_relatively_to_inductive_types_context_nflc (ntypes : int) (mutind : MutInd.t) (nf_lc : Constr.rel_context * Constr.types) : Constr.rel_context * Constr.types =
-  let (ctx, t) = nf_lc in
-  let t = Term.it_mkProd_or_LetIn t ctx in
-  let t = Inductive.abstract_constructor_type_relatively_to_inductive_types_context ntypes mutind t in
-  Term.decompose_prod_decls t
-
 let arities_of_constructors (sigma : Evd.evar_map) (pind : Names.inductive puniverses) (mind_specif : Declarations.mind_specif) : EConstr.t array =
   let (ind, u) = pind in
   let u = EInstance.kind sigma u in
