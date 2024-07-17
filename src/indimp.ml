@@ -60,8 +60,8 @@ let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods 
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let open Declarations in
   let (f, _params) = decompose_appvect sigma coq_type in
-  let (ind, _) = destInd sigma f in
-  let (mutind0, _) = ind in
+  let (ind, _u) = destInd sigma f in
+  let (mutind0, _i) = ind in
   let mutind_body = Environ.lookup_mind mutind0 env in
   let ntypes = mutind_body.mind_ntypes in
   let rec iter f c = f c; Constr.iter (fun c' -> iter f c') c in
@@ -94,8 +94,8 @@ let ind_mutual_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.
   (*msg_info_hov (Pp.str "[codegen] ind_mutual_p:" +++ Printer.pr_econstr_env env sigma coq_type);*)
   let open Declarations in
   let (f, _params) = decompose_appvect sigma coq_type in
-  let (ind, _) = destInd sigma f in
-  let (mutind, _) = ind in
+  let (ind, _u) = destInd sigma f in
+  let (mutind, _i) = ind in
   let mutind_body = Environ.lookup_mind mutind env in
   mutind_body.mind_ntypes <> 1
 

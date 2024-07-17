@@ -1578,9 +1578,9 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
     match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
     | None ->
         (match EConstr.kind sigma f with
-        | Constr.Const (ctnt, _) ->
+        | Constr.Const (ctnt, _u) ->
             user_err (Pp.str "[codegen] C function name not configured:" +++ Printer.pr_constant env ctnt)
-        | Constr.Construct (cstr, _) ->
+        | Constr.Construct (cstr, _u) ->
             user_err (Pp.str "[codegen] C constructor name not configured:" +++ Printer.pr_constructor env cstr)
         | _ ->
             user_err (Pp.str "[codegen:bug] gen_app_const_construct expects Const or Construct"))

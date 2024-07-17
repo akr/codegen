@@ -65,8 +65,8 @@ let string_of_icommand (icommand : instance_command) : string =
 
 let pr_constant_or_constructor (env : Environ.env) (func : Constr.t) : Pp.t =
   match Constr.kind func with
-  | Const (ctnt, _) -> Printer.pr_constant env ctnt
-  | Construct (cstr, _) -> Printer.pr_constructor env cstr
+  | Const (ctnt, _u) -> Printer.pr_constant env ctnt
+  | Construct (cstr, _u) -> Printer.pr_constructor env cstr
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
 
 let pr_codegen_arguments (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : specialization_config) : Pp.t =
@@ -386,8 +386,8 @@ let interp_args (env : Environ.env) (sigma : Evd.evar_map)
 
 let label_name_of_constant_or_constructor (func : Constr.t) : string =
   match Constr.kind func with
-  | Const (ctnt, _) -> Label.to_string (Constant.label ctnt)
-  | Construct ((ind, j), _) ->
+  | Const (ctnt, _u) -> Label.to_string (Constant.label ctnt)
+  | Construct ((ind, j), _u) ->
       let j0 = j - 1 in
       let env = Global.env () in
       let (mind_body, oind_body) = Inductive.lookup_mind_specif env ind in
@@ -607,7 +607,7 @@ let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let ctnts = List.map
     (fun func ->
       match Constr.kind func with
-      | Const (ctnt, _) -> ctnt
+      | Const (ctnt, _u) -> ctnt
       | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
     funcs
   in
@@ -620,14 +620,14 @@ let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
   let sigma, func = func_of_qualid env sigma func_qualid in
   let ctnt =
     match Constr.kind func with
-    | Const (ctnt, _) -> ctnt
+    | Const (ctnt, _u) -> ctnt
     | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
   in
   let sigma, funcs = CList.fold_left_map (fun sigma func -> func_of_qualid env sigma func) sigma func_qualids in
   let ctnts = List.map
     (fun func ->
       match Constr.kind func with
-      | Const (ctnt, _) -> ctnt
+      | Const (ctnt, _u) -> ctnt
       | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
     funcs
   in
@@ -647,7 +647,7 @@ let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : 
           let cbody = Environ.lookup_constant ctnt env in
           let body = match Global.body_of_constant_body Library.indirect_accessor cbody with
                      | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++ Printer.pr_constant env ctnt)
-                     | Some (body,_, _) -> body
+                     | Some (body, _, _) -> body
           in
           aux (EConstr.of_constr body)
         else
@@ -1349,7 +1349,7 @@ and try_iota_match (aenv : aenv_t) (sigma : Evd.evar_map)
   | Context.Rel.Declaration.LocalDef (x,item_content,t) ->
       let (f, args) = decompose_appvect sigma item_content in
       (match EConstr.kind sigma f with
-      | Construct ((ind, j), _) ->
+      | Construct ((ind, j), _u) ->
           (* reduction: iota-match *)
           let args = (array_skipn ci.ci_npar args) in
           let args = Array.map (Vars.lift i) args in
