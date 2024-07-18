@@ -129,7 +129,7 @@ type 't cstr_names = {
 }
 
 type 't ind_names = {
-  ind_pind: inductive * EInstance.t;
+  ind_pind: inductive puniverses;
   ind_params: EConstr.t array;
   ind_name: string;
   ind_struct_tag: string;

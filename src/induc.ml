@@ -105,7 +105,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
           Printer.pr_econstr_env env sigma coq_type)
       | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
 
-let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : Declarations.mutual_inductive_body * Declarations.one_inductive_body * (Names.inductive * EInstance.t) * EConstr.constr array =
+let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : Declarations.mutual_inductive_body * Declarations.one_inductive_body * Names.inductive puniverses * EConstr.constr array =
   let open Declarations in
   let (f, args) = decompose_appvect sigma coq_type in
   (if not (EConstr.isInd sigma f) then
