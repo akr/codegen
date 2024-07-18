@@ -1282,9 +1282,9 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
     | Ind (ind, univ) ->
         let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
         Id.print oind_body.mind_typename
-    | Construct ((ind, cons_index), univ) ->
+    | Construct ((ind, cstr_index), univ) ->
         let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
-        Id.print oind_body.mind_consnames.(cons_index-1)
+        Id.print oind_body.mind_consnames.(cstr_index-1)
     | Case (ci, u, pms, mpred, iv, item, bl) ->
         let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ci.ci_ind in
         Pp.hov 2 (

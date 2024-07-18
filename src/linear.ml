@@ -137,7 +137,7 @@ let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd
     | Ind pind ->
         ty_set_ref := (ConstrSet.add (EConstr.to_constr sigma ty) !ty_set_ref);
         ind_cstrarg_iter env sigma pind ty_args
-          (fun ind_id cons_id argty ->
+          (fun ind_id cstr_id argty ->
             traverse_constructor_argument_types_acc env sigma argty ty_set_ref has_func_ref has_sort_ref)
     | _ -> user_err (Pp.str "[codegen:component_types] unexpected type:" +++ Printer.pr_econstr_env env sigma ty))
 
