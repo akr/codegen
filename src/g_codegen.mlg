@@ -288,12 +288,12 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
       { command_auto_arguments func_list }
     | [ "CodeGen" "TestArgs" ref(func) s_or_d_list(sd_list) ] -> { command_test_args func sd_list }
 
-    | [ "CodeGen" "Func" ref(func) constr_or_underscore_list(args) sp_instance_names3(names) func_mods(func_mods) ] ->
-      { command_function func args names func_mods }
-    | [ "CodeGen" "Primitive" ref(func) constr_or_underscore_list(args) sp_instance_names2(names) ] ->
-      { command_primitive func args names }
-    | [ "CodeGen" "Constant" ref(func) constr_list(args) sp_instance_names2(names) ] ->
-      { command_constant func args names }
+    | [ "CodeGen" "Func" lconstr(func_args) sp_instance_names3(names) func_mods(func_mods) ] ->
+      { command_function func_args names func_mods }
+    | [ "CodeGen" "Primitive" lconstr(func_args) sp_instance_names2(names) ] ->
+      { command_primitive func_args names }
+    | [ "CodeGen" "Constant" lconstr(func_args) sp_instance_names2(names) ] ->
+      { command_constant func_args names }
 
     | [ "CodeGen" "Snippet" string(section) string(str) ] -> { command_snippet section str }
     | [ "CodeGen" "HeaderSnippet" string(section) string(str) ] -> { command_header_snippet section str }

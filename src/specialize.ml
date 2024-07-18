@@ -155,6 +155,11 @@ let func_of_qualid (env : Environ.env) (sigma : Evd.evar_map) (qualid : Libnames
   let t = EConstr.to_constr sigma t in
   (sigma, t)
 
+let check_const_or_construct (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : unit =
+  match EConstr.kind sigma term with
+  | Const _ | Construct _ -> ()
+  | _ -> user_err (Pp.str "[codegen] constant or constructor expected:" +++ Printer.pr_econstr_env env sigma term)
+
 let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
   let func_is_cstr =
     match Constr.kind func with
@@ -370,20 +375,6 @@ let gensym_simplification (suffix : string) : Names.Id.t * Names.Id.t =
   let s = "codegen_s" ^ string_of_int n ^ suffix2 in (* simplified *)
   (Id.of_string p, Id.of_string s)
 
-let interp_args (env : Environ.env) (sigma : Evd.evar_map)
-    (istypearg_list : bool list)
-    (user_args : Constrexpr.constr_expr list) : Evd.evar_map * EConstr.t list =
-  let interp_arg sigma istypearg user_arg =
-    let sigma0 = sigma in
-    let interp = if istypearg then Constrintern.interp_type_evars
-                              else Constrintern.interp_constr_evars in
-    let (sigma, arg) = interp env sigma user_arg in
-    (* msg_info_hov (Printer.pr_econstr_env env sigma arg); *)
-    Pretyping.check_evars env ~initial:sigma0 sigma arg;
-    (sigma, arg)
-  in
-  CList.fold_left2_map interp_arg sigma istypearg_list user_args
-
 let label_name_of_constant_or_constructor (func : Constr.t) : string =
   match Constr.kind func with
   | Const (ctnt, _u) -> Label.to_string (Constant.label ctnt)
@@ -544,61 +535,78 @@ let codegen_define_instance
   (new_env_with_rels env, sp_inst)
 
 let codegen_instance_command
+    (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr option list)
+    (func : EConstr.t)
+    (user_args : EConstr.t option array)
     (names : sp_instance_names) : Environ.env * specialization_instance =
-  let sd_list = List.map
+  let sd_list = CArray.map_to_list
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     user_args
   in
   let static_args = List.filter_map
     (fun arg -> match arg with None -> None| Some a -> Some a)
-    user_args
+    (Array.to_list user_args)
   in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let sigma, func = func_of_qualid env sigma func in
-  let func_type = Retyping.get_type_of env sigma (EConstr.of_constr func) in
+  check_const_or_construct env sigma func;
+  let func_type = Retyping.get_type_of env sigma func in
   let func_istypearg_list = determine_type_arguments env sigma func_type in
   (if List.length func_istypearg_list < List.length sd_list then
     user_err (Pp.str "[codegen] too many arguments:" +++
-      Printer.pr_constr_env env sigma func +++
+      Printer.pr_econstr_env env sigma func +++
       Pp.str "(" ++
       Pp.int (List.length sd_list) ++ Pp.str " for " ++
       Pp.int (List.length func_istypearg_list) ++ Pp.str ")"));
-  let func_istypearg_list = CList.map_filter_i
-    (fun i arg -> match arg with None -> None | Some _ -> Some (List.nth func_istypearg_list i))
-    user_args
-  in
-  let (sigma, args) = interp_args env sigma func_istypearg_list static_args in
-  let args = List.map (Reductionops.nf_all env sigma) args in
+  let args = List.map (Reductionops.nf_all env sigma) static_args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  ignore (codegen_define_or_check_static_arguments env sigma func sd_list);
-  codegen_define_instance env sigma icommand func args (Some names)
+  let func0 = EConstr.to_constr sigma func in
+  ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
+  codegen_define_instance env sigma icommand func0 args (Some names)
+
+let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
+  let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
+  let (func, args) = decompose_appvect sigma func_args in
+  Pretyping.check_evars env ~initial:sigma0 sigma func;
+  let args = args |> Array.map (fun arg ->
+    if isEvar sigma arg then
+      None
+    else begin
+      Pretyping.check_evars env ~initial:sigma0 sigma arg;
+      Some arg
+    end)
+  in
+  (sigma, func, args)
 
 let command_function
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr option list)
+    (user_func_args : Constrexpr.constr_expr)
     (names : sp_instance_names)
     (func_mods : func_mods) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, func, args) = detect_holes env sigma user_func_args in
   let icommand = match func_mods.func_mods_static with Some false -> CodeGenFunc | _ -> CodeGenStaticFunc in
-  let (env, sp_inst) = codegen_instance_command icommand func user_args names in
+  let (env, sp_inst) = codegen_instance_command env sigma icommand func args names in
   codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
 let command_primitive
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr option list)
+    (user_func_args : Constrexpr.constr_expr)
     (names : sp_instance_names) : unit =
-  ignore (codegen_instance_command CodeGenPrimitive func user_args names)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, func, args) = detect_holes env sigma user_func_args in
+  ignore (codegen_instance_command env sigma CodeGenPrimitive func args names)
 
 let command_constant
-    (func : Libnames.qualid)
-    (user_args : Constrexpr.constr_expr list)
+    (user_func_args : Constrexpr.constr_expr)
     (names : sp_instance_names) : unit =
-  let user_args = List.map (fun arg -> Some arg) user_args in
-  ignore (codegen_instance_command CodeGenConstant func user_args names)
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, func, args) = detect_holes env sigma user_func_args in
+  if Array.exists Stdlib.Option.is_none args then
+    user_err (Pp.str "[codegen] hole detected. CodeGen Constant cannot take a term with hole:" +++
+      Ppconstr.pr_constr_expr env sigma user_func_args);
+  ignore (codegen_instance_command env sigma  CodeGenConstant func args names)
 
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in

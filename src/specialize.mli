@@ -23,14 +23,12 @@ val codegen_define_instance :
   State.sp_instance_names option ->
   Environ.env * State.specialization_instance
 val command_function :
-  Libnames.qualid -> Constrexpr.constr_expr option list ->
+  Constrexpr.constr_expr ->
   State.sp_instance_names -> func_mods -> unit
 val command_primitive :
-  Libnames.qualid ->
-  Constrexpr.constr_expr option list -> State.sp_instance_names -> unit
+  Constrexpr.constr_expr -> State.sp_instance_names -> unit
 val command_constant :
-  Libnames.qualid ->
-  Constrexpr.constr_expr list -> State.sp_instance_names -> unit
+  Constrexpr.constr_expr -> State.sp_instance_names -> unit
 val command_global_inline : Libnames.qualid list -> unit
 val command_local_inline : Libnames.qualid -> Libnames.qualid list -> unit
 val codegen_simplify :

@@ -457,8 +457,8 @@ let list_bool_src = {|
       CodeGen InductiveMatch list bool => "list_bool_is_nil" with
       | nil => ""
       | cons => "0" "list_bool_head" "list_bool_tail".
-      CodeGen Constant nil bool => "((list_bool)NULL)".
-      CodeGen Primitive cons bool => "list_bool_cons".
+      CodeGen Constant @nil bool => "((list_bool)NULL)".
+      CodeGen Primitive @cons bool => "list_bool_cons".
 
       CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -497,8 +497,8 @@ let list_nat_src = {|
       CodeGen InductiveMatch list nat => "list_nat_is_nil" with
       | nil => ""
       | cons => "0" "list_nat_head" "list_nat_tail".
-      CodeGen Constant nil nat => "((list_nat)NULL)".
-      CodeGen Primitive cons nat => "list_nat_cons".
+      CodeGen Constant @nil nat => "((list_nat)NULL)".
+      CodeGen Primitive @cons nat => "list_nat_cons".
 
       CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -733,7 +733,7 @@ let test_list = add_test test_list "test_pair_bool_bool" begin fun (ctx : test_c
       CodeGen InductiveType bool*bool => "pair_bool_bool".
       CodeGen InductiveMatch bool*bool => "" with
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive pair bool bool => "make_pair_bool_bool".
+      CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
       CodeGen Snippet "prologue" "
       typedef struct {
         bool fst;
@@ -763,12 +763,12 @@ let test_pair_2bool_bool (ctx : test_ctxt) : unit =
       CodeGen InductiveType bool*bool => "pair_bool_bool".
       CodeGen InductiveMatch bool*bool => "" with
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive pair bool bool => "make_pair_bool_bool".
+      CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
 
       CodeGen InductiveType bool*bool*bool => "pair_2bool_bool".
       CodeGen InductiveMatch bool*bool*bool => "" with
       | pair => "" "pair_2bool_bool_fst" "pair_2bool_bool_snd".
-      CodeGen Primitive pair (bool*bool) bool => "make_pair_2bool_bool".
+      CodeGen Primitive @pair (bool*bool) bool => "make_pair_2bool_bool".
 
       CodeGen Snippet "prologue" "
       typedef struct { bool fst; bool snd; } pair_bool_bool;
@@ -1518,7 +1518,7 @@ let test_list = add_test test_list "test_nth" begin fun (ctx : test_ctxt) ->
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Require Import List.
-      CodeGen Func nth nat => "nth".
+      CodeGen Func @nth nat => "nth".
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1538,8 +1538,8 @@ let test_list = add_test test_list "test_rev_append" begin fun (ctx : test_ctxt)
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Require Import List.
-      CodeGen Func nth nat => "nth".
-      CodeGen Func rev_append nat => "rev_append".
+      CodeGen Func @nth nat => "nth".
+      CodeGen Func @rev_append nat => "rev_append".
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
       #define head(s) list_nat_head(s)
@@ -1581,8 +1581,8 @@ let test_list = add_test test_list "test_merge" begin fun (ctx : test_ctxt) ->
                         g s2' (cons v2 s)
                   end
               end.
-      CodeGen Func nth nat => "nth".
-      CodeGen Func rev_append nat => "rev_append".
+      CodeGen Func @nth nat => "nth".
+      CodeGen Func @rev_append nat => "rev_append".
       CodeGen Func merge.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
@@ -1625,7 +1625,7 @@ let test_list = add_test test_list "test_merge_nontailrec" begin fun (ctx : test
                       cons v2 (g s2')
                 end
             end.
-      CodeGen Func nth nat => "nth".
+      CodeGen Func @nth nat => "nth".
       CodeGen Func merge_nontailrec.
     |}) {|
       #define is_nil(s) list_nat_is_nil(s)
@@ -2739,7 +2739,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       Definition make (x y : bool) := make_bool_pair x y.
       Definition bbfst (x : bool_pair) := let y := member1 x in id y.
       Definition bbsnd (x : bool_pair) := let y := member2 x in id y.
-      CodeGen Func id bool.
+      CodeGen Func @id bool.
       CodeGen Func make.
       CodeGen Func bbfst.
       CodeGen Func bbsnd.
@@ -2898,7 +2898,7 @@ let test_list = add_test test_list "test_auto_ind_type_with_arg" begin fun (ctx 
   codegen_test_template ctx
     (bool_src ^
     {|
-      CodeGen Primitive pair bool bool => "pair".
+      CodeGen Primitive @pair bool bool => "pair".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair(a,b) (((a) << 1) | (b))
@@ -3036,8 +3036,8 @@ let test_list = add_test test_list "test_option_bool_struct" begin fun (ctx : te
       CodeGen InductiveMatch option bool => "sw_option_bool" with
       | None => ""
       | Some => "option_bool_Some" "option_bool_Some_member1".
-      CodeGen Primitive None bool => "None_bool".
-      CodeGen Primitive Some bool => "Some_bool".
+      CodeGen Primitive @None bool => "None_bool".
+      CodeGen Primitive @Some bool => "Some_bool".
       CodeGen Snippet "prologue" "
       enum enum_option_bool { option_bool_None, option_bool_Some };
       typedef struct {
@@ -3080,7 +3080,7 @@ let test_list = add_test test_list "test_reduceeta_makes_single_function" begin 
           | nil => s2
           | cons x s => cons x (mycat s s2)
           end.
-      CodeGen Func mycat bool => "mycat_bool".
+      CodeGen Func @mycat bool => "mycat_bool".
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       list_bool s1 = cons(true,(cons(false,NULL)));
@@ -3161,7 +3161,7 @@ let test_list = add_test test_list "test_indimp_bool_pair" begin fun (ctx : test
       CodeGen InductiveType bool*bool => "prod_bool_bool".
       CodeGen InductiveMatch bool*bool => "" with
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Primitive @pair bool bool => "pair_bool_bool".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3191,7 +3191,7 @@ let test_list = add_test test_list "test_indimp_bool_nat_pair" begin fun (ctx : 
       CodeGen InductiveType nat*bool => "prod_nat_bool".
       CodeGen InductiveMatch nat*bool => "" with
       | pair => "" "pair_nat_bool_fst" "pair_nat_bool_snd".
-      CodeGen Primitive pair nat bool => "pair_nat_bool".
+      CodeGen Primitive @pair nat bool => "pair_nat_bool".
       CodeGen Snippet "prologue" "
       ".
       CodeGen IndImp nat*bool.
@@ -3237,7 +3237,7 @@ let test_list = add_test test_list "test_indimp_parametric_pair" begin fun (ctx 
       CodeGen InductiveType bool*bool => "prod_bool_bool".
       CodeGen InductiveMatch bool*bool => "" with
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Primitive @pair bool bool => "pair_bool_bool".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3279,8 +3279,8 @@ let test_list = add_test test_list "test_indimp_option_bool" begin fun (ctx : te
       CodeGen InductiveMatch option bool => "sw_option_bool" with
       | Some => "" "option_bool_get_some"
       | None => "0".
-      CodeGen Primitive Some bool => "some_bool".
-      CodeGen Constant None bool => "none_bool".
+      CodeGen Primitive @Some bool => "some_bool".
+      CodeGen Constant @None bool => "none_bool".
       CodeGen Snippet "prologue" "
       typedef int option_bool;
       #define sw_option_bool(x) ((x) & 1)
@@ -3322,7 +3322,7 @@ let test_list = add_test test_list "test_indimp_record" begin fun (ctx : test_ct
       CodeGen InductiveType bool*bool => "prod_bool_bool".
       CodeGen InductiveMatch bool*bool => "" with
       | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive pair bool bool => "pair_bool_bool".
+      CodeGen Primitive @pair bool bool => "pair_bool_bool".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3448,7 +3448,7 @@ let test_list = add_test test_list "test_indimp_rosetree" begin fun (ctx : test_
       CodeGen Func nd.
       CodeGen Func nl.
       CodeGen Func cns.
-      CodeGen Func fold_left nat (tree bool).
+      CodeGen Func @fold_left nat (tree bool).
       CodeGen Func count.
     |}) {|
       assert(count(nd(false, nl())) == 0);
@@ -3816,7 +3816,7 @@ let test_list = add_test test_list "test_prototype" begin fun (ctx : test_ctxt) 
       CodeGen HeaderFile "foo.h".
       CodeGen Snippet "prologue" "#include ""foo.h""".
       CodeGen Snippet "prologue" "void f(void) { id_bool(true); }".
-      CodeGen Func id bool => "id_bool".
+      CodeGen Func @id bool => "id_bool".
     |}) {|
     |}
 end
@@ -3998,7 +3998,7 @@ let test_list = add_test test_list "test_linear_match_without_deallocator" begin
       CodeGen InductiveType boolbox*boolbox => "pair_boolbox_boolbox".
       CodeGen InductiveMatch boolbox*boolbox => "" with
       | pair => "" "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
-      CodeGen Primitive pair boolbox boolbox => "make_pair_boolbox_boolbox".
+      CodeGen Primitive @pair boolbox boolbox => "make_pair_boolbox_boolbox".
       CodeGen Snippet "prologue" "
       typedef struct {
         boolbox fst;
