@@ -68,19 +68,7 @@ let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) 
       (fun oneind_body -> Id.print oneind_body.mind_typename)
       mutind_body.mind_packets
   in
-  let pp_indexed_ind_names () =
-    pp_sjoinmap_ary
-      (fun oneind_body ->
-        if oneind_body.mind_nrealargs <> 0 then
-          Id.print oneind_body.mind_typename
-        else
-          Pp.mt ())
-      mutind_body.mind_packets
-  in
-  if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
-    user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ pp_all_ind_names ());
-  if (Array.exists (fun oneind_body -> oneind_body.mind_nrealargs <> 0) mutind_body.mind_packets) then
-    user_err (Pp.str "[codegen] indexed types not supported:" +++ pp_indexed_ind_names ());
+  Array.iter (fun oneind_body -> check_codegen_supported_ind (mutind_body, oneind_body)) mutind_body.mind_packets;
   if not (List.for_all (valid_type_param env sigma) mutind_body.mind_params_ctxt) then
     user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
   let ind_ary = Array.map (fun j -> EConstr.mkIndU ((mutind, j), u))
