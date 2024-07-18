@@ -62,29 +62,29 @@ let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.r
 
 let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (u : EInstance.t) : EConstr.t array =
   let open Declarations in
-  let mind_body = Environ.lookup_mind mutind env in
+  let mutind_body = Environ.lookup_mind mutind env in
   let pp_all_ind_names () =
     pp_sjoinmap_ary
-      (fun oind_body -> Id.print oind_body.mind_typename)
-      mind_body.mind_packets
+      (fun oneind_body -> Id.print oneind_body.mind_typename)
+      mutind_body.mind_packets
   in
   let pp_indexed_ind_names () =
     pp_sjoinmap_ary
-      (fun oind_body ->
-        if oind_body.mind_nrealargs <> 0 then
-          Id.print oind_body.mind_typename
+      (fun oneind_body ->
+        if oneind_body.mind_nrealargs <> 0 then
+          Id.print oneind_body.mind_typename
         else
           Pp.mt ())
-      mind_body.mind_packets
+      mutind_body.mind_packets
   in
-  if mind_body.mind_nparams <> mind_body.mind_nparams_rec then
+  if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
     user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ pp_all_ind_names ());
-  if (Array.exists (fun oind_body -> oind_body.mind_nrealargs <> 0) mind_body.mind_packets) then
+  if (Array.exists (fun oneind_body -> oneind_body.mind_nrealargs <> 0) mutind_body.mind_packets) then
     user_err (Pp.str "[codegen] indexed types not supported:" +++ pp_indexed_ind_names ());
-  if not (List.for_all (valid_type_param env sigma) mind_body.mind_params_ctxt) then
+  if not (List.for_all (valid_type_param env sigma) mutind_body.mind_params_ctxt) then
     user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
   let ind_ary = Array.map (fun j -> EConstr.mkIndU ((mutind, j), u))
-    (iota_ary 0 mind_body.mind_ntypes) in
+    (iota_ary 0 mutind_body.mind_ntypes) in
   ind_ary
 
 let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
@@ -102,12 +102,12 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductiv
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =
   let open Declarations in
   let (ind, _u) = pind in
-  let (mind_body, oind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
+  let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   (*msg_debug_hov (Pp.str "[codegen:ind_cstrarg_iter] mutind=[" ++
-    pp_sjoinmap_ary (fun oind_body -> Id.print oind_body.mind_typename) mind_body.mind_packets ++ Pp.str "]" +++
+    pp_sjoinmap_ary (fun oneind_body -> Id.print oneind_body.mind_typename) mutind_body.mind_packets ++ Pp.str "]" +++
     Pp.str "params=[" ++
     pp_sjoinmap_ary (fun p -> Printer.pr_econstr_env env sigma p) params ++ Pp.str "]");*)
-  let ind_id = oind_body.mind_typename in
+  let ind_id = oneind_body.mind_typename in
   Array.iter2
     (fun cstr_id cstr_ty ->
       (* ctx is a list of innermost-first binder decls of the constructor (including inductive type parameters) *)
@@ -124,7 +124,7 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductiv
             user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cstr_id +++ Printer.pr_econstr_env env2 sigma ty');
           f ind_id cstr_id ty';
           None))
-    oind_body.mind_consnames (arities_of_constructors sigma pind mind_specif)
+    oneind_body.mind_consnames (arities_of_constructors sigma pind mind_specif)
 
 let rec traverse_constructor_argument_types_acc (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (ty_set_ref : ConstrSet.t ref) (has_func_ref : bool ref) (has_sort_ref : bool ref) : unit =
   if ConstrSet.mem (EConstr.to_constr sigma ty) !ty_set_ref then
@@ -826,8 +826,8 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
       if Array.exists (fun (br_lconsumed,_,_) -> not (IntSet.equal br0_lconsumed br_lconsumed)) branch_results then
         let union = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.union lconsumed br_lconsumed) IntSet.empty branch_results in
         let inter = Array.fold_left (fun lconsumed (br_lconsumed,_,_) -> IntSet.inter lconsumed br_lconsumed) br0_lconsumed branch_results in
-        let (mind_body, oind_body) = Inductive.lookup_mind_specif env ci.ci_ind in
-        let consnames = oind_body.Declarations.mind_consnames in
+        let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ci.ci_ind in
+        let consnames = oneind_body.Declarations.mind_consnames in
         let msgs =
           List.map
             (fun l ->
@@ -840,7 +840,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
               in
               pr_deBruijn_level env l +++ Pp.str "is used only for constructor" +++
                 pp_sjoinmap_list Id.print ids +++ Pp.str "of" +++
-                Id.print oind_body.Declarations.mind_typename)
+                Id.print oneind_body.Declarations.mind_typename)
             (IntSet.elements (IntSet.diff union inter))
         in
         user_err_hov (Pp.str "[codegen] match-branches uses linear variables inconsistently:" +++
@@ -881,8 +881,8 @@ let rec borrowcheck_constructor (env : Environ.env) (sigma : Evd.evar_map) (term
   | Construct (cstr,u) ->
       let (ind,j) = cstr in
       let (mutind,i) = ind in
-      let mind_body = Environ.lookup_mind mutind env in
-      let params = CArray.map_of_list (fun l -> mkRel (Environ.nb_rel env - l)) (CList.firstn mind_body.mind_nparams vs) in
+      let mutind_body = Environ.lookup_mind mutind env in
+      let params = CArray.map_of_list (fun l -> mkRel (Environ.nb_rel env - l)) (CList.firstn mutind_body.mind_nparams vs) in
       let ty = mkApp (mkIndU (ind, u), params) in
       (*msg_debug_hov (Pp.str "[codegen:borrowcheck_constructor] ty=" ++ Printer.pr_econstr_env env sigma ty);*)
       if is_borrow_type env sigma ty then

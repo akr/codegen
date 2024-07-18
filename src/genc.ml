@@ -1634,8 +1634,8 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
   (*msg_debug_hov (Pp.str "[codegen] gen_match: item_type=" ++ Printer.pr_econstr_env env sigma (EConstr.of_constr item_type));*)
   let item_cvar = carg_of_garg env item_relindex in
   let ind, u = Constr.destInd (if Constr.isApp item_type then fst (Constr.destApp item_type) else item_type) in
-  let (mind_body, oind_body) = Inductive.lookup_mind_specif env ind in
-  let h = Array.length oind_body.Declarations.mind_consnames in
+  let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+  let h = Array.length oneind_body.Declarations.mind_consnames in
   (*let result_type = Retyping.get_type_of env sigma term in*)
   (*let result_type = Reductionops.nf_all env sigma result_type in*)
   (*msg_debug_hov (Pp.str "[codegen] gen_match:2");*)
@@ -1667,7 +1667,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
            (fun i -> gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
-           (iota_ary 0 oind_body.Declarations.mind_consnrealargs.(j-1))))
+           (iota_ary 0 oneind_body.Declarations.mind_consnrealargs.(j-1))))
       (iota_ary 1 h)
   in
   (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls)

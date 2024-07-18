@@ -1280,20 +1280,20 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
           Pp.str ")")
     | Const (cnst, univ) -> Constant.print cnst
     | Ind (ind, univ) ->
-        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
-        Id.print oind_body.mind_typename
+        let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env0 ind in
+        Id.print oneind_body.mind_typename
     | Construct ((ind, cstr_index), univ) ->
-        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ind in
-        Id.print oind_body.mind_consnames.(cstr_index-1)
+        let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env0 ind in
+        Id.print oneind_body.mind_consnames.(cstr_index-1)
     | Case (ci, u, pms, mpred, iv, item, bl) ->
-        let (mind_body, oind_body) = Inductive.lookup_mind_specif env0 ci.ci_ind in
+        let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env0 ci.ci_ind in
         Pp.hov 2 (
           Pp.str "(match" +++
           aux relnames item +++
           Pp.str "with" +++
           pp_sjoinmap_ary
             (fun i ->
-              let consname = oind_body.mind_consnames.(i) in
+              let consname = oneind_body.mind_consnames.(i) in
               let (nas, b) = bl.(i) in
               let nas = Array.map Context.binder_name nas in
               Pp.hov 2 (
@@ -1302,7 +1302,7 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
                 pp_sjoinmap_ary Name.print nas +++
                 Pp.str "=>" +++
                 aux (List.append (CArray.rev_to_list nas) relnames) b))
-            (iota_ary 0 (Array.length oind_body.mind_consnames)) ++
+            (iota_ary 0 (Array.length oneind_body.mind_consnames)) ++
           Pp.str ")")
     | Fix ((ks, j), (nary, tary, fary)) ->
         let nary = Array.map Context.binder_name nary in

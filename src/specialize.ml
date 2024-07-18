@@ -381,8 +381,8 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
   | Construct ((ind, j), _u) ->
       let j0 = j - 1 in
       let env = Global.env () in
-      let (mind_body, oind_body) = Inductive.lookup_mind_specif env ind in
-      let cstr_id = oind_body.Declarations.mind_consnames.(j0) in
+      let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+      let cstr_id = oneind_body.Declarations.mind_consnames.(j0) in
       Id.to_string cstr_id
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
 
