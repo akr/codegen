@@ -203,16 +203,15 @@ let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
     user_err (Pp.str "[codegen] specialization already configured:" +++ Printer.pr_constr_env env sigma func));
   ignore (codegen_define_static_arguments env sigma func sd_list)
 
-let rec determine_type_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : bool list =
+let rec num_arguments (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : int =
   (* msg_info_hov (Printer.pr_econstr_env env sigma ty); *)
   let ty = Reductionops.whd_all env sigma ty in
   match EConstr.kind sigma ty with
   | Prod (x,t,b) ->
       let t = Reductionops.whd_all env sigma t in
-      let is_type_arg = EConstr.isSort sigma t in
       let env = env_push_assum env x t in
-      is_type_arg :: determine_type_arguments env sigma b
-  | _ -> []
+      1 + num_arguments env sigma b
+  | _ -> 0
 
 let type_can_be_monomorphic (env : Environ.env) (sigma : Evd.evar_map)  (ty : EConstr.t) : bool =
   let num_left_args = Environ.nb_rel env in
@@ -550,13 +549,11 @@ let codegen_instance_command
   in
   check_const_or_construct env sigma func;
   let func_type = Retyping.get_type_of env sigma func in
-  let func_istypearg_list = determine_type_arguments env sigma func_type in
-  (if List.length func_istypearg_list < List.length sd_list then
+  (if num_arguments env sigma func_type < List.length sd_list then
     user_err (Pp.str "[codegen] too many arguments:" +++
       Printer.pr_econstr_env env sigma func +++
       Pp.str "(" ++
-      Pp.int (List.length sd_list) ++ Pp.str " for " ++
-      Pp.int (List.length func_istypearg_list) ++ Pp.str ")"));
+      Pp.int (List.length sd_list) ++ Pp.str ")"));
   let args = List.map (Reductionops.nf_all env sigma) static_args in
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let func0 = EConstr.to_constr sigma func in
