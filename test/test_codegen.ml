@@ -5033,6 +5033,15 @@ let test_list = add_test test_list "test_closure_generated_from_fixfunc_argument
     |}
 end
 
+let test_list = add_test test_list "test_nofunc" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] NoFunc declared function used:") ctx
+    ({|
+      CodeGen NoFunc Nat.add.
+      CodeGen Func Nat.mul.
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 

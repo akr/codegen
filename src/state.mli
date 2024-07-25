@@ -73,12 +73,13 @@ type instance_command =
   | CodeGenStaticFunc
   | CodeGenPrimitive
   | CodeGenConstant
+  | CodeGenNoFunc
 type specialization_instance = {
   sp_static_arguments : Constr.t list;
-  sp_presimp_constr : Constr.t;
+  sp_presimp_constr : Constr.t; (* not used for CodeGenNoFunc *)
   sp_simplified_status : simplified_status;
   sp_presimp : Constr.t;
-  sp_cfunc_name : string;
+  sp_cfunc_name : string; (* not used for CodeGenNoFunc *)
   sp_icommand : instance_command;
 }
 type specialization_config = {

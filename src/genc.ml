@@ -2513,6 +2513,7 @@ let is_static_function_icommand (icommand : instance_command) : bool =
   | CodeGenStaticFunc -> true
   | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
   | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
+  | CodeGenNoFunc -> user_err (Pp.str "[codegen] unexpected CodeGenNoFunc")
 
 let make_simplified_for_cfunc (cfunc_name : string) :
     cfunc_t * Constr.types * Constr.t =

@@ -29,6 +29,8 @@ val command_primitive :
   Constrexpr.constr_expr -> State.sp_instance_names -> unit
 val command_constant :
   Constrexpr.constr_expr -> State.sp_instance_names -> unit
+val command_nofunc :
+  Constrexpr.constr_expr -> unit
 val command_global_inline : Libnames.qualid list -> unit
 val command_local_inline : Libnames.qualid -> Libnames.qualid list -> unit
 val codegen_simplify :

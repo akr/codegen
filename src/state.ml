@@ -228,6 +228,7 @@ type instance_command =
 | CodeGenStaticFunc
 | CodeGenPrimitive
 | CodeGenConstant
+| CodeGenNoFunc
 
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
