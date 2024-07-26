@@ -232,10 +232,10 @@ type instance_command =
 
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
+  sp_presimp : Constr.t; (* The key in sp_instance_map *)
   sp_presimp_constr : Constr.t; (* constant or constructor *)
-  sp_simplified_status : simplified_status;
-  sp_presimp : Constr.t;
   sp_cfunc_name : string;
+  sp_simplified_status : simplified_status;
   sp_icommand : instance_command;
 }
 
