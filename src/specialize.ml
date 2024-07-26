@@ -484,54 +484,51 @@ let codegen_define_instance
       Printer.pr_econstr_env env sigma presimp_type));
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));
-  let (sp_inst, sp_interface, sp_gen) =
-    let (need_presimplified_ctnt, s_id, p_id, cfunc_name) =
-      if icommand = CodeGenNoFunc then
-        (false, (fun () -> assert false), (fun () -> assert false), "/*CodeGenNoFunc*/")
-      else
-        instance_namegen func sp_cfg names_opt
-    in
-    check_cfunc_name_conflict env sigma icommand presimp cfunc_name;
-    let env, sigma, presimp_constr =
-      if icommand = CodeGenNoFunc then
-        env, sigma, func (* func is dummy.  sp_presimp_constr is not used for CodeGenNoFunc *)
-      else if not need_presimplified_ctnt then
-        env, sigma, func (* use the original function for fully dynamic function *)
-      else
-        let globref = Declare.declare_definition
-          ~info:(Declare.Info.make ())
-          ~cinfo:(Declare.CInfo.make ~name:(p_id ()) ~typ:(Some presimp_type) ())
-          ~opaque:false
-          ~body:(EConstr.of_constr presimp)
-          sigma
-        in
-        let env = Global.env () in
-        let sigma, declared_ctnt = fresh_global env sigma globref in
-        let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
-        env, sigma, declared_ctnt
-    in
-    let sp_gen =
-      match icommand with
-      | CodeGenFunc -> Some { sp_static_storage=static_storage; sp_simplified_status=(SpExpectedId (s_id ())) }
-      | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
-    in
-    let sp_interface =
-      match icommand with
-      | CodeGenFunc | CodeGenPrimitive | CodeGenConstant ->
-          Some {
-            sp_presimp_constr = presimp_constr;
-            sp_cfunc_name = cfunc_name;
-            sp_gen = sp_gen;
-          }
-      | CodeGenNoFunc -> None
-    in
-    let sp_inst = {
-      sp_presimp = presimp;
-      sp_static_arguments = static_args;
-      sp_interface = sp_interface;
-      sp_icommand = icommand; }
-    in
-    (sp_inst, sp_interface, sp_gen)
+  let (need_presimplified_ctnt, s_id, p_id, cfunc_name) =
+    if icommand = CodeGenNoFunc then
+      (false, (fun () -> assert false), (fun () -> assert false), "/*CodeGenNoFunc*/")
+    else
+      instance_namegen func sp_cfg names_opt
+  in
+  check_cfunc_name_conflict env sigma icommand presimp cfunc_name;
+  let env, sigma, presimp_constr =
+    if icommand = CodeGenNoFunc then
+      env, sigma, func (* func is dummy.  sp_presimp_constr is not used for CodeGenNoFunc *)
+    else if not need_presimplified_ctnt then
+      env, sigma, func (* use the original function for fully dynamic function *)
+    else
+      let globref = Declare.declare_definition
+        ~info:(Declare.Info.make ())
+        ~cinfo:(Declare.CInfo.make ~name:(p_id ()) ~typ:(Some presimp_type) ())
+        ~opaque:false
+        ~body:(EConstr.of_constr presimp)
+        sigma
+      in
+      let env = new_env_with_rels env in
+      let sigma, declared_ctnt = fresh_global env sigma globref in
+      let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
+      env, sigma, declared_ctnt
+  in
+  let sp_gen =
+    match icommand with
+    | CodeGenFunc -> Some { sp_static_storage=static_storage; sp_simplified_status=(SpExpectedId (s_id ())) }
+    | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
+  in
+  let sp_interface =
+    match icommand with
+    | CodeGenFunc | CodeGenPrimitive | CodeGenConstant ->
+        Some {
+          sp_presimp_constr = presimp_constr;
+          sp_cfunc_name = cfunc_name;
+          sp_gen = sp_gen;
+        }
+    | CodeGenNoFunc -> None
+  in
+  let sp_inst = {
+    sp_presimp = presimp;
+    sp_static_arguments = static_args;
+    sp_interface = sp_interface;
+    sp_icommand = icommand; }
   in
   (match sp_interface with
   | Some sp_interface ->
@@ -554,7 +551,7 @@ let codegen_define_instance
   let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
   let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
-  (new_env_with_rels env, sp_inst)
+  (env, sp_inst)
 
 let codegen_instance_command
     (env : Environ.env) (sigma : Evd.evar_map)
