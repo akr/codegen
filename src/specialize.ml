@@ -422,8 +422,7 @@ let instance_namegen (func : Constr.t) (sp_cfg : specialization_config) (names_o
   let lazy_gensym_s () = let (_, id) = lazy_gensym_simplification () in id in
   let has_static_arguments = List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list in
   let presimp_id_specified = match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false in
-  let need_presimplified_ctnt = has_static_arguments || presimp_id_specified
-  in
+  let need_presimplified_ctnt = has_static_arguments || presimp_id_specified in
   let s_id () = match names_opt with
     | Some { spi_simplified_id = Some s_id } -> s_id
     | _ -> lazy_gensym_s ()
