@@ -407,6 +407,48 @@ let check_cfunc_name_conflict env sigma icommand presimp cfunc_name =
   | (CodeGenPrimitive | CodeGenConstant), Some (CodeGenCfuncPrimitive _) -> ()
   | CodeGenNoFunc, _ -> ()
 
+let instance_namegen (func : Constr.t) (sp_cfg : specialization_config) (names_opt : sp_instance_names option) : bool * (unit -> Id.t) * (unit -> Id.t) * string =
+  let func_name = label_name_of_constant_or_constructor func in
+  let generated_simplification_syms = ref None in
+  let lazy_gensym_simplification () =
+    match !generated_simplification_syms with
+    | Some ids -> ids
+    | None ->
+        let ids = gensym_simplification func_name in
+        generated_simplification_syms := Some ids;
+        ids
+  in
+  let lazy_gensym_p () = let (id, _) = lazy_gensym_simplification () in id in
+  let lazy_gensym_s () = let (_, id) = lazy_gensym_simplification () in id in
+  let has_static_arguments = List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list in
+  let presimp_id_specified = match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false in
+  let need_presimplified_ctnt = has_static_arguments || presimp_id_specified
+  in
+  let s_id () = match names_opt with
+    | Some { spi_simplified_id = Some s_id } -> s_id
+    | _ -> lazy_gensym_s ()
+  in
+  let p_id () = match names_opt with
+    | Some { spi_presimp_id = Some p_id } -> p_id
+    | _ -> lazy_gensym_p ()
+  in
+  let cfunc_name = match names_opt with
+    | Some { spi_cfunc_name = Some name } ->
+        (* We accept C's non-idetifier, such as "0" here. *)
+        name
+    | _ ->
+        if not has_static_arguments then
+          (* We use Gallina function name as-is for functions without static arguments *)
+          if valid_c_id_p func_name then
+            func_name
+          else
+            user_err (Pp.str "[codegen] Gallina function name is invalid in C:" +++ Pp.str func_name)
+        else
+          (* We use presimp name for functions with static arguments *)
+          c_id (Id.to_string (p_id ()))
+  in
+  (need_presimplified_ctnt, s_id, p_id, cfunc_name)
+
 let codegen_define_instance
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -443,46 +485,11 @@ let codegen_define_instance
   (if ConstrMap.mem presimp sp_cfg.sp_instance_map then
     user_err (Pp.str "[codegen] specialization instance already configured:" +++ Printer.pr_constr_env env sigma presimp));
   let (sp_inst, sp_interface, sp_gen) =
-    let func_name = label_name_of_constant_or_constructor func in
-    let generated_simplification_syms = ref None in
-    let lazy_gensym_simplification () =
-      match !generated_simplification_syms with
-      | Some ids -> ids
-      | None ->
-          let ids = gensym_simplification func_name in
-          generated_simplification_syms := Some ids;
-          ids
-    in
-    let lazy_gensym_p () = let (id, _) = lazy_gensym_simplification () in id in
-    let lazy_gensym_s () = let (_, id) = lazy_gensym_simplification () in id in
-    let has_static_arguments = List.exists (fun sd -> sd = SorD_S) sp_cfg.sp_sd_list in
-    let presimp_id_specified = match names_opt with Some { spi_presimp_id = Some _ } -> true | _ -> false in
-    let need_presimplified_ctnt = has_static_arguments || presimp_id_specified
-    in
-    let s_id () = match names_opt with
-      | Some { spi_simplified_id = Some s_id } -> s_id
-      | _ -> lazy_gensym_s ()
-    in
-    let p_id () = match names_opt with
-      | Some { spi_presimp_id = Some p_id } -> p_id
-      | _ -> lazy_gensym_p ()
-    in
-    let cfunc_name = match names_opt with
-      | Some { spi_cfunc_name = Some name } ->
-          (* We accept C's non-idetifier, such as "0" here. *)
-          name
-      | _ ->
-          if icommand = CodeGenNoFunc then
-            "/*CodeGenNoFunc*/"
-          else if not has_static_arguments then
-            (* We use Gallina function name as-is for functions without static arguments *)
-            if valid_c_id_p func_name then
-              func_name
-            else
-              user_err (Pp.str "[codegen] Gallina function name is invalid in C:" +++ Pp.str func_name)
-          else
-            (* We use presimp name for functions with static arguments *)
-            c_id (Id.to_string (p_id ()))
+    let (need_presimplified_ctnt, s_id, p_id, cfunc_name) =
+      if icommand = CodeGenNoFunc then
+        (false, (fun () -> assert false), (fun () -> assert false), "/*CodeGenNoFunc*/")
+      else
+        instance_namegen func sp_cfg names_opt
     in
     check_cfunc_name_conflict env sigma icommand presimp cfunc_name;
     let env, sigma, presimp_constr =
