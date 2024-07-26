@@ -449,17 +449,17 @@ let instance_namegen (func : Constr.t) (sp_cfg : specialization_config) (names_o
   (need_presimplified_ctnt, s_id, p_id, cfunc_name)
 
 let declare_definition (env : Environ.env) (sigma : Evd.evar_map) (name : Id.t) (typ : EConstr.t) (body : EConstr.t) : Environ.env * Evd.evar_map * Constr.t =
-      let globref = Declare.declare_definition
-        ~info:(Declare.Info.make ())
-        ~cinfo:(Declare.CInfo.make ~name:name ~typ:(Some typ) ())
-        ~opaque:false
-        ~body:body
-        sigma
-      in
-      let env = new_env_with_rels env in
-      let sigma, declared_ctnt = fresh_global env sigma globref in
-      let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
-      env, sigma, declared_ctnt
+  let globref = Declare.declare_definition
+    ~info:(Declare.Info.make ())
+    ~cinfo:(Declare.CInfo.make ~name:name ~typ:(Some typ) ())
+    ~opaque:false
+    ~body:body
+    sigma
+  in
+  let env = new_env_with_rels env in
+  let sigma, declared_ctnt = fresh_global env sigma globref in
+  let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
+  (env, sigma, declared_ctnt)
 
 let codegen_define_instance
     ?(cfunc : string option)
