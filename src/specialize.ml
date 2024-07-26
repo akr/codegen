@@ -555,13 +555,7 @@ let codegen_define_instance
   specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
   (env, sp_inst)
 
-let codegen_instance_command
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (icommand : instance_command)
-    (static_storage : bool)
-    (func : EConstr.t)
-    (user_args : EConstr.t option array)
-    (names : sp_instance_names) : Environ.env * specialization_instance =
+let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (user_args : EConstr.t option array)=
   let sd_list = CArray.map_to_list
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     user_args
@@ -581,6 +575,16 @@ let codegen_instance_command
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let func0 = EConstr.to_constr sigma func in
   ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
+  (func0, args)
+
+let codegen_instance_command
+    (env : Environ.env) (sigma : Evd.evar_map)
+    (icommand : instance_command)
+    (static_storage : bool)
+    (func : EConstr.t)
+    (user_args : EConstr.t option array)
+    (names : sp_instance_names) : Environ.env * specialization_instance =
+  let (func0, args) = check_instance_args env sigma func user_args in
   codegen_define_instance env sigma icommand static_storage func0 args (Some names)
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
