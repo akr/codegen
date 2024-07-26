@@ -76,12 +76,15 @@ type specialization_instance_gen = {
   sp_static_storage : bool;
   sp_simplified_status : simplified_status;
 }
+type specialization_instance_interface = {
+  sp_presimp_constr : Constr.t; (* not used for CodeGenNoFunc *)
+  sp_cfunc_name : string; (* not used for CodeGenNoFunc *)
+  sp_gen : specialization_instance_gen option; (* None for CodeGenPrimitive and CodeGenConstant. Some for CodeGenFunc. *)
+}
 type specialization_instance = {
   sp_static_arguments : Constr.t list;
   sp_presimp : Constr.t;
-  sp_presimp_constr : Constr.t; (* not used for CodeGenNoFunc *)
-  sp_cfunc_name : string; (* not used for CodeGenNoFunc *)
-  sp_gen : specialization_instance_gen option;
+  sp_interface : specialization_instance_interface option; (* None for CodeGenNoFunc. *)
   sp_icommand : instance_command;
 }
 type specialization_config = {
@@ -95,7 +98,7 @@ val gallina_instance_map :
   (specialization_config * specialization_instance) ConstrMap.t ref
 
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_gen) (* CodeGenFunc *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen) (* CodeGenFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 val cfunc_instance_map :
   cfunc_usage CString.Map.t ref

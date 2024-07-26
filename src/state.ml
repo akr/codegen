@@ -232,12 +232,16 @@ type specialization_instance_gen = {
   sp_simplified_status : simplified_status;
 }
 
+type specialization_instance_interface = {
+  sp_presimp_constr : Constr.t; (* not used for CodeGenNoFunc *)
+  sp_cfunc_name : string; (* not used for CodeGenNoFunc *)
+  sp_gen : specialization_instance_gen option; (* None for CodeGenPrimitive and CodeGenConstant. Some for CodeGenFunc. *)
+}
+
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
   sp_presimp : Constr.t; (* The key in sp_instance_map *)
-  sp_presimp_constr : Constr.t; (* constant or constructor *)
-  sp_cfunc_name : string;
-  sp_gen : specialization_instance_gen option;
+  sp_interface : specialization_instance_interface option; (* None for CodeGenNoFunc. *)
   sp_icommand : instance_command;
 }
 
@@ -262,7 +266,7 @@ let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_gen) (* CodeGenFunc or CodeGenStaticFunc *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen) (* CodeGenFunc or CodeGenStaticFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"

@@ -1574,9 +1574,9 @@ let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
   Pp.str ")"
 
 let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
-  let sp_inst =
+  let (sp_inst, sp_interface) =
     match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
-    | None ->
+    | None | Some (_, {sp_interface=None})->
         (match EConstr.kind sigma f with
         | Constr.Const (ctnt, _u) ->
             user_err (Pp.str "[codegen] C function name not configured:" +++ Printer.pr_constant env ctnt)
@@ -1584,10 +1584,10 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
             user_err (Pp.str "[codegen] C constructor name not configured:" +++ Printer.pr_constructor env cstr)
         | _ ->
             user_err (Pp.str "[codegen:bug] gen_app_const_construct expects Const or Construct"))
-    | Some (sp_cfg, sp_inst) ->
-        sp_inst
+    | Some (sp_cfg, ({sp_interface=Some sp_interface} as sp_inst)) ->
+        (sp_inst, sp_interface)
   in
-  let c_fname = sp_inst.sp_cfunc_name in
+  let c_fname = sp_interface.sp_cfunc_name in
   let gen_constant = Array.length argvars = 0 && sp_inst.sp_icommand = CodeGenConstant in
   if gen_constant then
     Pp.str c_fname
@@ -2509,24 +2509,23 @@ let gen_func_multi
 
 let make_simplified_for_cfunc (cfunc_name : string) :
     cfunc_t * Constr.types * Constr.t =
-  let (sp_cfg, sp_inst, sp_gen) =
+  let (sp_cfg, sp_inst, sp_interface, sp_gen) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
         user_err (Pp.str "[codegen] C function name not found:" +++
                   Pp.str cfunc_name)
-    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) -> (sp_cfg, sp_inst, sp_gen)
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) -> (sp_cfg, sp_inst, sp_interface, sp_gen)
     | Some (CodeGenCfuncPrimitive _) ->
         user_err (Pp.str "[codegen] C primitive function name found:" +++
                   Pp.str cfunc_name)
   in
   let static = sp_gen.sp_static_storage in
   let (env, ctnt) =
-    match sp_inst.sp_gen with
-    | None -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
-    | Some { sp_simplified_status=(SpExpectedId id) } ->
+    match sp_gen with
+    | { sp_simplified_status=(SpExpectedId id) } ->
         let (env, declared_ctnt, referred_cfuncs) = codegen_simplify cfunc_name in (* modify global env *)
         (env, declared_ctnt)
-    | Some { sp_simplified_status=(SpDefined (ctnt, _)) } -> (Global.env (), ctnt)
+    | { sp_simplified_status=(SpDefined (ctnt, _)) } -> (Global.env (), ctnt)
   in
   (*msg_debug_hov (Pp.str "[codegen:make_simplified_for_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
@@ -2818,7 +2817,9 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
                 codegen_define_instance env sigma CodeGenFunc static_storage func [] None
             | Some sp_inst -> (env, sp_inst)
           in
-          GenFunc sp_inst.sp_cfunc_name)
+          match sp_inst.sp_interface with
+          | None -> user_err (Pp.str "[codegen] NoFunc declared function specified:" +++ Printer.pr_constr_env env sigma func)
+          | Some sp_interface -> GenFunc sp_interface.sp_cfunc_name)
       cfunc_names
   in
   (* Don't call codegen_resolve_dependencies.

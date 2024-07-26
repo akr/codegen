@@ -311,7 +311,9 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
               let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
               let (env, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm0 params0 (Some spi) in
               (env, cstr_names)
-          | Some (_sp_cfg, { sp_cfunc_name = cstr_name; sp_icommand }) ->
+          | Some (_, { sp_interface = None }) ->
+              user_err_hov (Pp.str "[codegen] CodeGen IndImp-generating inductive type has a constructor prohibited by CodeGen NoFunc:" +++ Id.print cstr_id);
+          | Some (_sp_cfg, { sp_interface = Some { sp_cfunc_name = cstr_name }; sp_icommand }) ->
               (* xxx: check name is valid identifier for C *)
               if sp_icommand <> CodeGenPrimitive then
                 user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cstr_id);
