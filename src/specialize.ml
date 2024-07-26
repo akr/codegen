@@ -448,6 +448,19 @@ let instance_namegen (func : Constr.t) (sp_cfg : specialization_config) (names_o
   in
   (need_presimplified_ctnt, s_id, p_id, cfunc_name)
 
+let declare_definition (env : Environ.env) (sigma : Evd.evar_map) (name : Id.t) (typ : EConstr.t) (body : EConstr.t) : Environ.env * Evd.evar_map * Constr.t =
+      let globref = Declare.declare_definition
+        ~info:(Declare.Info.make ())
+        ~cinfo:(Declare.CInfo.make ~name:name ~typ:(Some typ) ())
+        ~opaque:false
+        ~body:body
+        sigma
+      in
+      let env = new_env_with_rels env in
+      let sigma, declared_ctnt = fresh_global env sigma globref in
+      let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
+      env, sigma, declared_ctnt
+
 let codegen_define_instance
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -496,17 +509,7 @@ let codegen_define_instance
     else if not need_presimplified_ctnt then
       env, sigma, func (* use the original function for fully dynamic function *)
     else
-      let globref = Declare.declare_definition
-        ~info:(Declare.Info.make ())
-        ~cinfo:(Declare.CInfo.make ~name:(p_id ()) ~typ:(Some presimp_type) ())
-        ~opaque:false
-        ~body:(EConstr.of_constr presimp)
-        sigma
-      in
-      let env = new_env_with_rels env in
-      let sigma, declared_ctnt = fresh_global env sigma globref in
-      let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
-      env, sigma, declared_ctnt
+      declare_definition env sigma (p_id ()) presimp_type (EConstr.of_constr presimp)
   in
   let sp_gen =
     match icommand with
