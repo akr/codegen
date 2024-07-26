@@ -207,7 +207,6 @@ let borrow_type_set = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
 
 type simplified_status =
-| SpNoSimplification (* constructor or primitive function *)
 | SpExpectedId of Id.t (* simplified_id *)
 | SpDefined of (Constant.t * StringSet.t) (* (defined-constant, referred-cfuncs) *)
 
@@ -230,12 +229,16 @@ type instance_command =
 | CodeGenConstant
 | CodeGenNoFunc
 
+type specialization_instance_gen = {
+  sp_simplified_status : simplified_status;
+}
+
 type specialization_instance = {
   sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
   sp_presimp : Constr.t; (* The key in sp_instance_map *)
   sp_presimp_constr : Constr.t; (* constant or constructor *)
   sp_cfunc_name : string;
-  sp_simplified_status : simplified_status;
+  sp_gen : specialization_instance_gen option;
   sp_icommand : instance_command;
 }
 

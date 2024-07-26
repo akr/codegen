@@ -65,7 +65,6 @@ val borrow_function_set : Names.Cset.t ref
 val borrow_type_set : ConstrSet.t ref
 
 type simplified_status =
-    SpNoSimplification
   | SpExpectedId of Names.Id.t (* simplified_id *)
   | SpDefined of (Names.Constant.t * StringSet.t)
 type instance_command =
@@ -74,12 +73,15 @@ type instance_command =
   | CodeGenPrimitive
   | CodeGenConstant
   | CodeGenNoFunc
+type specialization_instance_gen = {
+  sp_simplified_status : simplified_status;
+}
 type specialization_instance = {
   sp_static_arguments : Constr.t list;
   sp_presimp : Constr.t;
   sp_presimp_constr : Constr.t; (* not used for CodeGenNoFunc *)
   sp_cfunc_name : string; (* not used for CodeGenNoFunc *)
-  sp_simplified_status : simplified_status;
+  sp_gen : specialization_instance_gen option;
   sp_icommand : instance_command;
 }
 type specialization_config = {

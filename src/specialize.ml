@@ -83,15 +83,15 @@ let pr_codegen_instance (env : Environ.env) (sigma : Evd.evar_map) (sp_cfg : spe
     Pp.str "_"
   else
     Printer.pr_constr_env env sigma sp_inst.sp_presimp_constr) +++
-  (match sp_inst.sp_simplified_status with
-  | SpNoSimplification -> Pp.mt ()
-  | SpExpectedId s_id -> Id.print s_id
-  | SpDefined (ctnt, refered_cfuncs) -> Printer.pr_constant env ctnt) ++
+  (match sp_inst.sp_gen with
+  | None -> Pp.mt ()
+  | Some { sp_simplified_status=(SpExpectedId s_id) } -> Id.print s_id
+  | Some { sp_simplified_status=(SpDefined (ctnt, refered_cfuncs)) } -> Printer.pr_constant env ctnt) ++
   Pp.str "." +++
-  (match sp_inst.sp_simplified_status with
-  | SpNoSimplification -> Pp.str "(*no-simplification*)"
-  | SpExpectedId s_id -> Pp.str "(*before-simplification*)"
-  | SpDefined (ctnt, refered_cfuncs) -> Pp.str "(*after-simplification*)")
+  (match sp_inst.sp_gen with
+  | None -> Pp.str "(*no-simplification*)"
+  | Some { sp_simplified_status=(SpExpectedId s_id) } -> Pp.str "(*before-simplification*)"
+  | Some { sp_simplified_status=(SpDefined (ctnt, refered_cfuncs)) } -> Pp.str "(*after-simplification*)")
 
 let command_print_specialization (funcs : Libnames.qualid list) : unit =
   let env = Global.env () in
@@ -100,10 +100,10 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     msg_info_hov (pr_codegen_arguments env sigma sp_cfg);
     let feedback_instance sp_inst =
       msg_info_hov (pr_codegen_instance env sigma sp_cfg sp_inst);
-      match sp_inst.sp_simplified_status with
-      | SpNoSimplification -> ()
-      | SpExpectedId id -> ()
-      | SpDefined (ctnt, referred_cfuncs) ->
+      match sp_inst.sp_gen with
+      | None -> ()
+      | Some { sp_simplified_status=(SpExpectedId id) } -> ()
+      | Some { sp_simplified_status=(SpDefined (ctnt, referred_cfuncs)) } ->
           msg_info_hov (Pp.str "Dependency" +++
             Pp.str sp_inst.sp_cfunc_name +++
             Pp.str "=>" +++
@@ -495,16 +495,16 @@ let codegen_define_instance
         let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
         env, sigma, declared_ctnt
     in
-    let simplified_status =
+    let gen_info =
       match icommand with
-      | CodeGenFunc | CodeGenStaticFunc -> SpExpectedId (s_id ())
-      | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> SpNoSimplification
+      | CodeGenFunc | CodeGenStaticFunc -> Some { sp_simplified_status=(SpExpectedId (s_id ())) }
+      | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
     in
     let sp_inst = {
       sp_presimp = presimp;
       sp_static_arguments = static_args;
       sp_presimp_constr = presimp_constr;
-      sp_simplified_status = simplified_status;
+      sp_gen = gen_info;
       sp_cfunc_name = cfunc_name;
       sp_icommand = icommand; }
     in
@@ -2333,10 +2333,10 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let s_id = (match sp_inst.sp_simplified_status with
-    | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
-    | SpExpectedId s_id -> s_id
-    | SpDefined _ -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
+  let s_id = (match sp_inst.sp_gen with
+    | None -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
+    | Some { sp_simplified_status=(SpExpectedId s_id) } -> s_id
+    | Some { sp_simplified_status=(SpDefined _) } -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
   in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
@@ -2412,7 +2412,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_presimp_constr = sp_inst.sp_presimp_constr;
-    sp_simplified_status = SpDefined (declared_ctnt, referred_cfuncs);
+    sp_gen = Some { sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) };
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_icommand = sp_inst.sp_icommand; }
   in
@@ -2448,13 +2448,13 @@ let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string l
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
     | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
-        (match sp_inst.sp_simplified_status with
-        | SpNoSimplification -> ()
-        | SpExpectedId _ ->
+        (match sp_inst.sp_gen with
+        | None -> ()
+        | Some { sp_simplified_status=(SpExpectedId _) } ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
             (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
             rev_postorder := cfunc :: !rev_postorder
-        | SpDefined (declared_ctnt, referred_cfuncs) ->
+        | Some { sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } ->
             (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
             rev_postorder := cfunc :: !rev_postorder)
     | Some (CodeGenCfuncPrimitive _) -> ())

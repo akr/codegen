@@ -2529,12 +2529,12 @@ let make_simplified_for_cfunc (cfunc_name : string) :
   in
   let static = is_static_function_icommand sp_inst.sp_icommand in
   let (env, ctnt) =
-    match sp_inst.sp_simplified_status with
-    | SpNoSimplification -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
-    | SpExpectedId id ->
+    match sp_inst.sp_gen with
+    | None -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
+    | Some { sp_simplified_status=(SpExpectedId id) } ->
         let (env, declared_ctnt, referred_cfuncs) = codegen_simplify cfunc_name in (* modify global env *)
         (env, declared_ctnt)
-    | SpDefined (ctnt, _) -> (Global.env (), ctnt)
+    | Some { sp_simplified_status=(SpDefined (ctnt, _)) } -> (Global.env (), ctnt)
   in
   (*msg_debug_hov (Pp.str "[codegen:make_simplified_for_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
