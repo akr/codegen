@@ -1724,7 +1724,6 @@ let pr_c_abstract_decl (c_type : c_typedata) : Pp.t =
 let str_instance_command (icommand : instance_command) : string =
   match icommand with
   | CodeGenFunc -> "Func"
-  | CodeGenStaticFunc -> "StaticFunc"
   | CodeGenPrimitive -> "Primitive"
   | CodeGenConstant -> "Constant"
   | CodeGenNoFunc -> "NoFunc"

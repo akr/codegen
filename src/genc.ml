@@ -2507,27 +2507,19 @@ let gen_func_multi
   let impl = Pp.v 0 (pp_body_function) in
   (decl, impl)
 
-let is_static_function_icommand (icommand : instance_command) : bool =
-  match icommand with
-  | CodeGenFunc -> false
-  | CodeGenStaticFunc -> true
-  | CodeGenPrimitive -> user_err (Pp.str "[codegen] unexpected CodeGenPrimitive")
-  | CodeGenConstant -> user_err (Pp.str "[codegen] unexpected CodeGenConstant")
-  | CodeGenNoFunc -> user_err (Pp.str "[codegen] unexpected CodeGenNoFunc")
-
 let make_simplified_for_cfunc (cfunc_name : string) :
     cfunc_t * Constr.types * Constr.t =
-  let (sp_cfg, sp_inst) =
+  let (sp_cfg, sp_inst, sp_gen) =
     match CString.Map.find_opt cfunc_name !cfunc_instance_map with
     | None ->
         user_err (Pp.str "[codegen] C function name not found:" +++
                   Pp.str cfunc_name)
-    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) -> (sp_cfg, sp_inst)
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) -> (sp_cfg, sp_inst, sp_gen)
     | Some (CodeGenCfuncPrimitive _) ->
         user_err (Pp.str "[codegen] C primitive function name found:" +++
                   Pp.str cfunc_name)
   in
-  let static = is_static_function_icommand sp_inst.sp_icommand in
+  let static = sp_gen.sp_static_storage in
   let (env, ctnt) =
     match sp_inst.sp_gen with
     | None -> user_err (Pp.str "[codegen] not a target of code generation:" +++ Pp.str cfunc_name)
@@ -2821,7 +2813,9 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
             user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));
           let (env, sp_inst) =
             match ConstrMap.find_opt func sp_cfg.sp_instance_map with
-            | None -> codegen_define_instance env sigma CodeGenFunc func [] None
+            | None ->
+                let static_storage = true in
+                codegen_define_instance env sigma CodeGenFunc static_storage func [] None
             | Some sp_inst -> (env, sp_inst)
           in
           GenFunc sp_inst.sp_cfunc_name)

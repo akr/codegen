@@ -213,23 +213,22 @@ type simplified_status =
 (*
 - CodeGenFunc
   Codegen-generated function.  Gallina function only.  Any dynamic argument.
-- CodeGenStaticFunc
-  Codegen-generated function.  Gallina function only.  Any dynamic argument.
-  The generated function is defined as static function.
 - CodeGenPrimitive
   User-defined function.  Function or constructor.  Any dynamic argument.
 - CodeGenConstant
   User-defined function.  Function or constructor.  No dynamic argument.
   Generate C constant "foo", instead of function call "foo()".
+- CodeGenNoFunc
+  Code generation prohibited.
 *)
 type instance_command =
 | CodeGenFunc
-| CodeGenStaticFunc
 | CodeGenPrimitive
 | CodeGenConstant
 | CodeGenNoFunc
 
 type specialization_instance_gen = {
+  sp_static_storage : bool;
   sp_simplified_status : simplified_status;
 }
 
@@ -263,7 +262,7 @@ let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunc or CodeGenStaticFunc *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_gen) (* CodeGenFunc or CodeGenStaticFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"

@@ -309,7 +309,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
           match ConstrMap.find_opt presimp !gallina_instance_map with
           | None ->
               let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
-              let (env, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive cstrterm0 params0 (Some spi) in
+              let (env, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm0 params0 (Some spi) in
               (env, cstr_names)
           | Some (_sp_cfg, { sp_cfunc_name = cstr_name; sp_icommand }) ->
               (* xxx: check name is valid identifier for C *)

@@ -373,8 +373,8 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
 
 let check_cfunc_name_conflict env sigma icommand presimp cfunc_name =
   match icommand, CString.Map.find_opt cfunc_name !cfunc_instance_map with
-  | (CodeGenFunc | CodeGenStaticFunc), None -> ()
-  | (CodeGenFunc | CodeGenStaticFunc), Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
+  | (CodeGenFunc), None -> ()
+  | (CodeGenFunc), Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) ->
       user_err
         (Pp.str "[codegen] C function name already used:" +++
         Pp.str cfunc_name +++
@@ -382,7 +382,7 @@ let check_cfunc_name_conflict env sigma icommand presimp cfunc_name =
         Printer.pr_constr_env env sigma sp_inst.sp_presimp +++
         Pp.str "but also for" +++
         Printer.pr_constr_env env sigma presimp)
-  | (CodeGenFunc | CodeGenStaticFunc), Some (CodeGenCfuncPrimitive _) ->
+  | (CodeGenFunc), Some (CodeGenCfuncPrimitive _) ->
       user_err
         (Pp.str "[codegen] C function name already used:" +++
         Pp.str cfunc_name +++
@@ -390,7 +390,7 @@ let check_cfunc_name_conflict env sigma icommand presimp cfunc_name =
         Pp.str "but also for" +++
         Printer.pr_constr_env env sigma presimp)
   | (CodeGenPrimitive | CodeGenConstant), None -> ()
-  | (CodeGenPrimitive | CodeGenConstant), Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
+  | (CodeGenPrimitive | CodeGenConstant), Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) ->
       user_err
         (Pp.str "[codegen] C function name already used:" +++
         Pp.str cfunc_name +++
@@ -404,6 +404,7 @@ let codegen_define_instance
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
+    (static_storage : bool)
     (func : Constr.t) (static_args : Constr.t list)
     (names_opt : sp_instance_names option) : Environ.env * specialization_instance =
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
@@ -412,7 +413,7 @@ let codegen_define_instance
   in
   begin
     match icommand with
-    | CodeGenFunc | CodeGenStaticFunc ->
+    | CodeGenFunc ->
         if sp_cfg.sp_is_cstr then
           user_err (Pp.str "[codegen]" +++ Pp.str (str_instance_command icommand) +++
                     Pp.str "is used for a constructor:" +++
@@ -495,16 +496,16 @@ let codegen_define_instance
         let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
         env, sigma, declared_ctnt
     in
-    let gen_info =
+    let sp_gen =
       match icommand with
-      | CodeGenFunc | CodeGenStaticFunc -> Some { sp_simplified_status=(SpExpectedId (s_id ())) }
+      | CodeGenFunc -> Some { sp_static_storage=static_storage; sp_simplified_status=(SpExpectedId (s_id ())) }
       | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
     in
     let sp_inst = {
       sp_presimp = presimp;
       sp_static_arguments = static_args;
       sp_presimp_constr = presimp_constr;
-      sp_gen = gen_info;
+      sp_gen = sp_gen;
       sp_cfunc_name = cfunc_name;
       sp_icommand = icommand; }
     in
@@ -518,8 +519,9 @@ let codegen_define_instance
     gallina_instance_map := (ConstrMap.add sp_inst.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map));
   gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
   (match icommand with
-  | CodeGenFunc | CodeGenStaticFunc ->
-      cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst)) !cfunc_instance_map)
+  | CodeGenFunc ->
+      let sp_gen = Option.get sp_inst.sp_gen in
+      cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) !cfunc_instance_map)
   | CodeGenPrimitive | CodeGenConstant ->
       (match CString.Map.find_opt cfunc_name !cfunc_instance_map with
       | None -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]) !cfunc_instance_map);
@@ -534,6 +536,7 @@ let codegen_define_instance
 let codegen_instance_command
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
+    (static_storage : bool)
     (func : EConstr.t)
     (user_args : EConstr.t option array)
     (names : sp_instance_names) : Environ.env * specialization_instance =
@@ -556,7 +559,7 @@ let codegen_instance_command
   let args = List.map (Evarutil.flush_and_check_evars sigma) args in
   let func0 = EConstr.to_constr sigma func in
   ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
-  codegen_define_instance env sigma icommand func0 args (Some names)
+  codegen_define_instance env sigma icommand static_storage func0 args (Some names)
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
   let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
@@ -579,8 +582,8 @@ let command_function
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  let icommand = match func_mods.func_mods_static with Some false -> CodeGenFunc | _ -> CodeGenStaticFunc in
-  let (env, sp_inst) = codegen_instance_command env sigma icommand func args names in
+  let static_storage = match func_mods.func_mods_static with Some false -> false | _ -> true in
+  let (env, sp_inst) = codegen_instance_command env sigma CodeGenFunc static_storage func args names in
   codegen_add_header_generation (GenPrototype sp_inst.sp_cfunc_name);
   codegen_add_source_generation (GenFunc sp_inst.sp_cfunc_name)
 
@@ -590,7 +593,7 @@ let command_primitive
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  ignore (codegen_instance_command env sigma CodeGenPrimitive func args names)
+  ignore (codegen_instance_command env sigma CodeGenPrimitive false func args names)
 
 let command_constant
     (user_func_args : Constrexpr.constr_expr)
@@ -601,14 +604,14 @@ let command_constant
   if Array.exists Stdlib.Option.is_none args then
     user_err (Pp.str "[codegen] hole detected. CodeGen Constant cannot take a term with hole:" +++
       Ppconstr.pr_constr_expr env sigma user_func_args);
-  ignore (codegen_instance_command env sigma  CodeGenConstant func args names)
+  ignore (codegen_instance_command env sigma  CodeGenConstant false func args names)
 
 let command_nofunc (user_func_args : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
   let empty_names = { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None } in
-  ignore (codegen_instance_command env sigma CodeGenNoFunc func args empty_names)
+  ignore (codegen_instance_command env sigma CodeGenNoFunc false func args empty_names)
 
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
@@ -1750,8 +1753,9 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
-        let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenStaticFunc in
-        codegen_define_instance ~cfunc env sigma icommand func nf_static_args None
+        let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunc in
+        let static_storage = if sp_cfg.sp_is_cstr then false else true in
+        codegen_define_instance ~cfunc env sigma icommand static_storage func nf_static_args None
     | Some sp_inst ->
         if sp_inst.sp_icommand = CodeGenNoFunc then
           user_err (Pp.str "[codegen] NoFunc declared function used:" +++ Printer.pr_constr_env env sigma presimp);
@@ -2321,7 +2325,7 @@ let combine_equality_proofs (env : Environ.env) (sigma : Evd.evar_map) (term1 : 
 
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
-  let (sp_cfg, sp_inst) =
+  let (sp_cfg, sp_inst, sp_gen) =
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None ->
         user_err (Pp.str "[codegen] specialization instance not defined:" +++
@@ -2329,14 +2333,13 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     | Some (CodeGenCfuncPrimitive _) ->
         user_err (Pp.str "[codegen] not a target of simplification:" +++
                   Pp.str (escape_as_coq_string cfunc))
-    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) -> (sp_cfg, sp_inst)
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) -> (sp_cfg, sp_inst, sp_gen)
   in
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let s_id = (match sp_inst.sp_gen with
-    | None -> user_err (Pp.str "[codegen] not a target of simplification:" +++ Pp.str cfunc)
-    | Some { sp_simplified_status=(SpExpectedId s_id) } -> s_id
-    | Some { sp_simplified_status=(SpDefined _) } -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc))
+  let s_id = match sp_gen with
+    | { sp_simplified_status=(SpExpectedId s_id) } -> s_id
+    | { sp_simplified_status=(SpDefined _) } -> user_err (Pp.str "[codegen] already simplified:" +++ Pp.str cfunc)
   in
   let presimp = sp_inst.sp_presimp in
   let epresimp = EConstr.of_constr presimp in
@@ -2408,11 +2411,12 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let env = Global.env () in
   let sigma, declared_ctnt_term = fresh_global env sigma globref in
   let declared_ctnt_term = EConstr.to_constr sigma declared_ctnt_term in
+  let sp_gen2 = { sp_static_storage=sp_gen.sp_static_storage; sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } in
   let sp_inst2 = {
     sp_presimp = sp_inst.sp_presimp;
     sp_static_arguments = sp_inst.sp_static_arguments;
     sp_presimp_constr = sp_inst.sp_presimp_constr;
-    sp_gen = Some { sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) };
+    sp_gen = Some sp_gen2;
     sp_cfunc_name = sp_inst.sp_cfunc_name;
     sp_icommand = sp_inst.sp_icommand; }
   in
@@ -2425,7 +2429,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     let m = ConstrMap.add declared_ctnt_term (sp_cfg, sp_inst2) m in
     gallina_instance_map := m);
   (let m = !cfunc_instance_map in
-    let m = CString.Map.set sp_inst.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2)) m in
+    let m = CString.Map.set sp_inst.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_gen2)) m in
     cfunc_instance_map := m);
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
@@ -2447,14 +2451,13 @@ let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string l
     (visited := StringSet.add cfunc !visited;
     match CString.Map.find_opt cfunc !cfunc_instance_map with
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
-    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst)) ->
-        (match sp_inst.sp_gen with
-        | None -> ()
-        | Some { sp_simplified_status=(SpExpectedId _) } ->
+    | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_gen)) ->
+        (match sp_gen with
+        | { sp_simplified_status=(SpExpectedId _) } ->
             let (_, _, referred_cfuncs) = codegen_simplify cfunc in
             (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
             rev_postorder := cfunc :: !rev_postorder
-        | Some { sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } ->
+        | { sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } ->
             (StringSet.iter (recursive_simplify visited rev_postorder) referred_cfuncs);
             rev_postorder := cfunc :: !rev_postorder)
     | Some (CodeGenCfuncPrimitive _) -> ())

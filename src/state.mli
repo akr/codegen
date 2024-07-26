@@ -69,11 +69,11 @@ type simplified_status =
   | SpDefined of (Names.Constant.t * StringSet.t)
 type instance_command =
     CodeGenFunc
-  | CodeGenStaticFunc
   | CodeGenPrimitive
   | CodeGenConstant
   | CodeGenNoFunc
 type specialization_instance_gen = {
+  sp_static_storage : bool;
   sp_simplified_status : simplified_status;
 }
 type specialization_instance = {
@@ -95,7 +95,7 @@ val gallina_instance_map :
   (specialization_config * specialization_instance) ConstrMap.t ref
 
 type cfunc_usage =
-| CodeGenCfuncGenerate of (specialization_config * specialization_instance) (* CodeGenFunc or CodeGenStaticFunc *)
+| CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_gen) (* CodeGenFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 val cfunc_instance_map :
   cfunc_usage CString.Map.t ref
