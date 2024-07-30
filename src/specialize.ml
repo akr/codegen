@@ -537,9 +537,9 @@ let codegen_define_instance
       msg_info_hov (Pp.str "[codegen]" +++
         (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
         pr_codegen_instance env sigma sp_cfg sp_inst);
-      gallina_instance_map := (ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_map);
+      gallina_instance_codegeneration_map := (ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_codegeneration_map);
   | None -> ());
-  gallina_instance_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_map);
+  gallina_instance_specialization_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map);
   (match sp_interface, sp_gen with
   | (Some sp_interface), (Some sp_gen) ->
       cfunc_instance_map := (CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) !cfunc_instance_map)
@@ -2437,8 +2437,6 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let declared_ctnt = Globnames.destConstRef globref in
   let env = Global.env () in
-  let sigma, declared_ctnt_term = fresh_global env sigma globref in
-  let declared_ctnt_term = EConstr.to_constr sigma declared_ctnt_term in
   let sp_gen2 = { sp_static_storage=sp_gen.sp_static_storage; sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } in
   let sp_interface2 = {
     sp_presimp_constr = sp_interface.sp_presimp_constr;
@@ -2455,11 +2453,12 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   msg_info_hov (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
-  (let m = !gallina_instance_map in
-    let m = ConstrMap.set sp_interface.sp_presimp_constr (sp_cfg, sp_inst2) m in
+  (let m = !gallina_instance_specialization_map in
     let m = ConstrMap.set presimp (sp_cfg, sp_inst2) m in
-    let m = ConstrMap.add declared_ctnt_term (sp_cfg, sp_inst2) m in
-    gallina_instance_map := m);
+    gallina_instance_specialization_map := m);
+  (let m = !gallina_instance_codegeneration_map in
+    let m = ConstrMap.set sp_interface.sp_presimp_constr (sp_cfg, sp_inst2) m in
+    gallina_instance_codegeneration_map := m);
   (let m = !cfunc_instance_map in
     let m = CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)) m in
     cfunc_instance_map := m);

@@ -306,7 +306,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
           let cstrterm0 = EConstr.to_constr sigma cstrterm in
           ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
           let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
-          match ConstrMap.find_opt presimp !gallina_instance_map with
+          match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
           | None ->
               let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
               let (env, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm0 params0 (Some spi) in

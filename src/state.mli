@@ -94,7 +94,9 @@ type specialization_config = {
   sp_instance_map : specialization_instance ConstrMap.t;
 }
 val specialize_config_map : specialization_config ConstrMap.t ref
-val gallina_instance_map :
+val gallina_instance_specialization_map :
+  (specialization_config * specialization_instance) ConstrMap.t ref
+val gallina_instance_codegeneration_map :
   (specialization_config * specialization_instance) ConstrMap.t ref
 
 type cfunc_usage =

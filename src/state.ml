@@ -255,12 +255,12 @@ type specialization_config = {
 (* key is constant or constructor which is the target of specialization *)
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
 
-(*
-  key is a constant to refer a presimp (codegen_pN_foo),
-  the presimp itself (@cons bool) and
-  a constant to refer the simplified definition (codegen_sN_foo).
-*)
-let gallina_instance_map = Summary.ref ~name:"CodegenGallinaInstance"
+(* key is the presimp itself (@cons bool) *)
+let gallina_instance_specialization_map = Summary.ref ~name:"CodegenGallinaInstanceSpecialization"
+  (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
+
+(* key is a constant to refer a presimp (codegen_pN_foo) *)
+let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name

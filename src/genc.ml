@@ -1575,7 +1575,7 @@ let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
 
 let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
   let (sp_inst, sp_interface) =
-    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_map with
+    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_codegeneration_map with
     | None | Some (_, {sp_interface=None})->
         (match EConstr.kind sigma f with
         | Constr.Const (ctnt, _u) ->
