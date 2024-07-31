@@ -1784,11 +1784,13 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
         codegen_define_instance ~cfunc env sigma icommand static_storage func nf_static_args None
     | Some sp_inst ->
-        if sp_inst.sp_icommand = CodeGenNoFunc then
-          user_err (Pp.str "[codegen] NoFunc declared function used:" +++ Printer.pr_constr_env env sigma presimp);
         (env, sp_inst)
   in
-  let sp_interface = Option.get sp_inst.sp_interface in
+  let sp_interface =
+    match sp_inst.sp_interface with
+    | None -> user_err (Pp.str "[codegen] NoFunc declared function used:" +++ Printer.pr_constr_env env sigma presimp);
+    | Some sp_interface -> sp_interface
+  in
   let sp_ctnt = sp_interface.sp_presimp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in
   let newexp = mkApp (EConstr.of_constr sp_ctnt, CArray.filter_with dynamic_flags args) in
