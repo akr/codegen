@@ -84,8 +84,8 @@ CodeGen InductiveType lseq bool => "lseq_bool".
 CodeGen InductiveMatch lseq bool => "lseq_bool_sw" with
 | lnil => "lseq_bool_nil_tag"
 | lcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
-CodeGen Primitive lnil bool => "lseq_bool_nil".
-CodeGen Primitive lcons bool => "lseq_bool_cons".
+CodeGen Primitive @lnil bool => "lseq_bool_nil".
+CodeGen Primitive @lcons bool => "lseq_bool_cons".
 CodeGen IndImp lseq bool
   where heap on
   where static off
