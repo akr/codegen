@@ -515,8 +515,8 @@ let codegen_define_instance
     match icommand with
     | CodeGenFunc ->
         Some {
-          sp_static_storage=static_storage;
-          sp_simplified_status=(SpExpectedId (s_id ()))
+          sp_static_storage = static_storage;
+          sp_simplified_status = SpExpectedId (s_id ());
         }
     | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
   in
@@ -539,22 +539,22 @@ let codegen_define_instance
   let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
   let sp_cfg = { sp_cfg with sp_instance_map = inst_map } in
   specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-  gallina_instance_specialization_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map);
+  gallina_instance_specialization_map := ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map;
   (match sp_interface with
   | Some sp_interface ->
       msg_info_hov (Pp.str "[codegen]" +++
         (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
         pr_codegen_instance env sigma sp_cfg sp_inst);
-      gallina_instance_codegeneration_map := (ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_codegeneration_map);
+      gallina_instance_codegeneration_map := ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_codegeneration_map;
   | None -> ());
   (match sp_interface, sp_gen with
   | (Some sp_interface), (Some sp_gen) ->
-      cfunc_instance_map := (CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) !cfunc_instance_map)
+      cfunc_instance_map := CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) !cfunc_instance_map
   | (Some sp_interface), None ->
       let cfunc_name = sp_interface.sp_cfunc_name in
       (match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-      | None -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]) !cfunc_instance_map);
-      | Some (CodeGenCfuncPrimitive l) -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)) !cfunc_instance_map)
+      | None -> cfunc_instance_map := CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]) !cfunc_instance_map;
+      | Some (CodeGenCfuncPrimitive l) -> cfunc_instance_map := CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)) !cfunc_instance_map
       | Some (CodeGenCfuncGenerate l) -> assert false)
   | None, _ -> ());
   (env, sp_cfg, sp_inst)
