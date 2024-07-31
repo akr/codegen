@@ -467,7 +467,7 @@ let codegen_define_instance
     (icommand : instance_command)
     (static_storage : bool)
     (func : Constr.t) (static_args : Constr.t list)
-    (names_opt : sp_instance_names option) : Environ.env * specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
@@ -513,7 +513,11 @@ let codegen_define_instance
   in
   let sp_gen =
     match icommand with
-    | CodeGenFunc -> Some { sp_static_storage=static_storage; sp_simplified_status=(SpExpectedId (s_id ())) }
+    | CodeGenFunc ->
+        Some {
+          sp_static_storage=static_storage;
+          sp_simplified_status=(SpExpectedId (s_id ()))
+        }
     | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
   in
   let sp_interface =
@@ -532,6 +536,10 @@ let codegen_define_instance
     sp_interface = sp_interface;
     sp_icommand = icommand; }
   in
+  let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
+  let sp_cfg = { sp_cfg with sp_instance_map = inst_map } in
+  specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
+  gallina_instance_specialization_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map);
   (match sp_interface with
   | Some sp_interface ->
       msg_info_hov (Pp.str "[codegen]" +++
@@ -539,7 +547,6 @@ let codegen_define_instance
         pr_codegen_instance env sigma sp_cfg sp_inst);
       gallina_instance_codegeneration_map := (ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_codegeneration_map);
   | None -> ());
-  gallina_instance_specialization_map := (ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map);
   (match sp_interface, sp_gen with
   | (Some sp_interface), (Some sp_gen) ->
       cfunc_instance_map := (CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) !cfunc_instance_map)
@@ -550,10 +557,7 @@ let codegen_define_instance
       | Some (CodeGenCfuncPrimitive l) -> cfunc_instance_map := (CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)) !cfunc_instance_map)
       | Some (CodeGenCfuncGenerate l) -> assert false)
   | None, _ -> ());
-  let inst_map = ConstrMap.add presimp sp_inst sp_cfg.sp_instance_map in
-  let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
-  specialize_config_map := ConstrMap.add func sp_cfg2 !specialize_config_map;
-  (env, sp_inst)
+  (env, sp_cfg, sp_inst)
 
 let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (user_args : EConstr.t option array)=
   let sd_list = CArray.map_to_list
@@ -583,7 +587,7 @@ let codegen_instance_command
     (static_storage : bool)
     (func : EConstr.t)
     (user_args : EConstr.t option array)
-    (names : sp_instance_names) : Environ.env * specialization_instance =
+    (names : sp_instance_names) : Environ.env * specialization_config * specialization_instance =
   let (func0, args) = check_instance_args env sigma func user_args in
   codegen_define_instance env sigma icommand static_storage func0 args (Some names)
 
@@ -609,7 +613,7 @@ let command_function
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
   let static_storage = match func_mods.func_mods_static with Some false -> false | _ -> true in
-  let (env, sp_inst) = codegen_instance_command env sigma CodeGenFunc static_storage func args names in
+  let (env, sp_cfg, sp_inst) = codegen_instance_command env sigma CodeGenFunc static_storage func args names in
   let cfunc_name = (Option.get sp_inst.sp_interface).sp_cfunc_name in
   codegen_add_header_generation (GenPrototype cfunc_name);
   codegen_add_source_generation (GenFunc cfunc_name)
@@ -1778,13 +1782,13 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args in
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
-  let (env, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
+  let (env, sp_cfg, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
         let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunc in
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
         codegen_define_instance ~cfunc env sigma icommand static_storage func nf_static_args None
     | Some sp_inst ->
-        (env, sp_inst)
+        (env, sp_cfg, sp_inst)
   in
   let sp_interface =
     match sp_inst.sp_interface with

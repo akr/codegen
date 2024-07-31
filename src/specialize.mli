@@ -22,7 +22,7 @@ val codegen_define_instance :
   Constr.t ->
   Constr.t list ->
   State.sp_instance_names option ->
-  Environ.env * State.specialization_instance
+  Environ.env * State.specialization_config * State.specialization_instance
 val command_function :
   Constrexpr.constr_expr ->
   State.sp_instance_names -> func_mods -> unit

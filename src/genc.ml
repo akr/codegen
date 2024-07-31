@@ -2810,12 +2810,12 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
           let sp_cfg = codegen_auto_arguments_internal env sigma func in
           (if List.mem SorD_S sp_cfg.sp_sd_list then
             user_err (Pp.str "[codegen] function has static arguments:" +++ Printer.pr_constr_env env sigma func));
-          let (env, sp_inst) =
+          let (env, sp_cfg, sp_inst) =
             match ConstrMap.find_opt func sp_cfg.sp_instance_map with
             | None ->
                 let static_storage = true in
                 codegen_define_instance env sigma CodeGenFunc static_storage func [] None
-            | Some sp_inst -> (env, sp_inst)
+            | Some sp_inst -> (env, sp_cfg, sp_inst)
           in
           match sp_inst.sp_interface with
           | None -> user_err (Pp.str "[codegen] NoFunc declared function specified:" +++ Printer.pr_constr_env env sigma func)
