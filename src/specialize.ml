@@ -323,7 +323,7 @@ let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
     Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_defined ++ Pp.str "]"))
 
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
-    (f : EConstr.t) (f_type : EConstr.types) (static_args : Constr.t option list) : (Evd.evar_map * Constr.t * EConstr.types) =
+    (f : EConstr.t) (f_type : EConstr.types) (static_args : EConstr.t option list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type static_args =
     match static_args with
     | [] ->
@@ -346,7 +346,7 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
   in
   let sigma0 = sigma in
   let static_args = drop_trailing_none static_args in
-  let t = aux env f f_type (List.map (Option.map EConstr.of_constr) static_args) in
+  let t = aux env f f_type static_args in
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env ~initial:sigma0 sigma t;
   let t = Evarutil.flush_and_check_evars sigma t in
@@ -457,7 +457,7 @@ let declare_definition (env : Environ.env) (sigma : Evd.evar_map) (name : Id.t) 
   let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
   (env, sigma, declared_ctnt)
 
-let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (static_args : EConstr.t option array) : Constr.t * Constr.t option list =
+let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (static_args : EConstr.t option array) : Constr.t * EConstr.t option list =
   let sd_list = CArray.map_to_list
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     static_args
@@ -471,6 +471,7 @@ let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : ECons
       Pp.int (List.length sd_list) ++ Pp.str ")"));
   let args = List.map (Option.map (Reductionops.nf_all env sigma)) (Array.to_list static_args) in
   let args = List.map (Option.map (Evarutil.flush_and_check_evars sigma)) args in
+  let args = List.map (Option.map EConstr.of_constr) args in
   let func0 = EConstr.to_constr sigma func in
   ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
   (func0, args)
@@ -478,7 +479,7 @@ let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : ECons
 let make_presimp_for_instance
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command) (func : EConstr.t) (user_args : EConstr.t option array) (names_opt : sp_instance_names option) :
-      Environ.env * Evd.evar_map * specialization_config * Constr.t option list * Constr.t * Constr.t * (unit -> Id.t) * string =
+      Environ.env * Evd.evar_map * specialization_config * EConstr.t option list * Constr.t * Constr.t * (unit -> Id.t) * string =
   let (func, static_args) = check_instance_args env sigma func user_args in
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
@@ -586,7 +587,7 @@ let codegen_instance_command
   in
   let sp_inst = {
     sp_presimp = presimp;
-    sp_static_arguments = static_args;
+    sp_static_arguments = List.map (Option.map (EConstr.to_constr sigma)) static_args;
     sp_interface = sp_interface;
     sp_icommand = icommand; }
   in
@@ -1783,7 +1784,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
     nf_static_args);
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (_, presimp, _) = build_presimp env sigma efunc efunc_type (CArray.map_to_list (Option.map (EConstr.to_constr sigma)) nf_static_args) in
+  let (_, presimp, _) = build_presimp env sigma efunc efunc_type (Array.to_list nf_static_args) in
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_cfg, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
