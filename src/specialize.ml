@@ -49,6 +49,9 @@ let pr_s_or_d (sd : s_or_d) : Pp.t =
 let drop_trailing_d (sd_list : s_or_d list) : s_or_d list =
   List.fold_right (fun sd l -> match (sd,l) with (SorD_D,[]) -> [] | _ -> sd :: l) sd_list []
 
+let drop_trailing_none (l : 'a option list) : 'a option list =
+  List.fold_right (fun x l -> match (x,l) with (None,[]) -> [] | _ -> x :: l) l []
+
 let pr_constant_or_constructor (env : Environ.env) (func : Constr.t) : Pp.t =
   match Constr.kind func with
   | Const (ctnt, _u) -> Printer.pr_constant env ctnt
@@ -319,27 +322,8 @@ let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
     Pp.str "expected but" +++
     Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_defined ++ Pp.str "]"))
 
-let rec combine_sd_list_and_static_args sd_list static_args =
-  match sd_list, static_args with
-  | [], [] -> []
-  | SorD_S :: sd_list', arg :: static_args' -> Some arg :: combine_sd_list_and_static_args sd_list' static_args'
-  | SorD_D :: sd_list', _ -> None :: combine_sd_list_and_static_args sd_list' static_args
-  | [], _ :: _ -> user_err (Pp.str "[codegen] too many static arguments")
-  | _ :: _, [] -> user_err (Pp.str "[codegen] needs more argument")
-
-let rec partition_sd_list_and_static_args opt_list =
-  match opt_list with
-  | [] -> ([], [])
-  | None :: opt_list' ->
-      let (sd_list, static_args) = partition_sd_list_and_static_args opt_list' in
-      (SorD_D :: sd_list, static_args)
-  | Some arg :: opt_list' ->
-      let (sd_list, static_args) = partition_sd_list_and_static_args opt_list' in
-      (SorD_S :: sd_list, arg :: static_args)
-
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (static_args : Constr.t option list) : (Evd.evar_map * Constr.t * EConstr.types) =
-  let (sd_list, static_args) = partition_sd_list_and_static_args static_args in
   let rec aux env f f_type static_args =
     match static_args with
     | [] ->
@@ -361,8 +345,8 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
         | _ -> user_err (Pp.str "[codegen] needs a function type"))
   in
   let sigma0 = sigma in
-  let sd_list = drop_trailing_d sd_list in
-  let t = aux env f f_type (combine_sd_list_and_static_args sd_list (List.map EConstr.of_constr static_args)) in
+  let static_args = drop_trailing_none static_args in
+  let t = aux env f f_type (List.map (Option.map EConstr.of_constr) static_args) in
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env ~initial:sigma0 sigma t;
   let t = Evarutil.flush_and_check_evars sigma t in
