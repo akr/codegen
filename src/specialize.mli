@@ -13,7 +13,7 @@ val codegen_auto_arguments_internal :
   Environ.env -> Evd.evar_map -> Constr.t -> State.specialization_config
 val command_auto_arguments : Libnames.qualid list -> unit
 val command_test_args : Libnames.qualid -> State.s_or_d list -> unit
-val codegen_define_instance :
+val codegen_instance_command :
   ?cfunc:string ->
   Environ.env ->
   Evd.evar_map ->

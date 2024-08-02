@@ -309,7 +309,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
           match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
           | None ->
               let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
-              let (env, _sp_cfg, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm params0 (Some spi) in
+              let (env, _sp_cfg, _sp_inst) = codegen_instance_command env sigma CodeGenPrimitive false cstrterm params0 (Some spi) in
               (env, cstr_names)
           | Some (_, { sp_interface = None }) ->
               user_err_hov (Pp.str "[codegen] CodeGen IndImp-generating inductive type has a constructor prohibited by CodeGen NoFunc:" +++ Id.print cstr_id);

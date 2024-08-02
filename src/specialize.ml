@@ -564,7 +564,7 @@ let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : ECons
   ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
   (func0, args)
 
-let codegen_define_instance
+let codegen_instance_command
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
@@ -600,15 +600,6 @@ let codegen_define_instance
   in
   register_sp_instance ?cfunc env sigma func presimp sp_cfg sp_inst;
   (env, sp_cfg, sp_inst)
-
-let codegen_instance_command
-    (env : Environ.env) (sigma : Evd.evar_map)
-    (icommand : instance_command)
-    (static_storage : bool)
-    (func : EConstr.t)
-    (user_args : EConstr.t option array)
-    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
-  codegen_define_instance env sigma icommand static_storage func user_args names_opt
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
   let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
@@ -1806,7 +1797,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
     | None ->
         let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunc in
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
-        codegen_define_instance ~cfunc env sigma icommand static_storage efunc nf_static_args None
+        codegen_instance_command ~cfunc env sigma icommand static_storage efunc nf_static_args None
     | Some sp_inst ->
         (env, sp_cfg, sp_inst)
   in
