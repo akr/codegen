@@ -319,38 +319,40 @@ let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
     Pp.str "expected but" +++
     Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_defined ++ Pp.str "]"))
 
+let rec combine_sd_list_and_static_args sd_list static_args =
+  match sd_list, static_args with
+  | [], [] -> []
+  | SorD_S :: sd_list', arg :: static_args' -> Some arg :: combine_sd_list_and_static_args sd_list' static_args'
+  | SorD_D :: sd_list', _ -> None :: combine_sd_list_and_static_args sd_list' static_args
+  | [], _ :: _ -> user_err (Pp.str "[codegen] too many static arguments")
+  | _ :: _, [] -> user_err (Pp.str "[codegen] needs more argument")
+
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
     (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
-  let rec aux env f f_type sd_list static_args =
-    match sd_list with
+  let rec aux env f f_type static_args =
+    match static_args with
     | [] ->
-        if CList.is_empty static_args then
-          f
-        else
-          user_err (Pp.str "[codegen] too many static arguments")
-    | sd :: sd_list' ->
+        f
+    | sd :: static_args' ->
         let f_type = Reductionops.whd_all env sigma f_type in
         (match EConstr.kind sigma f_type with
         | Prod (x,t,c) ->
             (match sd with
-            | SorD_S ->
-                (match static_args with
-                | [] -> user_err (Pp.str "[codegen] needs more argument")
-                | arg :: static_args' ->
-                    let f' = mkApp (f, [| arg |]) in
-                    let f_type' = Termops.prod_applist sigma f_type [arg] in
-                    aux env f' f_type' sd_list' static_args')
-            | SorD_D ->
+            | Some arg ->
+                let f' = mkApp (f, [| arg |]) in
+                let f_type' = Termops.prod_applist sigma f_type [arg] in
+                aux env f' f_type' static_args'
+            | None ->
                 (let f1 = EConstr.Vars.lift 1 f in
                 let f1app = mkApp (f1, [| mkRel 1 |]) in
                 let env = env_push_assum env x t in
-                mkLambda (x, t, aux env f1app c sd_list' static_args)))
+                mkLambda (x, t, aux env f1app c static_args')))
         | _ -> user_err (Pp.str "[codegen] needs a function type"))
   in
   let sigma0 = sigma in
   let sd_list = drop_trailing_d sd_list in
-  let t = aux env f f_type sd_list (List.map EConstr.of_constr static_args) in
+  let t = aux env f f_type (combine_sd_list_and_static_args sd_list (List.map EConstr.of_constr static_args)) in
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env ~initial:sigma0 sigma t;
   let t = Evarutil.flush_and_check_evars sigma t in
