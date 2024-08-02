@@ -606,9 +606,9 @@ let codegen_instance_command
     (static_storage : bool)
     (func : EConstr.t)
     (user_args : EConstr.t option array)
-    (names : sp_instance_names) : Environ.env * specialization_config * specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
   let (func0, args) = check_instance_args env sigma func user_args in
-  codegen_define_instance env sigma icommand static_storage func0 args (Some names)
+  codegen_define_instance env sigma icommand static_storage func0 args names_opt
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
   let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
@@ -632,7 +632,7 @@ let command_function
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
   let static_storage = match func_mods.func_mods_static with Some false -> false | _ -> true in
-  let (env, sp_cfg, sp_inst) = codegen_instance_command env sigma CodeGenFunc static_storage func args names in
+  let (env, sp_cfg, sp_inst) = codegen_instance_command env sigma CodeGenFunc static_storage func args (Some names) in
   let cfunc_name = (Option.get sp_inst.sp_interface).sp_cfunc_name in
   codegen_add_header_generation (GenPrototype cfunc_name);
   codegen_add_source_generation (GenFunc cfunc_name)
@@ -643,7 +643,7 @@ let command_primitive
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  ignore (codegen_instance_command env sigma CodeGenPrimitive false func args names)
+  ignore (codegen_instance_command env sigma CodeGenPrimitive false func args (Some names))
 
 let command_constant
     (user_func_args : Constrexpr.constr_expr)
@@ -654,14 +654,13 @@ let command_constant
   if Array.exists Stdlib.Option.is_none args then
     user_err (Pp.str "[codegen] hole detected. CodeGen Constant cannot take a term with hole:" +++
       Ppconstr.pr_constr_expr env sigma user_func_args);
-  ignore (codegen_instance_command env sigma  CodeGenConstant false func args names)
+  ignore (codegen_instance_command env sigma  CodeGenConstant false func args (Some names))
 
 let command_nofunc (user_func_args : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  let empty_names = { spi_cfunc_name = None; spi_presimp_id = None; spi_simplified_id = None } in
-  ignore (codegen_instance_command env sigma CodeGenNoFunc false func args empty_names)
+  ignore (codegen_instance_command env sigma CodeGenNoFunc false func args None)
 
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
