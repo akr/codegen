@@ -542,13 +542,36 @@ let register_sp_instance ?(cfunc : string option)
   | None, _ -> ());
   ()
 
+let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (user_args : EConstr.t option array)=
+  let sd_list = CArray.map_to_list
+    (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
+    user_args
+  in
+  let static_args = List.filter_map
+    (fun arg -> match arg with None -> None| Some a -> Some a)
+    (Array.to_list user_args)
+  in
+  check_const_or_construct env sigma func;
+  let func_type = Retyping.get_type_of env sigma func in
+  (if num_arguments env sigma func_type < List.length sd_list then
+    user_err (Pp.str "[codegen] too many arguments:" +++
+      Printer.pr_econstr_env env sigma func +++
+      Pp.str "(" ++
+      Pp.int (List.length sd_list) ++ Pp.str ")"));
+  let args = List.map (Reductionops.nf_all env sigma) static_args in
+  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
+  let func0 = EConstr.to_constr sigma func in
+  ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
+  (func0, args)
+
 let codegen_define_instance
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
     (static_storage : bool)
-    (func : Constr.t) (static_args : Constr.t list)
+    (func : EConstr.t) (user_args : EConstr.t option array)
     (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
+  let (func, static_args) = check_instance_args env sigma func user_args in
   let (env, sigma, sp_cfg, presimp, presimp_constr, s_id, cfunc_name) = make_presimp_for_instance env sigma icommand func static_args names_opt in
   let sp_gen =
     match icommand with
@@ -578,28 +601,6 @@ let codegen_define_instance
   register_sp_instance ?cfunc env sigma func presimp sp_cfg sp_inst;
   (env, sp_cfg, sp_inst)
 
-let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (user_args : EConstr.t option array)=
-  let sd_list = CArray.map_to_list
-    (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
-    user_args
-  in
-  let static_args = List.filter_map
-    (fun arg -> match arg with None -> None| Some a -> Some a)
-    (Array.to_list user_args)
-  in
-  check_const_or_construct env sigma func;
-  let func_type = Retyping.get_type_of env sigma func in
-  (if num_arguments env sigma func_type < List.length sd_list then
-    user_err (Pp.str "[codegen] too many arguments:" +++
-      Printer.pr_econstr_env env sigma func +++
-      Pp.str "(" ++
-      Pp.int (List.length sd_list) ++ Pp.str ")"));
-  let args = List.map (Reductionops.nf_all env sigma) static_args in
-  let args = List.map (Evarutil.flush_and_check_evars sigma) args in
-  let func0 = EConstr.to_constr sigma func in
-  ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);
-  (func0, args)
-
 let codegen_instance_command
     (env : Environ.env) (sigma : Evd.evar_map)
     (icommand : instance_command)
@@ -607,8 +608,7 @@ let codegen_instance_command
     (func : EConstr.t)
     (user_args : EConstr.t option array)
     (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
-  let (func0, args) = check_instance_args env sigma func user_args in
-  codegen_define_instance env sigma icommand static_storage func0 args names_opt
+  codegen_define_instance env sigma icommand static_storage func user_args names_opt
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
   let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
@@ -1775,36 +1775,38 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
               Pp.int (Array.length args) ++
               Pp.str ")"));
   let sd_list = List.append sd_list (List.init (Array.length args - List.length sd_list) (fun _ -> SorD_D)) in
-  let static_flags = List.map (fun sd -> sd = SorD_S) sd_list in
-  let nf_static_args = CArray.filter_with static_flags args in (* static arguments are already normalized by normalize_static_arguments *)
-  (Array.iteri (fun i nf_arg ->
-    let fvs = free_variables_index_set env sigma nf_arg in
-    if not (IntSet.is_empty fvs) then
-      user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
-        Printer.pr_constr_env env sigma func ++
-        Pp.str "'s" +++
-        Pp.str (CString.ordinal (i+1)) +++
-        Pp.str "static argument" +++
-        Printer.pr_econstr_env env sigma nf_arg +++
-        Pp.str "refer" +++
-        pp_joinmap_list (Pp.str ",")
-          (fun k ->
-            let decl = Environ.lookup_rel k env in
-            let name = Context.Rel.Declaration.get_name decl in
-            Pp.str (str_of_name_permissive name))
-          (IntSet.elements fvs)
-        ))
+  let nf_static_args = Array.map2 (fun sd arg -> if sd = SorD_S then Some arg else None) (Array.of_list sd_list) args in (* static arguments are already normalized by normalize_static_arguments *)
+  (Array.iteri (fun i nf_arg_opt ->
+    match nf_arg_opt with
+    | None -> ()
+    | Some nf_arg ->
+        let fvs = free_variables_index_set env sigma nf_arg in
+        if not (IntSet.is_empty fvs) then
+          user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
+            Printer.pr_constr_env env sigma func ++
+            Pp.str "'s" +++
+            Pp.str (CString.ordinal (i+1)) +++
+            Pp.str "static argument" +++
+            Printer.pr_econstr_env env sigma nf_arg +++
+            Pp.str "refer" +++
+            pp_joinmap_list (Pp.str ",")
+              (fun k ->
+                let decl = Environ.lookup_rel k env in
+                let name = Context.Rel.Declaration.get_name decl in
+                Pp.str (str_of_name_permissive name))
+              (IntSet.elements fvs)
+            ))
     nf_static_args);
-  let nf_static_args = CArray.map_to_list (EConstr.to_constr sigma) nf_static_args in
+  let nf_static_args0 = List.filter_map (fun arg_opt -> Option.map (EConstr.to_constr sigma) arg_opt) (Array.to_list nf_static_args) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args in
+  let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args0 in
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_cfg, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
         let icommand = if sp_cfg.sp_is_cstr then CodeGenPrimitive else CodeGenFunc in
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
-        codegen_define_instance ~cfunc env sigma icommand static_storage func nf_static_args None
+        codegen_define_instance ~cfunc env sigma icommand static_storage efunc nf_static_args None
     | Some sp_inst ->
         (env, sp_cfg, sp_inst)
   in

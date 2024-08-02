@@ -298,7 +298,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, ind_names) =
     let (env, ind_cstrs) =
-      let params0 = CArray.map_to_list (EConstr.to_constr sigma) params in
+      let params0 = Array.map (fun param -> Some param) params in
       CArray.fold_left_map
         (fun env cstr_names ->
           let { cstr_j; cstr_id; cstr_name; cstr_enum_const; cstr_members } = cstr_names in
@@ -309,7 +309,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
           match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
           | None ->
               let spi = { spi_cfunc_name = Some cstr_name; spi_presimp_id = None; spi_simplified_id = None } in
-              let (env, _sp_cfg, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm0 params0 (Some spi) in
+              let (env, _sp_cfg, _sp_inst) = codegen_define_instance env sigma CodeGenPrimitive false cstrterm params0 (Some spi) in
               (env, cstr_names)
           | Some (_, { sp_interface = None }) ->
               user_err_hov (Pp.str "[codegen] CodeGen IndImp-generating inductive type has a constructor prohibited by CodeGen NoFunc:" +++ Id.print cstr_id);

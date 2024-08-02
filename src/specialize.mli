@@ -19,8 +19,8 @@ val codegen_define_instance :
   Evd.evar_map ->
   State.instance_command ->
   bool ->
-  Constr.t ->
-  Constr.t list ->
+  EConstr.t ->
+  EConstr.t option array ->
   State.sp_instance_names option ->
   Environ.env * State.specialization_config * State.specialization_instance
 val command_function :
