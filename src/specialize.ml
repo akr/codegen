@@ -327,9 +327,19 @@ let rec combine_sd_list_and_static_args sd_list static_args =
   | [], _ :: _ -> user_err (Pp.str "[codegen] too many static arguments")
   | _ :: _, [] -> user_err (Pp.str "[codegen] needs more argument")
 
+let rec partition_sd_list_and_static_args opt_list =
+  match opt_list with
+  | [] -> ([], [])
+  | None :: opt_list' ->
+      let (sd_list, static_args) = partition_sd_list_and_static_args opt_list' in
+      (SorD_D :: sd_list, static_args)
+  | Some arg :: opt_list' ->
+      let (sd_list, static_args) = partition_sd_list_and_static_args opt_list' in
+      (SorD_S :: sd_list, arg :: static_args)
+
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
-    (f : EConstr.t) (f_type : EConstr.types) (sd_list : s_or_d list)
-    (static_args : Constr.t list) : (Evd.evar_map * Constr.t * EConstr.types) =
+    (f : EConstr.t) (f_type : EConstr.types) (static_args : Constr.t option list) : (Evd.evar_map * Constr.t * EConstr.types) =
+  let (sd_list, static_args) = partition_sd_list_and_static_args static_args in
   let rec aux env f f_type static_args =
     match static_args with
     | [] ->
@@ -510,7 +520,7 @@ let make_presimp_for_instance
   end;
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type sp_cfg.sp_sd_list static_args in
+  let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type (combine_sd_list_and_static_args sp_cfg.sp_sd_list static_args) in
   (if (icommand = CodeGenConstant) &&
       not (isInd sigma (fst (decompose_appvect sigma presimp_type))) then
     user_err (Pp.str "[codegen] CodeGen Constant needs a non-function constant:" +++
@@ -1794,7 +1804,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let nf_static_args0 = List.filter_map (fun arg_opt -> Option.map (EConstr.to_constr sigma) arg_opt) (Array.to_list nf_static_args) in
   let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
-  let (_, presimp, _) = build_presimp env sigma efunc efunc_type sd_list nf_static_args0 in
+  let (_, presimp, _) = build_presimp env sigma efunc efunc_type (combine_sd_list_and_static_args sd_list nf_static_args0) in
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
   let (env, sp_cfg, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
