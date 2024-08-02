@@ -239,7 +239,7 @@ type specialization_instance_interface = {
 }
 
 type specialization_instance = {
-  sp_static_arguments : Constr.t list; (* The length should be equal to number of "s" in sp_sd_list *)
+  sp_static_arguments : Constr.t option list; (* The length is equal to the length of sp_sd_list.  SorD_D corresponds None.  SorD_S corresponds (Some static_arg). *)
   sp_presimp : Constr.t; (* The key in sp_instance_map *)
   sp_interface : specialization_instance_interface option; (* None for CodeGenNoFunc. *)
   sp_icommand : instance_command;

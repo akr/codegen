@@ -82,7 +82,7 @@ type specialization_instance_interface = {
   sp_gen : specialization_instance_gen option; (* None for CodeGenPrimitive and CodeGenConstant. Some for CodeGenFunc. *)
 }
 type specialization_instance = {
-  sp_static_arguments : Constr.t list;
+  sp_static_arguments : Constr.t option list;
   sp_presimp : Constr.t;
   sp_interface : specialization_instance_interface option; (* None for CodeGenNoFunc. *)
   sp_icommand : instance_command;
