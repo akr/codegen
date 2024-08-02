@@ -1777,7 +1777,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
             Printer.pr_constr_env env sigma func ++
             Pp.str "'s" +++
             Pp.str (CString.ordinal (i+1)) +++
-            Pp.str "static argument" +++
+            Pp.str "argument" +++
             Printer.pr_econstr_env env sigma nf_arg +++
             Pp.str "refer" +++
             pp_joinmap_list (Pp.str ",")
