@@ -1752,6 +1752,23 @@ let delete_unused_let (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
   check_convertible "specialize" env sigma term result;
   result
 
+let err_static_argument_has_free_variables (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (nf_arg : EConstr.t) (i : int) : unit =
+  let fvs = free_variables_index_set env sigma nf_arg in
+  if not (IntSet.is_empty fvs) then
+    user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
+      Printer.pr_constr_env env sigma func ++
+      Pp.str "'s" +++
+      Pp.str (CString.ordinal (i+1)) +++
+      Pp.str "argument" +++
+      Printer.pr_econstr_env env sigma nf_arg +++
+      Pp.str "refer" +++
+      pp_joinmap_list (Pp.str ",")
+        (fun k ->
+          let decl = Environ.lookup_rel k env in
+          let name = Context.Rel.Declaration.get_name decl in
+          Pp.str (str_of_name_permissive name))
+        (IntSet.elements fvs))
+
 (* func must be a constant or constructor *)
 let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (args : EConstr.t array) : Environ.env * EConstr.t * string =
   (* msg_info_hov (Pp.str "[codegen] replace_app:" +++ Printer.pr_econstr_env env sigma (mkApp ((EConstr.of_constr func), args))); *)
@@ -1770,23 +1787,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   (Array.iteri (fun i nf_arg_opt ->
     match nf_arg_opt with
     | None -> ()
-    | Some nf_arg ->
-        let fvs = free_variables_index_set env sigma nf_arg in
-        if not (IntSet.is_empty fvs) then
-          user_err (Pp.str "[codegen] Free variable found in a static argument:" +++
-            Printer.pr_constr_env env sigma func ++
-            Pp.str "'s" +++
-            Pp.str (CString.ordinal (i+1)) +++
-            Pp.str "argument" +++
-            Printer.pr_econstr_env env sigma nf_arg +++
-            Pp.str "refer" +++
-            pp_joinmap_list (Pp.str ",")
-              (fun k ->
-                let decl = Environ.lookup_rel k env in
-                let name = Context.Rel.Declaration.get_name decl in
-                Pp.str (str_of_name_permissive name))
-              (IntSet.elements fvs)
-            ))
+    | Some nf_arg -> if not (Vars.closed0 sigma nf_arg) then err_static_argument_has_free_variables env sigma func nf_arg i)
     nf_static_args);
   let nf_static_args0 = List.filter_map (fun arg_opt -> Option.map (EConstr.to_constr sigma) arg_opt) (Array.to_list nf_static_args) in
   let efunc = EConstr.of_constr func in
