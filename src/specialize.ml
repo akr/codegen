@@ -478,9 +478,9 @@ let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : ECons
 
 let make_presimp_for_instance
     (env : Environ.env) (sigma : Evd.evar_map)
-    (icommand : instance_command) (func : EConstr.t) (user_args : EConstr.t option array) (names_opt : sp_instance_names option) :
+    (icommand : instance_command) (efunc : EConstr.t) (user_args : EConstr.t option array) (names_opt : sp_instance_names option) :
       Environ.env * Evd.evar_map * specialization_config * EConstr.t option list * Constr.t * Constr.t * (unit -> Id.t) * string =
-  let (func, static_args) = check_instance_args env sigma func user_args in
+  let (func, static_args) = check_instance_args env sigma efunc user_args in
   let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
@@ -499,7 +499,6 @@ let make_presimp_for_instance
                     Printer.pr_constr_env env sigma func)
     | CodeGenNoFunc -> ()
   end;
-  let efunc = EConstr.of_constr func in
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (sigma, presimp, presimp_type) = build_presimp env sigma efunc efunc_type static_args in
   (if (icommand = CodeGenConstant) &&
