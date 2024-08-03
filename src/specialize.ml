@@ -457,11 +457,13 @@ let declare_definition (env : Environ.env) (sigma : Evd.evar_map) (name : Id.t) 
   let declared_ctnt = EConstr.to_constr sigma declared_ctnt in
   (env, sigma, declared_ctnt)
 
-let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (static_args : EConstr.t option array) : Constr.t * EConstr.t option list =
-  let sd_list = CArray.map_to_list
+let make_sd_list (static_args : EConstr.t option array) : s_or_d list =
+  CArray.map_to_list
     (fun arg -> match arg with None -> SorD_D | Some _ -> SorD_S)
     static_args
-  in
+
+let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : EConstr.t) (static_args : EConstr.t option array) : Constr.t * EConstr.t option list =
+  let sd_list = make_sd_list static_args in
   check_const_or_construct env sigma func;
   let func_type = Retyping.get_type_of env sigma func in
   (if num_arguments env sigma func_type < List.length sd_list then
