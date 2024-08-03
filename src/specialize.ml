@@ -231,7 +231,7 @@ let type_can_be_monomorphic (env : Environ.env) (sigma : Evd.evar_map)  (ty : EC
         else
           (* This variable is bound in this type.
             It means that this type is polymorphic.
-            Thus codegen treat it as static because codegen generates monomorpic code. *)
+            Thus codegen treat it as static because codegen generates monomorphic code. *)
           false
     | _ ->
         (* This type contains a complex expression.
