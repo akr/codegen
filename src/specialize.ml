@@ -559,6 +559,27 @@ let register_sp_instance ?(cfunc : string option)
   | None, _ -> ());
   ()
 
+let make_sp_gen (static_storage : bool) (s_id : unit -> Id.t) : specialization_instance_gen =
+  {
+    sp_static_storage = static_storage;
+    sp_simplified_status = SpExpectedId (s_id ());
+  }
+
+let make_sp_interface (presimp_constr : Constr.t) (cfunc_name : string) (sp_gen : specialization_instance_gen option) : specialization_instance_interface =
+  {
+    sp_presimp_constr = presimp_constr;
+    sp_cfunc_name = cfunc_name;
+    sp_gen = sp_gen;
+  }
+
+let make_sp_inst (sigma : Evd.evar_map) (presimp : Constr.t) (static_args : EConstr.t option list) (sp_interface : specialization_instance_interface option) (icommand : instance_command) : specialization_instance =
+  {
+    sp_presimp = presimp;
+    sp_static_arguments = List.map (Option.map (EConstr.to_constr sigma)) static_args;
+    sp_interface = sp_interface;
+    sp_icommand = icommand;
+  }
+
 let codegen_instance_command
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
@@ -569,29 +590,15 @@ let codegen_instance_command
   let (env, sigma, sp_cfg, static_args, presimp, presimp_constr, s_id, cfunc_name) = make_presimp_for_instance env sigma icommand func user_args names_opt in
   let sp_gen =
     match icommand with
-    | CodeGenFunc ->
-        Some {
-          sp_static_storage = static_storage;
-          sp_simplified_status = SpExpectedId (s_id ());
-        }
+    | CodeGenFunc -> Some (make_sp_gen static_storage s_id)
     | CodeGenPrimitive | CodeGenConstant | CodeGenNoFunc -> None
   in
   let sp_interface =
     match icommand with
-    | CodeGenFunc | CodeGenPrimitive | CodeGenConstant ->
-        Some {
-          sp_presimp_constr = presimp_constr;
-          sp_cfunc_name = cfunc_name;
-          sp_gen = sp_gen;
-        }
+    | CodeGenFunc | CodeGenPrimitive | CodeGenConstant -> Some (make_sp_interface presimp_constr cfunc_name sp_gen)
     | CodeGenNoFunc -> None
   in
-  let sp_inst = {
-    sp_presimp = presimp;
-    sp_static_arguments = List.map (Option.map (EConstr.to_constr sigma)) static_args;
-    sp_interface = sp_interface;
-    sp_icommand = icommand; }
-  in
+  let sp_inst = make_sp_inst sigma presimp static_args sp_interface icommand in
   register_sp_instance ?cfunc env sigma (EConstr.to_constr sigma func) presimp sp_cfg sp_inst;
   (env, sp_cfg, sp_inst)
 
