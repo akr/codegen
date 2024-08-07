@@ -30,7 +30,7 @@ val codegen_instance_command_constant :
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
-  Environ.env * State.specialization_config * State.specialization_instance
+  Environ.env * State.specialization_config * State.specialization_instance * State.specialization_instance_interface
 val codegen_instance_command_primitive :
   ?cfunc:string ->
   Environ.env ->
@@ -39,7 +39,7 @@ val codegen_instance_command_primitive :
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
-  Environ.env * State.specialization_config * State.specialization_instance
+  Environ.env * State.specialization_config * State.specialization_instance * State.specialization_instance_interface
 val codegen_instance_command_func :
   ?cfunc:string ->
   Environ.env ->
@@ -48,8 +48,7 @@ val codegen_instance_command_func :
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
-  Environ.env * State.specialization_config * State.specialization_instance
-
+  Environ.env * State.specialization_config * State.specialization_instance * State.specialization_instance_interface * State.specialization_instance_gen
 
 val command_function :
   Constrexpr.constr_expr ->

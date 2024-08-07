@@ -597,40 +597,40 @@ let codegen_instance_command_constant
     (env : Environ.env) (sigma : Evd.evar_map)
     (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
-    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance * specialization_instance_interface =
   let icommand = CodeGenConstant in
   let (env, sigma, sp_cfg, static_args, presimp, presimp_constr, s_id, cfunc_name) = make_presimp_for_instance env sigma icommand func user_args names_opt in
   let sp_interface = make_sp_interface presimp_constr cfunc_name None in
   let sp_inst = make_sp_inst sigma presimp static_args (Some sp_interface) icommand in
   register_sp_instance ?cfunc env sigma (EConstr.to_constr sigma func) presimp sp_cfg sp_inst;
-  (env, sp_cfg, sp_inst)
+  (env, sp_cfg, sp_inst, sp_interface)
 
 let codegen_instance_command_primitive
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
-    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance * specialization_instance_interface =
   let icommand = CodeGenPrimitive in
   let (env, sigma, sp_cfg, static_args, presimp, presimp_constr, s_id, cfunc_name) = make_presimp_for_instance env sigma icommand func user_args names_opt in
   let sp_interface = make_sp_interface presimp_constr cfunc_name None in
   let sp_inst = make_sp_inst sigma presimp static_args (Some sp_interface) icommand in
   register_sp_instance ?cfunc env sigma (EConstr.to_constr sigma func) presimp sp_cfg sp_inst;
-  (env, sp_cfg, sp_inst)
+  (env, sp_cfg, sp_inst, sp_interface)
 
 let codegen_instance_command_func
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
     (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
-    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
+    (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen =
   let icommand = CodeGenFunc in
   let (env, sigma, sp_cfg, static_args, presimp, presimp_constr, s_id, cfunc_name) = make_presimp_for_instance env sigma icommand func user_args names_opt in
   let sp_gen = make_sp_gen static_storage s_id in
   let sp_interface = make_sp_interface presimp_constr cfunc_name (Some sp_gen) in
   let sp_inst = make_sp_inst sigma presimp static_args (Some sp_interface) icommand in
   register_sp_instance ?cfunc env sigma (EConstr.to_constr sigma func) presimp sp_cfg sp_inst;
-  (env, sp_cfg, sp_inst)
+  (env, sp_cfg, sp_inst, sp_interface, sp_gen)
 
 let detect_holes (env : Environ.env) (sigma0 : Evd.evar_map) (user_func_args : Constrexpr.constr_expr) : Evd.evar_map * EConstr.t * EConstr.t option array =
   let (sigma, func_args) = Constrintern.interp_constr_evars env sigma0 user_func_args in
@@ -654,8 +654,8 @@ let command_function
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
   let static_storage = match func_mods.func_mods_static with Some false -> false | _ -> true in
-  let (env, sp_cfg, sp_inst) = codegen_instance_command_func env sigma static_storage func args (Some names) in
-  let cfunc_name = (Option.get sp_inst.sp_interface).sp_cfunc_name in
+  let (env, sp_cfg, sp_inst, sp_interface, sp_gen) = codegen_instance_command_func env sigma static_storage func args (Some names) in
+  let cfunc_name = sp_interface.sp_cfunc_name in
   codegen_add_header_generation (GenPrototype cfunc_name);
   codegen_add_source_generation (GenFunc cfunc_name)
 
@@ -1824,20 +1824,18 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
   let efunc_type = Retyping.get_type_of env sigma efunc in
   let (_, presimp, _) = build_presimp env sigma efunc efunc_type (Array.to_list nf_static_args) in
   (*msg_info_hov (Pp.str "[codegen] replace presimp:" +++ Printer.pr_constr_env env sigma presimp);*)
-  let (env, sp_cfg, sp_inst) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
+  let (env, sp_cfg, sp_inst, sp_interface) = match ConstrMap.find_opt presimp sp_cfg.sp_instance_map with
     | None ->
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
         if sp_cfg.sp_is_cstr then
           codegen_instance_command_primitive ~cfunc env sigma static_storage efunc nf_static_args None
         else
-          codegen_instance_command_func ~cfunc env sigma static_storage efunc nf_static_args None
+          let (env, sp_cfg, sp_inst, sp_interface, sp_gen) = codegen_instance_command_func ~cfunc env sigma static_storage efunc nf_static_args None in
+          (env, sp_cfg, sp_inst, sp_interface)
     | Some sp_inst ->
-        (env, sp_cfg, sp_inst)
-  in
-  let sp_interface =
-    match sp_inst.sp_interface with
-    | None -> user_err (Pp.str "[codegen] NoFunc declared function used:" +++ Printer.pr_constr_env env sigma presimp);
-    | Some sp_interface -> sp_interface
+        match sp_inst with
+        | { sp_interface = None } -> user_err (Pp.str "[codegen] NoFunc declared function used:" +++ Printer.pr_constr_env env sigma presimp);
+        | { sp_interface = Some sp_interface } -> (env, sp_cfg, sp_inst, sp_interface)
   in
   let sp_ctnt = sp_interface.sp_presimp_constr in
   let dynamic_flags = List.map (fun sd -> sd = SorD_D) sd_list in

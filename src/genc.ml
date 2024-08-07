@@ -2814,7 +2814,8 @@ let command_gen (cfunc_names : string_or_qualid list) : unit =
             match ConstrMap.find_opt func sp_cfg.sp_instance_map with
             | None ->
                 let static_storage = true in
-                codegen_instance_command_func env sigma static_storage (EConstr.of_constr func) [||] None
+                let (env, sp_cfg, sp_inst, sp_interface, sp_gen) = codegen_instance_command_func env sigma static_storage (EConstr.of_constr func) [||] None in
+                (env, sp_cfg, sp_inst)
             | Some sp_inst -> (env, sp_cfg, sp_inst)
           in
           match sp_inst.sp_interface with
