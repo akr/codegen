@@ -13,16 +13,44 @@ val codegen_auto_arguments_internal :
   Environ.env -> Evd.evar_map -> Constr.t -> State.specialization_config
 val command_auto_arguments : Libnames.qualid list -> unit
 val command_test_args : Libnames.qualid -> State.s_or_d list -> unit
-val codegen_instance_command :
+val codegen_instance_command_nofunc :
   ?cfunc:string ->
   Environ.env ->
   Evd.evar_map ->
-  State.instance_command ->
   bool ->
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
   Environ.env * State.specialization_config * State.specialization_instance
+val codegen_instance_command_constant :
+  ?cfunc:string ->
+  Environ.env ->
+  Evd.evar_map ->
+  bool ->
+  EConstr.t ->
+  EConstr.t option array ->
+  State.sp_instance_names option ->
+  Environ.env * State.specialization_config * State.specialization_instance
+val codegen_instance_command_primitive :
+  ?cfunc:string ->
+  Environ.env ->
+  Evd.evar_map ->
+  bool ->
+  EConstr.t ->
+  EConstr.t option array ->
+  State.sp_instance_names option ->
+  Environ.env * State.specialization_config * State.specialization_instance
+val codegen_instance_command_func :
+  ?cfunc:string ->
+  Environ.env ->
+  Evd.evar_map ->
+  bool ->
+  EConstr.t ->
+  EConstr.t option array ->
+  State.sp_instance_names option ->
+  Environ.env * State.specialization_config * State.specialization_instance
+
+
 val command_function :
   Constrexpr.constr_expr ->
   State.sp_instance_names -> func_mods -> unit
