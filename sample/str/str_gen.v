@@ -10,6 +10,8 @@ CodeGen SourceFile "str.c".
 
 CodeGen HeaderSnippet "prologue" "
 #ifdef STR_H
+#include <stdbool.h>
+#include <string.h>
 #include ""nat.h""
 #include ""ascii.h""
 ".
@@ -23,6 +25,7 @@ typedef struct {
 #define str_head(x) (*(x).ptr)
 static inline str_t str_tail(str_t x) { return (str_t){ x.ptr+1, x.size-1 }; }
 #define str_empty() ((str_t){ (unsigned char *)0, 0 })
+static inline bool eqstr(str_t x, str_t y) { return x.size == y.size && memcmp(x.ptr, y.ptr, x.size) == 0; }
 ".
 
 
