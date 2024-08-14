@@ -21,6 +21,7 @@ CodeGen HeaderSnippet "func_impls" "
 #define ascii_cstr(b0, b1, b2, b3, b4, b5, b6, b7) \
   (((b0)     ) | ((b1) << 1) | ((b2) << 2) | ((b3) << 3) | \
    ((b4) << 4) | ((b5) << 5) | ((b6) << 6) | ((b7) << 7))
+#define eqascii(a, b) ((a) == (b))
 ".
 
 CodeGen Snippet "prologue" "#include ""ascii.h""".
