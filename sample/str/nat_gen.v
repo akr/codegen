@@ -6,7 +6,8 @@ CodeGen HeaderFile "nat.h".
 CodeGen SourceFile "nat.c".
 
 CodeGen HeaderSnippet "prologue" "
-#ifdef NAT_H
+#ifndef NAT_H
+#define NAT_H
 #include <stdint.h> /* uint64_t */
 ".
 

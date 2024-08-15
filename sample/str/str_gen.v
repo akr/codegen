@@ -9,7 +9,8 @@ CodeGen HeaderFile "str.h".
 CodeGen SourceFile "str.c".
 
 CodeGen HeaderSnippet "prologue" "
-#ifdef STR_H
+#ifndef STR_H
+#define STR_H
 #include <stdbool.h>
 #include <string.h>
 #include ""nat.h""
@@ -29,6 +30,8 @@ static inline bool eqstr(str_t x, str_t y) { return x.size == y.size && memcmp(x
 static inline str_t takestr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr, s.size-n }; }
 static inline str_t dropstr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr+n, s.size-n }; }
 ".
+
+CodeGen Snippet "prologue" "#include ""str.h""".
 
 Fixpoint mystrlen (x : string) : nat :=
   match x with
