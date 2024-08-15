@@ -50,3 +50,10 @@ Proof.
 Qed.
 
 HB.instance Definition _ := hasDecEq.Build string eqstrP.
+
+Definition takestr (n : nat) (s : string) : string :=
+  str_of_seq (take n (seq_of_str s)).
+
+Definition dropstr (n : nat) (s : string) : string :=
+  str_of_seq (drop n (seq_of_str s)).
+

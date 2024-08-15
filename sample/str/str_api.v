@@ -15,3 +15,5 @@ CodeGen Primitive EmptyString => "str_empty".
 CodeGen NoFunc String.
 
 CodeGen Primitive eqstr => "eqstr".
+CodeGen Primitive takestr => "takestr".
+CodeGen Primitive dropstr => "dropstr".
