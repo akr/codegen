@@ -57,3 +57,8 @@ Definition takestr (n : nat) (s : string) : string :=
 Definition dropstr (n : nat) (s : string) : string :=
   str_of_seq (drop n (seq_of_str s)).
 
+Definition takestrr (n : nat) (s : string) : string :=
+  str_of_seq (drop (size s - n) (seq_of_str s)).
+
+Definition dropstrr (n : nat) (s : string) : string :=
+  str_of_seq (take (size s - n) (seq_of_str s)).

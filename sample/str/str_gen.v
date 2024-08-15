@@ -29,6 +29,8 @@ static inline str_t str_tail(str_t x) { return (str_t){ x.ptr+1, x.size-1 }; }
 static inline bool eqstr(str_t x, str_t y) { return x.size == y.size && memcmp(x.ptr, y.ptr, x.size) == 0; }
 static inline str_t takestr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr, n }; }
 static inline str_t dropstr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr+n, s.size-n }; }
+static inline str_t takestrr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr+(s.size-n), n }; }
+static inline str_t dropstrr(nat n, str_t s) { if (s.size < n) n = s.size; return (str_t){ s.ptr, s.size-n }; }
 ".
 
 CodeGen Snippet "prologue" "#include ""str.h""".
