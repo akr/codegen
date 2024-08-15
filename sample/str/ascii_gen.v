@@ -8,6 +8,7 @@ CodeGen SourceFile "ascii.c".
 CodeGen HeaderSnippet "prologue" "
 #ifndef ASCII_H
 #define ASCII_H
+#include <stdint.h>
 ".
 
 CodeGen HeaderSnippet "func_impls" "
