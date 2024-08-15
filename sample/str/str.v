@@ -3,7 +3,7 @@ From HB Require Import structures.
 
 Require Import nat.
 Require Import ascii.
-
+Require Ascii.
 Require Import String.
 (*
 Inductive string : Set :=
@@ -50,6 +50,9 @@ Proof.
 Qed.
 
 HB.instance Definition _ := hasDecEq.Build string eqstrP.
+
+Definition nthstr (s : string) (i : nat) : Ascii.ascii :=
+  nth Ascii.zero (seq_of_str s) i.
 
 Definition takestr (n : nat) (s : string) : string :=
   str_of_seq (take n (seq_of_str s)).
