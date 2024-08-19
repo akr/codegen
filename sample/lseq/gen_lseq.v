@@ -15,7 +15,7 @@ CodeGen HeaderSnippet "prologue" "#define LSEQ_H".
 CodeGen Snippet "prologue" "#include ""lseq.h""".
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => "" with
+CodeGen InductiveMatch bool with
 | true => case ""
 | false => case "0".
 CodeGen Constant true => "true".
@@ -26,7 +26,7 @@ CodeGen HeaderSnippet "prologue" "
 ".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => "" with
+CodeGen InductiveMatch nat with
 | O => case "0"
 | S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".

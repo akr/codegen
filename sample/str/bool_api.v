@@ -3,7 +3,7 @@ Require Import codegen.codegen.
 Require Import bool.
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => "" with
+CodeGen InductiveMatch bool with
 | true => case "true"
 | false => case "false".
 CodeGen Constant true => "true".

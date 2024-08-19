@@ -2,14 +2,14 @@ From mathcomp Require Import ssreflect ssrbool eqtype ssrfun ssrnat seq.
 Require Import codegen.codegen.
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => "" with
+CodeGen InductiveMatch bool with
 | true => ""
 | false => "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => "" with
+CodeGen InductiveMatch nat with
 | O => "0"
 | S => "" "predn".
 CodeGen Constant O => "0".
@@ -28,7 +28,7 @@ CodeGen SimplifyFunction "non_mangled_code".
 Print non_mangled_code_s.
 
 CodeGen InductiveType bool*bool => "pair_bool_bool".
-CodeGen InductiveMatch bool*bool => "" with
+CodeGen InductiveMatch bool*bool with
 | pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
 CodeGen Primitive pair bool bool => "make_pair_bool_bool".
 

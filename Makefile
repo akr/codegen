@@ -50,6 +50,7 @@ check checker:
 	cd test; $(MAKE) $@
 
 run-sample:
+	coqtop -batch -l sample/ind.v
 	coqc -Q theories codegen -I src sample/pow.v
 	gcc -g -Wall sample/pow.c -o sample/pow
 	sample/pow

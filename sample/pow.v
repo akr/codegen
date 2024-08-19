@@ -23,7 +23,7 @@ Fixpoint fastpow_iter a k x :=
 Definition fastpow a k := fastpow_iter a k 1.
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => "" with
+CodeGen InductiveMatch bool with
 | true => case ""
 | false => case "0".
 CodeGen Constant true => "true".
@@ -36,7 +36,7 @@ CodeGen Snippet "prologue" "
 ".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => "" with
+CodeGen InductiveMatch nat with
 | O => case "0"
 | S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".

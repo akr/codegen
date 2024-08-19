@@ -3,7 +3,7 @@ Require Import codegen.codegen.
 Require Import nat.
 
 CodeGen InductiveType nat => "uint64_t".
-CodeGen InductiveMatch nat => "" with
+CodeGen InductiveMatch nat with
 | O => case "0"
 | S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".

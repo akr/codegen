@@ -48,7 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
-  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] )* )?.
+  CodeGen InductiveMatch COQ_TYPE [ => "C_SWFUNC" ] ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] )* )?.
   CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
@@ -63,21 +63,21 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Example:
 
   CodeGen InductiveType bool => "bool".
-  CodeGen InductiveMatch bool => "" | true => case "" | false => case "0".
+  CodeGen InductiveMatch bool with true => case "" | false => case "0".
   CodeGen Primitive true => "true".
   CodeGen Primitive false => "false".
   Print CodeGen Inductive bool.
 
   CodeGen InductiveType nat => "uint64_t".
-  CodeGen InductiveMatch nat => "" | O => case "0" | S => case "" accessor "pred".
+  CodeGen InductiveMatch nat with O => case "0" | S => case "" accessor "pred".
   CodeGen Primitive O => "0".
   CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
   CodeGen InductiveType option bool => "int".
-  CodeGen InductiveMatch option bool => "" | None => case "-1" | Some => case "" accessor "".
-  CodeGen Primitive None bool => "(-1)".
-  CodeGen Primitive Some bool => "(int)".
+  CodeGen InductiveMatch option bool with None => case "-1" | Some => case "" accessor "".
+  CodeGen Primitive @None bool => "(-1)".
+  CodeGen Primitive @Some bool => "(int)".
   Print CodeGen Inductive (option bool).
 
   Print CodeGen Inductive.
@@ -232,6 +232,10 @@ VERNAC ARGUMENT EXTEND func_mods
 | [] -> { func_mods_empty }
 END
 
+VERNAC ARGUMENT EXTEND indmatch_swfunc
+| [ "=>" string(swfunc) ] -> { swfunc }
+END
+
 VERNAC ARGUMENT EXTEND indmatch_cstrs
 | [ "with" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
 | [ "with" "|" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
@@ -280,8 +284,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
       { command_ind_type coq_type (simple_c_type c_type) }
 
-    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) "=>" string(swfunc) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
-      { command_ind_match coq_type swfunc cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indmatch_swfunc_opt(swfunc) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
+      { command_ind_match coq_type (Stdlib.Option.value swfunc ~default:"") cstr_caselabel_accesors_list }
 
     | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) indimp_cstrs(dealloc_cstr_deallocator_list) ] ->
       { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }

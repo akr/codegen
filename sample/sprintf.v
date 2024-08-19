@@ -81,14 +81,14 @@ Require Import codegen.codegen.
 CodeGen SourceFile "sample/sprintf_generated.c".
 
 CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool => "" with
+CodeGen InductiveMatch bool with
 | true => case ""
 | false => case "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
 CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat => "" with
+CodeGen InductiveMatch nat with
 | O => case "0"
 | S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".
