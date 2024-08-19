@@ -24,8 +24,8 @@ Definition fastpow a k := fastpow_iter a k 1.
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => "" with
-| true => ""
-| false => "0".
+| true => case ""
+| false => case "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
@@ -37,8 +37,8 @@ CodeGen Snippet "prologue" "
 
 CodeGen InductiveType nat => "nat".
 CodeGen InductiveMatch nat => "" with
-| O => "0"
-| S => "" "nat_pred".
+| O => case "0"
+| S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 

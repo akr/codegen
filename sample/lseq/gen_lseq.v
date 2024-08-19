@@ -16,8 +16,8 @@ CodeGen Snippet "prologue" "#include ""lseq.h""".
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => "" with
-| true => ""
-| false => "0".
+| true => case ""
+| false => case "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
@@ -27,8 +27,8 @@ CodeGen HeaderSnippet "prologue" "
 
 CodeGen InductiveType nat => "nat".
 CodeGen InductiveMatch nat => "" with
-| O => "0"
-| S => "" "nat_pred".
+| O => case "0"
+| S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 
@@ -82,8 +82,8 @@ CodeGen Snippet "prologue" "
 
 CodeGen InductiveType lseq bool => "lseq_bool".
 CodeGen InductiveMatch lseq bool => "lseq_bool_sw" with
-| lnil => "lseq_bool_nil_tag"
-| lcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
+| lnil => case "lseq_bool_nil_tag"
+| lcons => case "lseq_bool_cons_tag" accessor "lseq_bool_head" "lseq_bool_tail".
 CodeGen Primitive @lnil bool => "lseq_bool_nil".
 CodeGen Primitive @lcons bool => "lseq_bool_cons".
 CodeGen IndImp lseq bool
@@ -103,8 +103,8 @@ CodeGen Func @lseq_consume bool => "lseq_consume_bool" where static off.
 
 CodeGen InductiveType bseq bool => "lseq_bool".
 CodeGen InductiveMatch bseq bool => "lseq_bool_sw" with
-| bnil => "lseq_bool_nil_tag"
-| bcons => "lseq_bool_cons_tag" "lseq_bool_head" "lseq_bool_tail".
+| bnil => case "lseq_bool_nil_tag"
+| bcons => case "lseq_bool_cons_tag" accessor "lseq_bool_head" "lseq_bool_tail".
 
 
 CodeGen Func @lncons bool => "lncons_bool" where static off.

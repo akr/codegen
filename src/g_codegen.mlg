@@ -48,7 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
-  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( with ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )* )?.
+  CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] )* )?.
   CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
@@ -63,19 +63,19 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
   Example:
 
   CodeGen InductiveType bool => "bool".
-  CodeGen InductiveMatch bool => "" | true => "" | false => "0".
+  CodeGen InductiveMatch bool => "" | true => case "" | false => case "0".
   CodeGen Primitive true => "true".
   CodeGen Primitive false => "false".
   Print CodeGen Inductive bool.
 
   CodeGen InductiveType nat => "uint64_t".
-  CodeGen InductiveMatch nat => "" | O "0" | S "" "pred".
+  CodeGen InductiveMatch nat => "" | O => case "0" | S => case "" accessor "pred".
   CodeGen Primitive O => "0".
   CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
   CodeGen InductiveType option bool => "int".
-  CodeGen InductiveMatch option bool => "" | None => "-1" | Some => "" "".
+  CodeGen InductiveMatch option bool => "" | None => case "-1" | Some => case "" accessor "".
   CodeGen Primitive None bool => "(-1)".
   CodeGen Primitive Some bool => "(int)".
   Print CodeGen Inductive (option bool).
@@ -151,8 +151,11 @@ VERNAC ARGUMENT EXTEND where_or_and
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
-| [ ident(cstr_id) "=>" string(cstr_caselabel) string_list(cstr_accessors) ] ->
-  { { cstr_id; cstr_caselabel; cstr_accessors } }
+| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) "accessor" string_list(cstr_accessors) ] -> { { cstr_id; cstr_caselabel; cstr_accessors } }
+| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=[] } }
+| [ ident(cstr_id) "=>" "accessor" string_list(cstr_accessors) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors } }
+| [ ident(cstr_id) "=>" ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[] } }
+| [ ident(cstr_id) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[] } }
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator

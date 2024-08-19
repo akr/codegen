@@ -4,8 +4,8 @@ Require Import nat.
 
 CodeGen InductiveType nat => "uint64_t".
 CodeGen InductiveMatch nat => "" with
-| O => "0"
-| S => "" "nat_pred".
+| O => case "0"
+| S => case "" accessor "nat_pred".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "nat_succ".
 

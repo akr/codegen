@@ -4,8 +4,8 @@ Require Import bool.
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool => "" with
-| true => "true"
-| false => "false".
+| true => case "true"
+| false => case "false".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
