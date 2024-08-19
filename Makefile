@@ -51,6 +51,7 @@ check checker:
 
 run-sample:
 	coqtop -batch -l sample/ind.v
+	coqtop -batch -l sample/genc.v
 	coqc -Q theories codegen -I src sample/pow.v
 	gcc -g -Wall sample/pow.c -o sample/pow
 	sample/pow

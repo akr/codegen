@@ -3,15 +3,15 @@ Require Import codegen.codegen.
 
 CodeGen InductiveType bool => "bool".
 CodeGen InductiveMatch bool with
-| true => ""
-| false => "0".
+| true => case ""
+| false => case "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
 CodeGen InductiveType nat => "nat".
 CodeGen InductiveMatch nat with
-| O => "0"
-| S => "" "predn".
+| O => case "0"
+| S => case "" accessor "predn".
 CodeGen Constant O => "0".
 CodeGen Primitive S => "succn".
 
@@ -29,12 +29,12 @@ Print non_mangled_code_s.
 
 CodeGen InductiveType bool*bool => "pair_bool_bool".
 CodeGen InductiveMatch bool*bool with
-| pair => "" "pair_bool_bool_fst" "pair_bool_bool_snd".
-CodeGen Primitive pair bool bool => "make_pair_bool_bool".
+| pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
+CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
 
 Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
 Definition swap_bb p := @swap bool bool p.
-CodeGen Func swap bool bool => "swap" swap_p swap_s.
+CodeGen Func @swap bool bool => "swap" swap_p swap_s.
 CodeGen Func swap_bb => swap_bb_p swap_bb_s.
 CodeGen SimplifyFunction "swap_bb".
 CodeGen SimplifyFunction "swap".
