@@ -265,7 +265,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
     in
     { ind_names with ind_name }
   in
-  (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => "C_CASELABEL" "C_ACCESSOR"* )* *)
+  (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => case "C_CASELABEL" accessor "C_ACCESSOR"* )* *)
   let ind_names =
     match ind_cfg_opt with
     | Some { c_swfunc=Some swfunc; cstr_configs=cstr_cfgs } ->
@@ -274,21 +274,21 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
           ind_cstrs=
             ind_names.ind_cstrs |> Array.map (fun cstr_names ->
               let cstr_cfg =
-                match cstr_cfgs |> array_find_opt (fun { coq_cstr } -> Id.equal coq_cstr cstr_names.cstr_id) with
+                match cstr_cfgs |> array_find_opt (fun { State.cstr_id=coq_cstr } -> Id.equal coq_cstr cstr_names.cstr_id) with
                 | None -> user_err_hov (Pp.str "[codegen] constuctor configuration not found:" +++ Id.print cstr_names.cstr_id)
                 | Some cstr_cfg -> cstr_cfg
               in
-              (* xxx: check c_caselabel is not empty string *)
+              (* xxx: check cstr_caselabel is not empty string *)
               { cstr_names with
-                cstr_enum_const=cstr_cfg.c_caselabel;
+                cstr_enum_const=cstr_cfg.cstr_caselabel;
                 cstr_members=
                   List.map2 (fun member_names accessor -> { member_names with member_accessor = accessor })
-                    cstr_names.cstr_members (Array.to_list cstr_cfg.c_accessors) }) }
+                    cstr_names.cstr_members (Array.to_list cstr_cfg.cstr_accessors) }) }
     | _ ->
         let cstr_caselabel_accessors_ary =
           ind_names.ind_cstrs |> Array.map (fun { cstr_id; cstr_enum_const; cstr_members } ->
             let caselabel = cstr_enum_const in
-            let accessors = List.map (fun { member_accessor } -> member_accessor) cstr_members in
+            let accessors = CArray.map_of_list (fun { member_accessor } -> member_accessor) cstr_members in
             { cstr_id; cstr_caselabel=caselabel; cstr_accessors=accessors })
         in
         let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
@@ -320,13 +320,13 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
               let (cstr_enum_const, cstr_members) =
                 match ind_cfg_opt with
                 | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
-                    (match array_find_opt (fun { coq_cstr } -> Id.equal coq_cstr cstr_id ) cstr_cfgs with
-                    | Some { c_caselabel; c_accessors } ->
+                    (match array_find_opt (fun { State.cstr_id=coq_cstr } -> Id.equal coq_cstr cstr_id ) cstr_cfgs with
+                    | Some { cstr_caselabel; cstr_accessors } ->
                         let cstr_members =
                           List.map2 (fun member_names c_accessor -> { member_names with member_accessor=c_accessor })
-                            cstr_members (Array.to_list c_accessors)
+                            cstr_members (Array.to_list cstr_accessors)
                         in
-                        (c_caselabel, cstr_members)
+                        (cstr_caselabel, cstr_members)
                     | None -> (cstr_enum_const, cstr_members))
                 | _ -> (cstr_enum_const, cstr_members)
               in

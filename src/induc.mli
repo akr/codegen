@@ -8,7 +8,7 @@ val register_ind_match :
   Environ.env ->
   Evd.evar_map ->
   EConstr.t ->
-  string -> State.ind_cstr_caselabel_accessors list -> State.ind_config
+  string -> State.cstr_config list -> State.ind_config
 val ind_is_void_type : Environ.env -> Evd.evar_map -> EConstr.types -> bool
 val c_type_is_void : State.c_typedata -> bool
 val c_typename : Environ.env -> Evd.evar_map -> EConstr.types -> State.c_typedata
@@ -21,5 +21,5 @@ val case_cstrmember :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> int -> string
 val command_ind_match :
   Constrexpr.constr_expr ->
-  string -> State.ind_cstr_caselabel_accessors list -> unit
+  string -> State.cstr_config list -> unit
 val command_deallocator : Constrexpr.constr_expr -> State.dealloc_cstr_deallocator list -> unit

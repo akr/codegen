@@ -21,9 +21,9 @@ type string_or_qualid =
     StrOrQid_Str of string
   | StrOrQid_Qid of Libnames.qualid
 type cstr_config = {
-  coq_cstr : Names.Id.t;
-  c_caselabel : string;
-  c_accessors : string array;
+  cstr_id: Names.Id.t;
+  cstr_caselabel: string;
+  cstr_accessors: string array;
 }
 type c_typedata = {
   c_type_left : string;
@@ -35,11 +35,6 @@ type ind_config = {
   c_swfunc : string option;
   cstr_configs : cstr_config array;
   is_void_type : bool;
-}
-type ind_cstr_caselabel_accessors = {
-  cstr_id: Names.Id.t;
-  cstr_caselabel: string;
-  cstr_accessors: string list;
 }
 
 type s_or_d = SorD_S | SorD_D

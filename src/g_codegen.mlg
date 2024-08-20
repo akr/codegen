@@ -150,12 +150,12 @@ VERNAC ARGUMENT EXTEND where_or_and
 | [ "and" ] -> { () }
 END
 
-VERNAC ARGUMENT EXTEND ind_cstr_caselabel_accessors
-| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) "accessor" string_list(cstr_accessors) ] -> { { cstr_id; cstr_caselabel; cstr_accessors } }
-| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=[] } }
-| [ ident(cstr_id) "=>" "accessor" string_list(cstr_accessors) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors } }
-| [ ident(cstr_id) "=>" ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[] } }
-| [ ident(cstr_id) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[] } }
+VERNAC ARGUMENT EXTEND ind_cstr_config
+| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) "accessor" string_list(accessors) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=(Array.of_list accessors) } }
+| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=[||] } }
+| [ ident(cstr_id) "=>" "accessor" string_list(accessors) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=(Array.of_list accessors) } }
+| [ ident(cstr_id) "=>" ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[||] } }
+| [ ident(cstr_id) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[||] } }
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator
@@ -237,8 +237,8 @@ VERNAC ARGUMENT EXTEND indmatch_swfunc
 END
 
 VERNAC ARGUMENT EXTEND indmatch_cstrs
-| [ "with" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
-| [ "with" "|" ne_ind_cstr_caselabel_accessors_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
+| [ "with" ne_ind_cstr_config_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
+| [ "with" "|" ne_ind_cstr_config_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
 | [ "with" ] -> { [] }
 | [ ] -> { [] }
 END

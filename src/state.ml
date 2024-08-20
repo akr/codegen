@@ -144,9 +144,9 @@ let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
 
 type cstr_config = {
-  coq_cstr : Id.t;
-  c_caselabel : string; (* meaningful if c_swfnc is not None *)
-  c_accessors : string array (* meaningful if c_swfnc is not None *)
+  cstr_id: Names.Id.t;
+  cstr_caselabel: string;
+  cstr_accessors: string array;
 }
 
 type c_typedata = {
@@ -160,12 +160,6 @@ type ind_config = {
   c_swfunc : string option;
   cstr_configs : cstr_config array;
   is_void_type : bool;
-}
-
-type ind_cstr_caselabel_accessors = {
-  cstr_id: Names.Id.t;
-  cstr_caselabel: string;
-  cstr_accessors: string list;
 }
 
 type s_or_d = SorD_S | SorD_D
