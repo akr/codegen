@@ -150,11 +150,19 @@ VERNAC ARGUMENT EXTEND where_or_and
 | [ "and" ] -> { () }
 END
 
+VERNAC ARGUMENT EXTEND ind_cstr_case
+| [ "case" string(cstr_caselabel) ] -> { cstr_caselabel }
+END
+
+VERNAC ARGUMENT EXTEND ind_cstr_accessor
+| [ "accessor" string_list(accessors)  ] -> { Array.of_list accessors }
+END
+
 VERNAC ARGUMENT EXTEND ind_cstr_config
-| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) "accessor" string_list(accessors) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=(Array.of_list accessors) } }
-| [ ident(cstr_id) "=>" "case" string(cstr_caselabel) ] -> { { cstr_id; cstr_caselabel; cstr_accessors=[||] } }
-| [ ident(cstr_id) "=>" "accessor" string_list(accessors) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=(Array.of_list accessors) } }
-| [ ident(cstr_id) "=>" ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[||] } }
+| [ ident(cstr_id) "=>" ind_cstr_case_opt(cstr_caselabel) ind_cstr_accessor_opt(accessors) ] ->
+  { { cstr_id;
+      cstr_caselabel=(Stdlib.Option.value cstr_caselabel ~default:"");
+      cstr_accessors=(Stdlib.Option.value accessors ~default:[||]) } }
 | [ ident(cstr_id) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[||] } }
 END
 
