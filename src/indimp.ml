@@ -278,18 +278,22 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
                 | None -> user_err_hov (Pp.str "[codegen] constuctor configuration not found:" +++ Id.print cstr_names.cn_id)
                 | Some cstr_cfg -> cstr_cfg
               in
-              (* xxx: check cstr_caselabel is not empty string *)
+              (* xxx: check cstr_caselabel is valid C identifier *)
               { cstr_names with
-                cn_enum_const=cstr_cfg.cstr_caselabel;
-                cn_members=
-                  List.map2 (fun member_names accessor -> { member_names with member_accessor = accessor })
+                cn_enum_const = Stdlib.Option.value cstr_cfg.cstr_caselabel ~default:cstr_names.cn_enum_const;
+                cn_members =
+                  List.map2 (fun member_names accessor -> { member_names with member_accessor = Stdlib.Option.value accessor ~default:member_names.member_accessor })
                     cstr_names.cn_members (Array.to_list cstr_cfg.cstr_accessors) }) }
     | _ ->
         let cstr_caselabel_accessors_ary =
           ind_names.ind_cstrs |> Array.map (fun { cn_id; cn_enum_const; cn_members } ->
-            let caselabel = cn_enum_const in
-            let accessors = CArray.map_of_list (fun { member_accessor } -> member_accessor) cn_members in
-            { cstr_id=cn_id; cstr_caselabel=caselabel; cstr_accessors=accessors })
+            let caselabel = Some cn_enum_const in
+            let accessors = CArray.map_of_list (fun { member_accessor } -> Some member_accessor) cn_members in
+            { cstr_id = cn_id;
+              cstr_caselabel = caselabel;
+              cstr_accessors = accessors;
+              cstr_deallocator = None
+            })
         in
         let cstr_caselabel_accessors_list = Array.to_list cstr_caselabel_accessors_ary in
         ignore (register_ind_match env sigma coq_type_i ind_names.ind_swfunc cstr_caselabel_accessors_list);
@@ -322,11 +326,12 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
                 | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
                     (match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
                     | Some { cstr_caselabel; cstr_accessors } ->
+                        let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
                         let cn_members =
-                          List.map2 (fun member_names c_accessor -> { member_names with member_accessor=c_accessor })
+                          List.map2 (fun member_names c_accessor -> { member_names with member_accessor = Stdlib.Option.value c_accessor ~default:member_names.member_accessor })
                             cn_members (Array.to_list cstr_accessors)
                         in
-                        (cstr_caselabel, cn_members)
+                        (cn_enum_const, cn_members)
                     | None -> (cn_enum_const, cn_members))
                 | _ -> (cn_enum_const, cn_members)
               in

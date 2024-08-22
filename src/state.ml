@@ -145,8 +145,9 @@ type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
 
 type cstr_config = {
   cstr_id: Names.Id.t;
-  cstr_caselabel: string;
-  cstr_accessors: string array;
+  cstr_caselabel: string option;
+  cstr_accessors: string option array;
+  cstr_deallocator: string option;
 }
 
 type c_typedata = {

@@ -16,9 +16,9 @@ val c_closure_function_type : Environ.env -> Evd.evar_map -> EConstr.types -> St
 val c_closure_type : State.c_typedata list -> State.c_typedata -> State.c_typedata
 val case_swfunc : Environ.env -> Evd.evar_map -> EConstr.types -> string
 val case_cstrlabel :
-  Environ.env -> Evd.evar_map -> EConstr.types -> int -> string
+  Environ.env -> Evd.evar_map -> EConstr.types -> int -> string option
 val case_cstrmember :
-  Environ.env -> Evd.evar_map -> EConstr.types -> int -> int -> string
+  Environ.env -> Evd.evar_map -> EConstr.types -> int -> int -> string option
 val command_ind_match :
   Constrexpr.constr_expr ->
   string -> State.cstr_config list -> unit

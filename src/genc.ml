@@ -1627,7 +1627,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
     ((*h*)int *
      (*item_type*)Constr.types *
      (*item_cvar*)string * (*c_deallocations*)Pp.t array *
-     (*caselabel_accessorcalls*)(string * Pp.t array) array) =
+     (*caselabel_accessorcalls*)(string option * Pp.t option array) array) =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
@@ -1666,7 +1666,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
         (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
         (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
-           (fun i -> gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
+           (fun i -> Option.map gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
            (iota_ary 0 oneind_body.Declarations.mind_consnrealargs.(j-1))))
       (iota_ary 1 h)
   in
@@ -1702,11 +1702,13 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     let c_member_access =
       pp_sjoin_ary
         (Array.map2
-          (fun c_var_opt accessor_call ->
-            match c_var_opt with
-            | Some c_var ->
+          (fun c_var_opt accessor_call_opt ->
+            match c_var_opt, accessor_call_opt with
+            | Some c_var, Some accessor_call ->
                 gen_assignment (Pp.str c_var) accessor_call
-            | None -> Pp.mt ())
+            | Some c_var, None ->
+                user_err (Pp.str "[codegen] constructor member accessor not configured:" +++ Printer.pr_constr_env env sigma item_type)
+            | None, _ -> Pp.mt ())
           c_vars accessor_calls)
     in
     c_member_access
@@ -1728,6 +1730,11 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     gen_branch accessorcalls c_deallocation branch)
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
+    let caselabel_accessorcalls = caselabel_accessorcalls |> Array.map (fun (caselabel, accessors) ->
+      match caselabel with
+      | None -> user_err (Pp.str "[codegen] constructor member accessor not configured:" +++ Printer.pr_constr_env env sigma item_type)
+      | Some caselabel -> (caselabel, accessors))
+    in
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then
                    Pp.str item_cvar
@@ -1747,7 +1754,9 @@ let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
   assert (h = 1);
   let accessorcall = (snd caselabel_accessorcalls.(0)).(Projection.arg pr) in
   let c_deallocation = c_deallocations.(0) in
-  c_deallocation +++ gen_cont accessorcall
+  match accessorcall with
+  | None -> user_err (Pp.str "[codegen] constructor member accessor not configured:" +++ Printer.pr_constr_env env sigma item_type)
+  | Some accessorcall -> c_deallocation +++ gen_cont accessorcall
 
 let gen_parallel_assignment (assignments : ((*lhs*)string * (*rhs*)string * (*type*)c_typedata) array) : Pp.t =
   let assign = Array.to_list assignments in

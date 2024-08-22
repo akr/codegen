@@ -3838,7 +3838,7 @@ let boolbox_src = {|
       CodeGen Linear boolbox.
       CodeGen InductiveType boolbox => "boolbox".
       CodeGen InductiveMatch boolbox with
-      | BoolBox => accessor "boolbox_get".
+      | BoolBox => accessor "boolbox_get" deallocator "boolbox_dealloc".
       CodeGen InductiveDeallocator boolbox with BoolBox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
@@ -4733,7 +4733,7 @@ let test_list = add_test test_list "test_void_head_proj" begin fun (ctx : test_c
         constant_zero x.
       CodeGen InductiveType TestRecord => "TestRecord".
       CodeGen InductiveMatch TestRecord with
-      | mk => accessor "TestRecord_umem" "TestRecord_nmem".
+      | mk => accessor "TestRecord_umem" "TestRecord_nmem" deallocator "dealloc_TestRecord".
       CodeGen Linear TestRecord.
       CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
@@ -4759,7 +4759,7 @@ let test_list = add_test test_list "test_void_tail_proj" begin fun (ctx : test_c
       Definition f (x : TestRecord) : unit := umem x.
       CodeGen InductiveType TestRecord => "TestRecord".
       CodeGen InductiveMatch TestRecord with
-      | mk => accessor "TestRecord_umem" "TestRecord_nmem".
+      | mk => accessor "TestRecord_umem" "TestRecord_nmem" deallocator "dealloc_TestRecord".
       CodeGen Linear TestRecord.
       CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".

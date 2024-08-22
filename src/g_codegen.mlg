@@ -151,19 +151,24 @@ VERNAC ARGUMENT EXTEND where_or_and
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_case
-| [ "case" string(cstr_caselabel) ] -> { cstr_caselabel }
+| [ "case" string(caselabel) ] -> { caselabel }
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_accessor
-| [ "accessor" string_list(accessors)  ] -> { Array.of_list accessors }
+| [ "accessor" string_list(accessors)  ] -> { Array.map (fun accessor -> Some accessor) (Array.of_list accessors) }
+END
+
+VERNAC ARGUMENT EXTEND ind_cstr_deallocator
+| [ "deallocator" string(deallocator)  ] -> { deallocator }
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_config
-| [ ident(cstr_id) "=>" ind_cstr_case_opt(cstr_caselabel) ind_cstr_accessor_opt(accessors) ] ->
+| [ ident(cstr_id) "=>" ind_cstr_case_opt(caselabel) ind_cstr_accessor_opt(accessors) ind_cstr_deallocator_opt(deallocator) ] ->
   { { cstr_id;
-      cstr_caselabel=(Stdlib.Option.value cstr_caselabel ~default:"");
-      cstr_accessors=(Stdlib.Option.value accessors ~default:[||]) } }
-| [ ident(cstr_id) ] -> { { cstr_id; cstr_caselabel=""; cstr_accessors=[||] } }
+      cstr_caselabel = caselabel;
+      cstr_accessors = Stdlib.Option.value accessors ~default:[||];
+      cstr_deallocator = deallocator;
+    } }
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator

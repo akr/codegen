@@ -132,6 +132,8 @@ CodeGen Primitive eqn => "eqn".
 CodeGen InductiveType bits => "bits".
 CodeGen InductiveType DArr => "DArr".
 CodeGen InductiveType MDArr => "MDArr".
+CodeGen InductiveMatch MDArr with
+| mdarr => deallocator "dealloc_MDArr".
 CodeGen InductiveDeallocator MDArr with mdarr => "dealloc_MDArr".
 
 CodeGen InductiveType MDArr*MDArr => "pair_MDArr_MDArr".
