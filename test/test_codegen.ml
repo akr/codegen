@@ -670,6 +670,17 @@ let test_list = add_test test_list "test_mono_id_bool" begin fun (ctx : test_ctx
     |}
 end
 
+let test_list = add_test test_list "test_indmatch_no_accessor" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq  ctx
+    (bool_src ^ {|
+      Inductive D : Type := C : nat -> D.
+      CodeGen InductiveType D => "D".
+      CodeGen InductiveMatch D with
+      | C => deallocator "dealloc_D".
+    |}) {|
+    |}
+end
+
 let test_list = add_test test_list "test_mono_id_mybool" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     ({|

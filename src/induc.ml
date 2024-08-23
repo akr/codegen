@@ -279,7 +279,8 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
   let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
   let f j0 cstr_cfg cstr_caselabel_accessors =
     let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = cstr_caselabel_accessors in
-    (if oneind_body.Declarations.mind_consnrealargs.(j0) <> Array.length accessors then
+    let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
+    (if num_members < Array.length accessors then
       user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" +++
         Pp.str "needs" +++
         Pp.int oneind_body.Declarations.mind_consnrealargs.(j0) +++
@@ -289,6 +290,12 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
         Id.print cstr_cfg.cstr_id +++
         Pp.str "of" +++
         Printer.pr_econstr_env env sigma coq_type));
+    let accessors =
+      if Array.length accessors = num_members then
+        accessors
+      else
+        Array.init num_members (fun i -> if i < Array.length accessors then accessors.(i) else None)
+    in
     let caselabel =
       match caselabel with
       | None -> None
