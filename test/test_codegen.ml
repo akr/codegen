@@ -120,6 +120,15 @@ let expand_tab (str : string) : string =
     str;
     Buffer.contents buf
 
+let complete_newline (str : string) : string =
+  let n = String.length str in
+  if n = 0 then
+    str
+  else if str.[n-1] = '\n' then
+    str
+  else
+    str ^ "\n"
+
 let min_indent (str : string) : int =
   let min = ref (String.length str + 1) in
   let indent = ref (Some 0) in
@@ -277,6 +286,7 @@ let codegen_test_template
     ?(c_files : string list = [])
     ?(cc_exit_code : Unix.process_status option)
     ?(main_toplevel_defs : string option)
+    ?(c_snippet_before_gen : string option)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -300,6 +310,9 @@ let codegen_test_template
     ("/* " ^ test_path ^ " */\n" ^
     "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
     "#include <assert.h>\n" ^
+    (match c_snippet_before_gen with
+    | None -> ""
+    | Some str -> delete_indent (expand_tab str) ^ "\n") ^
     "#include \"gen.c\"\n" ^
     delete_indent (expand_tab (Stdlib.Option.value main_toplevel_defs ~default:"")) ^ "\n" ^
     "int main(int argc, char *argv[]) {\n" ^
@@ -3617,7 +3630,6 @@ let test_list = add_test test_list "test_indimp_dealloc_list" begin fun (ctx : t
       CodeGen InductiveType mylist => "mylist".
       CodeGen Primitive mynil => "mynil".
       CodeGen Primitive mycons => "mycons".
-      (*CodeGen InductiveDeallocator mylist with mynil => "mynil_dealloc" | mycons => "mycons_dealloc".*)
       CodeGen Linear mylist.
       CodeGen IndImp mylist.
       CodeGen Func mylen.
@@ -3805,6 +3817,110 @@ let test_list = add_test test_list "test_indimp_multifile_private_type_impl" beg
     |}
 end
 
+let test_list = add_test test_list "test_indimp_with_deallocator" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ctx
+    ~c_snippet_before_gen:{|
+      int malloc_count;
+      int free_count;
+      void *my_malloc(size_t size)
+      {
+        malloc_count++;
+        return malloc(size);
+      }
+      void my_free(void *ptr)
+      {
+        free_count++;
+        free(ptr);
+      }
+      #define malloc(size) my_malloc(size)
+      #define free(ptr) my_free(ptr)
+    |}
+    (bool_src ^
+    {|
+      Inductive boolbox : Set := BoolBox : bool -> boolbox.
+      Definition boolbox_dealloc (x : boolbox) : unit := tt.
+      CodeGen Linear boolbox.
+      CodeGen InductiveType boolbox => "boolbox".
+      CodeGen Primitive BoolBox => "boolbox_alloc".
+      CodeGen IndImp boolbox
+        where heap on (* heap is required for malloc/free *)
+        where prefix "bb".
+      Definition produce (b : bool) : boolbox := BoolBox b.
+      Definition consume (x : boolbox) : bool :=
+        match x with
+        | BoolBox b => b
+        end.
+      CodeGen Func produce.
+      CodeGen Func consume.
+    |})
+    {|
+      bool b;
+      boolbox x;
+      assert(malloc_count == 0);
+      assert(free_count == 0);
+      x = produce(true);
+      assert(malloc_count == 1);
+      assert(free_count == 0);
+      b = consume(x);
+      assert(malloc_count == 1);
+      assert(free_count == 1);
+      assert(b == true);
+    |}
+end
+
+let test_list = add_test test_list "test_indimp_indmatch_with_deallocator" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ctx
+    ~c_snippet_before_gen:{|
+      int malloc_count;
+      int free_count;
+      void *my_malloc(size_t size)
+      {
+        malloc_count++;
+        return malloc(size);
+      }
+      void my_free(void *ptr)
+      {
+        free_count++;
+        free(ptr);
+      }
+      #define malloc(size) my_malloc(size)
+      #define free(ptr) my_free(ptr)
+    |}
+    (bool_src ^
+    {|
+      Inductive boolbox : Set := BoolBox : bool -> boolbox.
+      Definition boolbox_dealloc (x : boolbox) : unit := tt.
+      CodeGen Linear boolbox.
+      CodeGen InductiveType boolbox => "boolbox".
+      CodeGen InductiveMatch boolbox with
+      | BoolBox => accessor "boolbox_get" deallocator "boolbox_dealloc".
+      CodeGen Primitive BoolBox => "boolbox_alloc".
+      CodeGen IndImp boolbox
+        where heap on (* heap is required for malloc/free *)
+        where prefix "bb".
+      Definition produce (b : bool) : boolbox := BoolBox b.
+      Definition consume (x : boolbox) : bool :=
+        match x with
+        | BoolBox b => b
+        end.
+      CodeGen Func produce.
+      CodeGen Func consume.
+    |})
+    {|
+      bool b;
+      boolbox x;
+      assert(malloc_count == 0);
+      assert(free_count == 0);
+      x = produce(true);
+      assert(malloc_count == 1);
+      assert(free_count == 0);
+      b = consume(x);
+      assert(malloc_count == 1);
+      assert(free_count == 1);
+      assert(b == true);
+    |}
+end
+
 let test_list = add_test test_list "test_header_snippet" begin fun (ctx : test_ctxt) ->
   codegen_test_template ~goal:UntilCC ctx
     {|
@@ -3850,7 +3966,6 @@ let boolbox_src = {|
       CodeGen InductiveType boolbox => "boolbox".
       CodeGen InductiveMatch boolbox with
       | BoolBox => accessor "boolbox_get" deallocator "boolbox_dealloc".
-      CodeGen InductiveDeallocator boolbox with BoolBox => "boolbox_dealloc".
       CodeGen Primitive BoolBox => "boolbox_alloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
@@ -4746,7 +4861,6 @@ let test_list = add_test test_list "test_void_head_proj" begin fun (ctx : test_c
       CodeGen InductiveMatch TestRecord with
       | mk => accessor "TestRecord_umem" "TestRecord_nmem" deallocator "dealloc_TestRecord".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".
@@ -4772,7 +4886,6 @@ let test_list = add_test test_list "test_void_tail_proj" begin fun (ctx : test_c
       CodeGen InductiveMatch TestRecord with
       | mk => accessor "TestRecord_umem" "TestRecord_nmem" deallocator "dealloc_TestRecord".
       CodeGen Linear TestRecord.
-      CodeGen InductiveDeallocator TestRecord with mk => "dealloc_TestRecord".
       CodeGen Snippet "prologue" "typedef int TestRecord;".
       CodeGen Snippet "prologue" "int dealloc_called = 0;".
       CodeGen Snippet "prologue" "#define TestRecord_umem(x) (abort(x))".

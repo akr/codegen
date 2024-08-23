@@ -48,8 +48,7 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 (*
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
-  CodeGen InductiveMatch COQ_TYPE [ => "C_SWFUNC" ] ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] )* )?.
-  CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?.
+  CodeGen InductiveMatch COQ_TYPE [ => "C_SWFUNC" ] ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] [deallocator "C_DEALLOCATOR"])* )?.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -167,7 +166,7 @@ VERNAC ARGUMENT EXTEND ind_cstr_config
   { { cstr_id;
       cstr_caselabel = caselabel;
       cstr_accessors = Stdlib.Option.value accessors ~default:[||];
-      cstr_deallocator = deallocator;
+      cstr_deallocator = Option.map (fun str -> Lazy.from_val (Some str)) deallocator;
     } }
 END
 
@@ -299,9 +298,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indmatch_swfunc_opt(swfunc) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
       { command_ind_match coq_type (Stdlib.Option.value swfunc ~default:"") cstr_caselabel_accesors_list }
-
-    | [ "CodeGen" "InductiveDeallocator" lconstr(coq_type_or_cstr) indimp_cstrs(dealloc_cstr_deallocator_list) ] ->
-      { command_deallocator coq_type_or_cstr dealloc_cstr_deallocator_list }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }

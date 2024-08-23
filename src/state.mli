@@ -24,7 +24,7 @@ type cstr_config = {
   cstr_id: Names.Id.t;
   cstr_caselabel: string option;
   cstr_accessors: string option array;
-  cstr_deallocator: string option;
+  cstr_deallocator: string option Lazy.t option;
 }
 type c_typedata = {
   c_type_left : string;
@@ -54,7 +54,6 @@ type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
   dealloc_cstr_deallocator: string;
 }
-val cstr_deallocator_cfunc_map : string ConstrMap.t ref
 
 val downward_type_set : ConstrSet.t ref
 val borrow_function_set : Names.Cset.t ref

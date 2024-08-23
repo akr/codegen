@@ -51,7 +51,13 @@ let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind
         cstr_cfg.cstr_accessors) +++
       (match cstr_cfg.cstr_deallocator with
        | None -> Pp.mt ()
-       | Some s -> Pp.str "deallocator" +++ Pp.str (quote_coq_string s)))
+       | Some string_opt_lazy ->
+           if Lazy.is_val string_opt_lazy then
+             match Lazy.force string_opt_lazy with
+             | None -> Pp.mt ()
+             | Some s -> Pp.str "deallocator" +++ Pp.str (quote_coq_string s)
+           else
+             Pp.str "deallocator" +++ Pp.str "(lazy)"))
   in
   match ind_cfg.c_swfunc with
   | Some c_swfunc ->
@@ -70,35 +76,9 @@ let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (in
   | Some c_swfunc -> Feedback.msg_info (pr_inductive_match env sigma ind_cfg)
   | None -> ()
 
-let codegen_print_inductive_deallocator (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
-  let (f, params) = decompose_appvect sigma (EConstr.of_constr ind_cfg.coq_type) in
-  let pind = EConstr.destInd sigma f in
-  let deallocs =
-    ind_cfg.cstr_configs |> Array.mapi (fun j0 cstr_cfg ->
-      let cstr_id = cstr_cfg.cstr_id in
-      let cstr_j = j0 + 1 in
-      let cstrterm = mkApp (mkConstructUi (pind, cstr_j), params) in
-      let dealloc_opt = ConstrMap.find_opt (EConstr.to_constr sigma cstrterm) !cstr_deallocator_cfunc_map in
-      (cstr_id, dealloc_opt))
-  in
-  (* CodeGen InductiveDeallocator COQ_TYPE ( with ( | CONSTRUCTOR => "C_CSTR_DEALLOCATOR" )* )?. *)
-  let deallocs = Array.to_list deallocs |>
-    List.filter_map (fun (cstr_id, dealloc_opt) -> match dealloc_opt with None -> None | Some dealloc -> Some (cstr_id, dealloc))
-  in
-  if not (CList.is_empty deallocs) then
-    msg_info_hov (
-      Pp.str "CodeGen InductiveDeallocator" +++
-      Printer.pr_constr_env env sigma ind_cfg.coq_type +++
-      (deallocs |> List.mapi (fun k (cstr_id, dealloc) -> (k, cstr_id, dealloc)) |>
-       pp_sjoinmap_list (fun (k, cstr_id, dealloc) ->
-         Pp.str (if k = 0 then "with" else "|") +++
-         Id.print cstr_id +++ Pp.str "=>" +++ Pp.str (quote_coq_string dealloc))) ++
-      Pp.str ".")
-
 let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   codegen_print_inductive_type env sigma ind_cfg;
-  codegen_print_inductive_match env sigma ind_cfg;
-  codegen_print_inductive_deallocator env sigma ind_cfg
+  codegen_print_inductive_match env sigma ind_cfg
 
 let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit =
   let env = Global.env () in
@@ -271,14 +251,16 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
      (swfunc : string) (cstr_caselabel_accessors_list : cstr_config list) : ind_config =
   let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   let ind_cfg = get_ind_config env sigma coq_type in
+  (*
   (match ind_cfg.c_swfunc with
   | Some _ -> user_err (
       Pp.str "[codegen] inductive match configuration already registered:" +++
       Printer.pr_econstr_env env sigma coq_type)
   | None -> ());
+  *)
   let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
   let f j0 cstr_cfg cstr_caselabel_accessors =
-    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = cstr_caselabel_accessors in
+    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors; cstr_deallocator=deallocator } = cstr_caselabel_accessors in
     let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
     (if num_members < Array.length accessors then
       user_err (Pp.str "[codegen] inductive match: too many member accessors:" +++
@@ -308,7 +290,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
           else
             Some caselabel
     in
-    { cstr_cfg with cstr_caselabel = caselabel; cstr_accessors = accessors }
+    { cstr_cfg with cstr_caselabel = caselabel; cstr_accessors = accessors; cstr_deallocator = deallocator }
   in
   let ind_cfg =
     { ind_cfg with
@@ -410,20 +392,29 @@ let case_cstrmember (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.type
   in
   ind_cfg.cstr_configs.(j-1).cstr_accessors.(k)
 
+let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (j : int) : string option =
+  let ind_cfg = get_ind_config env sigma t in
+  let ind_cfg =
+    match ind_cfg.c_swfunc with
+    | Some _ -> ind_cfg
+    | None -> generate_ind_match env sigma t
+  in
+  (msg_debug_hov (Pp.str "case_deallocator" +++  Printer.pr_econstr_env env sigma t +++ Pp.int j));
+  (let result = ind_cfg.cstr_configs.(j-1).cstr_deallocator in
+  match result with
+  | None -> msg_debug_hov (Pp.str "case_deallocator:noresult")
+  | Some string_opt_lazy ->
+      match Lazy.force string_opt_lazy with
+      | None -> msg_debug_hov (Pp.str "case_deallocator:noresult")
+      | Some str -> msg_debug_hov (Pp.str "case_deallocator: result =" +++ Pp.str str)
+  );
+  match ind_cfg.cstr_configs.(j-1).cstr_deallocator with
+  | None -> None
+  | Some string_opt_lazy -> Lazy.force string_opt_lazy
+
 let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
     (cstr_caselabel_accessors_list : cstr_config list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
-
-let command_deallocator (user_coq_type : Constrexpr.constr_expr) (dealloc_cstr_deallocator_list : dealloc_cstr_deallocator list) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  let (mutind_body, oneind_body, pind, params) = get_ind_coq_type env sigma coq_type in
-  let dealloc_cstr_deallocator_ary = reorder_cstrs oneind_body (fun { dealloc_cstr_id } -> dealloc_cstr_id) dealloc_cstr_deallocator_list in
-  dealloc_cstr_deallocator_ary |> Array.iteri (fun j0 { dealloc_cstr_id; dealloc_cstr_deallocator } ->
-    let j = j0 + 1 in
-    let cstr_term = EConstr.to_constr sigma (mkApp (mkConstructUi (pind, j), params)) in
-    cstr_deallocator_cfunc_map := ConstrMap.add cstr_term dealloc_cstr_deallocator !cstr_deallocator_cfunc_map)
