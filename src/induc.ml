@@ -281,7 +281,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
     let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors } = cstr_caselabel_accessors in
     let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
     (if num_members < Array.length accessors then
-      user_err (Pp.str "[codegen] inductive match: invalid number of member accessors:" +++
+      user_err (Pp.str "[codegen] inductive match: too many member accessors:" +++
         Pp.str "needs" +++
         Pp.int oneind_body.Declarations.mind_consnrealargs.(j0) +++
         Pp.str "but" +++
