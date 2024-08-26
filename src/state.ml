@@ -160,7 +160,6 @@ type ind_config = {
   c_type : c_typedata;
   c_swfunc : string option;
   cstr_configs : cstr_config array;
-  is_void_type : bool;
 }
 
 type s_or_d = SorD_S | SorD_D

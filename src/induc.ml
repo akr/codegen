@@ -185,7 +185,6 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECo
         c_type=c_type_void;
         c_swfunc=None;
         cstr_configs=cstr_cfgs;
-        is_void_type=true;
       }
     end
   else
@@ -203,7 +202,6 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECo
         c_type=c_type;
         c_swfunc=None;
         cstr_configs=cstr_cfgs;
-        is_void_type=false;
       } in
       ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
       ind_cfg
@@ -332,7 +330,7 @@ let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   if isProd sigma t then
     false
   else
-    (get_ind_config env sigma t).is_void_type
+    c_type_is_void (get_ind_config env sigma t).c_type
 
 let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
   let arg_types =
