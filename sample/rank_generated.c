@@ -210,7 +210,6 @@ buildDir1(bool v1_b, bits v2_s, nat v3_k, nat v4_sz1, nat v5_sz2, nat v6_c,
       v15_p = buildDir2(v1_b, v2_s, v5_sz2, v3_k, v7_i, v9_D2, v14_n);
       v16_D2_ = pair_MDArr_nat_D(v15_p);
       v17_m2 = pair_MDArr_nat_n(v15_p);
-      dealloc_MDArr_nat(v15_p);
       v18_n = addn(v7_i, v4_sz1);
       v19_n = addn(v10_m1, v17_m2);
       v6_c = v12_cp;
@@ -261,17 +260,14 @@ buildDir(bool v1_b, bits v2_s, nat v3_k, nat v4_sz2, nat v5_w1, nat v6_w2)
   v13_m, v14_n);
   v16_p = pair_2MDArr_nat_D12(v15_p);
   v17_m1 = pair_2MDArr_nat_n(v15_p);
-  dealloc_2MDArr_nat(v15_p);
   v18_D1 = pair_MDArr_MDArr_D1(v16_p);
   v19_D2 = pair_MDArr_MDArr_D2(v16_p);
-  dealloc_MDArr_MDArr(v16_p);
   v20_n = modn(v9_n2, v3_k);
   v21_n = muln(v10_n1, v7_sz1);
   v22_n = 0;
   v23_p = buildDir2(v1_b, v2_s, v4_sz2, v20_n, v21_n, v19_D2, v22_n);
   v24_D2 = pair_MDArr_nat_D(v23_p);
   v25_m2 = pair_MDArr_nat_n(v23_p);
-  dealloc_MDArr_nat(v23_p);
   v26_m = pushD(v18_D1, v17_m1);
   v27_m = pushD(v24_D2, v25_m2);
   return make_pair_MDArr_MDArr(v26_m, v27_m);
@@ -342,7 +338,6 @@ static Aux rank_init(bool v1_b, bits v2_s)
   v16_p = buildDir(v1_b, v2_s, v5_k, v7_sz2, v12_w1, v15_w2);
   v17_D1 = pair_MDArr_MDArr_D1(v16_p);
   v18_D2 = pair_MDArr_MDArr_D2(v16_p);
-  dealloc_MDArr_MDArr(v16_p);
   v19_d = freezeD(v17_D1);
   v20_d = freezeD(v18_D2);
   return mkAux(v1_b, v2_s, v5_k, v7_sz2, v19_d, v20_d);

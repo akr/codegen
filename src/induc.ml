@@ -399,18 +399,18 @@ let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
     | Some _ -> ind_cfg
     | None -> generate_ind_match env sigma t
   in
-  (msg_debug_hov (Pp.str "case_deallocator" +++  Printer.pr_econstr_env env sigma t +++ Pp.int j));
-  (let result = ind_cfg.cstr_configs.(j-1).cstr_deallocator in
-  match result with
-  | None -> msg_debug_hov (Pp.str "case_deallocator:noresult")
-  | Some string_opt_lazy ->
-      match Lazy.force string_opt_lazy with
-      | None -> msg_debug_hov (Pp.str "case_deallocator:noresult")
-      | Some str -> msg_debug_hov (Pp.str "case_deallocator: result =" +++ Pp.str str)
-  );
-  match ind_cfg.cstr_configs.(j-1).cstr_deallocator with
-  | None -> None
-  | Some string_opt_lazy -> Lazy.force string_opt_lazy
+  let result =
+    match ind_cfg.cstr_configs.(j-1).cstr_deallocator with
+    | None -> None
+    | Some string_opt_lazy -> Lazy.force string_opt_lazy
+  in
+  (*
+  (let pp = Pp.str "case_deallocator" +++  Printer.pr_econstr_env env sigma t +++ Id.print ind_cfg.cstr_configs.(j-1).cstr_id ++ Pp.str "(j=" ++ Pp.int j ++ Pp.str ")" in
+   match result with
+   | None -> msg_debug_hov (pp +++ Pp.str "no-deallocator")
+   | Some str -> msg_debug_hov (pp +++ Pp.str "deallocator=" ++ Pp.str str));
+  *)
+  result
 
 let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
     (cstr_caselabel_accessors_list : cstr_config list) : unit =

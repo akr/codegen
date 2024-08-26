@@ -173,6 +173,8 @@ let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_
     pp_sjoinmap_ary (pr_cstr_names env sigma) ind_names.ind_cstrs ++ Pp.brk (0,-2) ++
   Pp.str "}")
 
+let _ = ignore pr_ind_names
+
 type nvmember_names = {
   nvmember_type: c_typedata;
   nvmember_name: string;
@@ -252,7 +254,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
       { cn_j; cn_id; cn_name; cn_enum_const; cn_struct_tag; cn_umember; cn_members; cn_deallocator_lazy; })
   in
   let result = { ind_pind=pind; ind_params=params; ind_name; ind_struct_tag; ind_enum_tag; ind_swfunc; ind_cstrs } in
-  msg_info_v (pr_ind_names env sigma result);
+  (*msg_info_v (pr_ind_names env sigma result);*)
   result
 
 (* Merge generated names and user configuration.  Register generated names if no user configuration. *)
