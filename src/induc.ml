@@ -248,7 +248,7 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a 
     | Some v -> v)
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t)
-     (swfunc : string) (cstr_caselabel_accessors_list : cstr_config list) : ind_config =
+     (swfunc : string) (cstr_cfgs : cstr_config list) : ind_config =
   let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   let ind_cfg = get_ind_config env sigma coq_type in
   (*
@@ -258,9 +258,8 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
       Printer.pr_econstr_env env sigma coq_type)
   | None -> ());
   *)
-  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_caselabel_accessors_list in
-  let f j0 cstr_cfg cstr_caselabel_accessors =
-    let { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors; cstr_deallocator=deallocator } = cstr_caselabel_accessors in
+  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_cfgs in
+  let f j0 cstr_cfg { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors; cstr_deallocator=deallocator } =
     let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
     (if num_members < Array.length accessors then
       user_err (Pp.str "[codegen] inductive match: too many member accessors:" +++
@@ -305,7 +304,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
   let printed_type = mangle_term env sigma t in
   let swfunc = "sw_" ^ c_id (squeeze_white_spaces printed_type) in
   let numcons = Array.length oneind_body.Declarations.mind_consnames in
-  let cstr_caselabel_accessors_list =
+  let cstr_cfgs =
     List.init numcons
       (fun j0 ->
         let j = j0 + 1 in
@@ -323,7 +322,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
         in
         { cstr_id=consname; cstr_caselabel=(Some caselabel); cstr_accessors=accessors; cstr_deallocator=None })
   in
-  let ind_cfg = register_ind_match env sigma t swfunc cstr_caselabel_accessors_list in
+  let ind_cfg = register_ind_match env sigma t swfunc cstr_cfgs in
   Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
      Pp.hv 0 (pr_inductive_match env sigma ind_cfg)));
@@ -413,8 +412,8 @@ let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   result
 
 let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc : string)
-    (cstr_caselabel_accessors_list : cstr_config list) : unit =
+    (cstr_cfgs : cstr_config list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_match env sigma coq_type swfunc cstr_caselabel_accessors_list)
+  ignore (register_ind_match env sigma coq_type swfunc cstr_cfgs)
