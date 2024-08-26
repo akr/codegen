@@ -120,14 +120,40 @@ let expand_tab (str : string) : string =
     str;
     Buffer.contents buf
 
-let complete_newline (str : string) : string =
+let strip_beginning_empty_lines (str : string) : string =
   let n = String.length str in
-  if n = 0 then
-    str
-  else if str.[n-1] = '\n' then
+  let rec count newline_pos m =
+    if m < n then
+      let ch = str.[m] in
+      match ch with
+      | ' ' | '\t' -> count newline_pos (m+1)
+      | '\n' -> count (Some m) (m+1)
+      | _ -> (newline_pos, m)
+    else
+      (newline_pos, m)
+  in
+  match count None 0 with
+  | None, _ -> str
+  | Some l, m -> String.sub str (l+1) (n-(l+1))
+
+let normalize_last_whitespaces (str : string) : string =
+  let rec length_without_last_whitespaces n =
+    if 0 < n then
+      let ch = str.[n-1] in
+      match ch with
+      | '\n' | '\t' | ' ' -> length_without_last_whitespaces (n-1)
+      | _ -> n
+    else
+      0
+  in
+  let n = String.length str in
+  let m = length_without_last_whitespaces n in
+  if m = n then
+    str ^ "\n"
+  else if m+1 = n then
     str
   else
-    str ^ "\n"
+    String.sub str 0 (m+1)
 
 let min_indent (str : string) : int =
   let min = ref (String.length str + 1) in
@@ -173,6 +199,7 @@ let delete_n_indent (n : int) (str : string) : string =
   Buffer.contents buf
 
 let delete_indent (str : string) : string =
+  let str = expand_tab (strip_beginning_empty_lines (normalize_last_whitespaces str)) in
   delete_n_indent (min_indent str) str
 
 let add_n_indent (n : int) (str : string) : string =
@@ -274,6 +301,26 @@ let make_foutput regexp seq =
   with Not_found ->
     assert_bool "expected regexp not found" false
 
+let memleak_check_snippet_before_gen =
+    {|
+      int malloc_count;
+      int free_count;
+      void *my_malloc(size_t size)
+      {
+        malloc_count++;
+        return malloc(size);
+      }
+      void my_free(void *ptr)
+      {
+        free_count++;
+        free(ptr);
+      }
+      #define malloc(size) my_malloc(size)
+      #define free(ptr) my_free(ptr)
+    |}
+
+let memleak_check_snippet_at_last = "assert(malloc_count == free_count);"
+
 let codegen_test_template
     ?(goal : test_goal = UntilExe)
     ?(coq_exit_code : Unix.process_status option)
@@ -287,6 +334,7 @@ let codegen_test_template
     ?(cc_exit_code : Unix.process_status option)
     ?(main_toplevel_defs : string option)
     ?(c_snippet_before_gen : string option)
+    ?(memleak_check : bool option)
     (ctx : test_ctxt)
     (coq_commands : string)
     (c_body : string) : unit =
@@ -296,12 +344,17 @@ let codegen_test_template
   let gen_fn = d ^ "/gen.c" in
   let main_fn = d ^ "/main.c" in
   let exe_fn = d ^ "/exe" in
+  let (memleak_check_snippet_before_gen, memleak_check_snippet_at_last) =
+    match memleak_check with
+    | None | Some true -> (delete_indent memleak_check_snippet_before_gen, delete_indent memleak_check_snippet_at_last)
+    | Some false -> ("", "")
+  in
   write_file src_fn
     ("(* " ^ test_path ^ " *)\n" ^
     "From codegen Require codegen.\n" ^
     "CodeGen SourceFile \"gen.c\".\n" ^
     "CodeGen Snippet \"prologue\" " ^ (escape_coq_str ("/* " ^ test_path ^ " */\n")) ^ ".\n" ^
-    delete_indent (expand_tab coq_commands) ^ "\n" ^
+    delete_indent coq_commands ^
     "CodeGen GenerateFile" ^
     (if resolve_dependencies then "" else " DisableDependencyResolver") ^
     (if mutual_recursion_detection then "" else " DisableMutualRecursionDetection") ^
@@ -310,13 +363,15 @@ let codegen_test_template
     ("/* " ^ test_path ^ " */\n" ^
     "#include <stdlib.h> /* for EXIT_SUCCESS, abort and malloc */\n" ^
     "#include <assert.h>\n" ^
+    memleak_check_snippet_before_gen ^
     (match c_snippet_before_gen with
     | None -> ""
-    | Some str -> delete_indent (expand_tab str) ^ "\n") ^
+    | Some str -> delete_indent str) ^
     "#include \"gen.c\"\n" ^
-    delete_indent (expand_tab (Stdlib.Option.value main_toplevel_defs ~default:"")) ^ "\n" ^
+    delete_indent (Stdlib.Option.value main_toplevel_defs ~default:"") ^
     "int main(int argc, char *argv[]) {\n" ^
-    add_n_indent 2 (delete_indent (expand_tab c_body)) ^ "\n" ^
+    add_n_indent 2 (delete_indent c_body) ^
+    add_n_indent 2 memleak_check_snippet_at_last ^
     "  return EXIT_SUCCESS;\n" ^
     "}\n");
   let coq_foutput = Option.map make_foutput coq_output_regexp in
@@ -501,7 +556,13 @@ let list_bool_src = {|
         }
         return !(s1 || s2);
       }
-
+      static void list_bool_free(list_bool s) {
+        while (s) {
+          list_bool next = s->tail;
+          free(s);
+          s = next;
+        }
+      }
       ".
 |}
 
@@ -531,6 +592,13 @@ let list_nat_src = {|
         ret->head = v;
         ret->tail = s;
         return ret;
+      }
+      static void list_nat_free(list_nat s) {
+        while (s) {
+          list_nat next = s->tail;
+          free(s);
+          s = next;
+        }
       }
       ".
 |}
@@ -861,7 +929,9 @@ let test_list = add_test test_list "test_list_bool" begin fun (ctx : test_ctxt) 
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
       assert(is_nil(NULL));
-      assert(!is_nil(cons(true, NULL)));
+      list_bool s = cons(true, NULL);
+      assert(!is_nil(s));
+      free(s);
     |}
 end
 
@@ -877,9 +947,10 @@ let test_list = add_test test_list "test_list_bool_length" begin fun (ctx : test
       CodeGen Func length.
     |}) {|
       #define cons(h,t) list_bool_cons(h,t)
+      list_bool s;
       assert(length(NULL) == 0);
-      assert(length(cons(1, NULL)) == 1);
-      assert(length(cons(1, cons(2, NULL))) == 2);
+      s = cons(true, NULL); assert(length(s) == 1); list_bool_free(s);
+      s = cons(false, cons(true, NULL)); assert(length(s) == 2); list_bool_free(s);
     |}
 end
 
@@ -896,8 +967,9 @@ let test_list = add_test test_list "test_sum" begin fun (ctx : test_ctxt) ->
     |}) {|
       #define cons(h,t) list_nat_cons(h,t)
       assert(sum(NULL) == 0);
-      assert(sum(cons(1, NULL)) == 1);
-      assert(sum(cons(1, cons(2, NULL))) == 3);
+      list_nat s;
+      s = cons(1, NULL); assert(sum(s) == 1); list_nat_free(s);
+      s = cons(1, cons(2, NULL)); assert(sum(s) == 3); list_nat_free(s);
     |}
 end
 
@@ -928,6 +1000,7 @@ let test_list = add_test test_list "test_singleton_list" begin fun (ctx : test_c
       assert(!is_nil(s));
       assert(head(s) == 42);
       assert(is_nil(tail(s)));
+      list_nat_free(s);
     |}
 end
 
@@ -1554,6 +1627,7 @@ let test_list = add_test test_list "test_nth" begin fun (ctx : test_ctxt) ->
       assert(nth(1, s, 999) == 2);
       assert(nth(2, s, 999) == 3);
       assert(nth(3, s, 999) == 999);
+      list_nat_free(s);
     |}
 end
 
@@ -1580,6 +1654,8 @@ let test_list = add_test test_list "test_rev_append" begin fun (ctx : test_ctxt)
       assert(nth(4, s3, 999) == 5);
       assert(nth(5, s3, 999) == 6);
       assert(nth(6, s3, 999) == 999);
+      list_nat_free(s1);
+      list_nat_free(s3); /* s2 is included in s3 */
     |}
 end
 
@@ -1626,11 +1702,15 @@ let test_list = add_test test_list "test_merge" begin fun (ctx : test_ctxt) ->
       assert(nth(6, s3, 999) == 1);
       assert(nth(7, s3, 999) == 0);
       assert(nth(8, s3, 999) == 999);
+      list_nat_free(s1);
+      list_nat_free(s2);
+      list_nat_free(s3);
     |}
 end
 
 let test_list = add_test test_list "test_merge_nontailrec" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* the last cons of s2 is reused in s3 *)
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       Require Import List.
@@ -1804,6 +1884,7 @@ let test_list = add_test test_list "test_sum_nested_fix" begin fun (ctx : test_c
       #define list4(v1, v2, v3, v4) cons(v1, cons(v2, cons(v3, cons(v4, NULL))))
       list_nat s = list4(1,2,3,4);
       assert(sum(s, 0) == 10);
+      list_nat_free(s);
     |}
 end
 
@@ -1889,7 +1970,11 @@ let test_list = add_test test_list "test_map_succ" begin fun (ctx : test_ctxt) -
       #define tail(s) list_nat_tail(s)
       #define cons(h,t) list_nat_cons(h,t)
       assert(is_nil(map_succ(NULL)));
-      assert(head(map_succ(cons(1, NULL))) == 2);
+      list_nat s1 = cons(1, NULL);
+      list_nat s2 = map_succ(s1);
+      assert(head(s2) == 2);
+      list_nat_free(s1);
+      list_nat_free(s2);
     |}
 end
 
@@ -2129,6 +2214,7 @@ let forest_src = {|
 
 let test_list = add_test test_list "test_mutual_sizet_sizef" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* t1 is shared in f1 and f2 *)
     (nat_src ^ forest_src ^
     {|
       Fixpoint sizet (t:tree) : nat :=
@@ -2159,6 +2245,7 @@ end
 *)
 let test_list = add_test test_list "test_mutual_sizet_sizef_dedup" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* t1 is shared in f1 and f2 *)
     (nat_src ^ forest_src ^
     {|
       CodeGen Snippet "prologue" "
@@ -2204,6 +2291,7 @@ end
 
 let test_list = add_test test_list "test_mutual_sizet_sizef_nodedup" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* t1 is shared in f1 and f2 *)
     ~mutual_recursion_detection:false
     (nat_src ^ forest_src ^
     {|
@@ -3110,7 +3198,12 @@ let test_list = add_test test_list "test_reduceeta_makes_single_function" begin 
       list_bool s1 = cons(true,(cons(false,NULL)));
       list_bool s2 = cons(false,(cons(true,NULL)));
       list_bool s3 = cons(true,(cons(false,cons(false,(cons(true,NULL))))));
-      assert(list_bool_eq(s3, mycat_bool(s1,s2)));
+      list_bool s4 = mycat_bool(s1,s2);
+      assert(list_bool_eq(s3, s4));
+      list_bool_free(s1);
+      /* s2 is included in s4 */
+      list_bool_free(s3);
+      list_bool_free(s4);
     |}
 end
 
@@ -3367,6 +3460,7 @@ end
 
 let test_list = add_test test_list "test_indimp_nat" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* IndImp-generated non-linear data type *)
     (nat_src ^ {|
       Inductive mynat : Set := myO : mynat | myS : mynat -> mynat.
       Fixpoint mynat_of_nat (n : nat) : mynat :=
@@ -3394,6 +3488,7 @@ end
 
 let test_list = add_test test_list "test_indimp_mutual" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* IndImp-generated non-linear data type *)
     (bool_src ^ list_bool_src ^
     {|
       Inductive even_list : Set :=
@@ -3449,6 +3544,7 @@ end
 
 let test_list = add_test test_list "test_indimp_rosetree" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* IndImp-generated non-linear data type *)
     (bool_src ^ nat_src ^
     {|
       Inductive tree (T : Type) := node : T -> list (tree T) -> tree T.
@@ -3530,6 +3626,7 @@ end
 
 let test_list = add_test test_list "test_indimp_named_mynat" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* IndImp-generated non-linear data type *)
     (nat_src ^
     {|
       Inductive mynat := myO : mynat | myS : mynat -> mynat.
@@ -3560,6 +3657,7 @@ end
 
 let test_list = add_test test_list "test_indimp_force_heap" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
+    ~memleak_check:false (* IndImp-generated non-linear data type *)
     (nat_src ^
     {|
       Inductive nat4 := mkNat4 : nat -> nat -> nat -> nat -> nat4.
@@ -3819,22 +3917,6 @@ end
 
 let test_list = add_test test_list "test_indimp_with_deallocator" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
-    ~c_snippet_before_gen:{|
-      int malloc_count;
-      int free_count;
-      void *my_malloc(size_t size)
-      {
-        malloc_count++;
-        return malloc(size);
-      }
-      void my_free(void *ptr)
-      {
-        free_count++;
-        free(ptr);
-      }
-      #define malloc(size) my_malloc(size)
-      #define free(ptr) my_free(ptr)
-    |}
     (bool_src ^
     {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
@@ -3870,22 +3952,6 @@ end
 
 let test_list = add_test test_list "test_indimp_indmatch_with_deallocator" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
-    ~c_snippet_before_gen:{|
-      int malloc_count;
-      int free_count;
-      void *my_malloc(size_t size)
-      {
-        malloc_count++;
-        return malloc(size);
-      }
-      void my_free(void *ptr)
-      {
-        free_count++;
-        free(ptr);
-      }
-      #define malloc(size) my_malloc(size)
-      #define free(ptr) my_free(ptr)
-    |}
     (bool_src ^
     {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
@@ -4229,6 +4295,7 @@ let test_list = add_test test_list "test_downward_indirect_cycle" begin fun (ctx
       T x2 = C2(pair_T_T(C1(),C1()));
       assert(f(x1) == x1);
       assert(f(x2) == x2);
+      free(x2);
     |}
 end
 
@@ -4416,6 +4483,13 @@ let test_list = add_test test_list "test_borrowcheck_indirect_cycle" begin fun (
         }
         #define sw_L(l) ((l) == NULL)
         #define LC2_tag 0
+        static void L_free(L arg)
+        {
+          if (arg == NULL) return;
+          L_free(arg->member.member1);
+          L_free(arg->member.member2);
+          free(arg);
+        }
       ".
       CodeGen InductiveType L => "L".
       CodeGen InductiveMatch L => "sw_L" with LC1 => case "" | LC2 => case "0" accessor "L_member".
@@ -4424,7 +4498,9 @@ let test_list = add_test test_list "test_borrowcheck_indirect_cycle" begin fun (
       CodeGen Func f.
     |}) {|
       assert(f(LC1()) == true);
-      assert(f(LC2(pair_L_L(LC1(),LC1()))) == false);
+      L l = LC2(pair_L_L(LC1(),LC1()));
+      assert(f(l) == false);
+      L_free(l);
     |}
 end
 
