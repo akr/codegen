@@ -31,10 +31,10 @@ type c_typedata = {
   c_type_right : string;
 }
 type ind_config = {
-  coq_type : Constr.t;
-  c_type : c_typedata;
-  c_swfunc : string option;
-  cstr_configs : cstr_config array;
+  ind_coq_type : Constr.t;
+  ind_c_type : c_typedata;
+  ind_c_swfunc : string option;
+  ind_cstr_configs : cstr_config array;
 }
 
 type s_or_d = SorD_S | SorD_D

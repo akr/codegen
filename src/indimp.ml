@@ -267,10 +267,10 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
     let inm_name =
       match ind_cfg_opt with
       | Some ind_cfg ->
-          if is_simple_c_type ind_cfg.c_type then
-            ind_cfg.c_type.c_type_left
+          if is_simple_c_type ind_cfg.ind_c_type then
+            ind_cfg.ind_c_type.c_type_left
           else
-            user_err_hov (Pp.str "[codegen] inductive type already configured with complex C type:" +++ pr_c_abstract_decl ind_cfg.c_type)
+            user_err_hov (Pp.str "[codegen] inductive type already configured with complex C type:" +++ pr_c_abstract_decl ind_cfg.ind_c_type)
       | None ->
           let c_type = simple_c_type ind_names.inm_name in
           ignore (register_ind_type env sigma coq_type_i c_type);
@@ -282,7 +282,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
   let ind_names =
     let (swfunc_opt, cstr_cfgs) =
       match ind_cfg_opt with
-      | Some { c_swfunc=swfunc_opt; cstr_configs=cstr_cfgs } -> (swfunc_opt, cstr_cfgs)
+      | Some { ind_c_swfunc=swfunc_opt; ind_cstr_configs=cstr_cfgs } -> (swfunc_opt, cstr_cfgs)
       | None -> (None, [||])
     in
     let swfunc = Stdlib.Option.value swfunc_opt ~default:(ind_names.inm_swfunc) in
@@ -353,7 +353,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
                 user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
               let (cn_enum_const, cn_members) =
                 match ind_cfg_opt with
-                | Some { c_swfunc=Some _; cstr_configs=cstr_cfgs } ->
+                | Some { ind_c_swfunc=Some _; ind_cstr_configs=cstr_cfgs } ->
                     (match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
                     | Some { cstr_caselabel; cstr_accessors } ->
                         let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
