@@ -29,72 +29,86 @@ open State
 let c_type_void = { c_type_left = "void"; c_type_right = "" }
 let c_type_is_void (c_type : c_typedata) : bool = (c_type = c_type_void)
 
-let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
-  Feedback.msg_info (Pp.str "CodeGen Inductive Type" +++
-    Printer.pr_constr_env env sigma ind_cfg.ind_coq_type +++
-    (match ind_cfg.ind_c_type with
+let pr_codegen_indtype (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
+  let pp_coq_type = Printer.pr_lconstr_env env sigma ind_cfg.ind_coq_type in
+  let pp_c_type =
+    match ind_cfg.ind_c_type with
     | None -> Pp.mt ()
-    | Some c_type -> Pp.str (quote_coq_string (compose_c_abstract_decl c_type))) ++
-    Pp.str ".")
-
-let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
-  let f cstr_cfg =
-    Pp.hv 2 (
-      Pp.str "|" +++
-      Ppconstr.pr_id cstr_cfg.cstr_id +++
-      Pp.str "=>" +++
-      (match cstr_cfg.cstr_caselabel with
-       | None -> Pp.mt ()
-       | Some s -> Pp.str "case" +++ Pp.str (quote_coq_string s)) +++
-      (pp_sjoinmap_ary
-        (fun accessor ->
-          match accessor with
-          | None -> Pp.str "_"
-          | Some accessor -> Pp.str (quote_coq_string accessor))
-        cstr_cfg.cstr_accessors) +++
-      (match cstr_cfg.cstr_deallocator with
-       | None -> Pp.mt ()
-       | Some string_opt_lazy ->
-           if Lazy.is_val string_opt_lazy then
-             match Lazy.force string_opt_lazy with
-             | None -> Pp.mt ()
-             | Some s -> Pp.str "deallocator" +++ Pp.str (quote_coq_string s)
-           else
-             Pp.str "deallocator" +++ Pp.str "(lazy)"))
+    | Some { c_type_left; c_type_right } ->
+        if CString.is_empty c_type_right then
+          Pp.str (quote_coq_string c_type_left)
+        else
+          Pp.str (quote_coq_string c_type_left) +++ Pp.str (quote_coq_string c_type_right)
   in
-  match ind_cfg.ind_c_swfunc with
-  | Some c_swfunc ->
-      Pp.hv 2 (
-        Pp.str "CodeGen Inductive Match" +++
-          Pp.hv 2 (
-            Printer.pr_constr_env env sigma ind_cfg.ind_coq_type +++
-            Pp.str "=>" +++
-            Pp.str (quote_coq_string c_swfunc))) +++
-      pp_sjoinmap_ary f ind_cfg.ind_cstr_configs ++
-      Pp.str "."
-  | None -> Pp.mt ()
+  let pp_swfunc =
+    match ind_cfg.ind_c_swfunc with
+    | None -> Pp.mt ()
+    | Some swfunc -> Pp.str "swfunc" +++ Pp.str (quote_coq_string swfunc)
+  in
+  let pp_cstrs =
+    pp_sjoinmap_ary
+      (fun cstr_cfg ->
+        let pp_caselabel =
+          match cstr_cfg.cstr_caselabel with None -> Pp.mt () | Some caselabel -> Pp.str "case" +++ Pp.str (quote_coq_string caselabel)
+        in
+        let pp_accessors =
+          if Array.for_all Stdlib.Option.is_none cstr_cfg.cstr_accessors then
+            Pp.mt ()
+          else
+            Pp.str "accessor" +++
+            pp_sjoinmap_ary
+              (fun str_opt ->
+                match str_opt with
+                | None -> Pp.str "_"
+                | Some accessor -> Pp.str (quote_coq_string accessor))
+              cstr_cfg.cstr_accessors
+        in
+        let pp_deallocator =
+          match cstr_cfg.cstr_deallocator with
+          | None -> Pp.mt ()
+          | Some str_opt_lazy ->
+              if Lazy.is_val str_opt_lazy then
+                match Lazy.force str_opt_lazy with
+                | None -> Pp.mt ()
+                | Some deallocator -> Pp.str "deallocator" +++ Pp.str (quote_coq_string deallocator)
+              else
+                Pp.str "deallocator" +++ Pp.str "(lazy)"
+        in
+        let pp_cfg = pp_caselabel +++ pp_accessors +++ pp_deallocator in
+        if Pp.ismt pp_cfg then
+          Pp.mt ()
+        else
+          Pp.hov 0 (Pp.str "|" +++ Id.print cstr_cfg.cstr_id +++ Pp.str "=>" +++ pp_cfg))
+      ind_cfg.ind_cstr_configs
+  in
+  let pp_with =
+    if Pp.ismt pp_cstrs then
+      Pp.mt ()
+    else
+      Pp.str "with"
+  in
+  let pp =
+    Pp.hv 0 (
+      Pp.hov 0 (Pp.str "CodeGen IndType" +++ pp_coq_type +++ Pp.str "=>" +++ pp_c_type +++ pp_swfunc +++ pp_with) +++
+      pp_cstrs ++ Pp.str ".")
+  in
+  pp
 
-let codegen_print_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
-  match ind_cfg.ind_c_swfunc with
-  | Some c_swfunc -> Feedback.msg_info (pr_inductive_match env sigma ind_cfg)
-  | None -> ()
-
-let codegen_print_inductive1 (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
-  codegen_print_inductive_type env sigma ind_cfg;
-  codegen_print_inductive_match env sigma ind_cfg
+let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
+  Feedback.msg_info (pr_codegen_indtype env sigma ind_cfg)
 
 let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   if CList.is_empty coq_type_list then
-    ConstrMap.iter (fun key ind_cfg -> codegen_print_inductive1 env sigma ind_cfg) !ind_config_map
+    ConstrMap.iter (fun key ind_cfg -> codegen_print_inductive_type env sigma ind_cfg) !ind_config_map
   else
     coq_type_list |> List.iter (fun user_coq_type ->
       let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
       match ConstrMap.find_opt (EConstr.to_constr sigma coq_type) !ind_config_map with
       | None -> user_err (Pp.str "[codegen] inductive type not registered:" +++
           Printer.pr_econstr_env env sigma coq_type)
-      | Some ind_cfg -> codegen_print_inductive1 env sigma ind_cfg)
+      | Some ind_cfg -> codegen_print_inductive_type env sigma ind_cfg)
 
 let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : Declarations.mutual_inductive_body * Declarations.one_inductive_body * Names.inductive puniverses * EConstr.constr array =
   let open Declarations in
@@ -366,7 +380,7 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
   let ind_cfg = register_ind_match env sigma t swfunc_opt cstr_cfgs in
   Feedback.msg_info (Pp.v 2
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
-     Pp.hv 0 (pr_inductive_match env sigma ind_cfg)));
+     Pp.hv 0 (pr_codegen_indtype env sigma ind_cfg)));
   ind_cfg
 
 let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
