@@ -625,7 +625,7 @@ let test_list = add_test test_list "test_tail_constructor_bool" begin fun (ctx :
     |}
 end
 
-let test_tail_constructor_args (ctx : test_ctxt) : unit =
+let test_list = add_test test_list "test_tail_constructor_args" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
@@ -648,7 +648,7 @@ let test_tail_constructor_args (ctx : test_ctxt) : unit =
       assert(call_bpair(true, false) == 2);
       assert(call_bpair(true, true) == 3);
     |}
-let test_list = ("test_tail_constructor_args" >:: test_tail_constructor_args) :: test_list
+end
 
 let test_list = add_test test_list "test_tail_constant_bool" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
@@ -838,7 +838,7 @@ let test_list = add_test test_list "test_pair_bool_bool" begin fun (ctx : test_c
     |}
 end
 
-let test_pair_2bool_bool (ctx : test_ctxt) : unit =
+let test_list = add_test test_list "test_pair_2bool_bool" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^ {|
       CodeGen IndType bool*bool => "pair_bool_bool" with
@@ -874,7 +874,7 @@ let test_pair_2bool_bool (ctx : test_ctxt) : unit =
       assert(fst_pair(v).snd == true);
       assert(snd_pair(v) == false);
     |}
-let test_list = ("test_pair_2bool_bool" >:: test_pair_2bool_bool) :: test_list
+end
 
 let test_list = add_test test_list "test_nat_add_rec" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
@@ -2777,7 +2777,7 @@ let test_list = add_test test_list "test_delete_unreachable_fixfuncs_reference_i
     |}
 end
 
-let test_primitive_projection (ctx : test_ctxt) : unit =
+let test_list = add_test test_list "test_primitive_projection" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^
     {|
@@ -2811,9 +2811,9 @@ let test_primitive_projection (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
-let test_list = ("test_primitive_projection" >:: test_primitive_projection) :: test_list
+end
 
-let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
+let test_list = add_test test_list "test_primitive_projection_nontail" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
     (bool_src ^
     {|
@@ -2848,7 +2848,7 @@ let test_primitive_projection_nontail (ctx : test_ctxt) : unit =
       assert(bbfst(make(false,true)) == false); assert(bbsnd(make(false,true)) == true);
       assert(bbfst(make(false,false)) == false); assert(bbsnd(make(false,false)) == false);
     |}
-let test_list = ("test_primitive_projection_nontail" >:: test_primitive_projection_nontail) :: test_list
+end
 
 let test_list = add_test test_list "test_matchapp_twoarg" begin fun (ctx : test_ctxt) ->
   codegen_test_template ctx
@@ -4028,7 +4028,7 @@ let boolbox_src = {|
       ".
 |}
 
-let test_linear_types (ctx : test_ctxt) : unit =
+let test_list = add_test test_list "test_linear_types" begin fun (ctx : test_ctxt) ->
   codegen_test_template ~goal:UntilCoq ctx
     ({|
       Inductive L : Type := CL : L.
@@ -4045,7 +4045,7 @@ let test_linear_types (ctx : test_ctxt) : unit =
       CodeGen TestLinearType M.
       CodeGen TestLinearType list L.
     |}) {| |}
-let test_list = ("test_linear_types" >:: test_linear_types) :: test_list
+end
 
 let test_list = add_test test_list "test_linear_novar" begin fun (ctx : test_ctxt) ->
   codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
