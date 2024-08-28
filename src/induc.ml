@@ -382,6 +382,24 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
   ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type) ind_cfg !ind_config_map;
   ind_cfg
 
+let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : string option)
+    (cstr_cfgs : cstr_config list) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
+
+let command_ind_type2 (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : cstr_config list) : unit =
+  let (c_type_opt, swfunc_opt) = indtype_ind_args in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  (match c_type_opt with
+  | None -> ()
+  | Some c_type -> ignore (register_ind_type env sigma coq_type c_type));
+  ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs);
+  ()
+
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   let ind_cfg0 = get_ind_config env sigma t in
   let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma t in
@@ -466,21 +484,3 @@ let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
    | Some str -> msg_debug_hov (pp +++ Pp.str "deallocator=" ++ Pp.str str));
   *)
   result
-
-let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : string option)
-    (cstr_cfgs : cstr_config list) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
-
-let command_ind_type2 (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : cstr_config list) : unit =
-  let (c_type_opt, swfunc_opt) = indtype_ind_args in
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  (match c_type_opt with
-  | None -> ()
-  | Some c_type -> ignore (register_ind_type env sigma coq_type c_type));
-  ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs);
-  ()
