@@ -32,7 +32,10 @@ let c_type_is_void (c_type : c_typedata) : bool = (c_type = c_type_void)
 let codegen_print_inductive_type (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
   Feedback.msg_info (Pp.str "CodeGen Inductive Type" +++
     Printer.pr_constr_env env sigma ind_cfg.ind_coq_type +++
-    Pp.str (quote_coq_string (compose_c_abstract_decl ind_cfg.ind_c_type)) ++ Pp.str ".")
+    (match ind_cfg.ind_c_type with
+    | None -> Pp.mt ()
+    | Some c_type -> Pp.str (quote_coq_string (compose_c_abstract_decl c_type))) ++
+    Pp.str ".")
 
 let pr_inductive_match (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : Pp.t =
   let f cstr_cfg =
@@ -168,53 +171,24 @@ and cstr_args_are_void_types (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_c
     true
   with Exit -> false
 
-let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) (c_type : c_typedata) : ind_config =
+let register_empty_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : ind_config =
   let (mutind_body, oneind_body, pind, args) = get_ind_coq_type env sigma coq_type in
   check_ind_coq_type_not_registered env sigma coq_type;
-  if coq_type_is_void_type env sigma coq_type then
-    begin
-      let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
-        Array.map (fun cstrname -> {
-            cstr_id = cstrname;
-            cstr_caselabel = None;
-            cstr_accessors = [||];
-            cstr_deallocator = None;
-          }) in
-      {
-        ind_coq_type=EConstr.to_constr sigma coq_type;
-        ind_c_type=c_type_void;
-        ind_c_swfunc=None;
-        ind_cstr_configs=cstr_cfgs;
-      }
-    end
-  else
-    begin
-      let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
-        Array.map (fun cstrname -> {
-            cstr_id = cstrname;
-            cstr_caselabel = None;
-            cstr_accessors = [||];
-            cstr_deallocator = None
-          }) in
-      let coq_type=EConstr.to_constr sigma coq_type in
-      let ind_cfg = {
-        ind_coq_type=coq_type;
-        ind_c_type=c_type;
-        ind_c_swfunc=None;
-        ind_cstr_configs=cstr_cfgs;
-      } in
-      ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
-      ind_cfg
-    end
-
-let generate_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let printed_type = mangle_term env sigma t in
-  let c_name = c_id (squeeze_white_spaces printed_type) in
-  let ind_cfg = register_ind_type env sigma t (simple_c_type c_name) in
-  Feedback.msg_info (Pp.v 2
-    (Pp.str "[codegen] inductive type translation automatically configured:" +++
-     (Pp.hv 2 (Pp.str "CodeGen Inductive Type" +++ Printer.pr_econstr_env env sigma t +++
-     Pp.str "=>" +++ Pp.str (escape_as_coq_string c_name) ++ Pp.str "."))));
+  let cstr_cfgs = oneind_body.Declarations.mind_consnames |>
+    Array.map (fun cstrname -> {
+        cstr_id = cstrname;
+        cstr_caselabel = None;
+        cstr_accessors = [||];
+        cstr_deallocator = None
+      }) in
+  let coq_type = EConstr.to_constr sigma coq_type in
+  let ind_cfg = {
+    ind_coq_type = coq_type;
+    ind_c_type = None;
+    ind_c_swfunc = None;
+    ind_cstr_configs = cstr_cfgs;
+  } in
+  ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map;
   ind_cfg
 
 let lookup_ind_config (sigma : Evd.evar_map) (t : EConstr.types) : ind_config option =
@@ -223,7 +197,44 @@ let lookup_ind_config (sigma : Evd.evar_map) (t : EConstr.types) : ind_config op
 let get_ind_config (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
   match lookup_ind_config sigma t with
   | Some ind_cfg -> ind_cfg
-  | None -> generate_ind_config env sigma t
+  | None -> register_empty_ind_type env sigma t
+
+let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) (c_type : c_typedata) : ind_config =
+  let ind_cfg =
+    match lookup_ind_config sigma t with
+    | None -> register_empty_ind_type env sigma t
+    | Some ind_cfg -> ind_cfg
+  in
+  match ind_cfg.ind_c_type with
+  | None ->
+      let ind_cfg2 = { ind_cfg with ind_c_type = Some c_type } in
+      let coq_type = EConstr.to_constr sigma t in
+      ind_config_map := ConstrMap.add coq_type ind_cfg2 !ind_config_map;
+      ind_cfg2
+  | Some c_type ->
+      user_err (Pp.str "[codegen] c_type already registered:" +++ Printer.pr_econstr_env env sigma t +++ Pp.str "=>" +++ pr_c_abstract_decl c_type)
+
+let generate_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  let c_type =
+    if coq_type_is_void_type env sigma t then
+      c_type_void
+    else
+      let printed_type = mangle_term env sigma t in
+      let c_name = c_id (squeeze_white_spaces printed_type) in
+      simple_c_type c_name
+  in
+  register_ind_type env sigma t c_type
+
+let get_or_gen_c_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
+  if isProd sigma t then
+    user_err (Pp.str "[codegen:get_or_gen_c_type] function type given:" +++ Printer.pr_econstr_env env sigma t)
+  else
+    match (get_ind_config env sigma t).ind_c_type with
+    | Some c_type -> c_type
+    | None ->
+        match (generate_ind_type env sigma t).ind_c_type with
+        | Some c_type -> c_type
+        | None -> user_err (Pp.str "[codegen:bug] generate_ind_type doesn't generate c_type")
 
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typedata) : unit =
   let env = Global.env () in
@@ -330,7 +341,7 @@ let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   if isProd sigma t then
     false
   else
-    c_type_is_void (get_ind_config env sigma t).ind_c_type
+    c_type_is_void (get_or_gen_c_type env sigma t)
 
 let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
   let arg_types =
@@ -348,7 +359,7 @@ let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typ
 let rec c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
   match EConstr.kind sigma t with
   | Prod _ -> c_type_pointer_to (c_type_pointer_to (c_closure_function_type env sigma t))
-  | _ -> (get_ind_config env sigma t).ind_c_type
+  | _ -> get_or_gen_c_type env sigma t
 and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
   let (args, ret_type) = decompose_prod sigma t in
   let arg_types =
@@ -360,7 +371,7 @@ and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : ECon
           user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
       args
   in
-  c_closure_type arg_types (get_ind_config env sigma ret_type).ind_c_type
+  c_closure_type arg_types (get_or_gen_c_type env sigma ret_type)
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in

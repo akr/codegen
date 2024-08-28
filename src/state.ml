@@ -157,7 +157,7 @@ type c_typedata = {
 
 type ind_config = {
   ind_coq_type : Constr.t;
-  ind_c_type : c_typedata;
+  ind_c_type : c_typedata option;
   ind_c_swfunc : string option;
   ind_cstr_configs : cstr_config array;
 }

@@ -261,29 +261,26 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : Environ.env * member_names ind_names =
   let { inm_pind=pind; inm_params=params } = ind_names in
   let coq_type_i = mkApp (mkIndU pind, params) in
-  let ind_cfg_opt = lookup_ind_config sigma coq_type_i in
   (* Merge information from CodeGen InductiveType COQ_TYPE => "C_TYPE" *)
-  let ind_names =
-    let inm_name =
-      match ind_cfg_opt with
-      | Some ind_cfg ->
-          if is_simple_c_type ind_cfg.ind_c_type then
-            ind_cfg.ind_c_type.c_type_left
+  let (ind_names, ind_cfg) =
+    let (inm_name, ind_cfg) =
+      match lookup_ind_config sigma coq_type_i with
+      | Some ({ ind_c_type = Some c_type } as ind_cfg) ->
+          if is_simple_c_type c_type then
+            (c_type.c_type_left, ind_cfg)
           else
-            user_err_hov (Pp.str "[codegen] inductive type already configured with complex C type:" +++ pr_c_abstract_decl ind_cfg.ind_c_type)
-      | None ->
+            user_err_hov (Pp.str "[codegen] inductive type already configured with complex C type:" +++ pr_c_abstract_decl c_type)
+      | _ ->
           let c_type = simple_c_type ind_names.inm_name in
-          ignore (register_ind_type env sigma coq_type_i c_type);
-          ind_names.inm_name
+          let ind_cfg = register_ind_type env sigma coq_type_i c_type in
+          (ind_names.inm_name, ind_cfg)
     in
-    { ind_names with inm_name }
+    ({ ind_names with inm_name }, ind_cfg)
   in
   (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => case "C_CASELABEL" accessor "C_ACCESSOR"* )* *)
-  let ind_names =
+  let (ind_names, ind_cfg) =
     let (swfunc_opt, cstr_cfgs) =
-      match ind_cfg_opt with
-      | Some { ind_c_swfunc=swfunc_opt; ind_cstr_configs=cstr_cfgs } -> (swfunc_opt, cstr_cfgs)
-      | None -> (None, [||])
+      let { ind_c_swfunc=swfunc_opt; ind_cstr_configs=cstr_cfgs } = ind_cfg in (swfunc_opt, cstr_cfgs)
     in
     let swfunc = Stdlib.Option.value swfunc_opt ~default:(ind_names.inm_swfunc) in
     let cstr_names_and_cstr_config_ary =
@@ -326,8 +323,8 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
     in
     let inm_cstrs = Array.map fst cstr_names_and_cstr_config_ary in
     let cstr_configs = CArray.map_to_list snd cstr_names_and_cstr_config_ary in
-    ignore (register_ind_match env sigma coq_type_i swfunc cstr_configs);
-    { ind_names with inm_swfunc=swfunc; inm_cstrs; }
+    let ind_cfg = register_ind_match env sigma coq_type_i swfunc cstr_configs in
+    ({ ind_names with inm_swfunc=swfunc; inm_cstrs; }, ind_cfg)
   in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, ind_names) =
@@ -352,8 +349,8 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
               if sp_icommand <> CodeGenPrimitive then
                 user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
               let (cn_enum_const, cn_members) =
-                match ind_cfg_opt with
-                | Some { ind_c_swfunc=Some _; ind_cstr_configs=cstr_cfgs } ->
+                match ind_cfg with
+                | { ind_c_swfunc=Some _; ind_cstr_configs=cstr_cfgs } ->
                     (match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
                     | Some { cstr_caselabel; cstr_accessors } ->
                         let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
