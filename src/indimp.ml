@@ -259,6 +259,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
 
 (* Merge generated names and user configuration.  Register generated names if no user configuration. *)
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : Environ.env * member_names ind_names =
+  (*msg_debug_hov (Pp.str "[codegen:register_indimp]");*)
   let { inm_pind=pind; inm_params=params } = ind_names in
   let coq_type_i = mkApp (mkIndU pind, params) in
   (* Merge information from CodeGen InductiveType COQ_TYPE => "C_TYPE" *)
@@ -279,10 +280,15 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
   in
   (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => case "C_CASELABEL" accessor "C_ACCESSOR"* )* *)
   let (ind_names, ind_cfg) =
-    let (swfunc_opt, cstr_cfgs) =
-      let { ind_c_swfunc=swfunc_opt; ind_cstr_configs=cstr_cfgs } = ind_cfg in (swfunc_opt, cstr_cfgs)
+    let (swfunc_opt, ind_names) =
+      match ind_cfg.ind_c_swfunc with
+      | None -> (Some ind_names.inm_swfunc, ind_names)
+      | Some swfunc -> (None, { ind_names with inm_swfunc=swfunc })
     in
-    let swfunc = Stdlib.Option.value swfunc_opt ~default:(ind_names.inm_swfunc) in
+    (*msg_debug_hov (Pp.str "[codegen:register_indimp]" +++
+      Pp.str "old_swfunc_opt=" ++ (match ind_cfg.ind_c_swfunc with | None -> Pp.str "None" | Some swfunc -> Pp.str swfunc) +++
+      Pp.str "new_swfunc_opt=" ++ (match swfunc_opt with | None -> Pp.str "None" | Some swfunc -> Pp.str swfunc));*)
+    let cstr_cfgs = ind_cfg.ind_cstr_configs in
     let cstr_names_and_cstr_config_ary =
       ind_names.inm_cstrs |> Array.map (fun cstr_names ->
         let { cn_id } = cstr_names in
@@ -323,8 +329,8 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
     in
     let inm_cstrs = Array.map fst cstr_names_and_cstr_config_ary in
     let cstr_configs = CArray.map_to_list snd cstr_names_and_cstr_config_ary in
-    let ind_cfg = register_ind_match env sigma coq_type_i swfunc cstr_configs in
-    ({ ind_names with inm_swfunc=swfunc; inm_cstrs; }, ind_cfg)
+    let ind_cfg = register_ind_match env sigma coq_type_i swfunc_opt cstr_configs in
+    ({ ind_names with inm_cstrs; }, ind_cfg)
   in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, ind_names) =
@@ -349,18 +355,16 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
               if sp_icommand <> CodeGenPrimitive then
                 user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
               let (cn_enum_const, cn_members) =
-                match ind_cfg with
-                | { ind_c_swfunc=Some _; ind_cstr_configs=cstr_cfgs } ->
-                    (match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
-                    | Some { cstr_caselabel; cstr_accessors } ->
-                        let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
-                        let cn_members =
-                          List.map2 (fun member_names c_accessor -> { member_names with member_accessor = Stdlib.Option.value c_accessor ~default:member_names.member_accessor })
-                            cn_members (Array.to_list cstr_accessors)
-                        in
-                        (cn_enum_const, cn_members)
-                    | None -> (cn_enum_const, cn_members))
-                | _ -> (cn_enum_const, cn_members)
+                let cstr_cfgs = ind_cfg.ind_cstr_configs in
+                match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
+                | Some { cstr_caselabel; cstr_accessors } ->
+                    let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
+                    let cn_members =
+                      List.map2 (fun member_names c_accessor -> { member_names with member_accessor = Stdlib.Option.value c_accessor ~default:member_names.member_accessor })
+                        cn_members (Array.to_list cstr_accessors)
+                    in
+                    (cn_enum_const, cn_members)
+                | None -> (cn_enum_const, cn_members)
               in
               let cstr_names = { cstr_names with cn_name; cn_enum_const; cn_members } in
               (env, cstr_names))
@@ -788,6 +792,7 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   ()
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
+  msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type);
   (* msg_info_hov (Pp.str "[codegen] generate_indimp_heap:" +++ Printer.pr_econstr_env env sigma coq_type); *)
   let ind_names = generate_indimp_names env sigma coq_type ~global_prefix:indimp_mods.indimp_mods_prefix ~heap:true in
   let env, ind_names = register_indimp env sigma ind_names in

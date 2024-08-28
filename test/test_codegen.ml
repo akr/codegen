@@ -427,7 +427,7 @@ let template_coq_success
 
 let bool_src = {|
       CodeGen InductiveType bool => "bool".
-      CodeGen InductiveMatch bool with
+      CodeGen InductiveMatch bool => "" with
       | true => case ""
       | false => case "0".
       CodeGen Constant true => "true".
@@ -440,7 +440,7 @@ let bool_src = {|
 
 let bool_paren_src = {|
       CodeGen InductiveType bool => "bool (" ")". (* redundant parenthesis *)
-      CodeGen InductiveMatch bool with
+      CodeGen InductiveMatch bool => "" with
       | true => case ""
       | false => case "0".
       CodeGen Constant true => "true".
@@ -469,7 +469,7 @@ let struct_bool_src = {|
 
 let nat_src = {|
       CodeGen InductiveType nat => "nat".
-      CodeGen InductiveMatch nat with
+      CodeGen InductiveMatch nat => "" with
       | O => case "0"
       | S => case "" accessor "nat_pred".
       CodeGen Constant O => "0".
@@ -3883,7 +3883,7 @@ let test_list = add_test test_list "test_indimp_multifile_private_type_impl" beg
         end.
       Set CodeGen IndImpAutoLinear.
       CodeGen InductiveType bool => "int".
-      CodeGen InductiveMatch bool with
+      CodeGen InductiveMatch bool => "" with
       | true => case ""
       | false => case "0".
       CodeGen Constant true => "1".

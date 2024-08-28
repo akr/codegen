@@ -46,6 +46,14 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 }
 
 (*
+  CodeGen IndType COQ_TYPE =>
+    ["C_TYPE_LEFT" ["C_TYPE_RIGHT"]]
+    [swfunc "C_SWFUNC"]
+    [ with ( | CONSTRUCTOR =>
+      [case "C_CASELABEL"]
+      [accessor "C_ACCESSOR"*]
+      [deallocator "C_DEALLOCATOR"] )* ].
+
   CodeGen InductiveType COQ_TYPE => "C_TYPE".
   CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
   CodeGen InductiveMatch COQ_TYPE [ => "C_SWFUNC" ] ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] [deallocator "C_DEALLOCATOR"])* )?.
@@ -290,14 +298,31 @@ VERNAC ARGUMENT EXTEND indimp_mods
 | [] -> { indimp_mods_empty }
 END
 
+VERNAC ARGUMENT EXTEND indtype_c_type
+| [ string(c_type_left) string(c_type_right) ] -> { { c_type_left; c_type_right } }
+| [ string(c_type) ] -> { { c_type_left=c_type; c_type_right="" } }
+END
+
+VERNAC ARGUMENT EXTEND indtype_swfunc
+| [ "swfunc" string(swfunc) ] -> { swfunc }
+END
+
+VERNAC ARGUMENT EXTEND indtype_ind_args
+| [ "=>" indtype_c_type_opt(c_type_opt) indtype_swfunc_opt(swfunc_opt) ] -> { (c_type_opt, swfunc_opt) }
+| [] -> { (None, None) }
+END
+
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
+    | [ "CodeGen" "IndType" lconstr(coq_type) indtype_ind_args(indtype_ind_args) indmatch_cstrs(cstr_config_list) ] ->
+      { command_ind_type2 coq_type indtype_ind_args cstr_config_list }
+
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type_left) string(c_type_right) ] ->
       { command_ind_type coq_type { c_type_left; c_type_right } }
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
       { command_ind_type coq_type (simple_c_type c_type) }
 
-    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indmatch_swfunc_opt(swfunc) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
-      { command_ind_match coq_type (Stdlib.Option.value swfunc ~default:"") cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indmatch_swfunc_opt(swfunc_opt) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
+      { command_ind_match coq_type swfunc_opt cstr_caselabel_accesors_list }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
