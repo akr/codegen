@@ -228,28 +228,6 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.ty
   | Some c_type ->
       user_err (Pp.str "[codegen] c_type already registered:" +++ Printer.pr_econstr_env env sigma t +++ Pp.str "=>" +++ pr_c_abstract_decl c_type)
 
-let generate_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
-  let c_type =
-    if coq_type_is_void_type env sigma t then
-      c_type_void
-    else
-      let printed_type = mangle_term env sigma t in
-      let c_name = c_id (squeeze_white_spaces printed_type) in
-      simple_c_type c_name
-  in
-  register_ind_type env sigma t c_type
-
-let get_or_gen_c_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
-  if isProd sigma t then
-    user_err (Pp.str "[codegen:get_or_gen_c_type] function type given:" +++ Printer.pr_econstr_env env sigma t)
-  else
-    match (get_ind_config env sigma t).ind_c_type with
-    | Some c_type -> c_type
-    | None ->
-        match (generate_ind_type env sigma t).ind_c_type with
-        | Some c_type -> c_type
-        | None -> user_err (Pp.str "[codegen:bug] generate_ind_type doesn't generate c_type")
-
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typedata) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
@@ -284,6 +262,64 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_conf
     match List.find_opt (fun v -> Id.equal consname (cstr_of v)) s with
     | None -> { cstr_id=consname; cstr_caselabel=None; cstr_accessors=[||]; cstr_deallocator=None }
     | Some v -> v)
+
+let generate_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
+  let c_type =
+    if coq_type_is_void_type env sigma t then
+      c_type_void
+    else
+      let printed_type = mangle_term env sigma t in
+      let c_name = c_id (squeeze_white_spaces printed_type) in
+      simple_c_type c_name
+  in
+  register_ind_type env sigma t c_type
+
+let get_or_gen_c_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
+  if isProd sigma t then
+    user_err (Pp.str "[codegen:get_or_gen_c_type] function type given:" +++ Printer.pr_econstr_env env sigma t)
+  else
+    match (get_ind_config env sigma t).ind_c_type with
+    | Some c_type -> c_type
+    | None ->
+        match (generate_ind_type env sigma t).ind_c_type with
+        | Some c_type -> c_type
+        | None -> user_err (Pp.str "[codegen:bug] generate_ind_type doesn't generate c_type")
+
+let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
+  if isProd sigma t then
+    false
+  else
+    c_type_is_void (get_or_gen_c_type env sigma t)
+
+let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
+  let arg_types =
+    rcons
+      (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
+      { c_type_left="void *"; c_type_right="" } (* closure invocation pass the closure itself as the last argument *)
+  in
+  let arg_abstract_decls = List.map compose_c_abstract_decl arg_types in
+  (* closure type in C is a pointer to pointer to function that is actually
+     pointer to the first member of closure struct where the first member is a pointer to a function  *)
+  let declarator_left = "" in
+  let declarator_right = "(" ^ String.concat ", " arg_abstract_decls ^ ")" in
+  compose_c_type ret_type declarator_left declarator_right
+
+let rec c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
+  match EConstr.kind sigma t with
+  | Prod _ -> c_type_pointer_to (c_type_pointer_to (c_closure_function_type env sigma t))
+  | _ -> get_or_gen_c_type env sigma t
+and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
+  let (args, ret_type) = decompose_prod sigma t in
+  let arg_types =
+    List.rev_map
+      (fun (x, ty) ->
+        if Vars.closed0 sigma ty then
+          c_typename env sigma ty
+        else
+          user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
+      args
+  in
+  c_closure_type arg_types (get_or_gen_c_type env sigma ret_type)
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t)
      (swfunc_opt : string option) (cstr_cfgs : cstr_config list) : ind_config =
@@ -382,42 +418,6 @@ let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t
     (Pp.str "[codegen] match-expression translation automatically configured:" +++
      Pp.hv 0 (pr_codegen_indtype env sigma ind_cfg)));
   ind_cfg
-
-let ind_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : bool =
-  if isProd sigma t then
-    false
-  else
-    c_type_is_void (get_or_gen_c_type env sigma t)
-
-let c_closure_type (arg_types : c_typedata list) (ret_type : c_typedata) : c_typedata =
-  let arg_types =
-    rcons
-      (List.filter (fun c_ty -> not (c_type_is_void c_ty)) arg_types)
-      { c_type_left="void *"; c_type_right="" } (* closure invocation pass the closure itself as the last argument *)
-  in
-  let arg_abstract_decls = List.map compose_c_abstract_decl arg_types in
-  (* closure type in C is a pointer to pointer to function that is actually
-     pointer to the first member of closure struct where the first member is a pointer to a function  *)
-  let declarator_left = "" in
-  let declarator_right = "(" ^ String.concat ", " arg_abstract_decls ^ ")" in
-  compose_c_type ret_type declarator_left declarator_right
-
-let rec c_typename (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
-  match EConstr.kind sigma t with
-  | Prod _ -> c_type_pointer_to (c_type_pointer_to (c_closure_function_type env sigma t))
-  | _ -> get_or_gen_c_type env sigma t
-and c_closure_function_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : c_typedata =
-  let (args, ret_type) = decompose_prod sigma t in
-  let arg_types =
-    List.rev_map
-      (fun (x, ty) ->
-        if Vars.closed0 sigma ty then
-          c_typename env sigma ty
-        else
-          user_err (Pp.str "[codegen] dependent type given for c_typename:" +++ Printer.pr_econstr_env env sigma t))
-      args
-  in
-  c_closure_type arg_types (get_or_gen_c_type env sigma ret_type)
 
 let case_swfunc (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : string =
   let ind_cfg = get_ind_config env sigma t in
