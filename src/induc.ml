@@ -242,18 +242,22 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typeda
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_type env sigma coq_type c_type)
 
-let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (cstr_of : 'a -> Id.t) (s : 'a list) : 'a array =
-  (if List.length s <> Array.length oneind_body.Declarations.mind_consnames then
-    user_err (Pp.str "[codegen] invalid number of constructors:" +++
-      Pp.str "needs" +++
-      Pp.int (Array.length oneind_body.Declarations.mind_consnames) +++
-      Pp.str "but" +++
-      Pp.int (List.length s)));
+let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_config list) : cstr_config array =
+  let cstr_of = fun { cstr_id } -> cstr_id in
+  (let unexpected_cstr_ids =
+    s |> List.filter_map (fun { cstr_id } ->
+      if Array.exists (Id.equal cstr_id) oneind_body.Declarations.mind_consnames then
+        None
+      else
+        Some cstr_id)
+  in
+  if not (CList.is_empty unexpected_cstr_ids) then
+    user_err (
+      Pp.str "[codegen] unexpected constructor:" +++
+      pp_sjoinmap_list Id.print unexpected_cstr_ids));
   oneind_body.Declarations.mind_consnames |> Array.map (fun consname ->
     match List.find_opt (fun v -> Id.equal consname (cstr_of v)) s with
-    | None -> user_err (
-      Pp.str "[codegen] constructor not found:" +++
-        Id.print consname);
+    | None -> { cstr_id=consname; cstr_caselabel=None; cstr_accessors=[||]; cstr_deallocator=None }
     | Some v -> v)
 
 let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t)
@@ -267,7 +271,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
       Printer.pr_econstr_env env sigma coq_type)
   | None -> ());
   *)
-  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun { cstr_id } -> cstr_id) cstr_cfgs in
+  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body cstr_cfgs in
   let f j0 cstr_cfg { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors; cstr_deallocator=deallocator } =
     let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
     (if num_members < Array.length accessors then

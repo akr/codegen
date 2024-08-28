@@ -105,15 +105,13 @@ CodeGen SourceFile "sample/rank_generated.c".
 
 CodeGen Linear MDArr.
 
-CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool with
+CodeGen IndType bool => "bool" swfunc "" with
 | true => case ""
 | false => case "0".
 CodeGen Constant true => "true".
 CodeGen Constant false => "false".
 
-CodeGen InductiveType nat => "nat".
-CodeGen InductiveMatch nat with
+CodeGen IndType nat => "nat" swfunc "" with
 | O => case "0"
 | S => case "" accessor "predn".
 CodeGen Constant O => "0".
@@ -129,32 +127,27 @@ CodeGen Primitive eqb => "eqb".
 CodeGen Primitive negb => "negb".
 CodeGen Primitive eqn => "eqn".
 
-CodeGen InductiveType bits => "bits".
-CodeGen InductiveType DArr => "DArr".
-CodeGen InductiveType MDArr => "MDArr".
-CodeGen InductiveMatch MDArr with
+CodeGen IndType bits => "bits".
+CodeGen IndType DArr => "DArr".
+CodeGen IndType MDArr => "MDArr" with
 | mdarr => deallocator "dealloc_MDArr".
 
-CodeGen InductiveType MDArr*MDArr => "pair_MDArr_MDArr".
-CodeGen InductiveMatch MDArr*MDArr with
+CodeGen IndType MDArr*MDArr => "pair_MDArr_MDArr" with
 | pair => accessor "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen Primitive @pair MDArr MDArr => "make_pair_MDArr_MDArr".
 CodeGen IndImp MDArr*MDArr.
 
-CodeGen InductiveType MDArr*nat => "pair_MDArr_nat".
-CodeGen InductiveMatch MDArr*nat with
+CodeGen IndType MDArr*nat => "pair_MDArr_nat" with
 | pair => accessor "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen Primitive @pair MDArr nat => "make_pair_MDArr_nat".
 CodeGen IndImp MDArr*nat.
 
-CodeGen InductiveType MDArr*MDArr*nat => "pair_2MDArr_nat".
-CodeGen InductiveMatch MDArr*MDArr*nat with
+CodeGen IndType MDArr*MDArr*nat => "pair_2MDArr_nat" with
 | pair => accessor "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen Primitive @pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
 CodeGen IndImp MDArr*MDArr*nat.
 
-CodeGen InductiveType Aux => "Aux".
-CodeGen InductiveMatch Aux with
+CodeGen IndType Aux => "Aux" with
 | mkAux => accessor
   "aux_query_bit" "aux_input_bits" "aux_blksz2"
   "aux_ratio" "aux_dir1" "aux_dir2".

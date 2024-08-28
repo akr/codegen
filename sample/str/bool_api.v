@@ -2,8 +2,7 @@ Require Import codegen.codegen.
 
 Require Import bool.
 
-CodeGen InductiveType bool => "bool".
-CodeGen InductiveMatch bool with
+CodeGen IndType bool => "bool" swfunc "" with
 | true => case "true"
 | false => case "false".
 CodeGen Constant true => "true".

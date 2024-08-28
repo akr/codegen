@@ -6,8 +6,7 @@ Require Import str.
 
 Require Import String.
 
-CodeGen InductiveType string => "str_t".
-CodeGen InductiveMatch string => "str_sw" with
+CodeGen IndType string => "str_t" swfunc "str_sw" with
 | EmptyString => case "0"
 | String => case "" accessor "str_head" "str_tail".
 
