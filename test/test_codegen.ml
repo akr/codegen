@@ -5204,6 +5204,26 @@ let test_list = add_test test_list "test_nofunc" begin fun (ctx : test_ctxt) ->
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_indtype_unexpected_constructor" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] unexpected constructor:") ctx
+    ({|
+      CodeGen IndType bool => "bool" swfunc "" with
+      | foo => case "1"
+      | true => case "0".
+    |}) {| |}
+end
+
+let test_list = add_test test_list "test_indtype_duplicated_constructors" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] constructor specified multiple times:") ctx
+    ({|
+      CodeGen IndType bool => "bool" swfunc "" with
+      | true => case "1"
+      | true => case "0".
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 

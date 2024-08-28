@@ -252,9 +252,20 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_conf
         Some cstr_id)
   in
   if not (CList.is_empty unexpected_cstr_ids) then
-    user_err (
-      Pp.str "[codegen] unexpected constructor:" +++
-      pp_sjoinmap_list Id.print unexpected_cstr_ids));
+    user_err ( Pp.str "[codegen] unexpected constructor:" +++ pp_sjoinmap_list Id.print unexpected_cstr_ids));
+  begin
+    let cstr_id_counts =
+      List.fold_left
+        (fun m { cstr_id } -> Id.Map.add cstr_id (1 + Stdlib.Option.value (Id.Map.find_opt cstr_id m) ~default:0) m)
+        Id.Map.empty
+        s
+    in
+    let duplicated_cstr_ids =
+      (Id.Map.bindings cstr_id_counts) |> List.filter_map (fun (cstr_id, n) -> if 1 < n then Some cstr_id else None)
+    in
+    if not (CList.is_empty duplicated_cstr_ids) then
+      user_err ( Pp.str "[codegen] constructor specified multiple times:" +++ pp_sjoinmap_list Id.print duplicated_cstr_ids)
+  end;
   oneind_body.Declarations.mind_consnames |> Array.map (fun consname ->
     match List.find_opt (fun v -> Id.equal consname (cstr_of v)) s with
     | None -> { cstr_id=consname; cstr_caselabel=None; cstr_accessors=[||]; cstr_deallocator=None }
