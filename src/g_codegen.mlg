@@ -54,9 +54,6 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
       [accessor "C_ACCESSOR"*]
       [deallocator "C_DEALLOCATOR"] )* ].
 
-  CodeGen InductiveType COQ_TYPE => "C_TYPE".
-  CodeGen InductiveType COQ_TYPE => "C_TYPE_LEFT" "C_TYPE_RIGHT".
-  CodeGen InductiveMatch COQ_TYPE [ => "C_SWFUNC" ] ( with ( | CONSTRUCTOR => [case "C_CASELABEL"] [accessor "C_ACCESSOR"*] [deallocator "C_DEALLOCATOR"])* )?.
   CodeGen Primitive CONSTRUCTOR ARG_OR_HOLE* => "C_CONSTRUCTOR".
   CodeGen Constant CONSTRUCTOR ARG* => "C_CONSTANT".
 
@@ -69,21 +66,22 @@ open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 
   Example:
 
-  CodeGen InductiveType bool => "bool".
-  CodeGen InductiveMatch bool with true => case "" | false => case "0".
-  CodeGen Primitive true => "true".
-  CodeGen Primitive false => "false".
+  CodeGen IndType bool => "bool" swfunc "" with true => case "" | false => case "0".
+  CodeGen Constant true => "true".
+  CodeGen Constant false => "false".
   Print CodeGen Inductive bool.
 
-  CodeGen InductiveType nat => "uint64_t".
-  CodeGen InductiveMatch nat with O => case "0" | S => case "" accessor "pred".
-  CodeGen Primitive O => "0".
+  CodeGen IndType nat => "uint64_t" swfunc "" with
+  | O => case "0"
+  | S => case "" accessor "pred".
+  CodeGen Constant O => "0".
   CodeGen Primitive S => "succ".
   Print CodeGen Inductive nat.
 
-  CodeGen InductiveType option bool => "int".
-  CodeGen InductiveMatch option bool with None => case "-1" | Some => case "" accessor "".
-  CodeGen Primitive @None bool => "(-1)".
+  CodeGen IndType option bool => "int" swfunc "" with
+  | None => case "-1"
+  | Some => case "" accessor "".
+  CodeGen Constant @None bool => "(-1)".
   CodeGen Primitive @Some bool => "(int)".
   Print CodeGen Inductive (option bool).
 
