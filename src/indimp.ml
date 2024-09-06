@@ -119,6 +119,12 @@ type member_names = {
   member_accessor: string;
 }
 
+type nvmember_names = {
+  nvmember_type: c_typedata; (* non-void *)
+  nvmember_name: string;
+  nvmember_accessor: string;
+}
+
 type 't cstr_names = {
   cn_j: int;
   cn_id: Id.t;
@@ -126,7 +132,7 @@ type 't cstr_names = {
   cn_enum_const: string;
   cn_struct_tag: string;
   cn_umember: string; (* union member name *)
-  cn_members: 't list;
+  cn_members: 't list; (* member_names list or nvmember_names list *)
   cn_deallocator_lazy: string option Lazy.t;
 }
 
@@ -175,12 +181,6 @@ let pr_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_
   Pp.str "}")
 
 let _ = ignore pr_ind_names
-
-type nvmember_names = {
-  nvmember_type: c_typedata;
-  nvmember_name: string;
-  nvmember_accessor: string;
-}
 
 let non_void_cstr_members (cn_members : member_names list) : nvmember_names list =
   cn_members |> List.filter_map (fun { member_type_lazy; member_name; member_accessor } ->
