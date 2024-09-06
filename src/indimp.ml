@@ -57,6 +57,7 @@ let merge_indimp_mods (mods1 : indimp_mods) (mods2 : indimp_mods) : indimp_mods 
     indimp_mods_static = optmerge "static" mods1.indimp_mods_static mods2.indimp_mods_static;
   }
 
+(* ind_recursive_p checks only non-mutual recursion.  ind_mutual_p should be checked as well. *)
 let ind_recursive_p (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let open Declarations in
   let (f, _params) = decompose_appvect sigma coq_type in
