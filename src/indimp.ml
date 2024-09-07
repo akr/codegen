@@ -417,7 +417,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
       let params0 = Array.map (fun param -> Some param) params in
       CArray.fold_left_map
         (fun env cstr_names ->
-          let { cn_j; cn_id; cn_name; cn_enum_const; cn_members } = cstr_names in
+          let { cn_j; cn_id; cn_name; } = cstr_names in
           let cstrterm = mkConstructUi (pind, cn_j) in
           let cstrterm0 = EConstr.to_constr sigma cstrterm in
           ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
@@ -433,19 +433,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
               if not (valid_c_id_p cn_name) then user_err_hov (Pp.str "[codegen] IndImp needs constructor name as a valid C identifier:" +++ Pp.str (quote_coq_string cn_name));
               if sp_icommand <> CodeGenPrimitive then
                 user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
-              let (cn_enum_const, cn_members) =
-                let cstr_cfgs = ind_cfg.ind_cstr_configs in
-                match array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id ) cstr_cfgs with
-                | Some { cstr_caselabel; cstr_accessors } ->
-                    let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
-                    let cn_members =
-                      List.map2 (fun member_names c_accessor -> { member_names with member_accessor = Stdlib.Option.value c_accessor ~default:member_names.member_accessor })
-                        cn_members (Array.to_list cstr_accessors)
-                    in
-                    (cn_enum_const, cn_members)
-                | None -> (cn_enum_const, cn_members)
-              in
-              let cstr_names = { cstr_names with cn_name; cn_enum_const; cn_members } in
+              let cstr_names = { cstr_names with cn_name } in
               (env, cstr_names))
         env ind_names.inm_cstrs
     in
