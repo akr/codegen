@@ -412,33 +412,37 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
   ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type_i) ind_cfg !ind_config_map;
   let ind_names = put_ind_config_in_ind_names env sigma ind_names ind_cfg in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
-  let (env, ind_names) =
-    let (env, inm_cstrs) =
-      let params0 = Array.map (fun param -> Some param) params in
-      CArray.fold_left_map
-        (fun env cstr_names ->
-          let { cn_j; cn_id; cn_name; } = cstr_names in
-          let cstrterm = mkConstructUi (pind, cn_j) in
-          let cstrterm0 = EConstr.to_constr sigma cstrterm in
-          ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
-          let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
-          match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
-          | None ->
-              let spi = { spi_cfunc_name = Some cn_name; spi_presimp_id = None; spi_simplified_id = None } in
-              let (env, _sp_cfg, _sp_inst, _sp_interface) = codegen_instance_command_primitive env sigma false cstrterm params0 (Some spi) in
-              (env, cstr_names)
-          | Some (_, { sp_interface = None }) ->
-              user_err_hov (Pp.str "[codegen] CodeGen IndImp-generating inductive type has a constructor prohibited by CodeGen NoFunc:" +++ Id.print cn_id);
-          | Some (_sp_cfg, { sp_interface = Some { sp_cfunc_name = cn_name }; sp_icommand }) ->
-              if not (valid_c_id_p cn_name) then user_err_hov (Pp.str "[codegen] IndImp needs constructor name as a valid C identifier:" +++ Pp.str (quote_coq_string cn_name));
-              if sp_icommand <> CodeGenPrimitive then
-                user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
-              let cstr_names = { cstr_names with cn_name } in
-              (env, cstr_names))
-        env ind_names.inm_cstrs
-    in
-    (env, { ind_names with inm_cstrs })
+  let (env, tuples) =
+    let params0 = Array.map (fun param -> Some param) params in
+    CArray.fold_left_map
+      (fun env cstr_names ->
+        let { cn_j; cn_id; cn_name; } = cstr_names in
+        let cstrterm = mkConstructUi (pind, cn_j) in
+        let cstrterm0 = EConstr.to_constr sigma cstrterm in
+        ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
+        let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
+        match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
+        | None ->
+            let spi = { spi_cfunc_name = Some cn_name; spi_presimp_id = None; spi_simplified_id = None } in
+            let (env, _sp_cfg, sp_inst, sp_interface) = codegen_instance_command_primitive env sigma false cstrterm params0 (Some spi) in
+            (env, (cstr_names, sp_inst, sp_interface))
+        | Some (_sp_cfg, { sp_interface = None }) ->
+            user_err_hov (Pp.str "[codegen] CodeGen IndImp-generating inductive type has a constructor prohibited by CodeGen NoFunc:" +++ Id.print cn_id);
+        | Some (_sp_cfg, ({ sp_interface = Some sp_interface } as sp_inst)) ->
+            (env, (cstr_names, sp_inst, sp_interface)))
+      env ind_names.inm_cstrs
   in
+  let inm_cstrs =
+    tuples |> Array.map (fun (cstr_names, sp_inst, sp_interface) ->
+      let { cn_id } = cstr_names in
+      let { sp_icommand } = sp_inst in
+      let { sp_cfunc_name = cn_name } = sp_interface in
+      if sp_icommand <> CodeGenPrimitive then
+        user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
+      if not (valid_c_id_p cn_name) then user_err_hov (Pp.str "[codegen] IndImp needs constructor name as a valid C identifier:" +++ Pp.str (quote_coq_string cn_name));
+      { cstr_names with cn_name })
+  in
+  let ind_names = { ind_names with inm_cstrs } in
   (env, ind_names)
 
 let pr_static (static : bool option) : Pp.t =
