@@ -258,81 +258,159 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
   (*msg_info_v (pr_ind_names env sigma result);*)
   result
 
+let get_ind_config_from_ind_names (sigma : Evd.evar_map) (ind_names : member_names ind_names) : ind_config =
+  let { inm_pind; inm_params; inm_name; inm_swfunc; inm_cstrs } = ind_names in
+  let ind_coq_type = EConstr.to_constr sigma (mkApp (mkIndU inm_pind, inm_params)) in
+  let ind_c_type = Some (simple_c_type inm_name) in
+  let ind_c_swfunc = Some inm_swfunc in
+  let ind_cstr_configs =
+    inm_cstrs |> Array.map (fun { cn_id; cn_enum_const; cn_members; cn_deallocator_lazy } ->
+      let cstr_id = cn_id in
+      let cstr_caselabel = Some cn_enum_const in
+      let cstr_deallocator = Some cn_deallocator_lazy in
+      let cstr_accessors = cn_members |> CArray.map_of_list (fun { member_name } -> Some member_name) in
+      { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator; })
+  in
+  { ind_coq_type; ind_c_type; ind_c_swfunc; ind_cstr_configs }
+
+(* This forces computation of deallocator *)
+let check_user_ind_config (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind_config) : unit =
+  let { ind_coq_type; ind_c_type; ind_c_swfunc; ind_cstr_configs; } = ind_cfg in
+  begin
+    match ind_c_type with
+    | None -> ()
+    | Some ({ c_type_left; c_type_right } as c_type) ->
+        if not (valid_c_id_p c_type_left && CString.is_empty c_type_right) then
+          user_err_hov (Pp.str "[codegen] IndImp needs C type name as a valid C identifier:" +++ pr_c_abstract_decl c_type)
+  end;
+  begin
+    match ind_c_swfunc with
+    | None -> ()
+    | Some swfunc -> if not (valid_c_id_p swfunc) then user_err_hov (Pp.str "[codegen] IndImp needs swfunc as a valid C identifier:" +++ Pp.str (quote_coq_string swfunc))
+  end;
+  ind_cstr_configs |> Array.iter (fun { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator; } ->
+    begin
+      match cstr_caselabel with
+      | None -> ()
+      | Some caselabel -> if not (valid_c_id_p caselabel) then user_err_hov (Pp.str "[codegen] IndImp needs caselabel as a valid C identifier:" +++ Pp.str (quote_coq_string caselabel))
+    end;
+    begin
+      match cstr_deallocator with
+      | None -> ()
+      | Some (lazy None) -> ()
+      | Some (lazy (Some dealloc)) ->
+          user_err_hov (Pp.str "[codegen] IndImp needs deallocator not configured:" +++
+          Printer.pr_constr_env env sigma ind_coq_type +++ Id.print cstr_id +++ Pp.str (quote_coq_string dealloc))
+    end;
+    cstr_accessors |> Array.iter (fun accessor ->
+      match accessor with
+      | None -> ()
+      | Some access ->
+          if not (valid_c_id_p access) then user_err_hov (Pp.str "[codegen] IndImp needs accessor as a valid C identifier:" +++ Pp.str (quote_coq_string access))))
+
+let merge_option_right_preference (o1 : 't option) (o2 : 't option) : 't option =
+  match o1, o2 with
+  | None, None -> None
+  | None, Some _ -> o2
+  | Some _, None -> o1
+  | Some _, Some _ -> o2
+
+let merge_ind_config_right_preference (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg1 : ind_config) (ind_cfg2 : ind_config) : ind_config =
+  let { ind_coq_type=ind_coq_type1; ind_c_type=ind_c_type1; ind_c_swfunc=ind_c_swfunc1; ind_cstr_configs=ind_cstr_configs1 } = ind_cfg1 in
+  let { ind_coq_type=ind_coq_type2; ind_c_type=ind_c_type2; ind_c_swfunc=ind_c_swfunc2; ind_cstr_configs=ind_cstr_configs2 } = ind_cfg2 in
+  if not (Constr.equal ind_coq_type1 ind_coq_type2) then
+    user_err_hov (Pp.str "[codegen:merge_ind_config_right_preference] different ind_coq_type:" +++ Printer.pr_constr_env env sigma ind_coq_type1 +++ Printer.pr_constr_env env sigma ind_coq_type2);
+  let ind_coq_type = ind_coq_type1 in
+  let ind_c_type = merge_option_right_preference ind_c_type1 ind_c_type2 in
+  let ind_c_swfunc = merge_option_right_preference ind_c_swfunc1 ind_c_swfunc2 in
+  let ind_cstr_configs =
+    Array.map2
+      (fun cstr_config1 cstr_config2 ->
+        let { cstr_id=cstr_id1; cstr_caselabel=cstr_caselabel1; cstr_accessors=cstr_accessors1; cstr_deallocator=cstr_deallocator1; } = cstr_config1 in
+        let { cstr_id=cstr_id2; cstr_caselabel=cstr_caselabel2; cstr_accessors=cstr_accessors2; cstr_deallocator=cstr_deallocator2; } = cstr_config2 in
+        if not (Id.equal cstr_id1 cstr_id2) then
+          user_err_hov (Pp.str "[codegen:merge_ind_config_right_preference] different cstr_id:" +++ Id.print cstr_id1 +++ Id.print cstr_id2);
+        let cstr_id = cstr_id1 in
+        let cstr_caselabel = merge_option_right_preference cstr_caselabel1 cstr_caselabel2 in
+        let cstr_accessors =
+          let n1 = Array.length cstr_accessors1 in
+          let n2 = Array.length cstr_accessors2 in
+          Array.init (if n1 < n2 then n2 else n1) (fun i ->
+            let accessor1 = if i < n1 then cstr_accessors1.(i) else None in
+            let accessor2 = if i < n2 then cstr_accessors2.(i) else None in
+            merge_option_right_preference accessor1 accessor2)
+        in
+        let cstr_deallocator =
+          match cstr_deallocator1, cstr_deallocator2 with
+          | None, None -> None
+          | None, Some _ -> cstr_deallocator2
+          | Some _, None -> cstr_deallocator1
+          | Some str_opt_lazy1, Some str_opt_lazy2 ->
+              Some (lazy begin
+                let (lazy str_opt1, lazy str_opt2) = (str_opt_lazy1, str_opt_lazy2) in
+                merge_option_right_preference str_opt1 str_opt2
+              end)
+        in
+        { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator })
+      ind_cstr_configs1 ind_cstr_configs2
+  in
+  { ind_coq_type; ind_c_type; ind_c_swfunc; ind_cstr_configs }
+
+let put_ind_config_in_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) (ind_cfg : ind_config) : member_names ind_names =
+  let { inm_name; inm_swfunc; inm_cstrs } = ind_names in
+  let { ind_coq_type; ind_c_type; ind_c_swfunc; ind_cstr_configs; } = ind_cfg in
+  let inm_name =
+    match ind_c_type with
+    | None -> inm_name
+    | Some c_type -> c_type.c_type_left (* check_user_ind_config checks c_type is a simple C identifier *)
+  in
+  let inm_swfunc = Stdlib.Option.value ind_cfg.ind_c_swfunc ~default:inm_swfunc in
+  let inm_cstrs =
+    Array.map2 (fun ({ cn_id; cn_enum_const; cn_members; cn_deallocator_lazy; } as cstr_names)
+                    { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator; } ->
+        let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
+        (* cstr_deallocator is ignored because check_user_ind_config checks that it is not specified *)
+        let cn_members =
+          let n1 = List.length cn_members in
+          let n2 = Array.length cstr_accessors in
+          if n1 <> n2 then
+            user_err_hov (Pp.str "[codegen:put_ind_config_in_ind_names] n1 <> n2");
+          Array.init n1 (fun i ->
+            let { member_accessor } as cn_mem = List.nth cn_members i in
+            let accessor2 = cstr_accessors.(i) in
+            let member_accessor = Stdlib.Option.value accessor2 ~default:member_accessor in
+            { cn_mem with member_accessor })
+        in
+        let cn_members = Array.to_list cn_members in
+        { cstr_names with cn_enum_const; cn_members; cn_deallocator_lazy; })
+      inm_cstrs ind_cstr_configs
+  in
+  { ind_names with inm_name; inm_swfunc; inm_cstrs; }
+
 (* Merge generated names and user configuration.  Register generated names if no user configuration. *)
 let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : member_names ind_names) : Environ.env * member_names ind_names =
   (*msg_debug_hov (Pp.str "[codegen:register_indimp]");*)
   let { inm_pind=pind; inm_params=params } = ind_names in
   let coq_type_i = mkApp (mkIndU pind, params) in
-  (* Merge information from CodeGen InductiveType COQ_TYPE => "C_TYPE" *)
-  let (ind_names, ind_cfg) =
-    let (inm_name, ind_cfg) =
-      match lookup_ind_config sigma coq_type_i with
-      | Some ({ ind_c_type = Some c_type } as ind_cfg) ->
-          if is_simple_c_type c_type then
-            (c_type.c_type_left, ind_cfg)
-          else
-            user_err_hov (Pp.str "[codegen] inductive type already configured with complex C type:" +++ pr_c_abstract_decl c_type)
-      | _ ->
-          let c_type = simple_c_type ind_names.inm_name in
-          let ind_cfg = register_ind_type env sigma coq_type_i c_type in
-          (ind_names.inm_name, ind_cfg)
-    in
-    ({ ind_names with inm_name }, ind_cfg)
+  (* Merge information from CodeGen IndType.
+     CodeGen IndType COQ_TYPE =>
+       ["C_TYPE_LEFT" ["C_TYPE_RIGHT"]]
+       [swfunc "C_SWFUNC"]
+       [ with ( | CONSTRUCTOR =>
+         [case "C_CASELABEL"]
+         [accessor "C_ACCESSOR"*]
+         [deallocator "C_DEALLOCATOR"] )* ].
+         *)
+  let indimp_generated_ind_cfg = get_ind_config_from_ind_names sigma ind_names in
+  let ind_cfg =
+    match lookup_ind_config sigma coq_type_i with
+    | None -> indimp_generated_ind_cfg
+    | Some ind_cfg ->
+        check_user_ind_config env sigma ind_cfg;
+        merge_ind_config_right_preference env sigma indimp_generated_ind_cfg ind_cfg
   in
-  (* Merge information from CodeGen InductiveMatch COQ_TYPE => "C_SWFUNC" ( | CONSTRUCTOR => case "C_CASELABEL" accessor "C_ACCESSOR"* )* *)
-  let (ind_names, ind_cfg) =
-    let (swfunc_opt, ind_names) =
-      match ind_cfg.ind_c_swfunc with
-      | None -> (Some ind_names.inm_swfunc, ind_names)
-      | Some swfunc -> (None, { ind_names with inm_swfunc=swfunc })
-    in
-    (*msg_debug_hov (Pp.str "[codegen:register_indimp]" +++
-      Pp.str "old_swfunc_opt=" ++ (match ind_cfg.ind_c_swfunc with | None -> Pp.str "None" | Some swfunc -> Pp.str swfunc) +++
-      Pp.str "new_swfunc_opt=" ++ (match swfunc_opt with | None -> Pp.str "None" | Some swfunc -> Pp.str swfunc));*)
-    let cstr_cfgs = ind_cfg.ind_cstr_configs in
-    let cstr_names_and_cstr_config_ary =
-      ind_names.inm_cstrs |> Array.map (fun cstr_names ->
-        let { cn_id } = cstr_names in
-        let cstr_cfg =
-          match cstr_cfgs |> array_find_opt (fun { cstr_id } -> Id.equal cstr_id cn_id) with
-          | None -> {
-                      cstr_id = cn_id;
-                      cstr_caselabel = None;
-                      cstr_accessors = [||];
-                      cstr_deallocator = None;
-                    }
-          | Some cstr_cfg -> cstr_cfg
-        in
-        (* xxx: check cstr_caselabel is valid C identifier *)
-        let cn_enum_const = Stdlib.Option.value cstr_cfg.cstr_caselabel ~default:cstr_names.cn_enum_const in
-        let cn_members =
-          let cstr_accessors =
-            let m = List.length cstr_names.cn_members in
-            let n = Array.length cstr_cfg.cstr_accessors in
-            if m < n then
-              user_err (Pp.str "[codegen] IndImp: too many member accessors:" +++
-                Printer.pr_econstr_env env sigma coq_type_i +++ Id.print cn_id +++ Pp.str "needs" +++ Pp.int m +++ Pp.str "but" +++ Pp.int n +++ Pp.str "given")
-            else if n < m then
-              Array.init m (fun i -> if i < n then cstr_cfg.cstr_accessors.(i) else None)
-            else
-              cstr_cfg.cstr_accessors
-          in
-          List.map2 (fun member_names cfg_accessor ->
-              { member_names with member_accessor = Stdlib.Option.value cfg_accessor ~default:member_names.member_accessor })
-            cstr_names.cn_members (Array.to_list cstr_accessors)
-        in
-        let cstr_names = { cstr_names with cn_enum_const; cn_members; } in
-        let cstr_caselabel = Some cn_enum_const in
-        let cstr_accessors = CArray.map_of_list (fun { member_accessor } -> Some member_accessor) cn_members in
-        let cstr_deallocator = Some cstr_names.cn_deallocator_lazy in
-        let cstr_cfg = { cstr_id = cn_id; cstr_caselabel; cstr_accessors; cstr_deallocator; } in
-        (cstr_names, cstr_cfg))
-    in
-    let inm_cstrs = Array.map fst cstr_names_and_cstr_config_ary in
-    let cstr_configs = CArray.map_to_list snd cstr_names_and_cstr_config_ary in
-    let ind_cfg = register_ind_match env sigma coq_type_i swfunc_opt cstr_configs in
-    ({ ind_names with inm_cstrs; }, ind_cfg)
-  in
+  ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type_i) ind_cfg !ind_config_map;
+  let ind_names = put_ind_config_in_ind_names env sigma ind_names ind_cfg in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, ind_names) =
     let (env, inm_cstrs) =

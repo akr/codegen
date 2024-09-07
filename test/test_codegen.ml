@@ -3920,7 +3920,9 @@ let test_list = add_test test_list "test_indimp_with_deallocator" begin fun (ctx
 end
 
 let test_list = add_test test_list "test_indimp_indmatch_with_deallocator" begin fun (ctx : test_ctxt) ->
-  codegen_test_template ctx
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] IndImp needs deallocator not configured:")
+    ctx
     (bool_src ^
     {|
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
@@ -3939,20 +3941,7 @@ let test_list = add_test test_list "test_indimp_indmatch_with_deallocator" begin
         end.
       CodeGen Func produce.
       CodeGen Func consume.
-    |})
-    {|
-      bool b;
-      boolbox x;
-      assert(malloc_count == 0);
-      assert(free_count == 0);
-      x = produce(true);
-      assert(malloc_count == 1);
-      assert(free_count == 0);
-      b = consume(x);
-      assert(malloc_count == 1);
-      assert(free_count == 1);
-      assert(b == true);
-    |}
+    |}) {| |}
 end
 
 let test_list = add_test test_list "test_header_snippet" begin fun (ctx : test_ctxt) ->
