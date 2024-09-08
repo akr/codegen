@@ -114,7 +114,7 @@ let check_ind_id_conflict (mib : Declarations.mutual_inductive_body) : unit =
   done
 
 type member_names = {
-  member_type_lazy: c_typedata option Lazy.t;
+  member_type_lazy: c_typedata Lazy.t;
   member_name: string;
   member_accessor: string;
 }
@@ -150,8 +150,7 @@ let pr_member_names (_env : Environ.env) (_sigma : Evd.evar_map) (member_names :
   Pp.v 2 (Pp.str "{" +++
     Pp.hov 2 (Pp.str "member_type:" +++ (if Lazy.is_val member_names.member_type_lazy then
         match member_names.member_type_lazy with
-        | lazy None -> Pp.str "void"
-        | lazy (Some c_type) -> pr_c_abstract_decl c_type
+        | lazy c_type -> pr_c_abstract_decl c_type
       else
         Pp.str "(lazy)")) +++
     Pp.hov 2 (Pp.str "member_name:" +++ Pp.qstring member_names.member_name) +++
@@ -185,10 +184,13 @@ let _ = ignore pr_ind_names
 let non_void_cstr_members (cn_members : member_names list) : nvmember_names list =
   cn_members |> List.filter_map (fun { member_type_lazy; member_name; member_accessor } ->
     match member_type_lazy with
-    | lazy None -> None
-    | lazy (Some member_type) -> Some {nvmember_type=member_type;
-                                       nvmember_name=member_name;
-                                       nvmember_accessor=member_accessor})
+    | lazy member_type ->
+        if c_type_is_void member_type then
+          None
+        else
+          Some { nvmember_type=member_type;
+                 nvmember_name=member_name;
+                 nvmember_accessor=member_accessor })
 
 let non_void_cstr_names (cstr_names : member_names cstr_names) : nvmember_names cstr_names =
   { cstr_names with cn_members = non_void_cstr_members cstr_names.cn_members }
@@ -239,7 +241,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
           in
           let member_name = global_prefix ^ "_member" ^ k_suffix in
           let member_accessor = global_prefix ^ "_get" ^ k_suffix in
-          let member_type_lazy = lazy (if ind_is_void_type env sigma arg_type then None else Some (c_typename env sigma arg_type)) in
+          let member_type_lazy = lazy (if ind_is_void_type env sigma arg_type then c_type_void else c_typename env sigma arg_type) in
           { member_type_lazy; member_name; member_accessor })
       in
       let cn_deallocator_lazy = lazy (
