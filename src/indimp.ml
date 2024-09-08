@@ -436,11 +436,10 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
   in
   let inm_cstrs =
     tuples |> Array.map (fun (cstr_names, sp_inst, sp_interface) ->
-      let { cn_id } = cstr_names in
       let { sp_icommand } = sp_inst in
       let { sp_cfunc_name = cn_name } = sp_interface in
       if sp_icommand <> CodeGenPrimitive then
-        user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cn_id);
+        user_err_hov (Pp.str "[codegen] CodeGen IndImp needs that constructors declared by CodeGen Primitive (not " ++ Pp.str (str_instance_command sp_icommand) ++ Pp.str "):" +++ Id.print cstr_names.cn_id);
       if not (valid_c_id_p cn_name) then user_err_hov (Pp.str "[codegen] IndImp needs constructor name as a valid C identifier:" +++ Pp.str (quote_coq_string cn_name));
       { cstr_names with cn_name })
   in
