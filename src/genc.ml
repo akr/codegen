@@ -1594,40 +1594,42 @@ let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : ECon
   else
     gen_funcall c_fname argvars
 
-let gen_switch_without_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
+let gen_switch_without_break (swexpr : Pp.t) (branches : (Id.t * string * Pp.t) array) : Pp.t =
   let branches =
-    if Array.for_all (fun (caselabel, pp_branch) -> not (CString.is_empty caselabel)) branches then
-      branches |> Array.mapi (fun i (caselabel, pp_branch) ->
-        if i = 0 then
-          ("", pp_branch)
-        else
-          (caselabel, pp_branch))
-    else
-      branches
+    let num_defaults = array_count (fun (cstr_id, caselabel, pp_branch) -> CString.is_empty caselabel) branches in
+    match num_defaults with
+    | 0 ->
+        let m = Array.length branches - 1 in
+        branches |> Array.mapi (fun i (cstr_id, caselabel, pp_branch) -> (i = m, cstr_id, caselabel, pp_branch))
+    | 1 ->
+        branches |> Array.map (fun (cstr_id, caselabel, pp_branch) -> (CString.is_empty caselabel, cstr_id, caselabel, pp_branch))
+    | _ ->
+        user_err_hov (Pp.str "[codegen] empty caselabel specified for multiple constructors:" +++
+          ((Array.to_list branches)
+          |> List.filter_map (fun (cstr_id, caselabel, pp_branch) -> if CString.is_empty caselabel then Some cstr_id else None)
+          |> pp_sjoinmap_list Id.print));
   in
   Pp.v 0 (
   Pp.hov 0 (Pp.str "switch" +++ Pp.str "(" ++ swexpr ++ Pp.str ")") +++
   vbrace (pp_sjoinmap_ary
-    (fun (caselabel, pp_branch) ->
-      (if CString.is_empty caselabel then
-        Pp.str "default:"
-      else
-        Pp.str ("case " ^ caselabel ^ ":")) ++
-      Pp.brk (1,2) ++ Pp.v 0 pp_branch)
+    (fun (is_default, cstr_id, caselabel, pp_branch) ->
+      (if is_default then Pp.str "default:" else Pp.mt ()) +++
+      (if CString.is_empty caselabel then Pp.mt () else Pp.str ("case " ^ caselabel ^ ":")) ++ Pp.brk (1,2) ++
+      Pp.v 0 pp_branch)
     branches))
 
-let gen_switch_with_break (swexpr : Pp.t) (branches : (string * Pp.t) array) : Pp.t =
+let gen_switch_with_break (swexpr : Pp.t) (branches : (Id.t * string * Pp.t) array) : Pp.t =
   gen_switch_without_break swexpr
     (Array.map
-      (fun (caselabel, pp_branch) ->
-        (caselabel, pp_branch +++ Pp.str "break;"))
+      (fun (cstr_id, caselabel, pp_branch) ->
+        (cstr_id, caselabel, pp_branch +++ Pp.str "break;"))
       branches)
 
 let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConstr.t) :
     ((*h*)int *
      (*item_type*)Constr.types *
      (*item_cvar*)string * (*c_deallocations*)Pp.t array *
-     (*caselabel_accessorcalls*)(string option * Pp.t option array) array) =
+     (*caselabel_accessorcalls*)(Id.t * string option * Pp.t option array) array) =
   (*msg_debug_hov (Pp.str "[codegen] gen_match:1");*)
   let item_relindex = destRel sigma item in
   let item_type = Context.Rel.Declaration.get_type (Environ.lookup_rel item_relindex env) in
@@ -1661,7 +1663,8 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
     Array.map
       (fun j ->
         (*msg_debug_hov (Pp.str "[codegen] gen_match:30");*)
-        (case_cstrlabel env sigma (EConstr.of_constr item_type) j,
+        (oneind_body.Declarations.mind_consnames.(j-1),
+         case_cstrlabel env sigma (EConstr.of_constr item_type) j,
          Array.map
            (fun i -> Option.map gen_accessor_call (case_cstrmember env sigma (EConstr.of_constr item_type) j i))
            (iota_ary 0 oneind_body.Declarations.mind_consnrealargs.(j-1))))
@@ -1669,7 +1672,7 @@ let gen_case_fragments (env : Environ.env) (sigma : Evd.evar_map) (item : EConst
   in
   (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls)
 
-let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array -> Pp.t)
+let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (Id.t * string * Pp.t) array -> Pp.t)
     (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (item : EConstr.t)
@@ -1721,16 +1724,16 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
   let (bl, bl0) = branches in
   if h = 1 then
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:5");*)
-    let accessorcalls = snd caselabel_accessorcalls.(0) in
+    let (cstr_id, caselabel, accessorcalls) = caselabel_accessorcalls.(0) in
     let c_deallocation = c_deallocations.(0) in
     let branch = (bl.(0), bl0.(0)) in
     gen_branch accessorcalls c_deallocation branch)
   else
     ((*msg_debug_hov (Pp.str "[codegen] gen_match:6");*)
-    let caselabel_accessorcalls = caselabel_accessorcalls |> Array.map (fun (caselabel, accessors) ->
+    let caselabel_accessorcalls = caselabel_accessorcalls |> Array.map (fun (cstr_id, caselabel, accessors) ->
       match caselabel with
       | None -> user_err (Pp.str "[codegen] constructor member accessor not configured:" +++ Printer.pr_constr_env env sigma item_type)
-      | Some caselabel -> (caselabel, accessors))
+      | Some caselabel -> (cstr_id, caselabel, accessors))
     in
     let swfunc = case_swfunc env sigma (EConstr.of_constr item_type) in
     let swexpr = if swfunc = "" then
@@ -1740,8 +1743,8 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (string * Pp.t) array
     (*msg_debug_hov (Pp.str "[codegen] gen_match:7");*)
     gen_switch swexpr
       (array_map4
-        (fun (caselabel, accessorcalls) c_deallocation b b0 ->
-          (caselabel, gen_branch accessorcalls c_deallocation (b, b0)))
+        (fun (cstr_id, caselabel, accessorcalls) c_deallocation b b0 ->
+          (cstr_id, caselabel, gen_branch accessorcalls c_deallocation (b, b0)))
         caselabel_accessorcalls c_deallocations bl bl0))
 
 let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
@@ -1749,7 +1752,8 @@ let gen_proj (env : Environ.env) (sigma : Evd.evar_map)
     (gen_cont : Pp.t -> Pp.t) : Pp.t =
   let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma item in
   assert (h = 1);
-  let accessorcall = (snd caselabel_accessorcalls.(0)).(Projection.arg pr) in
+  let (cstr_id, caselabel, accessorcall) = caselabel_accessorcalls.(0) in
+  let accessorcall = accessorcall.(Projection.arg pr) in
   let c_deallocation = c_deallocations.(0) in
   match accessorcall with
   | None -> user_err (Pp.str "[codegen] constructor member accessor not configured:" +++ Printer.pr_constr_env env sigma item_type)

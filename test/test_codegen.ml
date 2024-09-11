@@ -428,7 +428,7 @@ let template_coq_success
 let bool_src = {|
       CodeGen IndType bool => "bool" swfunc "" with
       | true => case ""
-      | false => case "0".
+      | false => case "false".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
@@ -441,7 +441,7 @@ let bool_paren_src = {|
       CodeGen IndType bool => "bool (" ")" (* redundant parenthesis *)
         swfunc "" with
       | true => case ""
-      | false => case "0".
+      | false => case "false".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
       CodeGen Snippet "prologue" "
@@ -453,7 +453,7 @@ let bool_paren_src = {|
 let struct_bool_src = {|
       CodeGen IndType bool => "bool" swfunc "sw_struct_bool" with
       | true => case ""
-      | false => case "0".
+      | false => case "false".
       CodeGen Constant true => "struct_bool_true".
       CodeGen Constant false => "struct_bool_false".
       CodeGen Snippet "prologue" "
@@ -1327,7 +1327,7 @@ end
 let bool_matchcount_src = {|
       CodeGen IndType bool => "bool" swfunc "sw_bool" with
       | true => case ""
-      | false => case "0".
+      | false => case "false".
       CodeGen Constant true => "true".
       CodeGen Constant false => "false".
 
