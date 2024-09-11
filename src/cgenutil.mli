@@ -29,7 +29,7 @@ val array_find_index : ('a -> bool) -> 'a array -> int
 val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
 val array_count_sub : ('a -> bool) -> 'a array -> int -> int -> int
-val array_count : ('a -> bool) -> 'a array -> int -> int -> int
+val array_count : ('a -> bool) -> 'a array -> int
 val boolarray_count_sub : bool array -> int -> int -> int
 val boolarray_count : bool array -> int
 val array_filter_with : bool array -> ?result_length:int -> 'a array -> 'a array

@@ -237,7 +237,7 @@ let array_count_sub (p : 'a -> bool) (ary : 'a array) (i : int) (n : int) : int 
   in
   aux i n 0
 
-let array_count (p : 'a -> bool) (ary : 'a array) (i : int) (n : int) : int = array_count_sub p ary 0 (Array.length ary)
+let array_count (p : 'a -> bool) (ary : 'a array) : int = array_count_sub p ary 0 (Array.length ary)
 
 let boolarray_count_sub (ary : bool array) (i : int) (n : int) : int =
   let rec aux i n acc =
