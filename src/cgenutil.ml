@@ -1736,8 +1736,6 @@ let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
   | Some _, Some _ ->
       user_err (Pp.str "[codegen] duplicated option:" +++ Pp.str name)
 
-(* cstr_id is not merged.  It uses first one. *)
-(* lazy value of cstr_deallocator is not examined because this function is intended to be used in command line parsing of "CodeGen IndType" in g_codegen.mlg which doesn't produce lazy values. *)
 let merge_cstr_mod (cstr_mod1 : cstr_mod) (cstr_mod2 : cstr_mod) : cstr_mod =
   {
     cm_caselabel = optmerge "case" cstr_mod1.cm_caselabel cstr_mod2.cm_caselabel;
