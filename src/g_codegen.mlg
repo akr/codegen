@@ -302,14 +302,6 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "IndType" lconstr(coq_type) indtype_ind_args(indtype_ind_args) indtype_cstrs(cstr_config_list) ] ->
       { command_ind_type2 coq_type indtype_ind_args cstr_config_list }
 
-    | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type_left) string(c_type_right) ] ->
-      { command_ind_type coq_type { c_type_left; c_type_right } }
-    | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
-      { command_ind_type coq_type (simple_c_type c_type) }
-
-    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indtype_swfunc_opt(swfunc_opt) indtype_cstrs(cstr_id_mod_list) ] ->
-      { command_ind_match coq_type swfunc_opt cstr_id_mod_list }
-
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
     | [ "CodeGen" "AutoArgs" ref_list(func_list) ] ->
