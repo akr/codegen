@@ -3,7 +3,7 @@ val ind_coq_type_registered_p : Evd.evar_map -> EConstr.t -> bool
 val lookup_ind_config : Evd.evar_map -> EConstr.types -> State.ind_config option
 val register_ind_type :
   Environ.env -> Evd.evar_map -> EConstr.t -> State.c_typedata -> State.ind_config
-val command_ind_type : Constrexpr.constr_expr -> State.c_typedata option * string option -> State.cstr_config list -> unit
+val command_ind_type : Constrexpr.constr_expr -> State.c_typedata option * string option -> (Names.Id.t * State.cstr_mod) list -> unit
 val register_ind_match :
   Environ.env ->
   Evd.evar_map ->

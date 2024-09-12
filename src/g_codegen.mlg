@@ -163,9 +163,8 @@ END
 
 VERNAC ARGUMENT EXTEND ind_cstr_mod
 | [ ident(cstr_id) "=>" ind_cstr_mod_elt_list(s) ] ->
-  { let { cm_caselabel; cm_accessors; cm_deallocator } = List.fold_left merge_cstr_mod { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } s in
-    { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator }
-  }
+  { let cstr_mod = List.fold_left merge_cstr_mod { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } s in
+    (cstr_id, cstr_mod) }
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator

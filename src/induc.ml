@@ -383,7 +383,11 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : str
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
 
-let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : cstr_config list) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : (Id.t * cstr_mod) list) : unit =
+  let cstr_cfgs =
+    cstr_cfgs |> List.map (fun (cstr_id, { cm_caselabel; cm_accessors; cm_deallocator }) ->
+      { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator })
+  in
   let (c_type_opt, swfunc_opt) = indtype_ind_args in
   let env = Global.env () in
   let sigma = Evd.from_env env in
