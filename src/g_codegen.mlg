@@ -155,14 +155,14 @@ VERNAC ARGUMENT EXTEND where_or_and
 | [ "and" ] -> { () }
 END
 
-VERNAC ARGUMENT EXTEND ind_cstr_config_elt
+VERNAC ARGUMENT EXTEND ind_cstr_mod_elt
 | [ "case" string(caselabel) ] -> { { cm_caselabel = Some caselabel; cm_accessors = [||]; cm_deallocator = None } }
 | [ "accessor" string_list(accessors) ] -> { { cm_caselabel = None; cm_accessors = Array.map (fun accessor -> Some accessor) (Array.of_list accessors); cm_deallocator = None } }
 | [ "deallocator" string(deallocator) ] -> { { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = Some deallocator } }
 END
 
-VERNAC ARGUMENT EXTEND ind_cstr_config
-| [ ident(cstr_id) "=>" ind_cstr_config_elt_list(s) ] ->
+VERNAC ARGUMENT EXTEND ind_cstr_mod
+| [ ident(cstr_id) "=>" ind_cstr_mod_elt_list(s) ] ->
   { let { cm_caselabel; cm_accessors; cm_deallocator } = List.fold_left merge_cstr_mod { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } s in
     { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator }
   }
@@ -242,13 +242,9 @@ VERNAC ARGUMENT EXTEND func_mods
 | [] -> { func_mods_empty }
 END
 
-VERNAC ARGUMENT EXTEND indmatch_swfunc
-| [ "=>" string(swfunc) ] -> { swfunc }
-END
-
-VERNAC ARGUMENT EXTEND indmatch_cstrs
-| [ "with" ne_ind_cstr_config_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
-| [ "with" "|" ne_ind_cstr_config_list_sep(cstr_caselabel_accesors_list, "|") ] -> { cstr_caselabel_accesors_list }
+VERNAC ARGUMENT EXTEND indtype_cstrs
+| [ "with" ne_ind_cstr_mod_list_sep(cstr_id_mod_list, "|") ] -> { cstr_id_mod_list }
+| [ "with" "|" ne_ind_cstr_mod_list_sep(cstr_id_mod_list, "|") ] -> { cstr_id_mod_list }
 | [ "with" ] -> { [] }
 | [ ] -> { [] }
 END
@@ -303,7 +299,7 @@ VERNAC ARGUMENT EXTEND indtype_ind_args
 END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
-    | [ "CodeGen" "IndType" lconstr(coq_type) indtype_ind_args(indtype_ind_args) indmatch_cstrs(cstr_config_list) ] ->
+    | [ "CodeGen" "IndType" lconstr(coq_type) indtype_ind_args(indtype_ind_args) indtype_cstrs(cstr_config_list) ] ->
       { command_ind_type2 coq_type indtype_ind_args cstr_config_list }
 
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type_left) string(c_type_right) ] ->
@@ -311,8 +307,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "InductiveType" lconstr(coq_type) "=>" string(c_type) ] ->
       { command_ind_type coq_type (simple_c_type c_type) }
 
-    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indmatch_swfunc_opt(swfunc_opt) indmatch_cstrs(cstr_caselabel_accesors_list) ] ->
-      { command_ind_match coq_type swfunc_opt cstr_caselabel_accesors_list }
+    | [ "CodeGen" "InductiveMatch" lconstr(coq_type) indtype_swfunc_opt(swfunc_opt) indtype_cstrs(cstr_id_mod_list) ] ->
+      { command_ind_match coq_type swfunc_opt cstr_id_mod_list }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }
