@@ -300,7 +300,7 @@ END
 
 VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
     | [ "CodeGen" "IndType" lconstr(coq_type) indtype_ind_args(indtype_ind_args) indtype_cstrs(cstr_config_list) ] ->
-      { command_ind_type2 coq_type indtype_ind_args cstr_config_list }
+      { command_ind_type coq_type indtype_ind_args cstr_config_list }
 
     | [ "CodeGen" "StaticArgs" ref(func) s_or_d_list(sd_list) ] ->
       { command_arguments func sd_list }

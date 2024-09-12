@@ -228,12 +228,6 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.ty
   | Some c_type ->
       user_err (Pp.str "[codegen] c_type already registered:" +++ Printer.pr_econstr_env env sigma t +++ Pp.str "=>" +++ pr_c_abstract_decl c_type)
 
-let command_ind_type (user_coq_type : Constrexpr.constr_expr) (c_type : c_typedata) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_type env sigma coq_type c_type)
-
 let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_config list) : cstr_config array =
   let cstr_of = fun { cstr_id } -> cstr_id in
   (let unexpected_cstr_ids =
@@ -389,7 +383,7 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : str
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
 
-let command_ind_type2 (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : cstr_config list) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : cstr_config list) : unit =
   let (c_type_opt, swfunc_opt) = indtype_ind_args in
   let env = Global.env () in
   let sigma = Evd.from_env env in
