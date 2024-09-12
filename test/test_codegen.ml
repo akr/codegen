@@ -5213,6 +5213,16 @@ let test_list = add_test test_list "test_indtype_duplicated_constructors" begin 
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_indtype_duplicated_option" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ~coq_exit_code:(Unix.WEXITED 1)
+    ~coq_output_regexp:(Str.regexp_string "[codegen] duplicated option:") ctx
+    ({|
+      CodeGen IndType bool => "bool" swfunc "" with
+      | false => case "0" case "2"
+      | true => case "1".
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 
