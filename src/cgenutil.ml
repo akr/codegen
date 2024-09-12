@@ -1738,17 +1738,16 @@ let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
 
 (* cstr_id is not merged.  It uses first one. *)
 (* lazy value of cstr_deallocator is not examined because this function is intended to be used in command line parsing of "CodeGen IndType" in g_codegen.mlg which doesn't produce lazy values. *)
-let merge_cstr_config (cstr_cfg1 : cstr_config) (cstr_cfg2 : cstr_config) : cstr_config =
+let merge_cstr_mod (cstr_mod1 : cstr_mod) (cstr_mod2 : cstr_mod) : cstr_mod =
   {
-    cstr_id = cstr_cfg1.cstr_id;
-    cstr_caselabel = optmerge "case" cstr_cfg1.cstr_caselabel cstr_cfg2.cstr_caselabel;
-    cstr_accessors =
-      (let n1 = Array.length cstr_cfg1.cstr_accessors in
-      let n2 = Array.length cstr_cfg2.cstr_accessors in
-      Array.init (if n1 < n2 then n2 else n1) (fun i -> if i < n1 && i < n2 then optmerge "accessors" cstr_cfg1.cstr_accessors.(i) cstr_cfg2.cstr_accessors.(i)
-                                                        else if i < n1 then cstr_cfg1.cstr_accessors.(i)
-                                                        else cstr_cfg2.cstr_accessors.(i)));
-    cstr_deallocator = optmerge "deallocator" cstr_cfg1.cstr_deallocator cstr_cfg2.cstr_deallocator;
+    cm_caselabel = optmerge "case" cstr_mod1.cm_caselabel cstr_mod2.cm_caselabel;
+    cm_accessors =
+      (let n1 = Array.length cstr_mod1.cm_accessors in
+      let n2 = Array.length cstr_mod2.cm_accessors in
+      Array.init (if n1 < n2 then n2 else n1) (fun i -> if i < n1 && i < n2 then optmerge "accessors" cstr_mod1.cm_accessors.(i) cstr_mod2.cm_accessors.(i)
+                                                        else if i < n1 then cstr_mod1.cm_accessors.(i)
+                                                        else cstr_mod2.cm_accessors.(i)));
+    cm_deallocator = optmerge "deallocator" cstr_mod1.cm_deallocator cstr_mod2.cm_deallocator;
   }
 
 let check_codegen_supported_ind (mind_specif : Declarations.mind_specif) : unit =

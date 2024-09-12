@@ -156,16 +156,16 @@ VERNAC ARGUMENT EXTEND where_or_and
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_config_elt
-| [ "case" string(caselabel) ] -> { { cstr_id = Names.Id.of_string "dummy"; cstr_caselabel = Some caselabel; cstr_accessors = [||]; cstr_deallocator = None } }
-| [ "accessor" string_list(accessors) ] -> { { cstr_id = Names.Id.of_string "dummy"; cstr_caselabel = None; cstr_accessors = Array.map (fun accessor -> Some accessor) (Array.of_list accessors); cstr_deallocator = None } }
-| [ "deallocator" string(deallocator) ] -> { { cstr_id = Names.Id.of_string "dummy"; cstr_caselabel = None; cstr_accessors = [||]; cstr_deallocator = Some (Lazy.from_val (Some deallocator)) } }
+| [ "case" string(caselabel) ] -> { { cm_caselabel = Some caselabel; cm_accessors = [||]; cm_deallocator = None } }
+| [ "accessor" string_list(accessors) ] -> { { cm_caselabel = None; cm_accessors = Array.map (fun accessor -> Some accessor) (Array.of_list accessors); cm_deallocator = None } }
+| [ "deallocator" string(deallocator) ] -> { { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = Some deallocator } }
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_config
 | [ ident(cstr_id) "=>" ind_cstr_config_elt_list(s) ] ->
-  { match s with
-    | [] -> { cstr_id; cstr_caselabel = None; cstr_accessors = [||]; cstr_deallocator = None }
-    | hd :: tl -> { (List.fold_left merge_cstr_config hd tl) with cstr_id } }
+  { let { cm_caselabel; cm_accessors; cm_deallocator } = List.fold_left merge_cstr_mod { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } s in
+    { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator }
+  }
 END
 
 VERNAC ARGUMENT EXTEND dealloc_cstr_deallocator

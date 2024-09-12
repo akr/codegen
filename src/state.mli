@@ -20,12 +20,20 @@ val gensym_id : int ref
 type string_or_qualid =
     StrOrQid_Str of string
   | StrOrQid_Qid of Libnames.qualid
+
+type cstr_mod = {
+  cm_caselabel: string option;
+  cm_accessors: string option array;
+  cm_deallocator: string option;
+}
+
 type cstr_config = {
   cstr_id: Names.Id.t;
   cstr_caselabel: string option;
   cstr_accessors: string option array;
   cstr_deallocator: string option Lazy.t option;
 }
+
 type c_typedata = {
   c_type_left : string;
   c_type_right : string;
