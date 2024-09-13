@@ -377,13 +377,6 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
   ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type) ind_cfg !ind_config_map;
   ind_cfg
 
-let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : string option)
-    (cstr_cfgs : cstr_config list) : unit =
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
-  ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
-
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_mods : (Id.t * cstr_mod) list) : unit =
   let cstr_cfgs =
     cstr_mods |> List.map (fun (cstr_id, { cm_caselabel; cm_accessors; cm_deallocator }) ->
