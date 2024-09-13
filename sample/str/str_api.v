@@ -7,11 +7,8 @@ Require Import str.
 Require Import String.
 
 CodeGen IndType string => "str_t" swfunc "str_sw" with
-| EmptyString => case "0"
-| String => case "" accessor "str_head" "str_tail".
-
-CodeGen Primitive EmptyString => "str_empty".
-CodeGen NoFunc String.
+| EmptyString => primitive "str_empty" case "0"
+| String => nofunc case "" accessor "str_head" "str_tail".
 
 CodeGen Primitive eqstr => "eqstr".
 CodeGen Primitive nthstr => "nthstr".

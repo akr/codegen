@@ -427,10 +427,8 @@ let template_coq_success
 
 let bool_src = {|
       CodeGen IndType bool => "bool" swfunc "" with
-      | true => case ""
-      | false => case "false".
-      CodeGen Constant true => "true".
-      CodeGen Constant false => "false".
+      | true => constant "true" case ""
+      | false => constant "false" case "false".
 
       CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
@@ -440,10 +438,8 @@ let bool_src = {|
 let bool_paren_src = {|
       CodeGen IndType bool => "bool (" ")" (* redundant parenthesis *)
         swfunc "" with
-      | true => case ""
-      | false => case "false".
-      CodeGen Constant true => "true".
-      CodeGen Constant false => "false".
+      | true => constant "true" case ""
+      | false => constant "false" case "false".
       CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       ".
@@ -452,10 +448,8 @@ let bool_paren_src = {|
 (* bool implementation using struct.  It is not assignable to integer types. *)
 let struct_bool_src = {|
       CodeGen IndType bool => "bool" swfunc "sw_struct_bool" with
-      | true => case ""
-      | false => case "false".
-      CodeGen Constant true => "struct_bool_true".
-      CodeGen Constant false => "struct_bool_false".
+      | true => constant "struct_bool_true" case ""
+      | false => constant "struct_bool_false" case "false".
       CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
       typedef struct { bool b; } struct_bool;
@@ -467,10 +461,8 @@ let struct_bool_src = {|
 
 let nat_src = {|
       CodeGen IndType nat => "nat" swfunc "" with
-      | O => case "0"
-      | S => case "" accessor "nat_pred".
-      CodeGen Constant O => "0".
-      CodeGen Primitive S => "nat_succ".
+      | O => constant "0" case "0"
+      | S => primitive "nat_succ" case "" accessor "nat_pred".
 
       CodeGen Snippet "prologue" "
       #include <stdint.h>
@@ -519,10 +511,8 @@ let nat_src = {|
 
 let list_bool_src = {|
       CodeGen IndType list bool => "list_bool" swfunc "list_bool_is_nil" with
-      | nil => case ""
-      | cons => case "0" accessor "list_bool_head" "list_bool_tail".
-      CodeGen Constant @nil bool => "((list_bool)NULL)".
-      CodeGen Primitive @cons bool => "list_bool_cons".
+      | nil => constant "((list_bool)NULL)" case ""
+      | cons => primitive "list_bool_cons" case "0" accessor "list_bool_head" "list_bool_tail".
 
       CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -564,10 +554,8 @@ let list_bool_src = {|
 
 let list_nat_src = {|
       CodeGen IndType list nat => "list_nat" swfunc "list_nat_is_nil" with
-      | nil => case ""
-      | cons => case "0" accessor "list_nat_head" "list_nat_tail".
-      CodeGen Constant @nil nat => "((list_nat)NULL)".
-      CodeGen Primitive @cons nat => "list_nat_cons".
+      | nil => constant "((list_nat)NULL)" case ""
+      | cons => primitive "list_nat_cons" case "0" accessor "list_nat_head" "list_nat_tail".
 
       CodeGen Snippet "prologue" "
       #include <stdlib.h> /* for NULL, malloc(), abort() */
@@ -630,8 +618,7 @@ let test_list = add_test test_list "test_tail_constructor_args" begin fun (ctx :
     (bool_src ^ {|
       Inductive bool_pair : Set := bpair : bool -> bool -> bool_pair.
       CodeGen IndType bool_pair => "bool_pair" with
-      | bpair => accessor "bool_pair_fst" "bool_pair_snd".
-      CodeGen Primitive bpair => "bpair".
+      | bpair => primitive "bpair" accessor "bool_pair_fst" "bool_pair_snd".
 
       CodeGen Snippet "prologue" "
       typedef int bool_pair;
@@ -759,10 +746,8 @@ let test_list = add_test test_list "test_mono_id_mybool" begin fun (ctx : test_c
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen IndType mybool => "mybool" swfunc "" with
-      | mytrue => case ""
-      | myfalse => case "0".
-      CodeGen Constant mytrue => "mytrue".
-      CodeGen Constant myfalse => "myfalse".
+      | mytrue => constant "mytrue" case ""
+      | myfalse => constant "myfalse" case "0".
       CodeGen Snippet "prologue" "
       typedef int mybool;
       #define mytrue 1
@@ -781,10 +766,8 @@ let test_list = add_test test_list "test_mybool_true" begin fun (ctx : test_ctxt
     ({|
       Inductive mybool : Set := mytrue : mybool | myfalse : mybool.
       CodeGen IndType mybool => "mybool" swfunc "" with
-      | mytrue => case ""
-      | myfalse => case "0".
-      CodeGen Constant mytrue => "mytrue".
-      CodeGen Constant myfalse => "myfalse".
+      | mytrue => constant "mytrue" case ""
+      | myfalse => constant "myfalse" case "0".
       CodeGen Snippet "prologue" "
       typedef int mybool;
       #define mytrue 1
@@ -813,8 +796,7 @@ let test_list = add_test test_list "test_pair_bool_bool" begin fun (ctx : test_c
   codegen_test_template ctx
     (bool_src ^ {|
       CodeGen IndType bool*bool => "pair_bool_bool" with
-      | pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
+      | pair => primitive "make_pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Snippet "prologue" "
       typedef struct {
         bool fst;
@@ -842,12 +824,10 @@ let test_list = add_test test_list "test_pair_2bool_bool" begin fun (ctx : test_
   codegen_test_template ctx
     (bool_src ^ {|
       CodeGen IndType bool*bool => "pair_bool_bool" with
-      | pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
+      | pair => primitive "make_pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
 
       CodeGen IndType bool*bool*bool => "pair_2bool_bool" with
-      | pair => accessor "pair_2bool_bool_fst" "pair_2bool_bool_snd".
-      CodeGen Primitive @pair (bool*bool) bool => "make_pair_2bool_bool".
+      | pair => primitive "make_pair_2bool_bool" accessor "pair_2bool_bool_fst" "pair_2bool_bool_snd".
 
       CodeGen Snippet "prologue" "
       typedef struct { bool fst; bool snd; } pair_bool_bool;
@@ -1326,10 +1306,8 @@ end
 
 let bool_matchcount_src = {|
       CodeGen IndType bool => "bool" swfunc "sw_bool" with
-      | true => case ""
-      | false => case "false".
-      CodeGen Constant true => "true".
-      CodeGen Constant false => "false".
+      | true => constant "true" case ""
+      | false => constant "false" case "false".
 
       CodeGen Snippet "prologue" "
       #include <stdbool.h> /* for bool, true and false */
@@ -2113,9 +2091,9 @@ let test_list = add_test test_list "test_multifunc_different_return_types" begin
         | S _ => mytrue
         end.
       CodeGen Func f.
-      CodeGen IndType mybool => "mybool".
-      CodeGen Constant mytrue => "mytrue".
-      CodeGen Constant myfalse => "myfalse".
+      CodeGen IndType mybool => "mybool" with
+      | mytrue => constant "mytrue"
+      | myfalse => constant "myfalse".
     |}) {|
       assert(f(0).b == 0);
       assert(f(1).b == 1);
@@ -2792,8 +2770,7 @@ let test_list = add_test test_list "test_primitive_projection" begin fun (ctx : 
       Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
       CodeGen IndType bool_pair => "bool_pair" with
-      | make_bool_pair => accessor "bool_pair_fst" "bool_pair_snd".
-      CodeGen Primitive make_bool_pair => "make_bool_pair".
+      | make_bool_pair => primitive "make_bool_pair" accessor "bool_pair_fst" "bool_pair_snd".
 
       Definition make (x y : bool) := make_bool_pair x y.
       Definition bbfst (x : bool_pair) := member1 x.
@@ -2828,8 +2805,7 @@ let test_list = add_test test_list "test_primitive_projection_nontail" begin fun
       Record bool_pair : Set := make_bool_pair { member1 : bool; member2 : bool }.
 
       CodeGen IndType bool_pair => "bool_pair" with
-      | make_bool_pair => accessor "bool_pair_fst" "bool_pair_snd".
-      CodeGen Primitive make_bool_pair => "make_bool_pair".
+      | make_bool_pair => primitive "make_bool_pair" accessor "bool_pair_fst" "bool_pair_snd".
 
       Definition make (x y : bool) := make_bool_pair x y.
       Definition bbfst (x : bool_pair) := let y := member1 x in id y.
@@ -3128,10 +3104,8 @@ let test_list = add_test test_list "test_option_bool_struct" begin fun (ctx : te
     (bool_src ^
     {|
       CodeGen IndType option bool => "option_bool" swfunc "sw_option_bool" with
-      | None => case ""
-      | Some => case "option_bool_Some" accessor "option_bool_Some_member1".
-      CodeGen Primitive @None bool => "None_bool".
-      CodeGen Primitive @Some bool => "Some_bool".
+      | None => primitive "None_bool" case ""
+      | Some => primitive "Some_bool" case "option_bool_Some" accessor "option_bool_Some_member1".
       CodeGen Snippet "prologue" "
       enum enum_option_bool { option_bool_None, option_bool_Some };
       typedef struct {
@@ -3258,8 +3232,7 @@ let test_list = add_test test_list "test_indimp_bool_pair" begin fun (ctx : test
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_ynpair (ynpair_of_boolpair bb).
       CodeGen IndType bool*bool => "prod_bool_bool" with
-      | pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive @pair bool bool => "pair_bool_bool".
+      | pair => primitive "pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3287,8 +3260,7 @@ let test_list = add_test test_list "test_indimp_bool_nat_pair" begin fun (ctx : 
       Definition snd_nb (nb : nat * bool) :=
         match nb with (n, b) => b end.
       CodeGen IndType nat*bool => "prod_nat_bool" with
-      | pair => accessor "pair_nat_bool_fst" "pair_nat_bool_snd".
-      CodeGen Primitive @pair nat bool => "pair_nat_bool".
+      | pair => primitive "pair_nat_bool" accessor "pair_nat_bool_fst" "pair_nat_bool_snd".
       CodeGen Snippet "prologue" "
       ".
       CodeGen IndImp nat*bool.
@@ -3332,8 +3304,7 @@ let test_list = add_test test_list "test_indimp_parametric_pair" begin fun (ctx 
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_ynpair (ynpair_of_boolpair bb).
       CodeGen IndType bool*bool => "prod_bool_bool" with
-      | pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive @pair bool bool => "pair_bool_bool".
+      | pair => primitive "pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3372,10 +3343,8 @@ let test_list = add_test test_list "test_indimp_option_bool" begin fun (ctx : te
       Definition id_option_bool (ob : option bool) : option bool :=
         opt_of_myopt (myopt_of_opt ob).
       CodeGen IndType option bool => "option_bool" swfunc "sw_option_bool" with
-      | Some => case "" accessor "option_bool_get_some"
-      | None => case "0".
-      CodeGen Primitive @Some bool => "some_bool".
-      CodeGen Constant @None bool => "none_bool".
+      | Some => primitive "some_bool" case "" accessor "option_bool_get_some"
+      | None => constant "none_bool" case "0".
       CodeGen Snippet "prologue" "
       typedef int option_bool;
       #define sw_option_bool(x) ((x) & 1)
@@ -3415,8 +3384,7 @@ let test_list = add_test test_list "test_indimp_record" begin fun (ctx : test_ct
       Definition id_boolpair (bb : bool * bool) : bool * bool :=
         boolpair_of_bool2 (bool2_of_boolpair bb).
       CodeGen IndType bool*bool => "prod_bool_bool" with
-      | pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-      CodeGen Primitive @pair bool bool => "pair_bool_bool".
+      | pair => primitive "pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
       CodeGen Snippet "prologue" "
       typedef int prod_bool_bool;
       #define pair_bool_bool(a,b) (((a) << 1) | (b))
@@ -3587,10 +3555,8 @@ let test_list = add_test test_list "test_indimp_named_mybool" begin fun (ctx : t
         | myfalse => false
         end.
       CodeGen IndType mybool => "mybool" swfunc "sw_mybool" with
-      | mytrue => case "mytrue_tag"
-      | myfalse => case "myfalse_tag".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      | mytrue => primitive "mytrue" case "mytrue_tag"
+      | myfalse => primitive "myfalse" case "myfalse_tag".
       CodeGen IndImp mybool.
       CodeGen Func mybool_of_bool.
       CodeGen Func bool_of_mybool.
@@ -3617,10 +3583,8 @@ let test_list = add_test test_list "test_indimp_named_mynat" begin fun (ctx : te
         | myS m' => S (nat_of_mynat m')
         end.
       CodeGen IndType mynat => "mynat" swfunc "sw_mynat" with
-      | myO => case "myO_tag"
-      | myS => case "myS_tag" accessor "mynat_pred".
-      CodeGen Primitive myO => "myO".
-      CodeGen Primitive myS => "myS".
+      | myO => primitive "myO" case "myO_tag"
+      | myS => primitive "myS" case "myS_tag" accessor "mynat_pred".
       CodeGen IndImp mynat.
       CodeGen Func mynat_of_nat.
       CodeGen Func nat_of_mynat.
@@ -3637,8 +3601,7 @@ let test_list = add_test test_list "test_indimp_force_heap" begin fun (ctx : tes
     {|
       Inductive nat4 := mkNat4 : nat -> nat -> nat -> nat -> nat4.
       CodeGen IndType nat4 => "nat4" swfunc "sw_nat4" with
-      | mkNat4 => accessor "get_nat1" "get_nat2" "get_nat3" "get_nat4".
-      CodeGen Primitive mkNat4 => "mkNat4".
+      | mkNat4 => primitive "mkNat4" accessor "get_nat1" "get_nat2" "get_nat3" "get_nat4".
       CodeGen IndImp nat4 where heap on.
     |}) {|
       nat4 x = mkNat4(11,12,13,14);
@@ -3656,8 +3619,7 @@ let test_list = add_test test_list "test_indimp_force_imm" begin fun (ctx : test
     {|
       Inductive nat4 := mkNat4 : nat -> nat -> nat -> nat -> nat4.
       CodeGen IndType nat4 => "nat4" swfunc "sw_nat4" with
-      | mkNat4 => accessor "get_nat1" "get_nat2" "get_nat3" "get_nat4".
-      CodeGen Primitive mkNat4 => "mkNat4".
+      | mkNat4 => primitive "mkNat4" accessor "get_nat1" "get_nat2" "get_nat3" "get_nat4".
       CodeGen IndImp nat4 where heap off.
     |}) {|
       nat4 x = mkNat4(11,12,13,14);
@@ -3698,9 +3660,9 @@ let test_list = add_test test_list "test_indimp_dealloc_list" begin fun (ctx : t
         | mynil => 0
         | mycons _ s' => S (mylen s')
         end.
-      CodeGen IndType mylist => "mylist".
-      CodeGen Primitive mynil => "mynil".
-      CodeGen Primitive mycons => "mycons".
+      CodeGen IndType mylist => "mylist" with
+      | mynil => primitive "mynil"
+      | mycons => primitive "mycons".
       CodeGen Linear mylist.
       CodeGen IndImp mylist.
       CodeGen Func mylen.
@@ -3721,9 +3683,9 @@ let test_list = add_test test_list "test_indimp_auto_linear" begin fun (ctx : te
         | mycons _ s' => S (mylen s')
         end.
       Set CodeGen IndImpAutoLinear.
-      CodeGen IndType mylist => "mylist".
-      CodeGen Primitive mynil => "mynil".
-      CodeGen Primitive mycons => "mycons".
+      CodeGen IndType mylist => "mylist" with
+      | mynil => primitive "mynil"
+      | mycons => primitive "mycons".
       CodeGen IndImp mylist.
       Fail CodeGen TestBorrowCheck fun (x : mylist) => 0.
       CodeGen Func mylen.
@@ -3781,10 +3743,8 @@ let test_list = add_test test_list "test_indimp_multifile_public_type_impl" begi
         | myfalse => mytrue
         end.
       CodeGen IndType mybool => "mybool" swfunc "mybool_sw" with
-      | mytrue => case "mytrue_tag"
-      | myfalse => case "myfalse_tag".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      | mytrue => primitive "mytrue" case "mytrue_tag"
+      | myfalse => primitive "myfalse" case "myfalse_tag".
       CodeGen HeaderFile "mybool.h".
       CodeGen SourceFile "mybool.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
@@ -3815,10 +3775,8 @@ let test_list = add_test test_list "test_indimp_multifile_public_static_type_imp
         | myfalse => mytrue
         end.
       CodeGen IndType mybool => "mybool" swfunc "mybool_sw" with
-      | mytrue => case "mytrue_tag"
-      | myfalse => case "myfalse_tag".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      | mytrue => primitive "mytrue" case "mytrue_tag"
+      | myfalse => primitive "myfalse" case "myfalse_tag".
       CodeGen HeaderFile "mybool.h".
       CodeGen SourceFile "mybool.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
@@ -3854,15 +3812,11 @@ let test_list = add_test test_list "test_indimp_multifile_private_type_impl" beg
         end.
       Set CodeGen IndImpAutoLinear.
       CodeGen IndType bool => "int" swfunc "" with
-      | true => case ""
-      | false => case "0".
-      CodeGen Constant true => "1".
-      CodeGen Constant false => "0".
+      | true => constant "1" case ""
+      | false => constant "0" case "0".
       CodeGen IndType mybool => "mybool" swfunc "mybool_sw" with
-      | mytrue => case "mytrue_tag"
-      | myfalse => case "myfalse_tag".
-      CodeGen Primitive mytrue => "mytrue".
-      CodeGen Primitive myfalse => "myfalse".
+      | mytrue => primitive "mytrue" case "mytrue_tag"
+      | myfalse => primitive "myfalse" case "myfalse_tag".
       CodeGen HeaderFile "mybool.h".
       CodeGen SourceFile "mybool.c".
       CodeGen Snippet "prologue" "#include ""mybool.h""".
@@ -3891,8 +3845,8 @@ let test_list = add_test test_list "test_indimp_with_deallocator" begin fun (ctx
       Inductive boolbox : Set := BoolBox : bool -> boolbox.
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
       CodeGen Linear boolbox.
-      CodeGen IndType boolbox => "boolbox".
-      CodeGen Primitive BoolBox => "boolbox_alloc".
+      CodeGen IndType boolbox => "boolbox" with
+      | BoolBox => primitive "boolbox_alloc".
       CodeGen IndImp boolbox
         where heap on (* heap is required for malloc/free *)
         where prefix "bb".
@@ -3929,8 +3883,7 @@ let test_list = add_test test_list "test_indimp_indmatch_with_deallocator" begin
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
       CodeGen Linear boolbox.
       CodeGen IndType boolbox => "boolbox" with
-      | BoolBox => accessor "boolbox_get" deallocator "boolbox_dealloc".
-      CodeGen Primitive BoolBox => "boolbox_alloc".
+      | BoolBox => primitive "boolbox_alloc" accessor "boolbox_get" deallocator "boolbox_dealloc".
       CodeGen IndImp boolbox
         where heap on (* heap is required for malloc/free *)
         where prefix "bb".
@@ -3987,8 +3940,7 @@ let boolbox_src = {|
       Definition boolbox_dealloc (x : boolbox) : unit := tt.
       CodeGen Linear boolbox.
       CodeGen IndType boolbox => "boolbox" with
-      | BoolBox => accessor "boolbox_get" deallocator "boolbox_dealloc".
-      CodeGen Primitive BoolBox => "boolbox_alloc".
+      | BoolBox => primitive "boolbox_alloc" accessor "boolbox_get" deallocator "boolbox_dealloc".
       CodeGen Primitive boolbox_dealloc => "boolbox_dealloc".
 
       CodeGen Snippet "prologue" "
@@ -4144,8 +4096,7 @@ let test_list = add_test test_list "test_linear_match_without_deallocator" begin
     (bool_src ^ boolbox_src ^
     {|
       CodeGen IndType boolbox*boolbox => "pair_boolbox_boolbox" with
-      | pair => accessor "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
-      CodeGen Primitive @pair boolbox boolbox => "make_pair_boolbox_boolbox".
+      | pair => primitive "make_pair_boolbox_boolbox" accessor "pair_boolbox_boolbox_fst" "pair_boolbox_boolbox_snd".
       CodeGen Snippet "prologue" "
       typedef struct {
         boolbox fst;

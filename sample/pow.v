@@ -23,10 +23,8 @@ Fixpoint fastpow_iter a k x :=
 Definition fastpow a k := fastpow_iter a k 1.
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 
 CodeGen SourceFile "sample/pow_generated.c".
 
@@ -35,10 +33,8 @@ CodeGen Snippet "prologue" "
 ".
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "nat_pred".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "nat_succ".
+| O => constant "0" case "0"
+| S => primitive "nat_succ" case "" accessor "nat_pred".
 
 CodeGen Snippet "prologue" "
 #include <stdint.h>

@@ -143,7 +143,13 @@ let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
 type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
 
+type cstr_interface =
+| CiPrimitive of string
+| CiConstant of string
+| CiNoFunc
+
 type cstr_mod = {
+  cm_interface: cstr_interface option;
   cm_caselabel: string option;
   cm_accessors: string option array;
   cm_deallocator: string option;

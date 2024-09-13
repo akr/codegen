@@ -3,10 +3,8 @@ Require Import codegen.codegen.
 Require Import bool.
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case "true"
-| false => case "false".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case "true"
+| false => constant "false" case "false".
 
 CodeGen Primitive andb => "bool_and".
 CodeGen Primitive orb => "bool_or".

@@ -156,14 +156,17 @@ VERNAC ARGUMENT EXTEND where_or_and
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_mod_elt
-| [ "case" string(caselabel) ] -> { { cm_caselabel = Some caselabel; cm_accessors = [||]; cm_deallocator = None } }
-| [ "accessor" string_list(accessors) ] -> { { cm_caselabel = None; cm_accessors = Array.map (fun accessor -> Some accessor) (Array.of_list accessors); cm_deallocator = None } }
-| [ "deallocator" string(deallocator) ] -> { { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = Some deallocator } }
+| [ "primitive" string(cfunc) ] -> { { cm_interface = Some (CiPrimitive cfunc); cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } }
+| [ "constant" string(cvalue) ] -> { { cm_interface = Some (CiConstant cvalue); cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } }
+| [ "nofunc" ] -> { { cm_interface = Some CiNoFunc; cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } }
+| [ "case" string(caselabel) ] -> { { cm_interface = None; cm_caselabel = Some caselabel; cm_accessors = [||]; cm_deallocator = None } }
+| [ "accessor" string_list(accessors) ] -> { { cm_interface = None; cm_caselabel = None; cm_accessors = Array.map (fun accessor -> Some accessor) (Array.of_list accessors); cm_deallocator = None } }
+| [ "deallocator" string(deallocator) ] -> { { cm_interface = None; cm_caselabel = None; cm_accessors = [||]; cm_deallocator = Some deallocator } }
 END
 
 VERNAC ARGUMENT EXTEND ind_cstr_mod
 | [ ident(cstr_id) "=>" ind_cstr_mod_elt_list(s) ] ->
-  { let cstr_mod = List.fold_left merge_cstr_mod { cm_caselabel = None; cm_accessors = [||]; cm_deallocator = None } s in
+  { let cstr_mod = List.fold_left merge_cstr_mod cstr_mod_empty s in
     (cstr_id, cstr_mod) }
 END
 
@@ -187,15 +190,6 @@ VERNAC ARGUMENT EXTEND string_or_qualid
 | [ reference(qid) ] -> { StrOrQid_Qid qid }
 END
 
-(*
-  The order of constr(term) and "_" is important to parse "_" as None,
-  since "_" is valid expression as a constr,
-*)
-VERNAC ARGUMENT EXTEND constr_or_underscore
-| [ constr(term) ] -> { Some term }
-| [ "_" ] -> { None }
-END
-
 VERNAC ARGUMENT EXTEND sp_instance_names3
 | [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) id_or_underscore(simplified_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = simplified_id } }
 | [ "=>" string_opt(cfunc) id_or_underscore(presimp_id) ] -> { { spi_cfunc_name = cfunc; spi_presimp_id = presimp_id; spi_simplified_id = None } }
@@ -211,11 +205,6 @@ END
 
 VERNAC ARGUMENT EXTEND ind_constructor
 | [ "|" ident(coq_cstr) "=>" string(c_cstr) ] -> { { ic_coq_cstr = coq_cstr; ic_c_cstr = c_cstr } }
-END
-
-VERNAC ARGUMENT EXTEND string_or_none
-| [ string(s) ] -> { Some s }
-| [ "None" ] -> { None }
 END
 
 VERNAC ARGUMENT EXTEND genflag

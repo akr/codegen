@@ -3,10 +3,8 @@ Require Import codegen.codegen.
 Require Import nat.
 
 CodeGen IndType nat => "uint64_t" swfunc "" with
-| O => case "0"
-| S => case "" accessor "nat_pred".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "nat_succ".
+| O => constant "0" case "0"
+| S => primitive "nat_succ" case "" accessor "nat_pred".
 
 CodeGen Primitive Nat.add => "nat_add".
 CodeGen Primitive Nat.sub => "nat_sub".

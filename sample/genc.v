@@ -2,16 +2,12 @@ From mathcomp Require Import ssreflect ssrbool eqtype ssrfun ssrnat seq.
 Require Import codegen.codegen.
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "predn".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "succn".
+| O => constant "0" case "0"
+| S => primitive "succn" case "" accessor "predn".
 
 Definition succ2 n := S (S n).
 CodeGen Func succ2.
@@ -26,8 +22,7 @@ CodeGen SimplifyFunction "non_mangled_code".
 Print non_mangled_code_s.
 
 CodeGen IndType bool*bool => "pair_bool_bool" with
-| pair => accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
-CodeGen Primitive @pair bool bool => "make_pair_bool_bool".
+| pair => primitive "make_pair_bool_bool" accessor "pair_bool_bool_fst" "pair_bool_bool_snd".
 
 Definition swap {A B : Type} (p : A * B) := let (a, b) := p in (b, a).
 Definition swap_bb p := @swap bool bool p.

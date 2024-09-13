@@ -81,16 +81,12 @@ Require Import codegen.codegen.
 CodeGen SourceFile "sample/sprintf_generated.c".
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "nat_pred".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "nat_succ".
+| O => constant "0" case "0"
+| S => primitive "nat_succ" case "" accessor "nat_pred".
 
 CodeGen Primitive Nat.add => "nat_add".
 CodeGen Primitive Nat.sub => "nat_sub".
@@ -98,8 +94,7 @@ CodeGen Primitive Nat.mul => "nat_mul".
 CodeGen Primitive Nat.div => "nat_div".
 CodeGen Primitive Nat.modulo => "nat_mod".
 
-CodeGen IndType ascii => "unsigned char".
-CodeGen Primitive Ascii => "make_char".
+CodeGen IndType ascii => "unsigned char" with Ascii => primitive "make_char".
 CodeGen IndType buffer => "buffer".
 
 CodeGen Primitive mkbuf => "make_buffer".

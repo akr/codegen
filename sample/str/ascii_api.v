@@ -9,8 +9,8 @@ Inductive ascii : Set :=
 *)
 
 CodeGen IndType ascii => "uint8_t" with
-| Ascii => accessor "ascii_bit0" "ascii_bit1" "ascii_bit2" "ascii_bit3"
+| Ascii => primitive "ascii_cstr"
+           accessor "ascii_bit0" "ascii_bit1" "ascii_bit2" "ascii_bit3"
                     "ascii_bit4" "ascii_bit5" "ascii_bit6" "ascii_bit7".
-CodeGen Primitive Ascii => "ascii_cstr".
 
 CodeGen Primitive eqascii => "eqascii".

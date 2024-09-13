@@ -1,24 +1,18 @@
 From codegen Require Import codegen.
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 Print CodeGen Inductive bool.
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "predn".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "succn".
+| O => constant "0" case "0"
+| S => primitive "succn" case "" accessor "predn".
 Print CodeGen Inductive nat.
 
 CodeGen IndType (option bool) => "int" swfunc "" with
-| None => case "-1"
-| Some => case "" accessor "".
-CodeGen Constant @None bool => "(-1)".
-CodeGen Primitive @Some bool => "(int)".
+| None => constant "(-1)" case "-1"
+| Some => primitive "(int)" case "" accessor "".
 Print CodeGen Inductive (option bool).
 
 Definition opt_bool := option bool.

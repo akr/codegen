@@ -106,16 +106,12 @@ CodeGen SourceFile "sample/rank_generated.c".
 CodeGen Linear MDArr.
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "predn".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "succn".
+| O => constant "0" case "0"
+| S => primitive "succn" case "" accessor "predn".
 CodeGen Primitive addn => "addn".
 CodeGen Primitive subn => "subn".
 CodeGen Primitive muln => "muln".
@@ -133,25 +129,23 @@ CodeGen IndType MDArr => "MDArr" with
 | mdarr => deallocator "dealloc_MDArr".
 
 CodeGen IndType MDArr*MDArr => "pair_MDArr_MDArr" with
-| pair => accessor "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
-CodeGen Primitive @pair MDArr MDArr => "make_pair_MDArr_MDArr".
+| pair => primitive "make_pair_MDArr_MDArr" accessor "pair_MDArr_MDArr_D1" "pair_MDArr_MDArr_D2".
 CodeGen IndImp MDArr*MDArr.
 
 CodeGen IndType MDArr*nat => "pair_MDArr_nat" with
-| pair => accessor "pair_MDArr_nat_D" "pair_MDArr_nat_n".
-CodeGen Primitive @pair MDArr nat => "make_pair_MDArr_nat".
+| pair => primitive "make_pair_MDArr_nat" accessor "pair_MDArr_nat_D" "pair_MDArr_nat_n".
 CodeGen IndImp MDArr*nat.
 
 CodeGen IndType MDArr*MDArr*nat => "pair_2MDArr_nat" with
-| pair => accessor "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
-CodeGen Primitive @pair (MDArr*MDArr) nat => "make_pair_2MDArr_nat".
+| pair => primitive "make_pair_2MDArr_nat" accessor "pair_2MDArr_nat_D12" "pair_2MDArr_nat_n".
 CodeGen IndImp MDArr*MDArr*nat.
 
 CodeGen IndType Aux => "Aux" with
-| mkAux => accessor
-  "aux_query_bit" "aux_input_bits" "aux_blksz2"
-  "aux_ratio" "aux_dir1" "aux_dir2".
-CodeGen Primitive mkAux => "mkAux".
+| mkAux =>
+  primitive "mkAux"
+  accessor
+    "aux_query_bit" "aux_input_bits" "aux_blksz2"
+    "aux_ratio" "aux_dir1" "aux_dir2".
 CodeGen Primitive query_bit => "aux_query_bit".
 CodeGen Primitive input_bits => "aux_input_bits".
 CodeGen Primitive blksz2 => "aux_blksz2".

@@ -92,12 +92,9 @@ It is possible to configure code generation of inductive types.
       | S m' => add m' (S n)
       end.
 
-    CodeGen InductiveType nat => "uint64_t".
-    CodeGen InductiveMatch nat
-    | O => case "0"                 (* case "0" means "case 0:" in C switch statement *)
-    | S => case "" accessor "pred". (* case "" means "default:" in C switch statement *)
-    CodeGen Constant O => "0".
-    CodeGen Primitive S => "pred".
+    CodeGen IndType nat => "uint64_t" swfunc "" with
+    | O => constant "0" case "0"                  (* case "0" means "case 0:" in C switch statement *)
+    | S => primitive "S" case "" accessor "pred". (* case "" means "default:" in C switch statement *)
 
     CodeGen Gen add.
     (*

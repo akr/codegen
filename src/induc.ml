@@ -25,6 +25,7 @@ open EConstr
 open Cgenutil
 open State
 (*open Linear*)
+open Specialize
 
 let c_type_void = { c_type_left = "void"; c_type_right = "" }
 let c_type_is_void (c_type : c_typedata) : bool = (c_type = c_type_void)
@@ -228,10 +229,10 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.ty
   | Some c_type ->
       user_err (Pp.str "[codegen] c_type already registered:" +++ Printer.pr_econstr_env env sigma t +++ Pp.str "=>" +++ pr_c_abstract_decl c_type)
 
-let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_config list) : cstr_config array =
-  let cstr_of = fun { cstr_id } -> cstr_id in
+let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (make_default : Id.t -> 't) (cstr_of : 't -> Id.t) (s : 't list) : 't array =
   (let unexpected_cstr_ids =
-    s |> List.filter_map (fun { cstr_id } ->
+    s |> List.filter_map (fun x ->
+      let cstr_id = cstr_of x in
       if Array.exists (Id.equal cstr_id) oneind_body.Declarations.mind_consnames then
         None
       else
@@ -242,7 +243,7 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_conf
   begin
     let cstr_id_counts =
       List.fold_left
-        (fun m { cstr_id } -> Id.Map.add cstr_id (1 + Stdlib.Option.value (Id.Map.find_opt cstr_id m) ~default:0) m)
+        (fun m x -> let cstr_id = cstr_of x in Id.Map.add cstr_id (1 + Stdlib.Option.value (Id.Map.find_opt cstr_id m) ~default:0) m)
         Id.Map.empty
         s
     in
@@ -254,7 +255,7 @@ let reorder_cstrs (oneind_body : Declarations.one_inductive_body) (s : cstr_conf
   end;
   oneind_body.Declarations.mind_consnames |> Array.map (fun consname ->
     match List.find_opt (fun v -> Id.equal consname (cstr_of v)) s with
-    | None -> { cstr_id=consname; cstr_caselabel=None; cstr_accessors=[||]; cstr_deallocator=None }
+    | None -> make_default consname
     | Some v -> v)
 
 let generate_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =
@@ -326,7 +327,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
       Printer.pr_econstr_env env sigma coq_type)
   | None -> ());
   *)
-  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body cstr_cfgs in
+  let cstr_caselabel_accessors_ary = reorder_cstrs oneind_body (fun cstr_id -> { cstr_id; cstr_caselabel=None; cstr_accessors=[||]; cstr_deallocator=None }) (fun { cstr_id } -> cstr_id) cstr_cfgs in
   let f j0 cstr_cfg { cstr_id=cstr; cstr_caselabel=caselabel; cstr_accessors=accessors; cstr_deallocator=deallocator } =
     let num_members = oneind_body.Declarations.mind_consnrealargs.(j0) in
     (if num_members < Array.length accessors then
@@ -383,9 +384,9 @@ let command_ind_match (user_coq_type : Constrexpr.constr_expr) (swfunc_opt : str
   let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
   ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs)
 
-let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_cfgs : (Id.t * cstr_mod) list) : unit =
+let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_mods : (Id.t * cstr_mod) list) : unit =
   let cstr_cfgs =
-    cstr_cfgs |> List.map (fun (cstr_id, { cm_caselabel; cm_accessors; cm_deallocator }) ->
+    cstr_mods |> List.map (fun (cstr_id, { cm_caselabel; cm_accessors; cm_deallocator }) ->
       { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator })
   in
   let (c_type_opt, swfunc_opt) = indtype_ind_args in
@@ -396,6 +397,25 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args 
   | None -> ()
   | Some c_type -> ignore (register_ind_type env sigma coq_type c_type));
   ignore (register_ind_match env sigma coq_type swfunc_opt cstr_cfgs);
+  let (indterm, params) = decompose_appvect sigma coq_type in
+  let (ind, _u) as pind = destInd sigma indterm in
+  let (mutind_body, oneind_body) = Inductive.lookup_mind_specif env ind in
+  let cstr_interface_list = cstr_mods |> List.map (fun (cstr_id, { cm_interface }) -> (cstr_id, cm_interface)) in
+  let cstr_interface_ary = reorder_cstrs oneind_body (fun cstr_id -> (cstr_id, None)) (fun (cstr_id, _) -> cstr_id) cstr_interface_list in
+  cstr_interface_ary |> Array.iteri (fun j0 (cstr_id, cstr_interface) ->
+    let j = j0 + 1 in
+    let cstr = mkConstructUi (pind, j) in
+    let params' = Array.map (fun param -> Some param) params in
+    match cstr_interface with
+    | None -> ()
+    | Some (CiPrimitive c_name) ->
+        let names = { spi_cfunc_name = Some c_name; spi_presimp_id = None; spi_simplified_id = None } in
+        ignore (codegen_instance_command_primitive env sigma false cstr params' (Some names))
+    | Some (CiConstant c_name) ->
+        let names = { spi_cfunc_name = Some c_name; spi_presimp_id = None; spi_simplified_id = None } in
+        ignore (codegen_instance_command_constant env sigma false cstr params' (Some names))
+    | Some CiNoFunc ->
+        ignore (codegen_instance_command_nofunc env sigma false cstr params' None));
   ()
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =

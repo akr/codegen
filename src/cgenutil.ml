@@ -1736,8 +1736,16 @@ let optmerge (name : string) (o1 : 'a option) (o2 : 'a option) : 'a option =
   | Some _, Some _ ->
       user_err (Pp.str "[codegen] duplicated option:" +++ Pp.str name)
 
+let cstr_mod_empty = {
+  cm_interface = None;
+  cm_caselabel = None;
+  cm_accessors = [||];
+  cm_deallocator = None;
+}
+
 let merge_cstr_mod (cstr_mod1 : cstr_mod) (cstr_mod2 : cstr_mod) : cstr_mod =
   {
+    cm_interface = optmerge "primitive/constant/nofunc" cstr_mod1.cm_interface cstr_mod2.cm_interface;
     cm_caselabel = optmerge "case" cstr_mod1.cm_caselabel cstr_mod2.cm_caselabel;
     cm_accessors =
       (let n1 = Array.length cstr_mod1.cm_accessors in

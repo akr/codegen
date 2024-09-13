@@ -15,20 +15,16 @@ CodeGen HeaderSnippet "prologue" "#define LSEQ_H".
 CodeGen Snippet "prologue" "#include ""lseq.h""".
 
 CodeGen IndType bool => "bool" swfunc "" with
-| true => case ""
-| false => case "0".
-CodeGen Constant true => "true".
-CodeGen Constant false => "false".
+| true => constant "true" case ""
+| false => constant "false" case "0".
 
 CodeGen HeaderSnippet "prologue" "
 #include <stdbool.h> /* for bool, true and false */
 ".
 
 CodeGen IndType nat => "nat" swfunc "" with
-| O => case "0"
-| S => case "" accessor "nat_pred".
-CodeGen Constant O => "0".
-CodeGen Primitive S => "nat_succ".
+| O => constant "0" case "0"
+| S => primitive "nat_succ" case "" accessor "nat_pred".
 
 CodeGen HeaderSnippet "prologue" "
 #include <stdint.h>
@@ -79,10 +75,8 @@ CodeGen Snippet "prologue" "
 ".
 
 CodeGen IndType lseq bool => "lseq_bool" swfunc "lseq_bool_sw" with
-| lnil => case "lseq_bool_nil_tag"
-| lcons => case "lseq_bool_cons_tag" accessor "lseq_bool_head" "lseq_bool_tail".
-CodeGen Primitive @lnil bool => "lseq_bool_nil".
-CodeGen Primitive @lcons bool => "lseq_bool_cons".
+| lnil => primitive "lseq_bool_nil" case "lseq_bool_nil_tag"
+| lcons => primitive "lseq_bool_cons" case "lseq_bool_cons_tag" accessor "lseq_bool_head" "lseq_bool_tail".
 CodeGen IndImp lseq bool
   where heap on
   where static off
