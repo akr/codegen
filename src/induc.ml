@@ -410,12 +410,12 @@ let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args 
     | None -> ()
     | Some (CiPrimitive c_name) ->
         let names = { spi_cfunc_name = Some c_name; spi_presimp_id = None; spi_simplified_id = None } in
-        ignore (codegen_instance_command_primitive env sigma false cstr params' (Some names))
+        ignore (codegen_instance_command_primitive env sigma cstr params' (Some names))
     | Some (CiConstant c_name) ->
         let names = { spi_cfunc_name = Some c_name; spi_presimp_id = None; spi_simplified_id = None } in
-        ignore (codegen_instance_command_constant env sigma false cstr params' (Some names))
+        ignore (codegen_instance_command_constant env sigma cstr params' (Some names))
     | Some CiNoFunc ->
-        ignore (codegen_instance_command_nofunc env sigma false cstr params' None));
+        ignore (codegen_instance_command_nofunc env sigma cstr params' None));
   ()
 
 let generate_ind_match (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : ind_config =

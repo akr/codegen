@@ -17,7 +17,6 @@ val codegen_instance_command_nofunc :
   ?cfunc:string ->
   Environ.env ->
   Evd.evar_map ->
-  bool ->
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
@@ -26,7 +25,6 @@ val codegen_instance_command_constant :
   ?cfunc:string ->
   Environ.env ->
   Evd.evar_map ->
-  bool ->
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->
@@ -35,7 +33,6 @@ val codegen_instance_command_primitive :
   ?cfunc:string ->
   Environ.env ->
   Evd.evar_map ->
-  bool ->
   EConstr.t ->
   EConstr.t option array ->
   State.sp_instance_names option ->

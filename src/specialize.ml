@@ -583,7 +583,6 @@ let make_sp_inst (sigma : Evd.evar_map) (presimp : Constr.t) (static_args : ECon
 let codegen_instance_command_nofunc
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
     (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance =
   let icommand = CodeGenNoFunc in
@@ -595,7 +594,6 @@ let codegen_instance_command_nofunc
 let codegen_instance_command_constant
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
     (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance * specialization_instance_interface =
   let icommand = CodeGenConstant in
@@ -608,7 +606,6 @@ let codegen_instance_command_constant
 let codegen_instance_command_primitive
     ?(cfunc : string option)
     (env : Environ.env) (sigma : Evd.evar_map)
-    (static_storage : bool)
     (func : EConstr.t) (user_args : EConstr.t option array)
     (names_opt : sp_instance_names option) : Environ.env * specialization_config * specialization_instance * specialization_instance_interface =
   let icommand = CodeGenPrimitive in
@@ -665,7 +662,7 @@ let command_primitive
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  ignore (codegen_instance_command_primitive env sigma false func args (Some names))
+  ignore (codegen_instance_command_primitive env sigma func args (Some names))
 
 let command_constant
     (user_func_args : Constrexpr.constr_expr)
@@ -676,13 +673,13 @@ let command_constant
   if Array.exists Stdlib.Option.is_none args then
     user_err (Pp.str "[codegen] hole detected. CodeGen Constant cannot take a term with hole:" +++
       Ppconstr.pr_constr_expr env sigma user_func_args);
-  ignore (codegen_instance_command_constant env sigma false func args (Some names))
+  ignore (codegen_instance_command_constant env sigma func args (Some names))
 
 let command_nofunc (user_func_args : Constrexpr.constr_expr) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let (sigma, func, args) = detect_holes env sigma user_func_args in
-  ignore (codegen_instance_command_nofunc env sigma false func args None)
+  ignore (codegen_instance_command_nofunc env sigma func args None)
 
 let command_global_inline (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
@@ -1828,7 +1825,7 @@ let replace_app ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (fu
     | None ->
         let static_storage = if sp_cfg.sp_is_cstr then false else true in
         if sp_cfg.sp_is_cstr then
-          codegen_instance_command_primitive ~cfunc env sigma static_storage efunc nf_static_args None
+          codegen_instance_command_primitive ~cfunc env sigma efunc nf_static_args None
         else
           let (env, sp_cfg, sp_inst, sp_interface, sp_gen) = codegen_instance_command_func ~cfunc env sigma static_storage efunc nf_static_args None in
           (env, sp_cfg, sp_inst, sp_interface)
