@@ -1756,25 +1756,79 @@ let merge_cstr_mod (cstr_mod1 : cstr_mod) (cstr_mod2 : cstr_mod) : cstr_mod =
     cm_deallocator = optmerge "deallocator" cstr_mod1.cm_deallocator cstr_mod2.cm_deallocator;
   }
 
-let check_codegen_supported_ind (mind_specif : Declarations.mind_specif) : unit =
-  let (mutind_body, oneind_body) = mind_specif in
+let determine_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : Pp.t option =
+  let exception UnsuppotedTypeFound of Pp.t in
   let open Declarations in
-  (match mutind_body.mind_finite with
-  | Finite -> () (* Record *)
-  | BiFinite -> () (* Inductive *)
-  | CoFinite ->
-      user_err (Pp.str "[codegen] coinductive type not supported:" +++ Id.print oneind_body.mind_typename));
-  (if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
-    user_err (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Id.print oneind_body.mind_typename));
-  (if oneind_body.mind_nrealargs <> 0 then
-    user_err (Pp.str "[codegen] indexed inductive type given:" +++ Id.print oneind_body.mind_typename))
+  let open Context.Rel.Declaration in
+  let visited = ref ConstrSet.empty in
+  let rec aux (env : Environ.env) (coq_type : EConstr.types) : unit =
+    let nf_coq_type = Reductionops.nf_all env sigma coq_type in
+    let nf_coq_type0 = EConstr.to_constr sigma nf_coq_type in
+    if ConstrSet.mem nf_coq_type0 !visited then
+      ()
+    else begin
+      visited := ConstrSet.add nf_coq_type0 !visited;
+      let (f, args) = decompose_appvect sigma nf_coq_type in
+      match EConstr.kind sigma f with
+      | Rel _ | Var _ | Meta _ | Evar _ | Cast _ | Lambda _ | LetIn _ | App _
+      | Const _ | Construct _ | Case _ | Fix _ | CoFix _ | Proj _
+      | Int _ | Float _ | Array _ ->
+          raise (UnsuppotedTypeFound (Pp.str "[codegen] unexpected type:" +++ Printer.pr_econstr_env env sigma coq_type))
+      | Sort s -> raise (UnsuppotedTypeFound (Pp.str "[codegen] codegen doesn't support sort as a type for code generation:" +++ Printer.pr_econstr_env env sigma coq_type))
+      | Prod (x, t, b) ->
+          (* args must be empty because Prod cannot be a function *)
+          aux env t;
+          let env2 = env_push_assum env x t in
+          aux env2 b
+      | Ind pind ->
+          let ind, _u = pind in
+          let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
+          (match mutind_body.mind_finite with
+          | Finite -> () (* Record *)
+          | BiFinite -> () (* Inductive *)
+          | CoFinite ->
+              raise (UnsuppotedTypeFound (Pp.str "[codegen] coinductive type not supported:" +++ Id.print oneind_body.mind_typename)));
+          (if mutind_body.mind_nparams <> mutind_body.mind_nparams_rec then
+            raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Id.print oneind_body.mind_typename)));
+          (if mutind_body.mind_nparams <> List.length mutind_body.mind_params_ctxt then
+            raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type parameters has let-in binder:" +++ Id.print oneind_body.mind_typename)));
+          (if mutind_body.mind_nparams <> Array.length args then
+            raise (UnsuppotedTypeFound (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
+              Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
+              Pp.int (Array.length args) +++ Pp.str "given for" +++
+              Printer.pr_inductive env ind)));
+          (args |> Array.iter (fun param ->
+            if not (Vars.closed0 sigma param) then
+              raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type parameter has free variable:" +++ Printer.pr_econstr_env env sigma param))));
+          (if oneind_body.mind_nrealargs <> 0 then
+            raise (UnsuppotedTypeFound (Pp.str "[codegen] indexed inductive type given:" +++ Id.print oneind_body.mind_typename)));
+          (Array.iter2 (fun cstr_id cstr_ty ->
+              let (nf_lc_ctx, ret_type) = decompose_prod_decls sigma cstr_ty in
+              if List.exists (fun decl -> match decl with LocalDef _ -> true | LocalAssum _ -> false) nf_lc_ctx then
+                raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with let-in binder:" +++ Id.print oneind_body.mind_typename));
+              ind_nf_lc_iter env sigma nf_lc_ctx (Array.to_list args)
+                (fun env arg_ty ->
+                  let nf_arg_ty = Reductionops.nf_all env sigma arg_ty in
+                  if not (Vars.closed0 sigma nf_arg_ty) then
+                    raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with dependent type:" +++ Id.print oneind_body.mind_typename));
+                  aux env nf_arg_ty;
+                  None))
+            oneind_body.mind_consnames (arities_of_constructors sigma pind mind_specif));
+      ()
+    end
+  in
+  try
+    aux env coq_type;
+    None
+  with UnsuppotedTypeFound pp ->
+    Some pp
 
-let is_codegen_supported_ind (mind_specif : Declarations.mind_specif) : bool =
-  let (mutind_body, oneind_body) = mind_specif in
-  let open Declarations in
-  (match mutind_body.mind_finite with
-  | Finite -> true (* Record *)
-  | BiFinite -> true (* Inductive *)
-  | CoFinite -> false (* CoInductive *)) &&
-  (mutind_body.mind_nparams = mutind_body.mind_nparams_rec) &&
-  (oneind_body.mind_nrealargs = 0)
+let check_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : unit =
+  match determine_codegen_supported_type env sigma coq_type with
+  | None -> ()
+  | Some pp -> user_err pp
+
+let is_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : bool =
+  match determine_codegen_supported_type env sigma coq_type with
+  | None -> true
+  | Some pp -> false

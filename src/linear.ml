@@ -55,25 +55,14 @@ let command_downward (ty : Constrexpr.constr_expr) : unit =
   downward_type_set := ConstrSet.add (EConstr.to_constr sigma ty4) !downward_type_set;
   Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
-let valid_type_param (env : Environ.env) (sigma : Evd.evar_map) (decl : Constr.rel_declaration) : bool =
-  match decl with
-  | Context.Rel.Declaration.LocalAssum (name, ty) -> isSort sigma (whd_all env sigma (EConstr.of_constr ty))
-  | Context.Rel.Declaration.LocalDef _ -> false
-
-let make_ind_ary (env : Environ.env) (sigma : Evd.evar_map) (mutind : MutInd.t) (u : EInstance.t) : EConstr.t array =
+let make_mutual_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (mutind : MutInd.t) (u : EInstance.t) (params : EConstr.t array) : EConstr.t array =
   let open Declarations in
   let mutind_body = Environ.lookup_mind mutind env in
-  let pp_all_ind_names () =
-    pp_sjoinmap_ary
-      (fun oneind_body -> Id.print oneind_body.mind_typename)
-      mutind_body.mind_packets
-  in
-  Array.iter (fun oneind_body -> check_codegen_supported_ind (mutind_body, oneind_body)) mutind_body.mind_packets;
-  if not (List.for_all (valid_type_param env sigma) mutind_body.mind_params_ctxt) then
-    user_err (Pp.str "[codegen] inductive type has non-type parameter:" +++ pp_all_ind_names ());
   let ind_ary = Array.map (fun j -> EConstr.mkIndU ((mutind, j), u))
     (iota_ary 0 mutind_body.mind_ntypes) in
-  ind_ary
+  let ty_ary = Array.map (fun ind -> mkApp (ind, params)) ind_ary in
+  Array.iter (fun ty -> check_codegen_supported_type env sigma ty) ty_ary;
+  ty_ary
 
 let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : EConstr.t array =
   let (ty_f, ty_args) = decompose_appvect sigma ty in
@@ -83,8 +72,8 @@ let mutual_inductive_types (env : Environ.env) (sigma : Evd.evar_map) (ty : ECon
     | _ -> user_err_hov (Pp.str "[codegen:mutual_inductive_types] inductive type expected:" +++
                          Printer.pr_econstr_env env sigma ty)
   in
-  let ind_ary = make_ind_ary env sigma mutind u in
-  Array.map (fun ind -> nf_all env sigma (mkApp (ind, ty_args))) ind_ary
+  let ty_ary = make_mutual_types env sigma ty mutind u ty_args in
+  Array.map (fun ty -> nf_all env sigma ty) ty_ary
 
 let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductive puniverses) (params : EConstr.t array)
   (f : (*typename*)Id.t -> (*consname*)Id.t -> (*argtype*)EConstr.types -> unit) : unit =

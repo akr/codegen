@@ -180,5 +180,5 @@ val str_instance_command : State.instance_command -> string
 val optmerge : string -> 'a option -> 'a option -> 'a option
 val cstr_mod_empty : State.cstr_mod
 val merge_cstr_mod : State.cstr_mod -> State.cstr_mod -> State.cstr_mod
-val check_codegen_supported_ind : Declarations.mind_specif -> unit
-val is_codegen_supported_ind : Declarations.mind_specif -> bool
+val check_codegen_supported_type : Environ.env -> Evd.evar_map -> EConstr.t -> unit
+val is_codegen_supported_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool

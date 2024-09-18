@@ -112,7 +112,7 @@ let command_print_inductive (coq_type_list : Constrexpr.constr_expr list) : unit
       | Some ind_cfg -> codegen_print_inductive_type env sigma ind_cfg)
 
 let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.t) : Declarations.mutual_inductive_body * Declarations.one_inductive_body * Names.inductive puniverses * EConstr.constr array =
-  let open Declarations in
+  check_codegen_supported_type env sigma coq_type;
   let (f, args) = decompose_appvect sigma coq_type in
   (if not (EConstr.isInd sigma f) then
     user_err (Pp.str "[codegen] inductive type expected:" +++
@@ -120,12 +120,6 @@ let get_ind_coq_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : ECon
   let pind = EConstr.destInd sigma f in
   let ind, u = pind in
   let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
-  (if mutind_body.mind_nparams <> Array.length args then
-    user_err (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
-      Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
-      Pp.int (Array.length args) +++ Pp.str "given for" +++
-      Printer.pr_inductive env ind));
-  check_codegen_supported_ind mind_specif;
   (mutind_body, oneind_body, pind, args)
 
 let ind_coq_type_registered_p (sigma : Evd.evar_map) (coq_type : EConstr.t) : bool =
@@ -165,7 +159,7 @@ and coq_type_is_void_type1 (env : Environ.env) (sigma : Evd.evar_map) (coq_type 
   let (mutind_body, oneind_body) as mind_specif = Inductive.lookup_mind_specif env ind in
   if mutind_body.mind_nparams <> Array.length args then
     false (* unexpected number of inductive type parameters *)
-  else if not (is_codegen_supported_ind mind_specif) then
+  else if not (is_codegen_supported_type env sigma coq_type) then
     false (* not supported by codegen *)
   else if Array.length oneind_body.mind_consnames <> 1 then
     false (* single constructor inductive type expected *)
