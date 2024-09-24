@@ -1792,6 +1792,8 @@ let determine_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) 
             raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has non-uniform parameters:" +++ Id.print oneind_body.mind_typename)));
           (if mutind_body.mind_nparams <> List.length mutind_body.mind_params_ctxt then
             raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type parameters has let-in binder:" +++ Id.print oneind_body.mind_typename)));
+          (if oneind_body.mind_nrealargs <> 0 then
+            raise (UnsuppotedTypeFound (Pp.str "[codegen] indexed inductive type given:" +++ Id.print oneind_body.mind_typename)));
           (if mutind_body.mind_nparams <> Array.length args then
             raise (UnsuppotedTypeFound (Pp.str "[codegen] unexpected number of inductive type parameters:" +++
               Pp.int mutind_body.mind_nparams +++ Pp.str "expected but" +++
@@ -1800,17 +1802,15 @@ let determine_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) 
           (args |> Array.iter (fun param ->
             if not (Vars.closed0 sigma param) then
               raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type parameter has free variable:" +++ Printer.pr_econstr_env env sigma param))));
-          (if oneind_body.mind_nrealargs <> 0 then
-            raise (UnsuppotedTypeFound (Pp.str "[codegen] indexed inductive type given:" +++ Id.print oneind_body.mind_typename)));
           (Array.iter2 (fun cstr_id cstr_ty ->
               let (nf_lc_ctx, ret_type) = decompose_prod_decls sigma cstr_ty in
               if List.exists (fun decl -> match decl with LocalDef _ -> true | LocalAssum _ -> false) nf_lc_ctx then
-                raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with let-in binder:" +++ Id.print oneind_body.mind_typename));
+                raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with let-in binder:" +++ Id.print oneind_body.mind_typename +++ Id.print cstr_id));
               ind_nf_lc_iter env sigma nf_lc_ctx (Array.to_list args)
                 (fun env arg_ty ->
                   let nf_arg_ty = Reductionops.nf_all env sigma arg_ty in
                   if not (Vars.closed0 sigma nf_arg_ty) then
-                    raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with dependent type:" +++ Id.print oneind_body.mind_typename));
+                    raise (UnsuppotedTypeFound (Pp.str "[codegen] inductive type has a constructor with dependent type:" +++ Id.print oneind_body.mind_typename +++ Id.print cstr_id));
                   aux env nf_arg_ty;
                   None))
             oneind_body.mind_consnames (arities_of_constructors sigma pind mind_specif));
