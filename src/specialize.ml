@@ -726,9 +726,10 @@ let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : 
     | Const (ctnt, univ) ->
         if Cpred.mem ctnt pred then
           let cbody = Environ.lookup_constant ctnt env in
-          let body = match Global.body_of_constant_body Library.indirect_accessor cbody with
-                     | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++ Printer.pr_constant env ctnt)
-                     | Some (body, _, _) -> body
+          let body =
+            match cbody.const_body with
+            | Def term -> term
+            | _ -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++ Printer.pr_constant env ctnt)
           in
           aux (EConstr.of_constr body)
         else
@@ -764,7 +765,7 @@ let rec check_letin_in_cstr_type (env : Environ.env) (sigma : Evd.evar_map)
 and check_letin_in_cstr_type1 (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : unit =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:check_letin_in_cstr_type] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ | Sort _ | Prod _ | Ind _ -> ()
   | Cast (e,ck,t) -> check_letin_in_cstr_type env sigma e
@@ -856,7 +857,7 @@ let rec expand_eta_top (env : Environ.env) (sigma : Evd.evar_map)
 and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:expand_eta_top] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast (e,ck,t) -> expand_eta_top env sigma e (* strip cast *)
   | Lambda (x,ty,b) ->
@@ -886,7 +887,7 @@ and expand_eta_top1 (env : Environ.env) (sigma : Evd.evar_map)
 and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:search_fixclo_to_expand_eta] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Rel _ | Const _ | Construct _ | Sort _ | Prod _ | Ind _ -> term
   | Cast (e,ck,t) -> search_fixclo_to_expand_eta env sigma e (* strip cast *)
@@ -945,27 +946,27 @@ let aenv_of_env (env : Environ.env) : aenv_t =
     user_err (Pp.str "[codegen:bug] non-empty envronment given for aenv_of_env"));
   { aenv_env=env; aenv_fix_bounded=[] }
 
-let aenv_push_assum (aenv : aenv_t) (x : Names.Name.t Context.binder_annot) (t : EConstr.types) : aenv_t = {
+let aenv_push_assum (aenv : aenv_t) (x : Names.Name.t EConstr.binder_annot) (t : EConstr.types) : aenv_t = {
     aenv_env = env_push_assum aenv.aenv_env x t;
     aenv_fix_bounded = false :: aenv.aenv_fix_bounded;
   }
 
-let aenv_push_assums (aenv : aenv_t) (assums : (Names.Name.t Context.binder_annot * EConstr.types) list) : aenv_t = {
+let aenv_push_assums (aenv : aenv_t) (assums : (Names.Name.t EConstr.binder_annot * EConstr.types) list) : aenv_t = {
     aenv_env = env_push_assums aenv.aenv_env assums;
     aenv_fix_bounded = CList.addn (List.length assums) false aenv.aenv_fix_bounded;
   }
 
-let aenv_push_def (aenv : aenv_t) (x : Names.Name.t Context.binder_annot) (e : EConstr.t) (t : EConstr.types) : aenv_t = {
+let aenv_push_def (aenv : aenv_t) (x : Names.Name.t EConstr.binder_annot) (e : EConstr.t) (t : EConstr.types) : aenv_t = {
     aenv_env = env_push_def aenv.aenv_env x e t;
     aenv_fix_bounded = false :: aenv.aenv_fix_bounded;
   }
 
-let aenv_push_defs (aenv : aenv_t) (defs : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list) : aenv_t = {
+let aenv_push_defs (aenv : aenv_t) (defs : (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list) : aenv_t = {
     aenv_env = env_push_defs aenv.aenv_env defs;
     aenv_fix_bounded = CList.addn (List.length defs) false aenv.aenv_fix_bounded;
   }
 
-let aenv_push_fix (aenv : aenv_t) (prec : (EConstr.t, EConstr.t) Constr.prec_declaration) : aenv_t =
+let aenv_push_fix (aenv : aenv_t) (prec : EConstr.rec_declaration) : aenv_t =
   let (nary, tary, fary) = prec in
   {
     aenv_env = env_push_fix aenv.aenv_env prec;
@@ -988,7 +989,7 @@ let rec normalizeV_rec (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t)
 and normalizeV1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   let wrap_lets hoisted_exprs lifted_term =
     let hoisted_types = List.map (Retyping.get_type_of aenv.aenv_env sigma) hoisted_exprs in
-    let hoisted_names = List.map (fun ty -> Context.nameR (Id.of_string (Namegen.hdchar aenv.aenv_env sigma ty))) hoisted_types in
+    let hoisted_names = List.map (fun ty -> EConstr.nameR (Id.of_string (Namegen.hdchar aenv.aenv_env sigma ty))) hoisted_types in
     let rec aux i names exprs types acc_term =
       match names, exprs, types with
       | [], [], [] -> acc_term
@@ -1002,7 +1003,7 @@ and normalizeV1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECon
     aux 0 hoisted_names hoisted_exprs hoisted_types lifted_term
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:normalizeV] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:normalizeV] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
@@ -1120,7 +1121,7 @@ let reduce_arg (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
 
 let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
     (lift : int -> EConstr.t -> EConstr.t) (ks : int array)
-    (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) =
+    (prec : Name.t EConstr.binder_annot array * EConstr.types array * EConstr.t array) =
   (*msg_info_hov (Pp.str "test_bounded_fix: n=" ++ Pp.int n +++
     Printer.pr_econstr_env env sigma (mkFix ((ks,0),prec)));*)
   let h = Array.length ks in
@@ -1159,7 +1160,7 @@ let test_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (n : int)
   None is returned otherwise.
   *)
 let find_bounded_fix (env : Environ.env) (sigma : Evd.evar_map) (ks : int array)
-    (prec : Name.t Context.binder_annot array * EConstr.types array * EConstr.t array) :
+    (prec : Name.t EConstr.binder_annot array * EConstr.types array * EConstr.t array) :
     int option =
       (*msg_info_hov (Pp.str "[codegen] find_bounded_fix:" +++
         Printer.pr_econstr_env env sigma (mkFix ((ks,0),prec)));*)
@@ -1208,7 +1209,7 @@ let rec reduce_exp (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : E
 
 and reduce_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:reduce_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:reduce_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
@@ -1456,7 +1457,7 @@ and try_iota_match (aenv : aenv_t) (sigma : Evd.evar_map)
 
 let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:normalize_types] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:normalize_types] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1520,7 +1521,7 @@ let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : ECons
 *)
 let rec normalize_static_arguments (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:normalize_static_arguments] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:normalize_static_arguments] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1599,7 +1600,7 @@ let rec count_false_in_prefix (n : int) (vars_used : bool list) : int =
 let unlift_unused (sigma : Evd.evar_map) (vars_used : bool list) (term : EConstr.t) : EConstr.t =
   let rec aux (vars_used : bool list) (term : EConstr.t) : EConstr.t =
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:unlift_unused] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str ")")
     | Cast _ ->
         user_err (Pp.str "[codegen:unlift_unused] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str ")")
@@ -1652,7 +1653,7 @@ let rec delete_unused_let_rec (env : Environ.env) (sigma : Evd.evar_map) (term :
      retf vars_used)
 and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (IntSet.t * (bool list -> EConstr.t)) =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:delete_unused_let_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:delete_unused_let_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1852,7 +1853,7 @@ let rec replace ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (te
   (env, result, referred_cfuncs)
 and replace1 ~(cfunc : string) (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Environ.env * EConstr.t * StringSet.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:replace] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:replace] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1923,7 +1924,7 @@ let rec reduce_eta (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t)
 
 and reduce_eta1 (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:replace] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:replace] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -2074,7 +2075,7 @@ and complete_args_exp1 (aenv : aenv_t) (sigma : Evd.evar_map) (term : EConstr.t)
       it_mkLambda (mkApp (term', args)) fargs
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:complete_args_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:complete_args_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
@@ -2143,7 +2144,7 @@ let delete_unreachable_fixfuncs (env0 : Environ.env) (sigma : Evd.evar_map) (ter
     let (term, args) = decompose_appvect sigma term in
     let (term', fv) =
       match EConstr.kind sigma term with
-      | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+      | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
           user_err (Pp.str "[codegen:delete_unreachable_fixfuncs] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
       | Cast _ | App _ ->
           user_err (Pp.str "[codegen:delete_unreachable_fixfuncs] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env aenv.aenv_env sigma term)
@@ -2231,7 +2232,7 @@ let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
       Printer.pr_econstr_env env sigma ty);
   let rec aux env term =
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:monomorphism_check] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ ->
         user_err (Pp.str "[codegen:monomorphism_check] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -2283,7 +2284,7 @@ let monomorphism_check (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
   in
   aux env term
 
-let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t Context.binder_annot list =
+let rec formal_argument_names (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Name.t EConstr.binder_annot list =
   match EConstr.kind sigma term with
   | Lambda (x,t,e) ->
       let env2 = env_push_assum env x t in
@@ -2307,7 +2308,7 @@ let rename_vars (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : 
   let make_new_fixfunc old_name = Context.map_annot (fun old_name -> make_new_name "fixfunc" num_fixfuncs old_name) old_name in
   let rec r (env : Environ.env) (term : EConstr.t) =
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:rename_vars] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ ->
         user_err (Pp.str "[codegen:rename_vars] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)

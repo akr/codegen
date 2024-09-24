@@ -1,4 +1,4 @@
-module ConstrMap : CMap.ExtS with type key = Constr.t
+module ConstrMap : CMap.UExtS with type key = Constr.t
 module ConstrSet : CSet.S with type elt = Constr.t
 module StringSet : CSet.S with type elt = String.t
 

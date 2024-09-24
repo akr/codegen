@@ -229,9 +229,9 @@ let _ = ignore show_genchunks
 let rec fix_body_list (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) :
     (((*env including fixfunc names but without lambdas of fixfunc*)Environ.env *
       (*env including fixfunc names and lambdas of fixfunc*)Environ.env *
-      (*fixfunc name*)Names.Name.t Context.binder_annot *
+      (*fixfunc name*)Names.Name.t EConstr.binder_annot *
       (*fixfunc type*)EConstr.types *
-      (*fargs*)(Names.Name.t Context.binder_annot * EConstr.types) list) list *
+      (*fargs*)(Names.Name.t EConstr.binder_annot * EConstr.types) list) list *
      ((*env for body*)Environ.env *
       (*body*)EConstr.t)) list =
   match EConstr.kind sigma term with
@@ -269,7 +269,7 @@ let c_args_without_void_and_ret_type (env : Environ.env) (sigma : Evd.evar_map) 
 
 let rec make_fixterm_tbl (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Environ.env * EConstr.t) Id.Map.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:make_fixterm_tbl] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:make_fixterm_tbl] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -406,7 +406,7 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
       (* fixfunc variables at non-tail position, represented as de Bruijn levels *) IntSet.t *
       (* fixfunc variables at tail position, represented as de Bruijn levels *) IntSet.t =
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_lamfix] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -511,7 +511,7 @@ let make_inlinable_fixterm_tbl ~(higher_order_fixfunc_tbl : bool Id.Map.t) (env 
       | Rel _ | Const _ | Construct _ | Fix _ -> ()
       | _ -> user_err (Pp.str "[codegen] unexpected term in function position:" +++ Printer.pr_econstr_env env sigma term));
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
         user_err (Pp.str "[codegen:make_inlinable_fixterm_tbl_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -601,7 +601,7 @@ let obtain_function_genchunks
   let rec obtain_function_genchunks_lamfix ~(tail_position : bool) ~(individual_body : bool) ~(bodyroot : body_root_t) ~(bodyvars : body_var_t list) (env : Environ.env) (term : EConstr.t) :
       (genchunk_t Seq.t * (*genchunk_bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:obtain_function_genchunks_lamfix] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ ->
         user_err (Pp.str "[codegen:obtain_function_genchunks_lamfix] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -674,7 +674,7 @@ let obtain_function_genchunks
       (genchunk_t Seq.t * (*bodyhead_list*)bodyhead_t list * (*fixfunc_impls*)Id.Set.t * (*fixfunc_gotos*)Id.Set.t * (*fixfunc_calls*)Id.Set.t * (*closurr_defs*)Id.Set.t) =
     let (term, args) = decompose_appvect sigma term in
     match EConstr.kind sigma term with
-    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+    | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
         user_err (Pp.str "[codegen:obtain_function_genchunks_body] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
     | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
         user_err (Pp.str "[codegen:obtain_function_genchunks_body] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -838,7 +838,7 @@ let make_c_names_tbl
 let rec fixterm_free_variables_rec (env : Environ.env) (sigma : Evd.evar_map)
     (term : EConstr.t) ~(result : (Id.t, Id.Set.t) Hashtbl.t) : Id.Set.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:fixterm_free_variables_rec] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:fixterm_free_variables_rec] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1068,7 +1068,7 @@ let make_cfunc_tbl
 let rec find_closures ~(found : Environ.env -> EConstr.t -> Id.t option -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:find_closures] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:find_closures] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1082,7 +1082,7 @@ let rec find_closures ~(found : Environ.env -> EConstr.t -> Id.t option -> unit)
 and find_closures_exp ~(found : Environ.env -> EConstr.t -> Id.t option -> unit)
     (env : Environ.env) (sigma : Evd.evar_map) (var_to_bind : Id.t option) (term : EConstr.t) =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:find_closures_exp] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:find_closures_exp] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1462,7 +1462,7 @@ let collect_closures
    useless accessor call and assignment in translation of match-expression *)
 let rec make_used_variables (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Id.Set.t =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:make_used_variables] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ ->
       user_err (Pp.str "[codegen:make_used_variables] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1676,7 +1676,7 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (Id.t * string * Pp.t
     (gen_branch_body : Environ.env -> Evd.evar_map -> EConstr.t -> Pp.t)
     (env : Environ.env) (sigma : Evd.evar_map)
     (ci : case_info) (item : EConstr.t)
-    (branches : EConstr.t Constr.pcase_branch array * (EConstr.rel_context * EConstr.t) array) : Pp.t =
+    (branches : EConstr.case_branch array * (EConstr.rel_context * EConstr.t) array) : Pp.t =
   let (h, item_type, item_cvar, c_deallocations, caselabel_accessorcalls) = gen_case_fragments env sigma item in
   let gen_assign_member accessor_calls ctx =
     let m = Array.length accessor_calls in
@@ -1684,13 +1684,12 @@ let gen_match (used_vars : Id.Set.t) (gen_switch : Pp.t -> (Id.t * string * Pp.t
     let c_vars = Array.map
       (fun i ->
         let env3 = Environ.pop_rel_context (i-1) env2 in
-        let decl = Environ.lookup_rel 1 env3 in
+        let decl = EConstr.lookup_rel 1 env3 in
         let (x, _, t) = Context.Rel.Declaration.to_tuple decl in
         let c_id = id_of_annotated_name x in
         let c_var = Id.to_string c_id in
         (if Id.Set.mem c_id used_vars then
           let env4 = Environ.pop_rel_context 1 env3 in
-          let t = EConstr.of_constr t in
           (let c_ty = c_typename env4 sigma t in
           if not (c_type_is_void c_ty) then
             add_local_var c_ty c_var);
@@ -1847,7 +1846,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       (Array.to_list argsary))
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:gen_head] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
       user_err (Pp.str "[codegen:gen_head] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -1901,7 +1900,7 @@ and gen_head1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | LetIn (x,e,t,b) ->
       assert (CArray.is_empty argsary);
       let c_var = str_of_annotated_name x in
-      let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
+      let env2 = env_push_def env (EConstr.nameR (Id.of_string c_var)) e t in
       let cont1 =
         let c_ty = c_typename env sigma t in
         if c_type_is_void c_ty then
@@ -2012,7 +2011,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
       (Array.to_list argsary))
   in
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
       user_err (Pp.str "[codegen:gen_tail] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ | Sort _ | Prod _ | Ind _ | App _ ->
       user_err (Pp.str "[codegen:gen_tail] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -2067,7 +2066,7 @@ and gen_tail1 ~(fixfunc_tbl : fixfunc_table) ~(closure_tbl : closure_table) ~(us
   | LetIn (x,e,t,b) ->
       assert (CArray.is_empty argsary);
       let c_var = str_of_annotated_name x in
-      let env2 = env_push_def env (Context.nameR (Id.of_string c_var)) e t in
+      let env2 = env_push_def env (EConstr.nameR (Id.of_string c_var)) e t in
       let cont1 =
         let c_ty = c_typename env sigma t in
         if c_type_is_void c_ty then
@@ -2540,16 +2539,19 @@ let make_simplified_for_cfunc (cfunc_name : string) :
   (*msg_debug_hov (Pp.str "[codegen:make_simplified_for_cfunc] ctnt=" ++ Printer.pr_constant env ctnt);*)
   let cdef = Environ.lookup_constant ctnt env in
   let ty = cdef.Declarations.const_type in
-  match Global.body_of_constant_body Library.indirect_accessor cdef with
-  | None -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
-                      Printer.pr_constant env ctnt)
-  | Some (body,_, _) -> ({cfunc_static=static; cfunc_name=cfunc_name}, ty, body)
+  let body =
+    match cdef.const_body with
+    | Def term -> term
+    | _ -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++
+                     Printer.pr_constant env ctnt)
+  in
+  ({cfunc_static=static; cfunc_name=cfunc_name}, ty, body)
 
-let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (cfunc_t * Constr.t) list) : sibling_t list =
-  let (args, body) = Term.decompose_lambda primary_term in
-  if Constr.isFix body then
+let make_sibling_entfuncs (sigma : Evd.evar_map) (primary_term : EConstr.t) (sibling_cfunc_term_list : (cfunc_t * Constr.t) list) : sibling_t list =
+  let (args, body) = EConstr.decompose_lambda sigma primary_term in
+  if EConstr.isFix sigma body then
     let primary_nary =
-      let ((ks, j), (nary, tary, fary)) = Constr.destFix body in
+      let ((ks, j), (nary, tary, fary)) = EConstr.destFix sigma body in
       nary
     in
     List.map
@@ -2564,8 +2566,8 @@ let make_sibling_entfuncs (primary_term : Constr.t) (sibling_cfunc_term_list : (
 
 let gen_func_sub (env : Environ.env) (sigma : Evd.evar_map) (cfunc_term_list : (cfunc_t * Constr.t) list) : (string * Pp.t) list =
   let (primary_cfunc, primary_term) = List.hd cfunc_term_list in
-  let sibling_entfuncs = make_sibling_entfuncs primary_term (List.tl cfunc_term_list) in
   let primary_term = EConstr.of_constr primary_term in
+  let sibling_entfuncs = make_sibling_entfuncs sigma primary_term (List.tl cfunc_term_list) in
   (*msg_debug_hov (Pp.str "[codegen] gen_func_sub:1");*)
   let fixterm_tbl = make_fixterm_tbl env sigma primary_term in
   let fixfunc_fixterm_tbl = make_fixfunc_fixterm_tbl sigma ~fixterm_tbl in

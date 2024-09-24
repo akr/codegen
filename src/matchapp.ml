@@ -35,7 +35,7 @@ let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ECons
 *)
 let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : ((EConstr.t -> EConstr.t) * Environ.env * EConstr.case * EConstr.t array) option =
   match EConstr.kind sigma term with
-  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ ->
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
        user_err (Pp.str "[codegen:find_match_app] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
   | Cast _ ->
       user_err (Pp.str "[codegen:find_match_app] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
@@ -239,7 +239,7 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
             bl bl0
         in
         let lhs_appmatch = mkApp (mkCase ma_match, ma_args) in
-        let mpred_sr = Sorts.Relevant in
+        let mpred_sr = EConstr.ERelevance.relevant in
         let rhs_matchapp = mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl') in
         let sigma = verify_case_transform env sigma lhs_appmatch rhs_matchapp in
         Some (sigma, q rhs_matchapp)

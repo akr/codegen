@@ -505,7 +505,7 @@ let id_of_name (name : Name.t) : Id.t =
   | Name.Anonymous -> user_err (Pp.str "[codegen:bug] id_of_name require non-anonymous Name")
   | Name.Name id -> id
 
-let id_of_annotated_name (name : Name.t Context.binder_annot) : Id.t =
+let id_of_annotated_name (name : Name.t EConstr.binder_annot) : Id.t =
   id_of_name (Context.binder_name name)
 
 let str_of_name (name : Name.t) : string =
@@ -513,7 +513,7 @@ let str_of_name (name : Name.t) : string =
   | Name.Anonymous -> user_err (Pp.str "[codegen] str_of_name with anonymous name")
   | Name.Name id -> Id.to_string id
 
-let str_of_annotated_name (name : Name.t Context.binder_annot) : string =
+let str_of_annotated_name (name : Name.t EConstr.binder_annot) : string =
   str_of_name (Context.binder_name name)
 
 let str_of_name_permissive (name : Name.t) : string =
@@ -794,31 +794,31 @@ let disjoint_id_map_union_list (ms : 'a Id.Map.t list) : 'a Id.Map.t =
       disjoint_id_map_union m0 m1)
     Id.Map.empty ms
 
-let env_push_assum (env : Environ.env) (x : Names.Name.t Context.binder_annot) (t : EConstr.types) : Environ.env =
+let env_push_assum (env : Environ.env) (x : Names.Name.t EConstr.binder_annot) (t : EConstr.types) : Environ.env =
   let decl = Context.Rel.Declaration.LocalAssum (x, t) in
   let env2 = EConstr.push_rel decl env in
   env2
 
 (* assums is a list of (name,type).
   The innermost assumption is first.  *)
-let env_push_assums (env : Environ.env) (assums : (Names.Name.t Context.binder_annot * EConstr.types) list) : Environ.env =
+let env_push_assums (env : Environ.env) (assums : (Names.Name.t EConstr.binder_annot * EConstr.types) list) : Environ.env =
   let ctx = List.map (fun (x,t) -> Context.Rel.Declaration.LocalAssum (x,t)) assums in
   let env2 = EConstr.push_rel_context ctx env in
   env2
 
-let env_push_def (env : Environ.env) (x : Names.Name.t Context.binder_annot) (e : EConstr.t) (t : EConstr.types) : Environ.env =
+let env_push_def (env : Environ.env) (x : Names.Name.t EConstr.binder_annot) (e : EConstr.t) (t : EConstr.types) : Environ.env =
   let decl = Context.Rel.Declaration.LocalDef (x, e, t) in
   let env2 = EConstr.push_rel decl env in
   env2
 
 (* defs is a list of (name,exp,type).
   The innermost definition is first.  *)
-let env_push_defs (env : Environ.env) (defs : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list) : Environ.env =
+let env_push_defs (env : Environ.env) (defs : (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list) : Environ.env =
   let ctx = List.map (fun (x,e,t) -> Context.Rel.Declaration.LocalDef (x,e,t)) defs in
   let env2 = EConstr.push_rel_context ctx env in
   env2
 
-let env_push_fix (env : Environ.env) (prec : (EConstr.t, EConstr.t) Constr.prec_declaration) : Environ.env =
+let env_push_fix (env : Environ.env) (prec : EConstr.rec_declaration) : Environ.env =
   let env2 = push_rec_types prec env in
   env2
 
@@ -849,7 +849,7 @@ let decompose_appvect (sigma : Evd.evar_map) (term : EConstr.t) : (EConstr.t * E
   | App (f,args) -> (f,args)
   | _ -> (term, [||])
 
-let decompose_lam_upto_n (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t) list * EConstr.t =
+let decompose_lam_upto_n (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t =
   let rec aux n fargs term =
     if n <= 0 then
       (fargs, term)
@@ -889,7 +889,7 @@ let rec decompose_lam_n_env (env : Environ.env) (sigma : Evd.evar_map) (n : int)
   This order of bindings is same as Constr.rel_context used by
   Environ.push_rel_context.
 *)
-let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
+let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list * EConstr.t =
   let rec aux term defs =
     match EConstr.kind sigma term with
     | LetIn (x, e, ty, b) ->
@@ -898,7 +898,7 @@ let decompose_lets (sigma : Evd.evar_map) (term : EConstr.t) : (Name.t Context.b
   in
   aux term []
 
-let rec compose_lets (defs : (Name.t Context.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
+let rec compose_lets (defs : (Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list) (body : EConstr.t) : EConstr.t =
   match defs with
   | [] -> body
   | (x,e,ty) :: rest ->
@@ -959,30 +959,6 @@ let ind_nf_lc_iter (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : ECons
                 env := env_push_def !env x term ty)
   done
 
-let ind_nf_lc_iter0 (env : Environ.env) (sigma : Evd.evar_map) (nf_lc_ctx : Constr.rel_context) (args : EConstr.t list) (f : Environ.env -> EConstr.types -> EConstr.t option) : unit =
-  let rev_ctx = array_rev (Array.of_list nf_lc_ctx) in
-  let env = ref env in
-  let args = ref args in
-  let h = Array.length rev_ctx in
-  for j = 0 to h - 1 do
-    let decl = rev_ctx.(j) in
-    match decl with
-    | LocalDef (x,e,ty) ->
-        env := Environ.push_rel decl !env
-    | LocalAssum (x,ty) ->
-        let ty = EConstr.of_constr ty in
-        (match !args with
-        | term :: rest ->
-            args := rest;
-            env := env_push_def !env x (Vars.lift j term) ty
-        | [] ->
-            match f !env ty with
-            | None ->
-                env := Environ.push_rel decl !env
-            | Some term ->
-                env := env_push_def !env x term ty)
-  done
-
 let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer.t) (ty : EConstr.t) : unit =
   (*Feedback.msg_debug (Pp.str "mangle_term_buf:" +++ Printer.pr_econstr_env env sigma ty);*)
   match EConstr.kind sigma ty with
@@ -1023,6 +999,7 @@ let rec mangle_term_buf (env : Environ.env) (sigma : Evd.evar_map) (buf : Buffer
   | Int n -> user_err (Pp.str "[codegen] mangle_term_buf:int:")
   | Float n -> user_err (Pp.str "[codegen] mangle_term_buf:float:")
   | Array _ -> user_err (Pp.str "[codegen] mangle_term_buf:array:")
+  | String _ -> user_err (Pp.str "[codegen] mangle_term_buf:string:")
 
 let mangle_term (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) : string =
   let buf = Buffer.create 0 in
@@ -1095,7 +1072,7 @@ let escape_as_coq_string str =
   Buffer.add_char buf '"';
   Buffer.contents buf
 
-let rec compose_prod (l : (Name.t Context.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
+let rec compose_prod (l : (Name.t EConstr.binder_annot * EConstr.t) list) (b : EConstr.t) : EConstr.t =
   match l with
   | [] -> b
   | (v, e) :: l' -> compose_prod l' (mkProd (v,e,b))
@@ -1172,6 +1149,7 @@ let constr_name (sigma : Evd.evar_map) (term : EConstr.t) : string =
   | Int _ -> "Int"
   | Float _ -> "Float"
   | Array _ -> "Array"
+  | String _ -> "String"
 
 let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   match CAst.with_val (fun x -> x) c with
@@ -1358,6 +1336,7 @@ let pr_raw_econstr (sigma : Evd.evar_map) (term : EConstr.t) : Pp.t =
     | Int _ -> Pp.str "Int"
     | Float _ -> Pp.str "Float"
     | Array _ -> Pp.str "Array"
+    | String _ -> Pp.str "String"
   in
   aux [] term
 
@@ -1385,7 +1364,8 @@ let lib_ref (env : Environ.env) (sigma : Evd.evar_map) (name : string) : Evd.eva
   fresh_global env sigma gr
 
 let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : bool =
-  let name_equal x1 x2 = Context.eq_annot Names.Name.equal x1 x2 in
+  let r_eq _ _ = true (* ignore relevances *) in
+  let name_equal x1 x2 = Context.eq_annot Names.Name.equal r_eq x1 x2 in
   let instance_equal u1 u2 = UVars.Instance.equal (EInstance.kind sigma u1) (EInstance.kind sigma u2) in
   let rec eq t1 t2 =
     match EConstr.kind sigma t1, EConstr.kind sigma t2 with
@@ -1428,9 +1408,10 @@ let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : boo
       instance_equal u1 u2 &&
       CArray.equal eq t1 t2 &&
       eq def1 def2 && eq ty1 ty2
+    | String pstr1, String pstr2 -> Pstring.equal pstr1 pstr2
     | (Rel _ | Meta _ | Var _ | Sort _ | Cast _ | Prod _ | Lambda _ | LetIn _ | App _
       | Proj _ | Evar _ | Const _ | Ind _ | Construct _ | Case _ | Fix _
-      | CoFix _ | Int _ | Float _| Array _), _ -> false
+      | CoFix _ | Int _ | Float _| Array _| String _), _ -> false
   in
   eq t1 t2
 
@@ -1772,7 +1753,7 @@ let determine_codegen_supported_type (env : Environ.env) (sigma : Evd.evar_map) 
       match EConstr.kind sigma f with
       | Rel _ | Var _ | Meta _ | Evar _ | Cast _ | Lambda _ | LetIn _ | App _
       | Const _ | Construct _ | Case _ | Fix _ | CoFix _ | Proj _
-      | Int _ | Float _ | Array _ ->
+      | Int _ | Float _ | Array _ | String _ ->
           raise (UnsuppotedTypeFound (Pp.str "[codegen] unexpected type:" +++ Printer.pr_econstr_env env sigma coq_type))
       | Sort s -> raise (UnsuppotedTypeFound (Pp.str "[codegen] codegen doesn't support sort as a type for code generation:" +++ Printer.pr_econstr_env env sigma coq_type))
       | Prod (x, t, b) ->

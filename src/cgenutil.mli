@@ -61,9 +61,9 @@ val quote_coq_string : string -> string
 val expand_tab : string -> string
 val delete_indent : string -> string
 val id_of_name : Names.Name.t -> Names.Id.t
-val id_of_annotated_name : Names.Name.t Context.binder_annot -> Names.Id.t
+val id_of_annotated_name : Names.Name.t EConstr.binder_annot -> Names.Id.t
 val str_of_name : Names.Name.t -> string
-val str_of_annotated_name : Names.Name.t Context.binder_annot -> string
+val str_of_annotated_name : Names.Name.t EConstr.binder_annot -> string
 val str_of_name_permissive : Names.Name.t -> string
 val iota_ary : int -> int -> int array
 val iota_list : int -> int -> int list
@@ -120,19 +120,19 @@ val msg_info_v : Pp.t -> unit
 val msg_debug_v : Pp.t -> unit
 val format_deep : Pp.t -> string
 val pr_deep : Pp.t -> Pp.t
-val env_push_assum : Environ.env  -> Names.Name.t Context.binder_annot -> EConstr.types -> Environ.env
-val env_push_assums : Environ.env -> (Names.Name.t Context.binder_annot * EConstr.types) list -> Environ.env
-val env_push_def : Environ.env -> Names.Name.t Context.binder_annot -> EConstr.t -> EConstr.types -> Environ.env
-val env_push_defs : Environ.env -> (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list -> Environ.env
-val env_push_fix : Environ.env -> (EConstr.t, EConstr.t) Constr.prec_declaration -> Environ.env
+val env_push_assum : Environ.env  -> Names.Name.t EConstr.binder_annot -> EConstr.types -> Environ.env
+val env_push_assums : Environ.env -> (Names.Name.t EConstr.binder_annot * EConstr.types) list -> Environ.env
+val env_push_def : Environ.env -> Names.Name.t EConstr.binder_annot -> EConstr.t -> EConstr.types -> Environ.env
+val env_push_defs : Environ.env -> (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list -> Environ.env
+val env_push_fix : Environ.env -> EConstr.rec_declaration -> Environ.env
 val is_monomorphic_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val new_env_with_rels : Environ.env -> Environ.env
 val decompose_appvect : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
-val decompose_lam_upto_n : Environ.env -> Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t Context.binder_annot * EConstr.t) list * EConstr.t)
+val decompose_lam_upto_n : Environ.env -> Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t)
 val decompose_lam_n_env :
   Environ.env -> Evd.evar_map -> int -> EConstr.t -> Environ.env * EConstr.t
-val decompose_lets : Evd.evar_map -> EConstr.t -> (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list * EConstr.t
-val compose_lets : (Names.Name.t Context.binder_annot * EConstr.t * EConstr.types) list -> EConstr.t -> EConstr.t
+val decompose_lets : Evd.evar_map -> EConstr.t -> (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list * EConstr.t
+val compose_lets : (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list -> EConstr.t -> EConstr.t
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
 val nf_interp_constr : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
@@ -140,7 +140,6 @@ val nf_interp_type : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Ev
 val out_punivs : 'a EConstr.puniverses -> 'a
 val arities_of_constructors : Evd.evar_map -> Names.inductive EConstr.puniverses -> Declarations.mind_specif -> EConstr.t array
 val ind_nf_lc_iter : Environ.env -> Evd.evar_map -> EConstr.rel_context -> EConstr.t list -> (Environ.env -> EConstr.types -> EConstr.t option) -> unit
-val ind_nf_lc_iter0 : Environ.env -> Evd.evar_map -> Constr.rel_context -> EConstr.t list -> (Environ.env -> EConstr.types -> EConstr.t option) -> unit
 val mangle_term_buf :
   Environ.env -> Evd.evar_map -> Buffer.t -> EConstr.t -> unit
 val mangle_term : Environ.env -> Evd.evar_map -> EConstr.t -> string
@@ -151,7 +150,7 @@ val valid_c_id_p : string -> bool
 val check_c_id : string -> unit
 val escape_as_coq_string : string -> string
 val compose_prod :
-  (Names.Name.t Context.binder_annot * EConstr.t) list ->
+  (Names.Name.t EConstr.binder_annot * EConstr.t) list ->
   EConstr.t -> EConstr.t
 val free_variables_without :
   Environ.env -> Evd.evar_map -> int -> int -> EConstr.t -> bool array
