@@ -205,7 +205,8 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
       let branch1' := mkApp branch1_body lhs_args in
       let branch2' := mkApp branch2_body rhs_args in
       let subgoal_type := compose_prod binders1 (mkApp eq [| eq_type; branch1'; branch2' |]) in
-      let subgoal := open_constr:(_ : ltac2:(exact $subgoal_type)) in
+      let subgoal := open_constr:(_) in
+      Unification.unify_with_current_ts (Constr.type subgoal) subgoal_type;
       let subgoal_args := Array.init cstr_numargs (fun k => mkRel (Int.sub cstr_numargs k)) in
       let new_branch := compose_lambda binders1 (mkApp subgoal subgoal_args) in
       new_branch) in
@@ -218,8 +219,46 @@ Lemma L : forall (x : list nat),
   = match x with nil => Nat.add 1 2 | cons m _ => Nat.add m 2 end.
 Proof.
   intros.
+(*
+1 goal
+x : list nat
+______________________________________(1/1)
+match x with
+| nil => Nat.add 1
+| (m :: _)%list => Nat.add m
+end 2 = match x with
+        | nil => 1 + 2
+        | (m :: _)%list => m + 2
+        end
+*)
   Control.refine (fun () => make_proof_term_for_matchapp (Control.goal ())).
+
+(*
+2 goals
+x : list nat
+______________________________________(1/2)
+1 + 2 = 1 + 2
+______________________________________(2/2)
+forall m : nat, list nat -> m + 2 = m + 2
+*)
 Show Proof.
+(*
+(fun x : list nat =>
+ match
+   x as x0
+   return
+     (match x0 with
+      | nil => Nat.add 1
+      | (m :: _)%list => Nat.add m
+      end 2 = match x0 with
+              | nil => 1 + 2
+              | (m :: _)%list => m + 2
+              end)
+ with
+ | nil => ?Goal : 1 + 2 = 1 + 2
+ | (m :: l)%list => (?Goal0 : forall m0 : nat, list nat -> m0 + 2 = m0 + 2) m l
+ end)
+*)
     reflexivity.
   intros.
   reflexivity.
