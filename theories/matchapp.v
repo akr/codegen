@@ -255,8 +255,8 @@ Show Proof.
               | (m :: _)%list => m + 2
               end)
  with
- | nil => ?Goal : 1 + 2 = 1 + 2
- | (m :: l)%list => (?Goal0 : forall m0 : nat, list nat -> m0 + 2 = m0 + 2) m l
+ | nil => ?Goal
+ | (m :: l)%list => ?Goal0 m l
  end)
 *)
     reflexivity.
