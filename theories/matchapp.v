@@ -214,6 +214,8 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
   let proof_term := (mkCase cinfo1 new_ret rel1 cinv1 item1 new_branches) in
   proof_term.
 
+Ltac2 Notation codegen_matchapp := Control.refine (fun () => make_proof_term_for_matchapp (Control.goal ())).
+
 Lemma L : forall (x : list nat),
     match x with nil => Nat.add 1 | cons m _ => Nat.add m end 2
   = match x with nil => Nat.add 1 2 | cons m _ => Nat.add m 2 end.
@@ -231,7 +233,7 @@ end 2 = match x with
         | (m :: _)%list => m + 2
         end
 *)
-  Control.refine (fun () => make_proof_term_for_matchapp (Control.goal ())).
+  codegen_matchapp.
 
 (*
 2 goals
