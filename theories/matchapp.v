@@ -158,7 +158,7 @@ Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) 
 Ltac2 Eval mkApp_beta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
 *)
 
-Ltac2 mkSubgoal_context (ctx : constr list) (ty : constr) : constr :=
+Ltac2 mkSubgoal_with_context (ctx : constr list) (ty : constr) : constr :=
   let hole := preterm:(_) in
   let pre := List.fold_right (fun ty pre => preterm:(fun (H:$constr:ty) => $preterm:pre)) ctx hole in
   let t := Constr.Pretype.pretype
@@ -415,7 +415,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         in
         ih_type)
   in
-  let subgoals := Array.map (fun subgoal_type => mkSubgoal_context (Array.to_list ih_types) subgoal_type) subgoal_types in
+  let subgoals := Array.map (fun subgoal_type => mkSubgoal_with_context (Array.to_list ih_types) subgoal_type) subgoal_types in
   let new_funcs :=
     Array.init h
       (fun i =>
