@@ -43,11 +43,6 @@ Ltac2 mkInd (ind : inductive) (u : instance) : constr :=
 Ltac2 mkFix (decargs : int array) (entry : int) (binders : binder array) (funcs : constr array) : constr :=
   Constr.Unsafe.make (Constr.Unsafe.Fix decargs entry binders funcs).
 
-Ltac2 mkSubgoal (ty : constr) : constr :=
-  let t := open_constr:(_) in
-  Unification.unify_with_current_ts (Constr.type t) ty;
-  t.
-
 Ltac2 destInd (t : constr) : inductive * instance :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.Ind ind u => (ind, u)
@@ -158,7 +153,7 @@ Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) 
 Ltac2 Eval mkApp_beta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
 *)
 
-Ltac2 mkSubgoal_with_context (ctx : constr list) (ty : constr) : constr :=
+Ltac2 make_subgoal (ctx : constr list) (ty : constr) : constr :=
   let hole := preterm:(_) in
   let pre := List.fold_right (fun ty pre => preterm:(fun (H:$constr:ty) => $preterm:pre)) ctx hole in
   let t := Constr.Pretype.pretype
@@ -171,7 +166,7 @@ Ltac2 mkSubgoal_with_context (ctx : constr list) (ty : constr) : constr :=
   body.
 
 (*
-Ltac2 Eval mkSubgoal_context [constr:(nat); constr:(bool)] constr:(bool).
+Ltac2 Eval make_subgoal [constr:(nat); constr:(bool)] constr:(bool).
 *)
 
 Ltac2 isCase (t : constr) : bool :=
@@ -298,8 +293,7 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
       let branch1' := mkApp branch1_body lhs_args in
       let branch2' := mkApp branch2_body rhs_args in
       let subgoal_type := compose_prod binders1 (mkApp eq [| eq_type; branch1'; branch2' |]) in
-      let subgoal := open_constr:(_) in
-      Unification.unify_with_current_ts (Constr.type subgoal) subgoal_type;
+      let subgoal := make_subgoal [] subgoal_type in
       let subgoal_args := Array.init cstr_numargs (fun k => mkRel (Int.sub cstr_numargs k)) in
       let new_branch := compose_lambda binders1 (mkApp subgoal subgoal_args) in
       new_branch) in
@@ -415,7 +409,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         in
         ih_type)
   in
-  let subgoals := Array.map (fun subgoal_type => mkSubgoal_with_context (Array.to_list ih_types) subgoal_type) subgoal_types in
+  let subgoals := Array.map (fun subgoal_type => make_subgoal (Array.to_list ih_types) subgoal_type) subgoal_types in
   let new_funcs :=
     Array.init h
       (fun i =>
