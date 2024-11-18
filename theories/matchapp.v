@@ -49,6 +49,15 @@ Ltac2 destInd (t : constr) : inductive * instance :=
   | _ => Control.backtrack_tactic_failure "not ind-expression"
   end.
 
+Ltac2 destLetIn_opt (t : constr) : (binder * constr * constr) option :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.LetIn binder exp body => Some (binder, exp, body)
+  | _ => None
+  end.
+
+Ltac2 destLetIn (t : constr) : (binder * constr * constr) :=
+  Option.get (destLetIn_opt t).
+
 Ltac2 destFix_opt (t : constr) : (int array * int * binder array * constr array) option :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.Fix decargs entry binders bodies => Some (decargs, entry, binders, bodies)
@@ -110,6 +119,24 @@ Ltac2 rec decompose_prod (t : constr) : binder list * constr :=
   | _ => ([], t)
   end.
 
+Ltac2 rec compose_prod_decls (ctx : (binder * constr option) list) (t : constr) : constr :=
+  match ctx with
+  | [] => t
+  | (b, None) :: rest => mkProd b (compose_prod_decls rest t)
+  | (b, Some e) :: rest => mkLetIn b e (compose_prod_decls rest t)
+  end.
+
+Ltac2 rec decompose_prod_decls (t : constr) : (binder * constr option) list * constr :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.Prod b c =>
+      let (ctx, body) := decompose_prod_decls c in
+      (((b, None) :: ctx), body)
+  | Constr.Unsafe.LetIn b e c =>
+      let (ctx, body) := decompose_prod_decls c in
+      (((b, Some e) :: ctx), body)
+  | _ => ([], t)
+  end.
+
 Ltac2 rec compose_lambda (bs : binder list) (t : constr) : constr :=
   match bs with
   | [] => t
@@ -135,6 +162,24 @@ Ltac2 rec decompose_lambda_n (n : int) (t : constr) : binder list * constr :=
     | _ => Control.backtrack_tactic_failure "lambdas not enough"
     end.
 
+Ltac2 rec compose_lambda_decls (ctx : (binder * constr option) list) (t : constr) : constr :=
+  match ctx with
+  | [] => t
+  | (b, None) :: rest => mkLambda b (compose_lambda_decls rest t)
+  | (b, Some e) :: rest => mkLetIn b e (compose_lambda_decls rest t)
+  end.
+
+Ltac2 rec decompose_lambda_decls (t : constr) : (binder * constr option) list * constr :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.Lambda b c =>
+      let (ctx, body) := decompose_lambda_decls c in
+      (((b, None) :: ctx), body)
+  | Constr.Unsafe.LetIn b e c =>
+      let (ctx, body) := decompose_lambda_decls c in
+      (((b, Some e) :: ctx), body)
+  | _ => ([], t)
+  end.
+
 
 Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
   let nargs := Array.length args in
@@ -153,20 +198,60 @@ Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) 
 Ltac2 Eval mkApp_beta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
 *)
 
-Ltac2 make_subgoal (ctx : constr list) (ty : constr) : constr :=
-  let hole := preterm:(_) in
-  let pre := List.fold_right (fun ty pre => preterm:(fun (H:$constr:ty) => $preterm:pre)) ctx hole in
+Ltac2 make_subgoal (ctx : constr list) (concl : constr) : constr :=
+  let hole := preterm:(_ : $concl) in
+  let pre := List.fold_right (fun ty pre => preterm:(fun (x : $constr:ty) => $preterm:pre)) ctx hole in
   let t := Constr.Pretype.pretype
              Constr.Pretype.Flags.open_constr_flags_no_tc
              Constr.Pretype.expected_without_type_constraint
              pre
   in
   let (_binders, body) := decompose_lambda t in
-  Unification.unify_with_current_ts (Constr.type body) ty;
   body.
 
 (*
+Ltac2 Eval make_subgoal [constr:(nat); constr:(nat)] (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]).
 Ltac2 Eval make_subgoal [constr:(nat); constr:(bool)] constr:(bool).
+*)
+
+Ltac2 make_subgoal2 (ctx : (binder * constr option) list) (concl : constr) :=
+  let hole := preterm:(_ :> $concl) in
+  let pre := List.fold_right
+    (fun decl p =>
+      match decl with
+      | (b, None) =>
+          let ty := Constr.Binder.type b in
+          preterm:(fun (x : $ty) => $preterm:p) (* The variable name of the binder should be used, if possible. *)
+      | (b, Some exp) =>
+          let ty := Constr.Binder.type b in
+          preterm:(let x : $ty := $exp in $preterm:p) (* The variable name of the binder should be used, if possible. *)
+      end)
+    ctx hole
+  in
+  let t := Constr.Pretype.pretype
+             Constr.Pretype.Flags.open_constr_flags_no_tc
+             Constr.Pretype.expected_without_type_constraint
+             pre
+  in
+  let (_ctx, body) := decompose_lambda_decls t in
+  body.
+
+(*
+Goal 0 = 1.
+Proof.
+Control.refine (fun () =>
+  (Constr.Unsafe.make (Constr.Unsafe.LetIn (Constr.Binder.make None constr:(nat)) constr:(0)
+    (Constr.Unsafe.make (Constr.Unsafe.LetIn (Constr.Binder.make None constr:(nat)) constr:(1)
+      (make_subgoal2 [(Constr.Binder.make None constr:(nat), Some constr:(0));
+                      (Constr.Binder.make None constr:(nat), Some constr:(1))]
+                     (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]))))))).
+(*
+1 goal
+x0 := 0 : nat
+x := 1 : nat
+______________________________________(1/1)
+x0 = x
+*)
 *)
 
 Ltac2 isCase (t : constr) : bool :=
@@ -180,6 +265,44 @@ Ltac2 destCase (t : constr) : (Constr.Unsafe.case * constr * Constr.Binder.relev
   | Constr.Unsafe.Case cinfo (ret, rel) cinv item branches => (cinfo, ret, rel, cinv, item, branches)
   | _ => Control.backtrack_tactic_failure "not match-expression"
   end.
+
+Ltac2 destEqApp_opt (t : constr) : (constr * constr * constr array * constr * constr array) option :=
+  match! t with
+  | _ = _ =>
+      match Constr.Unsafe.kind t with
+      | Constr.Unsafe.App _eq args =>
+          let (fn1, args1) := decompose_app (Array.get args 1) in
+          let (fn2, args2) := decompose_app (Array.get args 2) in
+          Some (Array.get args 0, fn1, args1, fn2, args2)
+      | _ => None
+      end
+  | _ => None
+  end.
+
+Ltac2 Eval print (of_constr constr:(@Coq.Init.Logic.eq)).
+
+Ltac2 intarray_ascending (start : int) (n : int) : int array :=
+  Array.init n (fun k => Int.add start k).
+
+Ltac2 intarray_descending (start : int) (n : int) : int array :=
+  Array.init n (fun k => Int.sub start k).
+
+Ltac2 mkRel_ascending (start : int) (n : int) : constr array :=
+  Array.map mkRel (intarray_ascending start n).
+
+Ltac2 mkRel_descending (start : int) (n : int) : constr array :=
+  Array.map mkRel (intarray_descending start n).
+
+Ltac2 make_exteq (nftype : constr) (lhs : constr) (rhs : constr) : constr :=
+  let eq := constr:(@Coq.Init.Logic.eq) in
+  let (binders, ret) := decompose_prod nftype in
+  let n := List.length binders in
+  let args := mkRel_descending n n in
+  let lhs' := mkApp_beta (Constr.Unsafe.liftn n 1 lhs) args in
+  let rhs' := mkApp_beta (Constr.Unsafe.liftn n 1 rhs) args in
+  compose_prod binders (mkApp eq [|ret; lhs'; rhs'|]).
+
+(* Ltac2 Eval print (of_constr (make_exteq constr:(nat -> nat -> nat) constr:(Nat.add) constr:(Nat.sub))). *)
 
 Ltac2 string_app3 (s1 : string) (s2 : string) (s3 : string) : string :=
   String.app s1 (String.app s2 s3).
@@ -463,6 +586,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
 
 Ltac2 Notation codegen_fix := Control.refine (fun () => make_proof_term_for_fix (Control.goal ())).
 
+(*
 Lemma L : forall (x y : nat),
     (fix f1 (a n : nat) : bool := match n with O => true | S m => g1 a m end
     with g1 (a n : nat) : bool := match n with O => false | S m => f1 a m end
@@ -484,6 +608,7 @@ Proof.
   apply H0.
 Show Proof.
 Qed.
+*)
 
 (*
     h is the number of mutual functions
@@ -503,4 +628,113 @@ Qed.
                   end
               ...
           for IHj) b1 ... bn : Fj b1 ... bn = Gj b1 ... bn
+*)
+
+Ltac2 make_proof_term_for_letin (goal_type : constr) :=
+  let (eq_type, lhs_fn, lhs_args, rhs_fn, rhs_args) :=
+    match destEqApp_opt goal_type with
+    | Some x => x
+    | _ => Control.backtrack_tactic_failure "goal is not equality"
+    end
+  in
+  let (binder1, exp1, body1) :=
+    match destLetIn_opt lhs_fn with
+    | Some x => x
+    | None => Control.backtrack_tactic_failure "LHS is not LetIn-expression"
+    end
+  in
+  let (binder2, exp2, body2) :=
+    match destLetIn_opt rhs_fn with
+    | Some x => x
+    | None => Control.backtrack_tactic_failure "RHS is not LetIn-expression"
+    end
+  in
+  let eq := constr:(@Coq.Init.Logic.eq) in
+  if Constr.equal exp1 exp2 then
+    let lhs := mkApp body1 lhs_args in
+    let rhs := mkApp body2 rhs_args in
+    let subgoal_body := make_subgoal2 [(binder1, Some exp1)] (mkApp eq [|eq_type; lhs; rhs|]) in
+    let proof_term := mkLetIn binder1 exp1 subgoal_body in
+    proof_term
+  else
+    let exp_type := nf_of (Constr.Binder.type binder1) in
+    let eq_exps := make_exteq exp_type exp1 exp2 in
+    let eq_vars := make_exteq exp_type (mkRel 2) (mkRel 1) in
+    let subgoal_exp := make_subgoal [] eq_exps in
+    let lhs := mkApp (Constr.Unsafe.liftn 2 1 body1) lhs_args in
+    let rhs := mkApp (Constr.Unsafe.liftn 1 1 body2) rhs_args in
+    let subgoal_body := make_subgoal2 [(binder1, Some exp1); (binder2, Some exp2); (Constr.Binder.make None eq_vars, None)]
+                          (mkApp eq [|eq_type; lhs; rhs |]) in
+    let proof_term :=
+      mkLetIn binder1 exp1
+        (mkLetIn binder2 exp2
+          (mkApp
+            (mkLambda (Constr.Binder.make None eq_vars) subgoal_body)
+            [| subgoal_exp |]))
+    in
+    proof_term.
+
+Ltac2 Notation codegen_letin := Control.refine (fun () => make_proof_term_for_letin (Control.goal ())).
+
+(* the binding expression is convertible.
+Lemma L : forall (x w : nat),
+    (let y := S x in Nat.add (y + 1)) w = (let z := S x in Nat.add (S z)) w.
+Proof.
+  intros.
+  codegen_letin.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  reflexivity.
+Qed.
+*)
+
+
+(* The binding expression is a function.
+Lemma L : forall (x : nat),
+    (let f y := S y in f x + 1) = (let g z := z + 1 in S (g x)).
+Proof.
+  intros.
+  codegen_letin.
+    intros y.
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  f_equal.
+  rewrite x.
+  reflexivity.
+Qed.
+*)
+
+(* The let-in expression is a function (partial application)).
+Lemma L : forall (x w : nat),
+    (let y := S x in Nat.add (y + 1)) w = (let z := x + 1 in Nat.add (S z)) w.
+Proof.
+  intros.
+  codegen_letin.
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  rewrite x.
+  reflexivity.
+Qed.
+*)
+
+(*
+Lemma L : forall (x : nat),
+    (let y := S x in y + 1) = (let z := x + 1 in S z).
+Proof.
+  intros.
+  codegen_letin.
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  rewrite x.
+  reflexivity.
+Qed.
 *)
