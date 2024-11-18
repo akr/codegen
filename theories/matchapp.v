@@ -254,6 +254,74 @@ x0 = x
 *)
 *)
 
+(*
+Ltac2 Eval make_subgoal2 [(Constr.Binder.make None constr:(Type), None);
+                          (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1), None)]
+                         constr:(True).
+*)
+
+(*
+Goal forall (T : Type) (x : T), True.
+Proof.
+Control.refine (fun () =>
+  (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.make None constr:(Type))
+    (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1))
+      (make_subgoal2 [(Constr.Binder.make None constr:(Type), None);
+                      (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1), None)]
+                     constr:(True))))))).
+(*
+1 goal
+x0 : Type
+x : x0
+______________________________________(1/1)
+True
+*)
+constructor.
+Qed.
+*)
+
+Ltac2 make_subgoal3 (ctx : (constr * constr option) list) (concl : constr) :=
+  let hole := preterm:(_ :> $concl) in
+  let pre := List.fold_right
+    (fun decl p =>
+      match decl with
+      | (ty, None) =>
+          preterm:(fun (x : $ty) => $preterm:p)
+      | (ty, Some exp) =>
+          preterm:(let x : $ty := $exp in $preterm:p)
+      end)
+    ctx hole
+  in
+  let t := Constr.Pretype.pretype
+             Constr.Pretype.Flags.open_constr_flags_no_tc
+             Constr.Pretype.expected_without_type_constraint
+             pre
+  in
+  let (_ctx, body) := decompose_lambda_decls t in
+  body.
+
+(*
+Ltac2 Eval make_subgoal3 [(constr:(Type), None); ((mkRel 1), None)] constr:(True).
+*)
+
+(*
+Goal forall (T : Type) (x : T), True.
+Proof.
+Control.refine (fun () =>
+  (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.make None constr:(Type))
+    (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1))
+      (make_subgoal3 [(constr:(Type), None); ((mkRel 1), None)] constr:(True))))))).
+(*
+1 goal
+x0 : Type
+x : x0
+______________________________________(1/1)
+True
+*)
+constructor.
+Qed.
+*)
+
 Ltac2 isCase (t : constr) : bool :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.Case _ _ _ _ _ => true
