@@ -806,3 +806,55 @@ Proof.
   reflexivity.
 Qed.
 *)
+
+Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
+  let (eq_type, lhs_fn, lhs_args, rhs_fn, rhs_args) :=
+    match destEqApp_opt goal_type with
+    | Some x => x
+    | _ => Control.backtrack_tactic_failure "goal is not equality"
+    end
+  in
+  let fntype1 := nftype_of lhs_fn in
+  let fntype2 := nftype_of rhs_fn in
+  if Bool.neg (Constr.equal fntype1 fntype2) then
+    Control.backtrack_tactic_failure "function type not equal"
+  else
+  let (arg_binders, _rettype) := decompose_prod fntype1 in
+  let argtypes := Array.map Constr.Binder.type (Array.of_list arg_binders) in (* assumes the types are closed *)
+  let n := Array.length lhs_args in
+  Control.assert_valid_argument "number of arguments in LHS and RHS are different" (Int.equal n (Array.length rhs_args));
+  let eq := constr:(@Coq.Init.Logic.eq) in
+  let rec aux i :=
+    if Int.equal i n then
+      Control.backtrack_tactic_failure "different argument not found"
+    else
+    let a1 := Array.get lhs_args i in
+    let a2 := Array.get rhs_args i in
+    if Constr.equal a1 a2 then
+      aux (Int.add i 1)
+    else
+    (let arg_type := Array.get argtypes i in
+    let make_rhs_args x := Array.init n (fun j => if Int.equal j i then x else Array.get rhs_args j) in
+    let make_goal x := mkApp eq [|eq_type; mkApp lhs_fn lhs_args; mkApp rhs_fn (make_rhs_args x)|] in
+    let subgoal_arg := make_subgoal2 [] (mkApp eq [|arg_type; a1; a2|]) in
+    let subgoal_next := make_subgoal2 [] (make_goal a1) in
+    let eq_ind := constr:(@Coq.Init.Logic.eq_ind) in
+    let pred := mkLambda (Constr.Binder.make (Some ident:(x)) arg_type) (make_goal (mkRel 1)) in
+    let proof_term :=
+      mkApp eq_ind [|arg_type; a1; pred; subgoal_next; a2; subgoal_arg|]
+    in
+    proof_term)
+  in
+  let proof_term := aux 0 in
+  proof_term.
+
+Ltac2 Notation codegen_apparg := Control.refine (fun () => make_proof_term_for_apparg (Control.goal ())).
+
+(*
+Lemma L (x y z : nat) (H : y = z) : x + y = x + z.
+Proof.
+  codegen_apparg.
+    now apply H.
+  now reflexivity.
+Qed.
+*)
