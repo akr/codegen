@@ -1,6 +1,8 @@
 From Ltac2 Require Import Ltac2.
 From Ltac2 Require Import Message.
 
+Require FunctionalExtensionality.
+
 Ltac2 array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : 'c array) :=
   Control.assert_valid_argument "array_map3" (Int.equal (Array.length a) (Array.length b));
   Control.assert_valid_argument "array_map3" (Int.equal (Array.length a) (Array.length c));
@@ -807,6 +809,21 @@ Proof.
 Qed.
 *)
 
+Ltac2 rec make_funext_subgoal (arg_binders_rev : binder list) (ty : constr) (t1 : constr) (t2 : constr) : constr :=
+  let nbinders := List.length arg_binders_rev in
+  let args := mkRel_descending nbinders nbinders in
+  let lhs := mkApp t1 args in
+  let rhs := mkApp t2 args in
+  match Constr.Unsafe.kind ty with
+  | Constr.Unsafe.Prod b ty' =>
+      mkApp constr:(@FunctionalExtensionality.functional_extensionality)
+        [| Constr.Binder.type b; ty'; lhs; rhs;
+           mkLambda b (make_funext_subgoal (b :: arg_binders_rev) ty' t1 t2) |]
+  | _ =>
+      let ctx := List.rev_map (fun b => (b, None)) arg_binders_rev in
+      make_subgoal2 ctx (mkApp constr:(@Init.Logic.eq) [|ty; lhs; rhs|])
+  end.
+
 Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
   let (eq_type, lhs_fn, lhs_args, rhs_fn, rhs_args) :=
     match destEqApp_opt goal_type with
@@ -836,7 +853,7 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
     (let arg_type := Array.get argtypes i in
     let make_rhs_args x := Array.init n (fun j => if Int.equal j i then x else Array.get rhs_args j) in
     let make_goal x := mkApp eq [|eq_type; mkApp lhs_fn lhs_args; mkApp rhs_fn (make_rhs_args x)|] in
-    let subgoal_arg := make_subgoal2 [] (mkApp eq [|arg_type; a1; a2|]) in
+    let subgoal_arg := make_funext_subgoal [] arg_type a1 a2 in
     let subgoal_next := make_subgoal2 [] (make_goal a1) in
     let eq_ind := constr:(@Coq.Init.Logic.eq_ind) in
     let pred := mkLambda (Constr.Binder.make (Some ident:(x)) arg_type) (make_goal (mkRel 1)) in
@@ -858,3 +875,20 @@ Proof.
   now reflexivity.
 Qed.
 *)
+
+(*
+Definition app (f : nat -> nat) (x : nat) : nat := f x.
+Lemma L (n : nat) : (let f x := x + 1 in app f n) = (let g x := S x in app g n).
+Proof.
+  intros.
+  codegen_letin.
+    intros.
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  codegen_apparg.
+    now apply x2.
+  now reflexivity.
+Qed.
+*)
+
