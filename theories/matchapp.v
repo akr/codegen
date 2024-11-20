@@ -821,7 +821,7 @@ Ltac2 rec make_funext_subgoal (arg_binders_rev : binder list) (ty : constr) (t1 
            mkLambda b (make_funext_subgoal (b :: arg_binders_rev) ty' t1 t2) |]
   | _ =>
       let ctx := List.rev_map (fun b => (b, None)) arg_binders_rev in
-      make_subgoal2 ctx (mkApp constr:(@Init.Logic.eq) [|ty; lhs; rhs|])
+      mkApp (make_subgoal2 ctx (compose_prod (List.rev arg_binders_rev) (mkApp constr:(@Init.Logic.eq) [|ty; lhs; rhs|]))) args
   end.
 
 Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
@@ -887,8 +887,22 @@ Proof.
     rewrite<- plus_n_O.
     reflexivity.
   codegen_apparg.
-    now apply x2.
-  now reflexivity.
+    assumption.
+  reflexivity.
 Qed.
 *)
 
+(*
+Definition app2 (f : nat -> nat -> nat) (x y : nat) : nat := f x y.
+Lemma L (m n : nat) : (let f x y := x + 1 + y in app2 f m n) = (let g x y := S x + y in app2 g m n).
+Proof.
+  codegen_letin.
+    intros.
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  codegen_apparg.
+    assumption.
+  reflexivity.
+Qed.
+*)
