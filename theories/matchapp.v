@@ -696,11 +696,11 @@ Ltac2 make_proof_term_for_letin (goal_type : constr) :=
     let subgoal_body := make_subgoal2 [(binder1, Some exp1); (binder2, Some exp2); (Constr.Binder.make None eq_vars, None)]
                           (mkApp eq [|eq_type; lhs; rhs |]) in
     let proof_term :=
-      mkLetIn binder1 exp1
-        (mkLetIn binder2 exp2
-          (mkApp
-            (mkLambda (Constr.Binder.make None eq_vars) subgoal_body)
-            [| subgoal_exp |]))
+      mkApp
+        (mkLetIn binder1 exp1
+          (mkLetIn binder2 exp2
+            (mkLambda (Constr.Binder.make None eq_vars) subgoal_body)))
+        [| subgoal_exp |]
     in
     proof_term.
 
