@@ -628,7 +628,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   in
   let subgoals :=
     Array.map
-      (fun subgoal_type => snd (decompose_lambda (make_subgoal (Array.to_list (Array.map (Constr.Binder.make None) ih_types)) subgoal_type)))
+      (fun subgoal_type => make_subgoal (Array.to_list (Array.map (Constr.Binder.make None) ih_types)) subgoal_type)
       subgoal_types
   in
   let new_funcs :=
@@ -672,7 +672,9 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let citem := mkRel (Int.sub (Int.add numargs 1) decarg) in
         let case_term := mkCase cinfo new_ret Constr.Binder.Relevant Constr.Unsafe.NoInvert citem branches in
         let subgoal_type := Array.get subgoal_types i in
-        let subgoal := Constr.Unsafe.liftn (List.length arg_binders) 1 (Array.get subgoals i) in
+        let subgoal :=
+          mkApp_beta (Array.get subgoals i) (mkRel_descending (Int.add h (List.length arg_binders)) h)
+        in
         let let_term := mkLetIn (Constr.Binder.make None subgoal_type) subgoal case_term in
         let new_fn := compose_lambda arg_binders let_term in
         new_fn)
@@ -683,6 +685,67 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   proof_term.
 
 Ltac2 Notation codegen_fix := Control.refine (fun () => make_proof_term_for_fix (Control.goal ())).
+
+(*
+Lemma L : forall (x : nat),
+            (fix f (n : nat) := match n with O => O | S m => S (f m) end) x
+          = (fix f (n : nat) := match n with O => O | S m => (f m) + 1 end) x.
+Proof.
+  intros.
+  codegen_fix.
+Show Proof.
+(*
+(fun x : nat =>
+ (fix H (n : nat) :
+      (fix f (n0 : nat) : nat := match n0 with
+                                 | 0 => 0
+                                 | S m => S (f m)
+                                 end) n =
+      (fix f (n0 : nat) : nat := match n0 with
+                                 | 0 => 0
+                                 | S m => f m + 1
+                                 end) n :=
+    let H0 :
+      forall n0 : nat,
+      match n0 with
+      | 0 => 0
+      | S m => S ((fix f (n1 : nat) : nat := match n1 with
+                                             | 0 => 0
+                                             | S m0 => S (f m0)
+                                             end) m)
+      end =
+      match n0 with
+      | 0 => 0
+      | S m => (fix f (n1 : nat) : nat := match n1 with
+                                          | 0 => 0
+                                          | S m0 => f m0 + 1
+                                          end) m + 1
+      end := ?Goal@{x0:=x; x:=H} in
+    match
+      n as n0
+      return
+        ((fix f (n1 : nat) : nat := match n1 with
+                                    | 0 => 0
+                                    | S m => S (f m)
+                                    end) n0 =
+         (fix f (n1 : nat) : nat := match n1 with
+                                    | 0 => 0
+                                    | S m => f m + 1
+                                    end) n0)
+    with
+    | 0 => H0 0
+    | S x0 => H0 (S x0)
+    end) x)
+*)
+  intros.
+  destruct n.
+    reflexivity.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  f_equal.
+  trivial with nocore.
+Qed.
+*)
 
 (*
 Lemma L : forall (x y : nat),
@@ -696,6 +759,191 @@ Proof.
   intros.
   codegen_fix.
   Show Proof.
+(*
+(fun x y : nat =>
+ (fix H (a n : nat) {struct n} :
+      (fix f1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g1 a0 m
+         end
+       with g1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f1 a0 m
+         end
+       for
+       f1) a n =
+      (fix f2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g2 a0 m
+         end
+       with g2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f2 a0 m
+         end
+       for
+       f2) a n :=
+    let H1 :
+      forall a0 n0 : nat,
+      match n0 with
+      | 0 => true
+      | S m =>
+          (fix f1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g1 a1 m0
+             end
+           with g1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f1 a1 m0
+             end
+           for
+           g1) a0 m
+      end =
+      match n0 with
+      | 0 => true
+      | S m =>
+          (fix f2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g2 a1 m0
+             end
+           with g2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f2 a1 m0
+             end
+           for
+           g2) a0 m
+      end := ?Goal@{x0:=x; x1:=H; x:=H0} in
+    match
+      n as n0
+      return
+        ((fix f1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g1 a0 m
+            end
+          with g1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f1 a0 m
+            end
+          for
+          f1) a n0 =
+         (fix f2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g2 a0 m
+            end
+          with g2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f2 a0 m
+            end
+          for
+          f2) a n0)
+    with
+    | 0 => H1 a 0
+    | S x0 => H1 a (S x0)
+    end
+  with H0 (a n : nat) {struct n} :
+      (fix f1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g1 a0 m
+         end
+       with g1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f1 a0 m
+         end
+       for
+       g1) a n =
+      (fix f2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g2 a0 m
+         end
+       with g2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f2 a0 m
+         end
+       for
+       g2) a n :=
+    let H1 :
+      forall a0 n0 : nat,
+      match n0 with
+      | 0 => false
+      | S m =>
+          (fix f1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g1 a1 m0
+             end
+           with g1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f1 a1 m0
+             end
+           for
+           f1) a0 m
+      end =
+      match n0 with
+      | 0 => false
+      | S m =>
+          (fix f2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g2 a1 m0
+             end
+           with g2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f2 a1 m0
+             end
+           for
+           f2) a0 m
+      end := ?Goal0@{x0:=x; x1:=H; x:=H0} in
+    match
+      n as n0
+      return
+        ((fix f1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g1 a0 m
+            end
+          with g1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f1 a0 m
+            end
+          for
+          g1) a n0 =
+         (fix f2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g2 a0 m
+            end
+          with g2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f2 a0 m
+            end
+          for
+          g2) a n0)
+    with
+    | 0 => H1 a 0
+    | S x0 => H1 a (S x0)
+    end
+  for
+  H) x y)
+*)
     intros a n.
     destruct n.
       reflexivity.
