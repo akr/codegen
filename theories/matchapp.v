@@ -238,12 +238,11 @@ Ltac2 make_subgoal (ctx : binder list) (concl : constr) :=
              Constr.Pretype.expected_without_type_constraint
              pre
   in
-  let (_ctx, body) := decompose_lambda t in
-  body.
+  t.
 
 (*
-Ltac2 Eval make_subgoal [constr:(nat); constr:(nat)] (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]).
-Ltac2 Eval make_subgoal [constr:(nat); constr:(bool)] constr:(bool).
+Ltac2 Eval make_subgoal (List.map (Constr.Binder.make None) [constr:(nat); constr:(nat)]) (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]).
+Ltac2 Eval make_subgoal (List.map (Constr.Binder.make None) [constr:(nat); constr:(bool)]) constr:(bool).
 *)
 
 Ltac2 make_subgoal2 (ctx : (binder * constr option) list) (concl : constr) :=
@@ -562,7 +561,11 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         in
         ih_type)
   in
-  let subgoals := Array.map (fun subgoal_type => make_subgoal (Array.to_list (Array.map (Constr.Binder.make None) ih_types)) subgoal_type) subgoal_types in
+  let subgoals :=
+    Array.map
+      (fun subgoal_type => snd (decompose_lambda (make_subgoal (Array.to_list (Array.map (Constr.Binder.make None) ih_types)) subgoal_type)))
+      subgoal_types
+  in
   let new_funcs :=
     Array.init h
       (fun i =>
