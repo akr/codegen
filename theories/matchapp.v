@@ -182,22 +182,32 @@ Ltac2 rec decompose_lambda_decls (t : constr) : (binder * constr option) list * 
   | _ => ([], t)
   end.
 
-
 Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
-  let nargs := Array.length args in
-  let nbinders :=
-    let (binders, _body) := decompose_lambda fn in
-    List.length binders
+  let rec aux t args :=
+    match args with
+    | [] => t
+    | first_arg :: rest_args =>
+        match Constr.Unsafe.kind t with
+        | Constr.Unsafe.Lambda _binder body =>
+            aux (Constr.Unsafe.substnl [first_arg] 0 body) rest_args
+        | Constr.Unsafe.LetIn binder exp body =>
+            let args' := List.map (Constr.Unsafe.liftn 1 1) args in
+            Constr.Unsafe.make (Constr.Unsafe.LetIn binder exp (aux body args'))
+        | _ => mkApp t (Array.of_list args)
+        end
+    end
   in
-  let n := if Int.le nargs nbinders then nargs else nbinders in
-  let (binders, body) := decompose_lambda_n n fn in
-  let fn' := Constr.Unsafe.substnl (Array.to_list (Array.rev (Array.sub args 0 n))) 0 body in
-  mkApp fn' (Array.sub args n (Int.sub nargs n)).
+  aux fn (Array.to_list args).
 
 (*
 Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2); constr:(3) |].
 Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) |].
 Ltac2 Eval mkApp_beta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
+Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a b => a + b) [| constr:(1) |].
+Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4) |].
+Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5) |].
+Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5); constr:(6) |].
+Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
 *)
 
 Ltac2 make_subgoal (ctx : constr list) (concl : constr) : constr :=
@@ -548,7 +558,6 @@ Show Proof.
 Qed.
 *)
 
-
 Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let (eq, _eq_type, lhs, rhs) :=
     match destEq_opt goal_type with
@@ -671,11 +680,11 @@ Proof.
     intros a n.
     destruct n.
       reflexivity.
-    apply H.
+    now trivial with nocore.
   intros a n.
   destruct n.
     reflexivity.
-  apply H0.
+  now trivial with nocore.
 Show Proof.
 Qed.
 *)
@@ -772,8 +781,7 @@ Proof.
   rewrite<- plus_n_Sm.
   rewrite<- plus_n_O.
   f_equal.
-  rewrite x.
-  reflexivity.
+  now trivial with nocore.
 Qed.
 *)
 
