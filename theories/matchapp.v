@@ -8,6 +8,9 @@ Ltac2 array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : '
   Control.assert_valid_argument "array_map3" (Int.equal (Array.length a) (Array.length c));
   Array.init (Array.length a) (fun i => f (Array.get a i) (Array.get b i) (Array.get c i)).
 
+Ltac2 array_take (n : int) (a : 'a array) : 'a array := Array.sub a 0 n.
+Ltac2 array_drop (n : int) (a : 'a array) : 'a array := Array.sub a n (Int.sub (Array.length a) n).
+
 Ltac2 rec numprods (t : constr) : int :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.Prod _b t' => Int.add 1 (numprods t')
@@ -44,6 +47,18 @@ Ltac2 mkInd (ind : inductive) (u : instance) : constr :=
 
 Ltac2 mkFix (decargs : int array) (entry : int) (binders : binder array) (funcs : constr array) : constr :=
   Constr.Unsafe.make (Constr.Unsafe.Fix decargs entry binders funcs).
+
+Ltac2 destLambda_opt (t : constr) : (binder * constr) option :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.Lambda b e => Some (b, e)
+  | _ => None
+  end.
+
+Ltac2 destLambda (t : constr) : binder * constr :=
+  match destLambda_opt t with
+  | Some x => x
+  | None => Control.backtrack_tactic_failure "not lambda-expression"
+  end.
 
 Ltac2 destInd (t : constr) : inductive * instance :=
   match Constr.Unsafe.kind t with
@@ -170,6 +185,17 @@ Ltac2 rec decompose_lambda_n (n : int) (t : constr) : binder list * constr :=
     | _ => Control.backtrack_tactic_failure "lambdas not enough"
     end.
 
+Ltac2 rec decompose_lambda_upto (n : int) (t : constr) : binder list * constr :=
+  if Int.le n 0 then
+    ([], t)
+  else
+    match Constr.Unsafe.kind t with
+    | Constr.Unsafe.Lambda b c =>
+        let (bs, body) := decompose_lambda_upto (Int.sub n 1) c in
+        ((b :: bs), body)
+    | _ => ([], t)
+    end.
+
 Ltac2 rec compose_lambda_decls (ctx : (binder * constr option) list) (t : constr) : constr :=
   match ctx with
   | [] => t
@@ -188,6 +214,43 @@ Ltac2 rec decompose_lambda_decls (t : constr) : (binder * constr option) list * 
   | _ => ([], t)
   end.
 
+Ltac2 rec compose_letin (ctx : (binder * constr) list) (t : constr) : constr :=
+  match ctx with
+  | [] => t
+  | (b, e) :: rest => mkLetIn b e (compose_letin rest t)
+  end.
+
+Ltac2 rec decompose_letin (t : constr) : (binder * constr) list * constr :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.LetIn b e c =>
+      let (ctx, body) := decompose_letin c in
+      (((b, e) :: ctx), body)
+  | _ => ([], t)
+  end.
+
+Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
+  let rec aux nbinders t ofs :=
+    let n := Int.sub (Array.length args) ofs in
+    if Int.le n 0 then
+      t
+    else
+    match Constr.Unsafe.kind t with
+    | Constr.Unsafe.Lambda _ _ =>
+        let (binders, body) := decompose_lambda_upto n t in
+        let m := List.length binders in
+        let body' := Constr.Unsafe.substnl (Array.to_list (Array.rev (Array.map (Constr.Unsafe.liftn nbinders 1) (Array.sub args ofs m)))) 0 body in
+        aux nbinders body' (Int.add ofs m)
+    | Constr.Unsafe.LetIn _ _ _ =>
+        let (let_binders, body) := decompose_letin t in
+        let m := List.length let_binders in
+        compose_letin let_binders (aux (Int.add nbinders m) body ofs)
+    | _ =>
+        mkApp t (array_drop ofs args)
+    end
+  in
+  aux 0 fn 0.
+
+(*
 Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
   let rec aux t args :=
     match args with
@@ -204,6 +267,7 @@ Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
     end
   in
   aux fn (Array.to_list args).
+*)
 
 (*
 Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2); constr:(3) |].
@@ -214,6 +278,7 @@ Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => 
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5) |].
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5); constr:(6) |].
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
+Ltac2 Eval let (b,t) := destLambda constr:(fun a => a + let x := 1 in a + x) in mkLambda b (mkApp_beta t [| mkRel 1 |]).
 *)
 
 Ltac2 make_simple_subgoal (concl : constr) : constr :=
@@ -640,6 +705,271 @@ Proof.
     reflexivity.
   now trivial with nocore.
 Show Proof.
+(*
+(fun x y : nat =>
+ (fix H (a n : nat) {struct n} :
+      (fix f1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g1 a0 m
+         end
+       with g1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f1 a0 m
+         end
+       for
+       f1) a n =
+      (fix f2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g2 a0 m
+         end
+       with g2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f2 a0 m
+         end
+       for
+       f2) a n :=
+    let H1 :
+      forall a0 n0 : nat,
+      match n0 with
+      | 0 => true
+      | S m =>
+          (fix f1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g1 a1 m0
+             end
+           with g1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f1 a1 m0
+             end
+           for
+           g1) a0 m
+      end =
+      match n0 with
+      | 0 => true
+      | S m =>
+          (fix f2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g2 a1 m0
+             end
+           with g2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f2 a1 m0
+             end
+           for
+           g2) a0 m
+      end :=
+      fun a0 n0 : nat =>
+      match
+        n0 as n1
+        return
+          (match n1 with
+           | 0 => true
+           | S m =>
+               (fix f1 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => true
+                  | S m0 => g1 a1 m0
+                  end
+                with g1 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => false
+                  | S m0 => f1 a1 m0
+                  end
+                for
+                g1) a0 m
+           end =
+           match n1 with
+           | 0 => true
+           | S m =>
+               (fix f2 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => true
+                  | S m0 => g2 a1 m0
+                  end
+                with g2 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => false
+                  | S m0 => f2 a1 m0
+                  end
+                for
+                g2) a0 m
+           end)
+      with
+      | 0 => eq_refl
+      | S n1 => (fun n2 : nat => H0 a0 n2) n1
+      end in
+    match
+      n as n0
+      return
+        ((fix f1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g1 a0 m
+            end
+          with g1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f1 a0 m
+            end
+          for
+          f1) a n0 =
+         (fix f2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g2 a0 m
+            end
+          with g2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f2 a0 m
+            end
+          for
+          f2) a n0)
+    with
+    | 0 => H1 a 0
+    | S x0 => H1 a (S x0)
+    end
+  with H0 (a n : nat) {struct n} :
+      (fix f1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g1 a0 m
+         end
+       with g1 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f1 a0 m
+         end
+       for
+       g1) a n =
+      (fix f2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => true
+         | S m => g2 a0 m
+         end
+       with g2 (a0 n0 : nat) {struct n0} : bool :=
+         match n0 with
+         | 0 => false
+         | S m => f2 a0 m
+         end
+       for
+       g2) a n :=
+    let H1 :
+      forall a0 n0 : nat,
+      match n0 with
+      | 0 => false
+      | S m =>
+          (fix f1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g1 a1 m0
+             end
+           with g1 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f1 a1 m0
+             end
+           for
+           f1) a0 m
+      end =
+      match n0 with
+      | 0 => false
+      | S m =>
+          (fix f2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => true
+             | S m0 => g2 a1 m0
+             end
+           with g2 (a1 n1 : nat) {struct n1} : bool :=
+             match n1 with
+             | 0 => false
+             | S m0 => f2 a1 m0
+             end
+           for
+           f2) a0 m
+      end :=
+      fun a0 n0 : nat =>
+      match
+        n0 as n1
+        return
+          (match n1 with
+           | 0 => false
+           | S m =>
+               (fix f1 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => true
+                  | S m0 => g1 a1 m0
+                  end
+                with g1 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => false
+                  | S m0 => f1 a1 m0
+                  end
+                for
+                f1) a0 m
+           end =
+           match n1 with
+           | 0 => false
+           | S m =>
+               (fix f2 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => true
+                  | S m0 => g2 a1 m0
+                  end
+                with g2 (a1 n2 : nat) {struct n2} : bool :=
+                  match n2 with
+                  | 0 => false
+                  | S m0 => f2 a1 m0
+                  end
+                for
+                f2) a0 m
+           end)
+      with
+      | 0 => eq_refl
+      | S n1 => (fun n2 : nat => H a0 n2) n1
+      end in
+    match
+      n as n0
+      return
+        ((fix f1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g1 a0 m
+            end
+          with g1 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f1 a0 m
+            end
+          for
+          g1) a n0 =
+         (fix f2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => true
+            | S m => g2 a0 m
+            end
+          with g2 (a0 n1 : nat) {struct n1} : bool :=
+            match n1 with
+            | 0 => false
+            | S m => f2 a0 m
+            end
+          for
+          g2) a n0)
+    with
+    | 0 => H1 a 0
+    | S x0 => H1 a (S x0)
+    end
+  for
+  H) x y)
+*)
 Qed.
 *)
 
@@ -767,7 +1097,7 @@ Show Proof.
 Qed.
 *)
 
-(* The let-in expression is a function (partial application)).
+(* The let-in expression is a function (partial application).
 Lemma L : forall (x w : nat),
     (let y := S x in Nat.add (y + 1)) w = (let z := x + 1 in Nat.add (S z)) w.
 Proof.
