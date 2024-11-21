@@ -306,60 +306,6 @@ constructor.
 Qed.
 *)
 
-Ltac2 make_subgoal3 (ctx : (constr * constr option) list) (concl : constr) :=
-  let hole := preterm:(_ :> $concl) in
-  let pre := List.fold_right
-    (fun decl p =>
-      match decl with
-      | (ty, None) =>
-          preterm:(fun (x : $ty) => $preterm:p)
-      | (ty, Some exp) =>
-          preterm:(let x : $ty := $exp in $preterm:p)
-      end)
-    ctx hole
-  in
-  let t := Constr.Pretype.pretype
-             Constr.Pretype.Flags.open_constr_flags_no_tc
-             Constr.Pretype.expected_without_type_constraint
-             pre
-  in
-  let (_ctx, body) := decompose_lambda_decls t in
-  body.
-
-(*
-Ltac2 Eval make_subgoal3 [(constr:(Type), None); ((mkRel 1), None)] constr:(True).
-*)
-
-(*
-Goal forall (T : Type) (x : T), True.
-Proof.
-Control.refine (fun () =>
-  (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.make None constr:(Type))
-    (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1))
-      (make_subgoal3 [(constr:(Type), None); ((mkRel 1), None)] constr:(True))))))).
-(*
-1 goal
-x0 : Type
-x : x0
-______________________________________(1/1)
-True
-*)
-constructor.
-Qed.
-*)
-
-Ltac2 isCase (t : constr) : bool :=
-  match Constr.Unsafe.kind t with
-  | Constr.Unsafe.Case _ _ _ _ _ => true
-  | _ => false
-  end.
-
-Ltac2 destCase (t : constr) : (Constr.Unsafe.case * constr * Constr.Binder.relevance * Constr.Unsafe.case_invert * constr * constr array) :=
-  match Constr.Unsafe.kind t with
-  | Constr.Unsafe.Case cinfo (ret, rel) cinv item branches => (cinfo, ret, rel, cinv, item, branches)
-  | _ => Control.backtrack_tactic_failure "not match-expression"
-  end.
-
 Ltac2 destEqApp_opt (t : constr) : (constr * constr * constr array * constr * constr array) option :=
   match! t with
   | _ = _ =>
@@ -434,15 +380,6 @@ Ltac2 message_of_binder (b : binder) : message :=
       " : "
       (Message.to_string (Message.of_constr (Constr.Binder.type b)))
       ")").
-
-Ltac2 map_invert (f : constr -> constr) (cinv : Constr.Unsafe.case_invert) : Constr.Unsafe.case_invert :=
-  match cinv with
-  | Constr.Unsafe.NoInvert => Constr.Unsafe.NoInvert
-  | Constr.Unsafe.CaseInvert indices => Constr.Unsafe.CaseInvert (Array.map f indices)
-  end.
-
-Ltac2 cinv_liftn (n : int) (k : int) (cinv : Constr.Unsafe.case_invert) : Constr.Unsafe.case_invert :=
-  map_invert (Constr.Unsafe.liftn n k) cinv.
 
 Ltac2 nf_of (t : constr) : constr :=
   Std.eval_cbv RedFlags.all t.
