@@ -878,7 +878,7 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
     let make_rhs_args x := Array.init n (fun j => if Int.equal j i then x else Array.get rhs_args j) in
     let make_goal x := mkApp eq [|eq_type; mkApp lhs_fn lhs_args; mkApp rhs_fn (make_rhs_args x)|] in
     let subgoal_arg := make_funext_subgoal [] arg_type a1 a2 in
-    let subgoal_next := make_subgoal2 [] (make_goal a1) in
+    let subgoal_next := make_simple_subgoal (make_goal a1) in
     let eq_ind := constr:(@Coq.Init.Logic.eq_ind) in
     let pred := mkLambda (Constr.Binder.make (Some ident:(x)) arg_type) (make_goal (mkRel 1)) in
     let proof_term :=
