@@ -60,6 +60,12 @@ Ltac2 destLetIn_opt (t : constr) : (binder * constr * constr) option :=
 Ltac2 destLetIn (t : constr) : (binder * constr * constr) :=
   Option.get (destLetIn_opt t).
 
+Ltac2 destCase_opt (t : constr) : (Constr.Unsafe.case * constr * Constr.Binder.relevance * Constr.Unsafe.case_invert * constr * constr array) option :=
+  match Constr.Unsafe.kind t with
+  | Constr.Unsafe.Case cinfo (ret, rel) cinv item branches => Some (cinfo, ret, rel, cinv, item, branches)
+  | _ => None
+  end.
+
 Ltac2 destFix_opt (t : constr) : (int array * int * binder array * constr array) option :=
   match Constr.Unsafe.kind t with
   | Constr.Unsafe.Fix decargs entry binders bodies => Some (decargs, entry, binders, bodies)
@@ -388,28 +394,21 @@ Ltac2 nftype_of (t : constr) : constr :=
   nf_of (Constr.type t).
 
 Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
-  let (eq, eq_type, lhs, rhs) :=
-    match! goal_type with
-    | _ = _ =>
-        match Constr.Unsafe.kind goal_type with
-        | Constr.Unsafe.App eq args =>
-            (eq, Array.get args 0, Array.get args 1, Array.get args 2)
-        | _ => Control.backtrack_tactic_failure "goal is not equality"
-        end
+  let (eq_type, lhs_fn, lhs_args, rhs_fn, rhs_args) :=
+    match destEqApp_opt goal_type with
+    | Some x => x
     | _ => Control.backtrack_tactic_failure "goal is not equality"
     end
   in
-  let (lhs_fn, lhs_args) := decompose_app lhs in
   let (cinfo1, ret1, rel1, cinv1, item1, branches1) :=
-    match Constr.Unsafe.kind lhs_fn with
-    | Constr.Unsafe.Case cinfo (ret, rel) cinv item branches => (cinfo, ret, rel, cinv, item, branches)
+    match destCase_opt lhs_fn with
+    | Some x => x
     | _ => Control.backtrack_tactic_failure "LHS is not match-expression"
     end
   in
-  let (rhs_fn, rhs_args) := decompose_app rhs in
   let (cinfo2, ret2, rel2, cinv2, item2, branches2) :=
-    match Constr.Unsafe.kind rhs_fn with
-    | Constr.Unsafe.Case cinfo (ret, rel) cinv item branches => (cinfo, ret, rel, cinv, item, branches)
+    match destCase_opt rhs_fn with
+    | Some x => x
     | _ => Control.backtrack_tactic_failure "RHS is not match-expression"
     end
   in
@@ -422,15 +421,15 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
     | _ =>  Control.backtrack_tactic_failure "return-clause is not Lambda"
     end
   in
+  let eq := constr:(@Coq.Init.Logic.eq) in
   let new_ret_item := mkRel 1 in
   let new_ret := Constr.Unsafe.make (Constr.Unsafe.Lambda item_binder
     (mkApp eq [| eq_type;
       mkApp (mkCase cinfo1 ret1 rel1 cinv1 new_ret_item branches1) lhs_args;
       mkApp (mkCase cinfo2 ret2 rel2 cinv2 new_ret_item branches2) rhs_args |]))
   in
-  let item_type := Std.eval_cbv RedFlags.all (Constr.Binder.type item_binder) in
-  let item_type_nf := Std.eval_cbv RedFlags.all item_type in
-  let (item_type_fn, item_type_params) := decompose_app item_type_nf in
+  let item_type := nf_of (Constr.Binder.type item_binder) in
+  let (item_type_fn, item_type_params) := decompose_app item_type in
   let numparams := Array.length item_type_params in
   let (item_type_ind, _item_type_u) := destInd item_type_fn in
   let item_type_ind_data := Ind.data item_type_ind in
@@ -512,13 +511,12 @@ Qed.
 *)
 
 Ltac2 make_proof_term_for_fix (goal_type : constr) :=
-  let (eq, _eq_type, lhs, rhs) :=
-    match destEq_opt goal_type with
+  let (_eq_type, fn1, args1, fn2, args2) :=
+    match destEqApp_opt goal_type with
     | Some x => x
     | _ => Control.backtrack_tactic_failure "goal is not equality"
     end
   in
-  let (fn1, args1) := decompose_app lhs in
   let (decargs1, entry1, binders1, bodies1) :=
     match destFix_opt fn1 with
     | Some x => x
@@ -528,7 +526,6 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let h := Array.length bodies1 in
   let fix_terms1 := Array.init h (fun i => mkFix decargs1 i binders1 bodies1) in
   let substituted_bodies1 := substFix decargs1 binders1 bodies1 in
-  let (fn2, args2) := decompose_app rhs in
   if Bool.neg (Array.equal Constr.equal args1 args2) then
     Control.backtrack_tactic_failure "matchapp-fix"
   else
@@ -541,6 +538,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let fix_terms2 := Array.init h (fun i => mkFix decargs2 i binders2 bodies2) in
   let substituted_bodies2 := substFix decargs2 binders2 bodies2 in
   let fn_types1 := Array.map (fun b => nf_of (Constr.Binder.type b)) binders1 in
+  let eq := constr:(@Coq.Init.Logic.eq) in
   let subgoal_types := array_map3
     (fun fn_type body1 body2 =>
       let (arg_binders, ret_type) := decompose_prod fn_type in
