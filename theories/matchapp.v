@@ -373,7 +373,9 @@ Ltac2 destEqApp_opt (t : constr) : (constr * constr * constr array * constr * co
   | _ => None
   end.
 
+(*
 Ltac2 Eval print (of_constr constr:(@Coq.Init.Logic.eq)).
+*)
 
 Ltac2 intarray_ascending (start : int) (n : int) : int array :=
   Array.init n (fun k => Int.add start k).
