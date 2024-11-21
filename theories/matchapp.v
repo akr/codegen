@@ -264,18 +264,15 @@ Ltac2 make_subgoal2 (ctx : (binder * constr option) list) (concl : constr) :=
              Constr.Pretype.expected_without_type_constraint
              pre
   in
-  let (_ctx, body) := decompose_lambda_decls t in
-  body.
+  t.
 
 (*
 Goal 0 = 1.
 Proof.
 Control.refine (fun () =>
-  (Constr.Unsafe.make (Constr.Unsafe.LetIn (Constr.Binder.make None constr:(nat)) constr:(0)
-    (Constr.Unsafe.make (Constr.Unsafe.LetIn (Constr.Binder.make None constr:(nat)) constr:(1)
-      (make_subgoal2 [(Constr.Binder.make None constr:(nat), Some constr:(0));
-                      (Constr.Binder.make None constr:(nat), Some constr:(1))]
-                     (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]))))))).
+  (make_subgoal2 [(Constr.Binder.make None constr:(nat), Some constr:(0));
+                  (Constr.Binder.make None constr:(nat), Some constr:(1))]
+                 (mkApp constr:(@eq) [| constr:(nat); mkRel 2; mkRel 1 |]))).
 (*
 1 goal
 x0 := 0 : nat
@@ -283,23 +280,24 @@ x := 1 : nat
 ______________________________________(1/1)
 x0 = x
 *)
+Show Proof.
+(* (let x := 0 in let x0 := 1 in ?Goal) *)
 *)
 
 (*
 Ltac2 Eval make_subgoal2 [(Constr.Binder.make None constr:(Type), None);
                           (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1), None)]
                          constr:(True).
+(* fun (x : Type) (x0 : x) => ?Goal@{x0:=x; x:=x0} *)
 *)
 
 (*
 Goal forall (T : Type) (x : T), True.
 Proof.
 Control.refine (fun () =>
-  (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.make None constr:(Type))
-    (Constr.Unsafe.make (Constr.Unsafe.Lambda (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1))
-      (make_subgoal2 [(Constr.Binder.make None constr:(Type), None);
-                      (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1), None)]
-                     constr:(True))))))).
+  (make_subgoal2 [(Constr.Binder.make None constr:(Type), None);
+                  (Constr.Binder.unsafe_make None Constr.Binder.Relevant (mkRel 1), None)]
+                 constr:(True))).
 (*
 1 goal
 x0 : Type
@@ -307,6 +305,8 @@ x : x0
 ______________________________________(1/1)
 True
 *)
+Show Proof.
+(* (fun (x : Type) (x0 : x) => ?Goal@{x0:=x; x:=x0}) *)
 constructor.
 Qed.
 *)
@@ -687,7 +687,7 @@ Ltac2 make_proof_term_for_letin (goal_type : constr) :=
     let lhs := mkApp body1 lhs_args in
     let rhs := mkApp body2 rhs_args in
     let subgoal_body := make_subgoal2 [(binder1, Some exp1)] (mkApp eq [|eq_type; lhs; rhs|]) in
-    let proof_term := mkLetIn binder1 exp1 subgoal_body in
+    let proof_term := subgoal_body in
     proof_term
   else
     let exp_type := nf_of (Constr.Binder.type binder1) in
@@ -700,9 +700,7 @@ Ltac2 make_proof_term_for_letin (goal_type : constr) :=
                           (mkApp eq [|eq_type; lhs; rhs |]) in
     let proof_term :=
       mkApp
-        (mkLetIn binder1 exp1
-          (mkLetIn binder2 exp2
-            (mkLambda (Constr.Binder.make None eq_vars) subgoal_body)))
+        subgoal_body
         [| subgoal_exp |]
     in
     proof_term.
@@ -715,12 +713,34 @@ Lemma L : forall (x w : nat),
 Proof.
   intros.
   codegen_letin.
+Show Proof. (* (fun x w : nat => let x0 := S x in ?Goal@{x0:=x}) *)
   rewrite<- plus_n_Sm.
   rewrite<- plus_n_O.
   reflexivity.
 Qed.
 *)
 
+(* The binding expression is not a function.
+Lemma L : forall (x : nat),
+    (let y := S x in y + 1) = (let z := x + 1 in S z).
+Proof.
+  intros.
+  codegen_letin.
+Show Proof.
+(*
+(fun x : nat =>
+ (let x0 := S x in let x1 := x + 1 in fun x2 : x0 = x1 => ?Goal0@{x0:=x; x:=x2})
+   (?Goal : S x = x + 1))
+*)
+    rewrite<- plus_n_Sm.
+    rewrite<- plus_n_O.
+    reflexivity.
+  rewrite<- plus_n_Sm.
+  rewrite<- plus_n_O.
+  rewrite x.
+  reflexivity.
+Qed.
+*)
 
 (* The binding expression is a function.
 Lemma L : forall (x : nat),
@@ -728,6 +748,14 @@ Lemma L : forall (x : nat),
 Proof.
   intros.
   codegen_letin.
+Show Proof.
+(*
+(fun x : nat =>
+ (let x0 := fun y : nat => S y in
+  let x1 := fun z : nat => z + 1 in
+  fun x2 : forall y : nat, x0 y = x1 y => ?Goal0@{x0:=x; x:=x2})
+   (?Goal : forall y : nat, S y = y + 1))
+*)
     intros y.
     rewrite<- plus_n_Sm.
     rewrite<- plus_n_O.
@@ -745,22 +773,12 @@ Lemma L : forall (x w : nat),
 Proof.
   intros.
   codegen_letin.
-    rewrite<- plus_n_Sm.
-    rewrite<- plus_n_O.
-    reflexivity.
-  rewrite<- plus_n_Sm.
-  rewrite<- plus_n_O.
-  rewrite x.
-  reflexivity.
-Qed.
-*)
-
+Show Proof.
 (*
-Lemma L : forall (x : nat),
-    (let y := S x in y + 1) = (let z := x + 1 in S z).
-Proof.
-  intros.
-  codegen_letin.
+(fun x w : nat =>
+ (let x0 := S x in let x1 := x + 1 in fun x2 : x0 = x1 => ?Goal0@{x0:=x; x:=x2})
+   (?Goal : S x = x + 1))
+*)
     rewrite<- plus_n_Sm.
     rewrite<- plus_n_O.
     reflexivity.
@@ -782,8 +800,8 @@ Ltac2 rec make_funext_subgoal (arg_binders_rev : binder list) (ty : constr) (t1 
         [| Constr.Binder.type b; ty'; lhs; rhs;
            mkLambda b (make_funext_subgoal (b :: arg_binders_rev) ty' t1 t2) |]
   | _ =>
-      let ctx := List.rev_map (fun b => (b, None)) arg_binders_rev in
-      make_subgoal2 ctx (mkApp constr:(@Init.Logic.eq) [|ty; lhs; rhs|])
+      let ctx := List.rev arg_binders_rev in
+      snd (decompose_lambda (make_subgoal ctx (mkApp constr:(@Init.Logic.eq) [|ty; lhs; rhs|])))
   end.
 
 Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
@@ -833,6 +851,11 @@ Ltac2 Notation codegen_apparg := Control.refine (fun () => make_proof_term_for_a
 Lemma L (x y z : nat) (H : y = z) : x + y = x + z.
 Proof.
   codegen_apparg.
+Show Proof.
+(*
+(fun (x y z : nat) (H : y = z) =>
+ eq_ind y (fun x0 : nat => x + y = x + x0) (?Goal0 : x + y = x + y) z ?Goal)
+*)
     now apply H.
   now reflexivity.
 Qed.
@@ -849,6 +872,22 @@ Proof.
     rewrite<- plus_n_O.
     reflexivity.
   codegen_apparg.
+Show Proof.
+(*
+(fun n : nat =>
+ (let x := fun x : nat => x + 1 in
+  let x0 := fun x0 : nat => S x0 in
+  fun x1 : forall x1 : nat, x x1 = x0 x1 =>
+  eq_ind x (fun x2 : nat -> nat => app x n = app x2 n) (?Goal0@{x:=x1} : app x n = app x n) x0
+    (FunctionalExtensionality.functional_extensionality x x0
+       (fun x2 : nat => ?Goal@{x2:=x1; x:=x2})))
+   ((fun x : nat =>
+     eq_ind (S (x + 0)) (fun n0 : nat => n0 = S x)
+       (eq_ind x (fun n0 : nat => S n0 = S x) eq_refl (x + 0) (plus_n_O x))
+       (x + 1) (plus_n_Sm x 0))
+    :
+    forall x : nat, x + 1 = S x))
+*)
     now trivial with nocore.
   reflexivity.
 Qed.
@@ -864,6 +903,25 @@ Proof.
     rewrite<- plus_n_O.
     reflexivity.
   codegen_apparg.
+Show Proof.
+(*
+(fun m n : nat =>
+ (let x := fun x y : nat => x + 1 + y in
+  let x0 := fun x0 y : nat => S x0 + y in
+  fun x1 : forall x1 y : nat, x x1 y = x0 x1 y =>
+  eq_ind x (fun x2 : nat -> nat -> nat => app2 x m n = app2 x2 m n)
+    (?Goal0@{x:=x1} : app2 x m n = app2 x m n) x0
+    (FunctionalExtensionality.functional_extensionality x x0
+       (fun H : nat =>
+        FunctionalExtensionality.functional_extensionality (x H) (x0 H)
+          (fun H0 : nat => ?Goal@{x2:=x1; x3:=H; x:=H0}))))
+   ((fun x y : nat =>
+     eq_ind (S (x + 0)) (fun n0 : nat => n0 + y = S x + y)
+       (eq_ind x (fun n0 : nat => S n0 + y = S x + y) eq_refl (x + 0) (plus_n_O x))
+       (x + 1) (plus_n_Sm x 0))
+    :
+    forall x y : nat, x + 1 + y = S x + y))
+*)
     now trivial with nocore.
   reflexivity.
 Qed.
