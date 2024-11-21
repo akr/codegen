@@ -210,15 +210,29 @@ Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => 
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
 *)
 
-Ltac2 make_subgoal (ctx : constr list) (concl : constr) : constr :=
+Ltac2 make_simple_subgoal (concl : constr) : constr :=
   let hole := preterm:(_ : $concl) in
-  let pre := List.fold_right (fun ty pre => preterm:(fun (x : $constr:ty) => $preterm:pre)) ctx hole in
+  let t := Constr.Pretype.pretype
+             Constr.Pretype.Flags.open_constr_flags_no_tc
+             Constr.Pretype.expected_without_type_constraint
+             hole
+  in
+  t.
+
+Ltac2 make_subgoal (ctx : binder list) (concl : constr) :=
+  let hole := preterm:(_ :> $concl) in
+  let pre := List.fold_right
+    (fun b p =>
+      let ty := Constr.Binder.type b in
+      preterm:(fun (x : $ty) => $preterm:p)) (* The variable name of the binder should be used, if possible. *)
+    ctx hole
+  in
   let t := Constr.Pretype.pretype
              Constr.Pretype.Flags.open_constr_flags_no_tc
              Constr.Pretype.expected_without_type_constraint
              pre
   in
-  let (_binders, body) := decompose_lambda t in
+  let (_ctx, body) := decompose_lambda t in
   body.
 
 (*
@@ -611,7 +625,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         in
         ih_type)
   in
-  let subgoals := Array.map (fun subgoal_type => make_subgoal (Array.to_list ih_types) subgoal_type) subgoal_types in
+  let subgoals := Array.map (fun subgoal_type => make_subgoal (Array.to_list (Array.map (Constr.Binder.make None) ih_types)) subgoal_type) subgoal_types in
   let new_funcs :=
     Array.init h
       (fun i =>
@@ -739,7 +753,7 @@ Ltac2 make_proof_term_for_letin (goal_type : constr) :=
     let exp_type := nf_of (Constr.Binder.type binder1) in
     let eq_exps := make_exteq exp_type exp1 exp2 in
     let eq_vars := make_exteq exp_type (mkRel 2) (mkRel 1) in
-    let subgoal_exp := make_subgoal [] eq_exps in
+    let subgoal_exp := make_simple_subgoal eq_exps in
     let lhs := mkApp (Constr.Unsafe.liftn 2 1 body1) lhs_args in
     let rhs := mkApp (Constr.Unsafe.liftn 1 1 body2) rhs_args in
     let subgoal_body := make_subgoal2 [(binder1, Some exp1); (binder2, Some exp2); (Constr.Binder.make None eq_vars, None)]
