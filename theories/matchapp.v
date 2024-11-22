@@ -509,8 +509,8 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
       let (binders1, branch1_body) := decompose_lambda_n cstr_numargs branch1 in
       let branch2 := Array.get branches2 j in
       let (_binders2, branch2_body) := decompose_lambda_n cstr_numargs branch2 in
-      let branch1' := mkApp branch1_body lhs_args in
-      let branch2' := mkApp branch2_body rhs_args in
+      let branch1' := mkApp_beta branch1_body lhs_args in
+      let branch2' := mkApp_beta branch2_body rhs_args in
       let subgoal_type := compose_prod binders1 (mkApp eq [| eq_type; branch1'; branch2' |]) in
       let subgoal := make_simple_subgoal subgoal_type in
       let subgoal_args := Array.init cstr_numargs (fun k => mkRel (Int.sub cstr_numargs k)) in
@@ -1502,5 +1502,101 @@ Show Proof.
 *)
     now trivial with nocore.
   reflexivity.
+Qed.
+*)
+
+(*
+Goal forall a b,
+  (fix add1 a b :=
+    match a with
+    | O => b
+    | S a' => S (add1 a' b)
+    end) a b =
+  (fix add2 a b :=
+    match a with
+    | O => fun c => c
+    | S a' => fun c => S (add2 a' c)
+    end b) a b.
+Proof.
+  intros.
+  codegen_fix.
+  intros.
+  codegen_matchapp.
+    reflexivity.
+  intros.
+  codegen_apparg.
+    now trivial with nocore.
+  reflexivity.
+Qed.
+*)
+
+(*
+Goal forall a b,
+  (fix add1 a b :=
+    match a with
+    | O => b
+    | S a' => S (add1 a' b)
+    end) a b =
+  (fix add2 a b :=
+    match a with
+    | O => fun c => c
+    | S a' => fun c => S (add2 a' c)
+    end b) a b.
+Proof.
+  solve [
+    repeat
+      (intros;
+      first [
+        now reflexivity |
+        now trivial with nocore |
+        codegen_matchapp |
+        codegen_fix |
+        codegen_letin |
+        codegen_apparg ]) ].
+Qed.
+*)
+
+Ltac2 codegen_applyhyp0 () := Std.trivial Std.Off [] (Some [ident:(nocore)]).
+Ltac2 Notation codegen_applyhyp := solve [codegen_applyhyp0 ()].
+
+(*
+Goal 0 = 0.
+intros.
+Fail codegen_trivial.
+reflexivity.
+Qed.
+
+Goal (forall (n : nat), n = n) -> 1 = 1.
+intros.
+codegen_trivial.
+Qed.
+*)
+
+Ltac2 Notation codegen_solve :=
+  solve [
+    repeat
+      (intros;
+      first [
+        reflexivity |
+        codegen_applyhyp |
+        codegen_matchapp |
+        codegen_fix |
+        codegen_letin |
+        codegen_apparg ]) ].
+
+(*
+Goal forall a b,
+  (fix add1 a b :=
+    match a with
+    | O => b
+    | S a' => S (add1 a' b)
+    end) a b =
+  (fix add2 a b :=
+    match a with
+    | O => fun c => c
+    | S a' => fun c => S (add2 a' c)
+    end b) a b.
+Proof.
+  codegen_solve.
 Qed.
 *)
