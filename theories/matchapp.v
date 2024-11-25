@@ -661,7 +661,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
               let branch_body_args := Array.init numargs
                 (fun k =>
                   if Int.equal k decarg then
-                    mkApp cstr (Array.init cstr_numargs_without_params (fun l => mkRel (Int.sub cstr_numargs_without_params l)))
+                    mkApp cstr (Array.append decarg_type_args (Array.init cstr_numargs_without_params (fun l => mkRel (Int.sub cstr_numargs_without_params l))))
                   else
                     mkRel (Int.sub (Int.add numargs (Int.add 1 cstr_numargs_without_params)) k))
               in
@@ -1223,6 +1223,7 @@ Qed.
 
 (*
     h is the number of mutual functions
+    params is the inductive type parameters of T_{ki}
     forall j, (Fj is (fix ... (fi/ki:Ti := ti) ... for fj))
     forall j, (Gj is (fix ... (gi/ki:Ti := ui) ... for gj))
     forall j, (Γ, (IH1 : F1 ~ G1), ..., (IHh : Fh ~ Gh) |- p_j : t_j[F1/f1,...,Fh/fh] ~ ui[G1/g1,...,Gh/gh])
@@ -1233,9 +1234,9 @@ Qed.
                   let H := pi in
                   match a_{ki} as x return Fi a1 ... a{ki-1} x a{ki+1} ... an
                                          = Gi a1 ... a{ki-1} x a{ki+1} ... an with
-                  | C1 cargs1 => H a1 ... a{ki-1} (C1 cargs1) a{ki+1} ... an
+                  | C1 cargs1 => H a1 ... a{ki-1} (C1 params cargs1) a{ki+1} ... an
                   | ...
-                  | Cm cargsm => H a1 ... a{ki-1} (Cm cargsm) a{ki+1} ... an
+                  | Cm cargsm => H a1 ... a{ki-1} (Cm params cargsm) a{ki+1} ... an
                   end
               ...
           for IHj) b1 ... bn : Fj b1 ... bn = Gj b1 ... bn
@@ -1395,7 +1396,8 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
     Control.backtrack_tactic_failure "function type not equal"
   else
   let (arg_binders, _rettype) := decompose_prod fntype1 in
-  let argtypes := Array.map Constr.Binder.type (Array.of_list arg_binders) in (* assumes the types are closed *)
+  (*let argtypes := Array.map Constr.Binder.type (Array.of_list arg_binders) in (* assumes the types are closed *)*)
+  let argtypes := Array.map nftype_of lhs_args in (* we want to use parametric inductive types for testing *)
   let n := Array.length lhs_args in
   Control.assert_valid_argument "number of arguments in LHS and RHS are different" (Int.equal n (Array.length rhs_args));
   let eq := constr:(@Coq.Init.Logic.eq) in
@@ -1556,8 +1558,11 @@ Proof.
 Qed.
 *)
 
+(*
 Ltac2 codegen_applyhyp0 () := Std.trivial Std.Off [] (Some [ident:(nocore)]).
 Ltac2 Notation codegen_applyhyp := solve [codegen_applyhyp0 ()].
+*)
+Ltac2 Notation "codegen_applyhyp" := solve [ trivial with nocore ].
 
 (*
 Goal 0 = 0.
@@ -1597,6 +1602,70 @@ Goal forall a b,
     | S a' => fun c => S (add2 a' c)
     end b) a b.
 Proof.
+  codegen_solve.
+Qed.
+*)
+
+(*
+Definition merge1 :=
+  fix f (s1 : list nat) :=
+    fix g (s2 : list nat) :=
+      match s1 with
+      | nil => s2
+      | cons x1 s1' =>
+          match s2 with
+          | nil => s1
+          | cons x2 s2' =>
+              if Nat.leb x1 x2 then
+                cons x1 (f s1' s2)
+              else
+                cons x2 (g s2')
+          end
+      end.
+
+Definition merge2 :=
+  fix f (s1 : list nat) :=
+    fix g (s2 : list nat) :=
+      match s1 with
+      | nil => s2
+      | cons x1 s1' =>
+          match s2 with
+          | nil => fun _ => s1
+          | cons x2 s2' => fun _ =>
+              if Nat.leb x1 x2 then
+                cons x1 (f s1' s2)
+              else
+                cons x2 (g s2')
+          end tt
+      end.
+
+Goal forall s1 s2, merge1 s1 s2 = merge2 s1 s2.
+Proof.
+  intros.
+  unfold merge1, merge2.
+  codegen_fix.
+  intros.
+  codegen_fix.
+  intros.
+  codegen_matchapp.
+    reflexivity.
+  intros.
+  codegen_matchapp.
+    reflexivity.
+  intros.
+  codegen_matchapp.
+    codegen_apparg.
+      codegen_applyhyp.
+    reflexivity.
+  codegen_apparg.
+    codegen_applyhyp.
+  reflexivity.
+Qed.
+
+Goal forall s1 s2, merge1 s1 s2 = merge2 s1 s2.
+Proof.
+  intros.
+  unfold merge1, merge2.
   codegen_solve.
 Qed.
 *)
