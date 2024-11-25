@@ -1669,3 +1669,39 @@ Proof.
   codegen_solve.
 Qed.
 *)
+
+(*
+Definition add1 :=
+  fix f (a b : nat) : nat :=
+    match a with
+    | O => b
+    | S a' => S (f a' b)
+    end.
+
+Definition add2 :=
+  fix g (a : nat) : nat -> nat :=
+    match a with
+    | O => fun b => b
+    | S a' => fun b => S (g a' b)
+    end.
+
+Goal forall a b, add1 a b = add2 a b.
+Proof.
+  intros.
+  unfold add1, add2.
+  codegen_fix.
+  intros.
+  codegen_matchapp.
+    reflexivity.
+  intros.
+  codegen_apparg.
+    codegen_applyhyp.
+  reflexivity.
+Qed.
+
+Goal forall a b, add1 a b = add2 a b.
+Proof.
+  unfold add1, add2.
+  codegen_solve.
+Qed.
+*)
