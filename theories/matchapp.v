@@ -1705,3 +1705,34 @@ Proof.
   codegen_solve.
 Qed.
 *)
+
+(*
+Definition sub1 :=
+  fix f (a b : nat) : nat :=
+    match a with
+    | O => O
+    | S a' =>
+        match b with
+        | O => a
+        | S b' => f a' b'
+        end
+    end.
+
+Definition sub2 :=
+  fix f (a b : nat) : nat :=
+    match a with
+    | O => O
+    | S a' =>
+        match b with
+        | O => fun a' => a
+        | S b' => fun a' => f a' b'
+        end a'
+    end.
+
+Goal forall a b, sub1 a b = sub2 a b.
+Proof.
+  intros.
+  unfold sub1, sub2.
+  codegen_solve.
+Qed.
+*)
