@@ -1736,3 +1736,149 @@ Proof.
   codegen_solve.
 Qed.
 *)
+
+(*
+Fixpoint mem_seq1 (s : list nat) (x : nat) :=
+  match s with
+  | nil => (fun z => false)
+  | cons y s' => (fun z => orb (Nat.eqb y z) (mem_seq1 s' z))
+  end x.
+
+Fixpoint mem_seq2 (s : list nat) (x : nat) :=
+  match s with
+  | nil => false
+  | cons y s' => orb (Nat.eqb y x) (mem_seq2 s' x)
+  end.
+
+Goal forall s x, mem_seq1 s x = mem_seq2 s x.
+Proof.
+  intros.
+  unfold mem_seq1, mem_seq2.
+  codegen_solve.
+Qed.
+*)
+
+(*
+Fixpoint fib1 (n : nat) : nat :=
+  match n with
+  | O => 0
+  | S n1 =>
+      match n1 with
+      | O => 1
+      | S n2 => fib1 n1 + fib1 n2
+      end
+  end.
+
+Fixpoint fib2 (n : nat) : nat :=
+  match n with
+  | O => 0
+  | S n1 =>
+      match n1 with
+      | O => fun _ => 1
+      | S n2 => fun _ => fib2 n1 + fib2 n2
+      end tt
+  end.
+
+Goal forall n, fib1 n = fib2 n.
+Proof.
+  intros.
+  unfold fib1, fib2.
+  codegen_solve.
+Qed.
+*)
+
+(*
+Fixpoint even1 n :=
+  match n with
+  | O => true
+  | S n' => odd1 n'
+  end
+with odd1 n :=
+  match n with
+  | O => false
+  | S n' => even1 n'
+  end.
+
+Fixpoint even2 n :=
+  match n with
+  | O => fun _ => true
+  | S n' => fun _ => odd2 n'
+  end tt
+with odd2 n :=
+  match n with
+  | O => false
+  | S n' => even2 n'
+  end.
+
+Goal forall n, even1 n = even2 n.
+Proof.
+  intros.
+  unfold even1, even2.
+  codegen_solve.
+Qed.
+*)
+
+(*
+Fixpoint half1 n :=
+  match n with
+  | O => O
+  | S n' => half1' n'
+  end
+with half1' n :=
+  match n with
+  | O => O
+  | S n' => S (half1 n')
+  end.
+
+Fixpoint half2 n :=
+  match n with
+  | O => O
+  | S n' => half2' n'
+  end
+with half2' n :=
+  match n with
+  | O => fun _ => O
+  | S n' => fun _ => S (half2 n')
+  end tt.
+
+Goal forall n, half1 n = half2 n.
+Proof.
+  intros.
+  unfold half1, half2.
+  codegen_solve.
+Qed.
+*)
+
+(*
+Definition ack1 :=
+  fix f m :=
+    fix g n :=
+      match m with
+      | O => n + 1
+      | S m' =>
+          match n with
+          | O => f m' 1
+          | S n' => f m' (g n')
+          end
+      end.
+
+Definition ack2 :=
+  fix f m :=
+    fix g n :=
+      match m with
+      | O => n + 1
+      | S m' =>
+          match n with
+          | O => fun _ => f m' 1
+          | S n' => fun _ => f m' (g n')
+          end tt
+      end.
+
+Goal forall m n, ack1 m n = ack2 m n.
+Proof.
+  intros.
+  unfold ack1, ack2.
+  codegen_solve.
+Qed.
+*)
+
