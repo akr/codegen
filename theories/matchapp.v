@@ -1882,3 +1882,38 @@ Proof.
 Qed.
 *)
 
+(* https://en.wikipedia.org/wiki/Sudan_function
+Definition sudan1 :=
+  fix f n x :=
+    fix g y :=
+      match n with
+      | O => x + y
+      | S n' =>
+          match y with
+          | O => x
+          | S y' => f n' (g y') (g y' + y' + 1)
+          end
+      end.
+
+Definition sudan2 :=
+  fix f n x :=
+    fix g y :=
+      match n with
+      | O => x + y
+      | S n' =>
+          match y with
+          | O => fun _ => x
+          | S y' => fun _ => f n' (g y') (g y' + y' + 1)
+          end tt
+      end.
+
+Goal forall n x y, sudan1 n x y = sudan2 n x y.
+Proof.
+  intros.
+  unfold sudan1, sudan2.
+  codegen_solve.
+Qed.
+*)
+
+
+
