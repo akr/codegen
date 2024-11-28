@@ -2015,3 +2015,34 @@ Proof.
   codegen_solve.
 Qed.
 *)
+
+(*
+Definition div1 n d :=
+  match d with
+  | O => 0
+  | S d' =>
+      (fix f n :=
+        match n - d' with
+        | O => 0
+        | S n'' => S (f n'')
+        end) n
+  end.
+
+Definition div2 n d :=
+  match d with
+  | O => 0
+  | S d' =>
+      (fix f n :=
+        match n - d' with
+        | O => fun _ => 0
+        | S n'' => fun _ => S (f n'')
+        end tt) n
+  end.
+
+Goal forall n d, div1 n d = div2 n d.
+Proof.
+  intros.
+  unfold div1, div2.
+  codegen_solve.
+Qed.
+*)
