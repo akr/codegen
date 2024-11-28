@@ -1850,6 +1850,29 @@ Qed.
 *)
 
 (*
+Fixpoint odd1' n :=
+  match n with
+  | O => false
+  | S O => true
+  | S (S n') => odd1' n'
+  end.
+
+Fixpoint odd2' n :=
+  match n with
+  | O => fun _ => false
+  | S O => fun _ => true
+  | S (S n') => fun _ => odd2' n'
+  end tt.
+
+Goal forall n, odd1' n = odd2' n.
+Proof.
+  intros.
+  unfold odd1', odd2'.
+  codegen_solve.
+Qed.
+*)
+
+(*
 Definition ack1 :=
   fix f m :=
     fix g n :=
@@ -1915,5 +1938,39 @@ Proof.
 Qed.
 *)
 
+(*
+Section forest.
+Variable A B : Set.
+Inductive tree : Set := node : A -> forest -> tree
+with forest : Set :=
+| leaf : B -> forest
+| cons : tree -> forest -> forest.
 
+Fixpoint size_tree1 t :=
+  match t with
+  | node _ f => 1 + (size_forest1 f)
+  end
+with size_forest1 f :=
+  match f with
+  | leaf _ => 1
+  | cons t f' => size_tree1 t + size_forest1 f'
+  end.
 
+Fixpoint size_tree2 t :=
+  match t with
+  | node _ f => fun _ => 1 + (size_forest2 f)
+  end tt
+with size_forest2 f :=
+  match f with
+  | leaf _ => fun _ => 1
+  | cons t f' => fun _ => size_tree2 t + size_forest2 f'
+  end tt.
+
+Goal forall t, size_tree1 t = size_tree2 t.
+Proof.
+  intros.
+  unfold size_tree1, size_tree2.
+  codegen_solve.
+Qed.
+End forest.
+*)
