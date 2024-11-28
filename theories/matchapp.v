@@ -1974,3 +1974,44 @@ Proof.
 Qed.
 End forest.
 *)
+
+(*
+Definition gcd1 :=
+  fix f m :=
+    fix g n :=
+      match m with
+      | O => n
+      | S m' =>
+          match n with
+          | O => m
+          | S n' =>
+              if Nat.leb m' n' then
+                g (n' - m')
+              else
+                f (m' - n') n
+          end
+      end.
+
+Definition gcd2 :=
+  fix f m :=
+    fix g n :=
+      match m with
+      | O => n
+      | S m' =>
+          match n with
+          | O => fun _ => m
+          | S n' => fun _ =>
+              if Nat.leb m' n' then
+                g (n' - m')
+              else
+                f (m' - n') n
+          end tt
+      end.
+
+Goal forall m n, gcd1 m n = gcd2 m n.
+Proof.
+  intros.
+  unfold gcd1, gcd2.
+  codegen_solve.
+Qed.
+*)
