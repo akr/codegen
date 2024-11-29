@@ -2046,3 +2046,34 @@ Proof.
   codegen_solve.
 Qed.
 *)
+
+(*
+Definition mod1 n d :=
+  match d with
+  | O => n
+  | S d' =>
+      (fix f n :=
+        match n - d' with
+        | O => n
+        | S n'' => f n''
+        end) n
+  end.
+
+Definition mod2 n d :=
+  match d with
+  | O => fun _ => n
+  | S d' => fun _ =>
+      (fix f n :=
+        match n - d' with
+        | O => n
+        | S n'' => f n''
+        end) n
+  end tt.
+
+Goal forall n d, mod1 n d = mod2 n d.
+Proof.
+  intros.
+  unfold mod1, mod2.
+  codegen_solve.
+Qed.
+*)
