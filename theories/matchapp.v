@@ -2021,28 +2021,30 @@ Definition div1 n d :=
   match d with
   | O => 0
   | S d' =>
-      (fix f n :=
+      let fix f n :=
         match n - d' with
         | O => 0
         | S n'' => S (f n'')
-        end) n
+        end
+      in f n
   end.
 
 Definition div2 n d :=
   match d with
   | O => 0
   | S d' =>
-      (fix f n :=
+      let fix f n :=
         match n - d' with
         | O => fun _ => 0
         | S n'' => fun _ => S (f n'')
-        end tt) n
+        end tt
+      in f n
   end.
 
 Goal forall n d, div1 n d = div2 n d.
 Proof.
   intros.
-  unfold div1, div2.
+  cbv beta delta [div1 div2].
   codegen_solve.
 Qed.
 *)
@@ -2052,28 +2054,30 @@ Definition mod1 n d :=
   match d with
   | O => n
   | S d' =>
-      (fix f n :=
+      let fix f n :=
         match n - d' with
         | O => n
         | S n'' => f n''
-        end) n
+        end
+      in f n
   end.
 
 Definition mod2 n d :=
   match d with
   | O => fun _ => n
   | S d' => fun _ =>
-      (fix f n :=
+      let fix f n :=
         match n - d' with
         | O => n
         | S n'' => f n''
-        end) n
+        end
+      in f n
   end tt.
 
 Goal forall n d, mod1 n d = mod2 n d.
 Proof.
   intros.
-  unfold mod1, mod2.
+  cbv beta delta [mod1 mod2].
   codegen_solve.
 Qed.
 *)
