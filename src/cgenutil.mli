@@ -35,6 +35,7 @@ val array_drop : int -> 'a array -> 'a array
 val boolarray_count_sub : bool array -> int -> int -> int
 val boolarray_count : bool array -> int
 val array_filter_with : bool array -> ?result_length:int -> 'a array -> 'a array
+val cons_opt : 'a option -> 'a list -> 'a list
 val ncons : int -> 'a -> 'a list -> 'a list
 val ntimes : int -> ('a -> 'a) -> 'a -> 'a
 val rcons : 'a list -> 'a -> 'a list

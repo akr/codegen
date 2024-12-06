@@ -287,6 +287,11 @@ let array_filter_with (filter : bool array)
       result
     end
 
+let cons_opt (x_opt : 'a option) (s : 'a list) : 'a list =
+  match x_opt with
+  | None -> s
+  | Some x -> x :: s
+
 let ncons n x s = CList.addn n x s
 
 let rec ntimes n f v =

@@ -2425,19 +2425,18 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "expand_eta_top" term;
   let term = normalizeV env sigma term in
   debug_simplification env sigma "normalizeV" term;
-  let rec repeat_reduction sigma term rev_steps_list =
+  let rec repeat_reduction sigma term rev_steps =
     let term1 = term in
     let term = reduce_exp (aenv_of_env env) sigma term in
     debug_simplification env sigma "reduce_exp" term;
-    let (sigma, term, rev_steps) = simplify_matchapp env sigma term in
+    let (sigma, term, step_opt) = simplify_matchapp env sigma term in
     debug_simplification env sigma "simplify_matchapp" term;
     if EConstr.eq_constr sigma term1 term then
-      (term, rev_steps_list)
+      (term, rev_steps)
     else
-      repeat_reduction sigma term (rev_steps :: rev_steps_list)
+      repeat_reduction sigma term (cons_opt step_opt rev_steps)
   in
-  let (term, rev_steps_list) = repeat_reduction sigma term [] in
-  let rev_steps = List.concat rev_steps_list in
+  let (term, rev_steps) = repeat_reduction sigma term [] in
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2451,8 +2450,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
   let term' = delete_unreachable_fixfuncs env sigma term in
-  let (sigma, step) = verify_transformation env sigma term term' in
-  let rev_steps = step :: rev_steps in
+  let (sigma, step_opt) = verify_transformation env sigma term term' in
+  let rev_steps = cons_opt step_opt rev_steps in
   let term = term' in
   debug_simplification env sigma "delete_unreachable_fixfuncs" term;
   monomorphism_check env sigma term;
