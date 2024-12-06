@@ -202,13 +202,12 @@ let rec transform_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EC
         mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl2)
 
 (*
-  (sigma, term') = simplify_matchapp env sigma term
+  (sigma, term', step_opt) = simplify_matchapp env sigma term
 
-  - proofs is a list of equality proofs from term to term'
-    If term is repeatedly rewritten to term' as
-    term=term1 -> term2 -> ... -> termN=term',
-    the first element of proofs is the tuple of (term{N-1}, termN, the proof of term{N-1} = termN), and
-    the last element of proofs is the tuple of (term1, term2, the proof of term1 = term2).
+  - step_opt is verification step.
+    If it is None, term and term' are same.
+    If it is (Some step), step is a evidence of
+    extensional equality of term and term'.
 *)
 let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Evd.evar_map * EConstr.t * verification_step option =
   (if !opt_debug_matchapp then
