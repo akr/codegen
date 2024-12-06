@@ -29,6 +29,8 @@ open Cgenutil
 open State
 open Filegen
 
+open Matchapp
+
 type func_mods = {
   func_mods_static : bool option;
 }
@@ -2377,26 +2379,6 @@ let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : stri
     prevterm := Some term;
     specialization_time := now)
 
-    (*
-let combine_equality_proofs (env : Environ.env) (sigma : Evd.evar_map) (term1 : EConstr.t) (term2 : EConstr.t) (proofs : (EConstr.t * EConstr.t * EConstr.t) list) : EConstr.t * EConstr.types =
-  let eq = lib_ref "core.eq.type" in
-  let eq_ind = lib_ref "core.eq.ind" in
-  let eq_refl = lib_ref "core.eq.refl" in
-  let ty = Retyping.get_type_of env sigma term1 in
-  let eq_prop = mkApp (eq, [| ty; term1; term2 |]) in
-  let p = mkLambda (Context.anonR, ty, (mkApp (eq, [| ty; term1; mkRel 1 |]))) in
-  let rec aux proofs =
-    match proofs with
-    | [] ->
-        mkApp (eq_refl, [| ty; term1 |])
-    | [(first_lhs, first_rhs, first_proof)] ->
-        first_proof
-    | (last_lhs, last_rhs, last_proof) :: rest_proofs ->
-        mkApp (eq_ind, [| ty; last_lhs; p; aux rest_proofs; last_rhs; last_proof |])
-  in
-  (aux proofs, eq_prop)
-  *)
-
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
   let (sp_cfg, sp_inst, sp_interface, sp_gen) =
@@ -2443,18 +2425,19 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "expand_eta_top" term;
   let term = normalizeV env sigma term in
   debug_simplification env sigma "normalizeV" term;
-  let rec repeat_reduction sigma term =
+  let rec repeat_reduction sigma term rev_steps_list =
     let term1 = term in
     let term = reduce_exp (aenv_of_env env) sigma term in
     debug_simplification env sigma "reduce_exp" term;
-    let (sigma, term) = Matchapp.simplify_matchapp env sigma term in
+    let (sigma, term, rev_steps) = simplify_matchapp env sigma term in
     debug_simplification env sigma "simplify_matchapp" term;
     if EConstr.eq_constr sigma term1 term then
-      term
+      (term, rev_steps_list)
     else
-      repeat_reduction sigma term
+      repeat_reduction sigma term (rev_steps :: rev_steps_list)
   in
-  let term = repeat_reduction sigma term in
+  let (term, rev_steps_list) = repeat_reduction sigma term [] in
+  let rev_steps = List.concat rev_steps_list in
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2467,21 +2450,37 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "reduce_eta" term;
   let term = complete_args env sigma term in
   debug_simplification env sigma "complete_args" term;
-  let term = delete_unreachable_fixfuncs env sigma term in
+  let term' = delete_unreachable_fixfuncs env sigma term in
+  let (sigma, step) = verify_transformation env sigma term term' in
+  let rev_steps = step :: rev_steps in
+  let term = term' in
   debug_simplification env sigma "delete_unreachable_fixfuncs" term;
   monomorphism_check env sigma term;
   Linear.borrowcheck env sigma term;
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
-  let globref = Declare.declare_definition
+  let specialized_globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())
     ~opaque:false
     ~body:term
     sigma
   in
-  let declared_ctnt = Globnames.destConstRef globref in
+  let declared_ctnt = Globnames.destConstRef specialized_globref in
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, declared_ctnt_term) = fresh_global env sigma specialized_globref in
+  let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps declared_ctnt_term in
+  (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);*)
+  let proof_globref = Declare.declare_definition
+    ~info:(Declare.Info.make ())
+    ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof")) ~typ:(Some eq_prop) ())
+    ~opaque:true
+    ~body:eq_proof
+    sigma
+  in
+  ignore proof_globref;
   let env = Global.env () in
   let sp_gen2 = { sp_static_storage=sp_gen.sp_static_storage; sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } in
   let sp_interface2 = {

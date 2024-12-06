@@ -25,10 +25,112 @@ open EConstr
 open Cgenutil
 open State
 
-open Proofview.Notations
+open Ltac2_plugin
+open Tac2expr
+open Tac2interp
+open Tac2val
+open Tac2core
 
 let whd_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
 let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = Reductionops.nf_all env sigma term
+
+let codegen_solve () : unit Proofview.tactic =
+  let gr = Coqlib.lib_ref "codegen.verification_anchor" in
+  let cnst =
+    match gr with
+    | ConstRef cnst -> cnst
+    | _ -> user_err (Pp.str "[codegen:matchapp] codegen.verification_anchor not found")
+  in
+  let modpath = KerName.modpath (Constant.canonical cnst) in
+  let kn = KerName.make modpath (Label.make "codegen_solve0") in
+  (*msg_debug_hov (Pp.str "[codegen] kn=" ++ KerName.debug_print kn);*)
+  let glb_tacexpr = GTacRef kn in
+  let valexpr = interp_value empty_environment glb_tacexpr in
+  let clo = to_closure valexpr in
+  let tac = apply clo [Core.v_unit] in
+  Proofview.tclIGNORE tac
+
+type verification_step = {
+  vstep_lhs_fun : EConstr.t;
+  vstep_rhs_fun : EConstr.t;
+  vstep_goal : EConstr.types;
+  vstep_proof : EConstr.t;
+}
+
+let verify_transformation (env : Environ.env) (sigma : Evd.evar_map) (lhs_fun : EConstr.t) (rhs_fun : EConstr.t) : (Evd.evar_map * verification_step) =
+  let sigma, eq = lib_ref env sigma "core.eq.type" in
+  let ty = nf_all env sigma (Retyping.get_type_of env sigma lhs_fun) in
+  let (ctx, ret_ty) = decompose_prod sigma ty in
+  let nargs = List.length ctx in
+  let args = mkRels_dec nargs nargs in
+  let lhs' = mkApp_beta sigma lhs_fun args in
+  let rhs' = mkApp_beta sigma rhs_fun args in
+  let equal = mkApp (eq, [| ret_ty; lhs'; rhs' |]) in
+  let goal = compose_prod ctx equal in
+  let (entry, pv) = Proofview.init sigma [(env, goal)] in
+  let ((), pv, unsafe, tree) =
+    Proofview.apply
+      ~name:(Names.Id.of_string "codegen")
+      ~poly:false
+      env
+      (
+        (* show_goals () <*> *)
+        codegen_solve ()
+      )
+      pv
+  in
+  if not (Proofview.finished pv) then
+    user_err (Pp.str "[codegen] could not prove matchapp equality:" +++
+      Printer.pr_econstr_env env sigma goal);
+  let sigma = Proofview.return pv in
+  let proofs = Proofview.partial_proof entry pv in
+  assert (List.length proofs = 1);
+  let proof = List.hd proofs in
+  (* Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "proofterm=" ++ (Printer.pr_econstr_env env sigma proof))); *)
+  if Evarutil.has_undefined_evars sigma proof then
+    user_err (Pp.str "[codegen] could not prove matchapp equality (evar remains):" +++
+      Printer.pr_econstr_env env sigma goal);
+  let (sigma, ty) = Typing.type_of env sigma (mkCast (proof, DEFAULTcast, goal)) in (* verify proof term *)
+  (sigma, { vstep_lhs_fun=lhs_fun; vstep_rhs_fun=rhs_fun; vstep_goal=ty; vstep_proof=proof })
+
+let combine_verification_steps (env : Environ.env) (sigma: Evd.evar_map) (first_term : EConstr.t) (rev_steps : verification_step list) (last_term : EConstr.t) : Evd.evar_map * EConstr.types * EConstr.t =
+  (*
+  List.iteri
+    (fun i (lhs_fun, rhs_fun, prop, proof) ->
+      msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] [" ++ Pp.int i ++ Pp.str "] lhs_fun=" +++ Printer.pr_econstr_env env sigma lhs_fun);
+      msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] [" ++ Pp.int i ++ Pp.str "] rhs_fun=" +++ Printer.pr_econstr_env env sigma rhs_fun);
+      msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] [" ++ Pp.int i ++ Pp.str "] prop=" +++ Printer.pr_econstr_env env sigma prop);
+      msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] [" ++ Pp.int i ++ Pp.str "] proof=" +++ Printer.pr_econstr_env env sigma proof))
+    rev_steps;
+  *)
+  let (sigma, eq) = lib_ref env sigma "core.eq.type" in (* forall {A : Type}, A -> A -> Prop *)
+  let (sigma, eq_refl) = lib_ref env sigma "core.eq.refl" in (* forall {A : Type} {x : A}, x = x *)
+  let (sigma, eq_trans) = lib_ref env sigma "core.eq.trans" in (* forall [A : Type] [x y z : A], x = y -> y = z -> x = z *)
+  let whole_type = nf_all env sigma (Retyping.get_type_of env sigma first_term) in
+  let (prod_ctx, val_type) = decompose_prod sigma whole_type in
+  let nargs = List.length prod_ctx in
+  let args = mkRels_dec nargs nargs in
+  let eq_prop = compose_prod prod_ctx (mkApp (eq, [| val_type; mkApp (first_term, args); mkApp (last_term, args) |])) in
+  let eq_proof =
+    match rev_steps with
+    | [] ->
+        let eq_proof = it_mkLambda (mkApp (eq_refl, [| val_type; mkApp (last_term, args) |])) prod_ctx in
+        eq_proof
+    | { vstep_proof=step_proof } :: [] ->
+        step_proof
+    | { vstep_lhs_fun=last_step_lhs_fun; vstep_rhs_fun=last_step_rhs_fun; vstep_goal=last_step_prop; vstep_proof=last_step_proof } :: rest ->
+        let proof = List.fold_left
+          (fun acc_proof { vstep_lhs_fun=prev_lhs_fun; vstep_rhs_fun=prev_rhs_fun; vstep_goal=prev_prop; vstep_proof=prev_proof } ->
+            mkApp (eq_trans, [| val_type; mkApp (prev_lhs_fun, args); mkApp (prev_rhs_fun, args); mkApp (last_term, args); mkApp (prev_proof, args); acc_proof |]))
+          (mkApp (last_step_proof, args))
+          rest
+        in
+        it_mkLambda proof prod_ctx
+  in
+  (*msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] eq_prop=" ++ Printer.pr_econstr_env env sigma eq_prop);
+  msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] eq_proof=" ++ Printer.pr_econstr_env env sigma eq_proof);*)
+  (sigma, eq_prop, eq_proof)
+
 
 (*
   term : V-normal form
@@ -102,103 +204,7 @@ let rec find_match_app (env : Environ.env) (sigma : Evd.evar_map) (term : EConst
           in
           Some (q', ma_env, ma_match, ma_args))
 
-(*
-  namemap : map from de Bruijn's level to id
-*)
-let term_rel_to_named (env : Environ.env) (sigma : Evd.evar_map) (namemap : Id.t Int.Map.t) (term : EConstr.t) : EConstr.t =
-  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:term_rel_to_named] term:" +++ pr_raw_econstr sigma term));*)
-  let rec aux n t =
-    match EConstr.kind sigma t with
-    | Rel i ->
-        if i <= n then
-          t
-        else
-          mkVar (Int.Map.find (Environ.nb_rel env - (i - n)) namemap)
-    | _ ->
-        Termops.map_constr_with_full_binders env sigma
-            (fun _ -> succ) aux n t
-  in
-  let result = aux 0 term in
-  (*Feedback.msg_debug (Pp.hov 2 (Pp.str "[codegen:term_rel_to_named] result:" +++ pr_raw_econstr sigma result));*)
-  result
-
-let env_rel_to_named (env : Environ.env) (sigma : Evd.evar_map) : (Environ.env * Id.t Int.Map.t) =
-  let avoid = ref (Environ.ids_of_named_context_val (Environ.named_context_val env)) in
-  let namemap = ref Int.Map.empty in (* map from de Bruijn's level to id *)
-  let n = Environ.nb_rel env in
-  let env2 = ref (Environ.pop_rel_context n env) in
-  for i = Environ.nb_rel env downto 1 do
-    let rel_decl = EConstr.lookup_rel i env in
-    let id = Namegen.next_name_away (Context.Rel.Declaration.get_name rel_decl) !avoid in
-    avoid := Id.Set.add id !avoid;
-    let env1 = Environ.pop_rel_context i env in
-    let named_decl =
-      (match rel_decl with
-      | Context.Rel.Declaration.LocalAssum (x,t) ->
-          Context.Named.Declaration.LocalAssum ((Context.map_annot (fun _ -> id) x),
-                                                term_rel_to_named env1 sigma !namemap t)
-      | Context.Rel.Declaration.LocalDef (x,e,t) ->
-          Context.Named.Declaration.LocalDef ((Context.map_annot (fun _ -> id) x),
-                                              term_rel_to_named env1 sigma !namemap e,
-                                              term_rel_to_named env1 sigma !namemap t))
-    in
-    env2 := EConstr.push_named named_decl !env2;
-    namemap := Int.Map.add (n - i) id !namemap
-  done;
-  (!env2, !namemap)
-
-(*
-  env: environment for lhs_appmatch and rhs_matchapp.
-  lhs_appmatch : match item with ... end args
-  rhs_matchapp : match item with ... | C vars => (...) args | ... end
-
-  This function verifies: lhs_appmatch = rhs_matchapp
-*)
-let verify_case_transform (env : Environ.env) (sigma : Evd.evar_map) (lhs_appmatch : EConstr.t) (rhs_matchapp : EConstr.t) : Evd.evar_map =
-  let sigma, eq = lib_ref env sigma "core.eq.type" in
-  let eq_ty = Retyping.get_type_of env sigma lhs_appmatch in
-  let eq_goal = mkApp (eq, [| eq_ty; lhs_appmatch; rhs_matchapp |]) in
-  let (proof_env, namemap) = env_rel_to_named env sigma in
-  let proof_goal = term_rel_to_named env sigma namemap eq_goal in
-  let (entry, pv) = Proofview.init sigma [(proof_env, proof_goal)] in
-  let ((), pv, unsafe, tree) =
-    Proofview.apply
-      ~name:(Names.Id.of_string "codegen")
-      ~poly:false
-      proof_env
-      (
-        (*show_goals () <*>*)
-        Proofview.Goal.enter begin fun g ->
-          let sigma = Proofview.Goal.sigma g in
-          let eq_matchapp = Proofview.Goal.concl g in
-          let (ci, u, pms, mpred, iv, item, bl) =
-            destCase sigma (snd (destApp sigma eq_matchapp)).(2)
-          in
-          (*show_goals () <*>*)
-          Tactics.simplest_case item <*>
-          (*show_goals () <*>*)
-          Tactics.intros <*>
-          (*show_goals () <*>*)
-          Tactics.reflexivity
-        end
-      )
-      pv
-  in
-  if not (Proofview.finished pv) then
-    user_err (Pp.str "[codegen] could not prove matchapp equality:" +++
-      Printer.pr_econstr_env env sigma eq_goal);
-  let sigma = Proofview.return pv in
-  let proofs = Proofview.partial_proof entry pv in
-  assert (List.length proofs = 1);
-  let proof = List.hd proofs in
-  (* Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "proofterm=" ++ (Printer.pr_econstr_env env sigma proof))); *)
-  if Evarutil.has_undefined_evars sigma proof then
-    user_err (Pp.str "[codegen] could not prove matchapp equality (evar remains):" +++
-      Printer.pr_econstr_env env sigma eq_goal);
-  let (sigma, ty) = Typing.type_of proof_env sigma proof in (* verify proof term *)
-  sigma
-
-let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Evd.evar_map * EConstr.t) option =
+let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : (Evd.evar_map * verification_step) option =
   match find_match_app env sigma term with
   | None -> None
   | Some (q, env, ma_match, ma_args) ->
@@ -238,11 +244,11 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
               (nas, body))
             bl bl0
         in
-        let lhs_appmatch = mkApp (mkCase ma_match, ma_args) in
         let mpred_sr = EConstr.ERelevance.relevant in
         let rhs_matchapp = mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl') in
-        let sigma = verify_case_transform env sigma lhs_appmatch rhs_matchapp in
-        Some (sigma, q rhs_matchapp)
+        let transformed_term = q rhs_matchapp in
+        let (sigma, step) = verify_transformation env sigma term transformed_term in
+        Some (sigma, step)
 
 (*
   (sigma, term') = simplify_matchapp env sigma term
@@ -253,17 +259,16 @@ let simplify_matchapp_once (env : Environ.env) (sigma : Evd.evar_map) (term : EC
     the first element of proofs is the tuple of (term{N-1}, termN, the proof of term{N-1} = termN), and
     the last element of proofs is the tuple of (term1, term2, the proof of term1 = term2).
 *)
-let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Evd.evar_map * EConstr.t =
-  let rec aux sigma term =
+let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Evd.evar_map * EConstr.t * verification_step list =
+  let rec aux sigma term rev_steps =
     (if !opt_debug_matchapp then
       msg_debug_hov (Pp.str "[codegen] simplify_matchapp:" +++ Printer.pr_econstr_env env sigma term));
     match simplify_matchapp_once env sigma term with
     | None ->
         ((if !opt_debug_matchapp then
           msg_debug_hov (Pp.str "[codegen] simplify_matchapp: no matchapp redex"));
-        (sigma, term))
-    | Some (sigma, term') ->
-        aux sigma term'
+        (sigma, term, rev_steps))
+    | Some (sigma, ({vstep_rhs_fun=term'} as step)) ->
+        aux sigma term' (step :: rev_steps)
   in
-  aux sigma term
-
+  aux sigma term []

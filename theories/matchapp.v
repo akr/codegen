@@ -3,6 +3,9 @@ From Ltac2 Require Import Message.
 
 Require FunctionalExtensionality.
 
+Definition codegen_verification_anchor := tt.
+Register codegen_verification_anchor as codegen.verification_anchor.
+
 Ltac2 array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : 'c array) :=
   Control.assert_valid_argument "array_map3" (Int.equal (Array.length a) (Array.length b));
   Control.assert_valid_argument "array_map3" (Int.equal (Array.length a) (Array.length c));
@@ -10,6 +13,18 @@ Ltac2 array_map3 (f : 'a -> 'b -> 'c -> 'd) (a : 'a array) (b : 'b array) (c : '
 
 Ltac2 array_take (n : int) (a : 'a array) : 'a array := Array.sub a 0 n.
 Ltac2 array_drop (n : int) (a : 'a array) : 'a array := Array.sub a n (Int.sub (Array.length a) n).
+
+Ltac2 array_find (p : 'a -> bool) (a : 'a array) : int option :=
+  let rec aux i n :=
+    if Int.equal n 0 then
+      None
+    else
+      if p (Array.get a i) then
+        Some i
+      else
+        aux (Int.add i 1) (Int.sub n 1)
+  in
+  aux 0 (Array.length a).
 
 Ltac2 rec numprods (t : constr) : int :=
   match Constr.Unsafe.kind t with
@@ -104,7 +119,7 @@ Ltac2 Eval
     destFix constr:(fix even (n : nat) : bool := match n with O => true | S m => odd m end
                     with odd (n : nat) : bool := match n with O => false | S m => even m end
                     for even) in
-  substFix decargs binders bodies. 
+  substFix decargs binders bodies.
 *)
 
 Ltac2 destEq_opt (t : constr) : (constr * constr * constr * constr) option :=
@@ -581,43 +596,55 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
     | _ => Control.backtrack_tactic_failure "goal is not equality"
     end
   in
-  let (decargs1, entry1, binders1, bodies1) :=
+  let (decargs1, _entry1, binders1, bodies1) :=
     match destFix_opt fn1 with
     | Some x => x
     | None => Control.backtrack_tactic_failure "LHS is not fix-expression"
     end
   in
-  let h := Array.length bodies1 in
-  let fix_terms1 := Array.init h (fun i => mkFix decargs1 i binders1 bodies1) in
+  let h1 := Array.length bodies1 in
+  let fix_terms1 := Array.init h1 (fun i1 => mkFix decargs1 i1 binders1 bodies1) in
   let substituted_bodies1 := substFix decargs1 binders1 bodies1 in
   if Bool.neg (Array.equal Constr.equal args1 args2) then
     Control.backtrack_tactic_failure "matchapp-fix"
   else
-  let (decargs2, _entry2, binders2, bodies2) :=
+  let (decargs2, entry2, binders2, bodies2) :=
     match destFix_opt fn2 with
     | Some x => x
     | _ => Control.backtrack_tactic_failure "RHS is not match-expression"
     end
   in
-  let fix_terms2 := Array.init h (fun i => mkFix decargs2 i binders2 bodies2) in
+  let h2 := Array.length bodies2 in
+  let fix_terms2 := Array.init h2 (fun i2 => mkFix decargs2 i2 binders2 bodies2) in
   let substituted_bodies2 := substFix decargs2 binders2 bodies2 in
-  let fn_types1 := Array.map (fun b => nf_of (Constr.Binder.type b)) binders1 in
+  let index1_of_index2 := Array.init h2
+    (fun i2 =>
+      let binder2 := Array.get binders2 i2 in
+      let id2 := Option.get (Constr.Binder.name binder2) in
+      let i1 := Option.get (array_find (fun b1 => Ident.equal (Option.get (Constr.Binder.name b1)) id2) binders1) in
+      i1)
+  in
+  let fn_types2 := Array.map (fun b => nf_of (Constr.Binder.type b)) binders2 in
   let eq := constr:(@Coq.Init.Logic.eq) in
-  let subgoal_types := array_map3
-    (fun fn_type body1 body2 =>
+  let subgoal_types := Array.init h2
+    (fun i2 =>
+      let i1 := Array.get index1_of_index2 i2 in
+      let fn_type := Array.get fn_types2 i2 in
+      let body2 := Array.get substituted_bodies2 i2 in
+      let body1 := Array.get substituted_bodies1 i1 in
       let (arg_binders, ret_type) := decompose_prod fn_type in
       let numargs := List.length arg_binders in
       let args := Array.init numargs (fun k => mkRel (Int.sub numargs k)) in
       let new_type := compose_prod arg_binders (mkApp eq [| ret_type; mkApp_beta body1 args; mkApp_beta body2 args |]) in
       new_type)
-    fn_types1 substituted_bodies1 substituted_bodies2
   in
   let ih_types :=
-    Array.init h
-      (fun i =>
-        let fix1 := Array.get fix_terms1 i in
-        let fix2 := Array.get fix_terms2 i in
-        let fn_type := Array.get fn_types1 i in
+    Array.init h2
+      (fun i2 =>
+        let i1 := Array.get index1_of_index2 i2 in
+        let fix1 := Array.get fix_terms1 i1 in
+        let fix2 := Array.get fix_terms2 i2 in
+        let fn_type := Array.get fn_types2 i2 in
         let (arg_binders, ret_type) := decompose_prod fn_type in
         let numargs := List.length arg_binders in
         let ih_type :=
@@ -632,12 +659,13 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
       subgoal_types
   in
   let new_funcs :=
-    Array.init h
-      (fun i =>
-        let fix1 := Array.get fix_terms1 i in
-        let fix2 := Array.get fix_terms2 i in
-        let decarg := Array.get decargs1 i in
-        let fn_type := Array.get fn_types1 i in
+    Array.init h2
+      (fun i2 =>
+        let i1 := Array.get index1_of_index2 i2 in
+        let fix1 := Array.get fix_terms1 i1 in
+        let fix2 := Array.get fix_terms2 i2 in
+        let decarg := Array.get decargs1 i1 in
+        let fn_type := Array.get fn_types2 i2 in
         let (arg_binders, ret_type) := decompose_prod fn_type in
         let numargs := List.length arg_binders in
         let decarg_binder := List.nth arg_binders decarg in
@@ -671,16 +699,16 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         in
         let citem := mkRel (Int.sub (Int.add numargs 1) decarg) in
         let case_term := mkCase cinfo new_ret Constr.Binder.Relevant Constr.Unsafe.NoInvert citem branches in
-        let subgoal_type := Array.get subgoal_types i in
+        let subgoal_type := Array.get subgoal_types i2 in
         let subgoal :=
-          mkApp_beta (Array.get subgoals i) (mkRel_descending (Int.add h (List.length arg_binders)) h)
+          mkApp_beta (Array.get subgoals i2) (mkRel_descending (Int.add h2 (List.length arg_binders)) h2)
         in
         let let_term := mkLetIn (Constr.Binder.make None subgoal_type) subgoal case_term in
         let new_fn := compose_lambda arg_binders let_term in
         new_fn)
   in
   let new_binders := Array.map (fun ih_type => Constr.Binder.make None ih_type) ih_types in
-  let new_fix_term := mkFix decargs1 entry1 new_binders new_funcs in
+  let new_fix_term := mkFix decargs2 entry2 new_binders new_funcs in
   let proof_term := mkApp new_fix_term args1 in
   proof_term.
 
@@ -1395,7 +1423,7 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
   if Bool.neg (Constr.equal fntype1 fntype2) then
     Control.backtrack_tactic_failure "function type not equal"
   else
-  let (arg_binders, _rettype) := decompose_prod fntype1 in
+  (*let (_arg_binders, _rettype) := decompose_prod fntype1 in *)
   (*let argtypes := Array.map Constr.Binder.type (Array.of_list arg_binders) in (* assumes the types are closed *)*)
   let argtypes := Array.map nftype_of lhs_args in (* we want to use parametric inductive types for testing *)
   let n := Array.length lhs_args in
@@ -1577,7 +1605,7 @@ codegen_trivial.
 Qed.
 *)
 
-Ltac2 Notation codegen_solve :=
+Ltac2 codegen_solve0 () : unit :=
   solve [
     repeat
       (intros;
@@ -1588,6 +1616,10 @@ Ltac2 Notation codegen_solve :=
         codegen_fix |
         codegen_letin |
         codegen_apparg ]) ].
+
+Ltac2 Notation codegen_solve := codegen_solve0 ().
+
+Ltac codegen_solve := ltac2:(codegen_solve).
 
 (*
 Goal forall a b,

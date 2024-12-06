@@ -30,6 +30,8 @@ val array_combine : 'a array -> 'b array -> ('a * 'b) array
 val array_flatten : 'a array array -> 'a array
 val array_count_sub : ('a -> bool) -> 'a array -> int -> int -> int
 val array_count : ('a -> bool) -> 'a array -> int
+val array_take : int -> 'a array -> 'a array
+val array_drop : int -> 'a array -> 'a array
 val boolarray_count_sub : bool array -> int -> int -> int
 val boolarray_count : bool array -> int
 val array_filter_with : bool array -> ?result_length:int -> 'a array -> 'a array
@@ -128,11 +130,14 @@ val env_push_fix : Environ.env -> EConstr.rec_declaration -> Environ.env
 val is_monomorphic_type : Environ.env -> Evd.evar_map -> EConstr.t -> bool
 val new_env_with_rels : Environ.env -> Environ.env
 val decompose_appvect : Evd.evar_map -> EConstr.t -> EConstr.t * EConstr.t array
-val decompose_lam_upto_n : Environ.env -> Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t)
+val decompose_lam_upto_n : Evd.evar_map -> int -> EConstr.t -> ((Names.Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t)
 val decompose_lam_n_env :
   Environ.env -> Evd.evar_map -> int -> EConstr.t -> Environ.env * EConstr.t
 val decompose_lets : Evd.evar_map -> EConstr.t -> (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list * EConstr.t
 val compose_lets : (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.types) list -> EConstr.t -> EConstr.t
+val mkApp_beta : Evd.evar_map ->  EConstr.t -> EConstr.t array -> EConstr.t
+val mkRels_dec : int -> int -> EConstr.t array
+val mkRels_inc : int -> int -> EConstr.t array
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
 val nf_interp_constr : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * EConstr.t

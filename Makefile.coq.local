@@ -3,3 +3,5 @@ CAMLFLAGS += -bin-annot
 
 # This is required to print backtrace with coqide -bt.
 CAMLDEBUG += -g
+
+CAMLPKGS += -package coq-core.plugins.ltac2

@@ -239,6 +239,9 @@ let array_count_sub (p : 'a -> bool) (ary : 'a array) (i : int) (n : int) : int 
 
 let array_count (p : 'a -> bool) (ary : 'a array) : int = array_count_sub p ary 0 (Array.length ary)
 
+let array_take (n : int) (a : 'a array) : 'a array = Array.sub a 0 n
+let array_drop (n : int) (a : 'a array) : 'a array = Array.sub a n (Array.length a - n)
+
 let boolarray_count_sub (ary : bool array) (i : int) (n : int) : int =
   let rec aux i n acc =
     if n <= 0 then
@@ -849,7 +852,7 @@ let decompose_appvect (sigma : Evd.evar_map) (term : EConstr.t) : (EConstr.t * E
   | App (f,args) -> (f,args)
   | _ -> (term, [||])
 
-let decompose_lam_upto_n (env : Environ.env) (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t =
+let decompose_lam_upto_n (sigma : Evd.evar_map) (n : int) (term : EConstr.t) : (Name.t EConstr.binder_annot * EConstr.t) list * EConstr.t =
   let rec aux n fargs term =
     if n <= 0 then
       (fargs, term)
@@ -903,6 +906,33 @@ let rec compose_lets (defs : (Name.t EConstr.binder_annot * EConstr.t * EConstr.
   | [] -> body
   | (x,e,ty) :: rest ->
       compose_lets rest (mkLetIn (x, e, ty, body))
+
+let mkApp_beta (sigma : Evd.evar_map) (fn : EConstr.t) (args : EConstr.t array) : EConstr.t =
+  let nargs = Array.length args in
+  let rec aux nlet t ofs =
+    if nargs <= ofs then
+      t
+    else
+      match EConstr.kind sigma t with
+      | Lambda _ ->
+          let (fun_binders, body) = decompose_lam_upto_n sigma (nargs - ofs) t in
+          let m = List.length fun_binders in
+          let body' = Vars.substl (Array.to_list (array_rev (Array.map (Vars.lift nlet) (Array.sub args ofs m)))) body in
+          aux nlet body' (ofs + m)
+      | LetIn _ ->
+          let (let_binders, body) = decompose_lets sigma t in
+          let m = List.length let_binders in
+          compose_lets let_binders (aux (nlet + m) body ofs)
+      | _ ->
+          mkApp (t, array_drop ofs args)
+  in
+  aux 0 fn 0
+
+let mkRels_dec (start : int) (n : int) : EConstr.t array =
+  Array.init n (fun i -> mkRel (start - i))
+
+let mkRels_inc (start : int) (n : int) : EConstr.t array =
+  Array.init n (fun i -> mkRel (start + i))
 
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg:" +++ Printer.pr_econstr_env env sigma t);*)

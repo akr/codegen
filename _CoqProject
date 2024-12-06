@@ -28,4 +28,5 @@ src/indimp.mli
 src/indimp.ml
 src/g_codegen.mli
 src/g_codegen.mlg
+theories/matchapp.v
 theories/codegen.v
