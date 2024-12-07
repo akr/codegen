@@ -1457,6 +1457,99 @@ and try_iota_match (aenv : aenv_t) (sigma : Evd.evar_map)
       | _ ->
           failure2 ()))
 
+(*
+  term : V-normal form
+*)
+let rec transform_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) (rels : int array) : EConstr.t =
+  match EConstr.kind sigma term with
+  | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->
+       user_err (Pp.str "[codegen:find_match_app] unsupported term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Cast _ ->
+      user_err (Pp.str "[codegen:find_match_app] unexpected term (" ++ Pp.str (constr_name sigma term) ++ Pp.str "):" +++ Printer.pr_econstr_env env sigma term)
+  | Sort _ | Prod _ | Ind _
+  | Rel _ | Const _ | Construct _ | Proj _ ->
+      mkApp (term, Array.map mkRel rels)
+  | Fix ((ks, j), ((nary, tary, fary) as prec)) ->
+      let env2 = push_rec_types prec env in
+      let fary2 = Array.map (fun f -> transform_matchapp env2 sigma f [||]) fary in
+      mkApp (mkFix ((ks, j), (nary, tary, fary2)), Array.map mkRel rels)
+  | App (f, args) ->
+      let rels2 = Array.map (destRel sigma) args in
+      transform_matchapp env sigma f (Array.append rels2 rels)
+  | Lambda (x,t,e) ->
+      let env2 = env_push_assum env x t in
+      let e2 = transform_matchapp env2 sigma e [||] in
+      mkApp (mkLambda (x, t, e2), Array.map mkRel rels)
+  | LetIn (x,e,t,b) ->
+      let env2 = env_push_assum env x t in
+      let e2 = transform_matchapp env sigma e [||] in
+      let b2 = transform_matchapp env2 sigma b (Array.map (Stdlib.Int.add 1) rels) in
+      mkLetIn (x, e2, t, b2)
+  | Case (ci, u, pms, ((mpred_nas, mpred_body) as mpred, sr), iv, item, bl) ->
+      let (_, _, _, ((mpred_ctx, _), _), _, _, bl0) = EConstr.annotate_case env sigma (ci, u, pms, (mpred, sr), iv, item, bl) in
+      let rec decompose_prod_n_acc env fargs n term =
+        let term = whd_all env sigma term in
+        if n <= 0 then
+          (fargs, term)
+        else
+          match EConstr.kind sigma term with
+          | Prod (x,t,e) ->
+              let t' = nf_all env sigma t in
+              let env2 = env_push_assum env x t in
+              decompose_prod_n_acc env2 ((x,t')::fargs) (n-1) e
+          | _ ->
+              user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (prod not exposed):" +++
+                        Printer.pr_econstr_env env sigma term)
+      in
+      let na = Array.length rels in
+      let (mpred_fargs, mpred_body) = decompose_prod_n_acc env [] na mpred_body in
+      if List.exists (fun (x,t) -> not (Vars.closed0 sigma t)) mpred_fargs then
+        user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (dependent argument):" +++
+                  Printer.pr_econstr_env env sigma term)
+      else
+        let mpred_body =
+          let n = List.length mpred_ctx in
+          let ma_args = Array.map (fun i -> mkRel (i + n)) rels in
+          Vars.substl (CArray.rev_to_list ma_args) mpred_body
+        in
+        let bl2 =
+          Array.map2
+            (fun (nas,body) (ctx,_) ->
+              let nctx = List.length ctx in
+              let env2 = EConstr.push_rel_context ctx env in
+              let body2 = transform_matchapp env2 sigma body (Array.map (Stdlib.Int.add nctx) rels) in
+              (nas,body2))
+            bl bl0
+        in
+        let mpred_sr = EConstr.ERelevance.relevant in
+        mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl2)
+
+(*
+  (sigma, term', step_opt) = simplify_matchapp env sigma term
+
+  - step_opt is verification step.
+    If it is None, term and term' are same.
+    If it is (Some step), step is a evidence of
+    extensional equality of term and term'.
+*)
+let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : Evd.evar_map * EConstr.t * verification_step option =
+  (if !opt_debug_matchapp then
+    msg_debug_hov (Pp.str "[codegen] simplify_matchapp:" +++ Printer.pr_econstr_env env sigma term));
+  let term' = transform_matchapp env sigma term [||] in
+  if EConstr.eq_constr sigma term term' then
+    begin
+      if !opt_debug_matchapp then
+        msg_debug_hov (Pp.str "[codegen] simplify_matchapp: no matchapp redex");
+      (sigma, term, None)
+    end
+  else
+    begin
+      let (sigma, step_opt) = verify_transformation env sigma term term' in
+      if !opt_debug_matchapp then
+        msg_debug_hov (Pp.str "[codegen] simplify_matchapp_result:" +++ Printer.pr_econstr_env env sigma term');
+      (sigma, term', step_opt)
+    end
+
 let rec normalize_types (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t =
   match EConstr.kind sigma term with
   | Var _ | Meta _ | Evar _ | CoFix _ | Array _ | Int _ | Float _ | String _ ->

@@ -939,6 +939,10 @@ let mkRels_dec (start : int) (n : int) : EConstr.t array =
 let mkRels_inc (start : int) (n : int) : EConstr.t array =
   Array.init n (fun i -> mkRel (start + i))
 
+let whd_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = EConstr.of_constr (Reduction.whd_all env (EConstr.to_constr sigma term))
+
+let nf_all (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr.t) : EConstr.t = Reductionops.nf_all env sigma term
+
 let numargs_of_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.types) : int =
   (*Feedback.msg_debug (Pp.str "[codegen] numargs_of_type arg:" +++ Printer.pr_econstr_env env sigma t);*)
   let t = Reductionops.nf_all env sigma t in

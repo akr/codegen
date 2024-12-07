@@ -139,6 +139,8 @@ val compose_lets : (Names.Name.t EConstr.binder_annot * EConstr.t * EConstr.type
 val mkApp_beta : Evd.evar_map ->  EConstr.t -> EConstr.t array -> EConstr.t
 val mkRels_dec : int -> int -> EConstr.t array
 val mkRels_inc : int -> int -> EConstr.t array
+val whd_all : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
+val nf_all : Environ.env -> Evd.evar_map -> EConstr.t -> EConstr.t
 val numargs_of_type : Environ.env -> Evd.evar_map -> EConstr.types -> int
 val numargs_of_exp : Environ.env -> Evd.evar_map -> EConstr.t -> int
 val nf_interp_constr : Environ.env -> Evd.evar_map -> Constrexpr.constr_expr -> Evd.evar_map * EConstr.t
