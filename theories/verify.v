@@ -620,9 +620,24 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let index1_of_index2 := Array.init h2
     (fun i2 =>
       let binder2 := Array.get binders2 i2 in
-      let id2 := Option.get (Constr.Binder.name binder2) in
-      let i1 := Option.get (array_find (fun b1 => Ident.equal (Option.get (Constr.Binder.name b1)) id2) binders1) in
-      i1)
+      let id2 :=
+        match Constr.Binder.name binder2 with
+        | None => Control.throw_invalid_argument "no-name fixfunc in RHS"
+        | Some id2 => id2
+        end
+      in
+      let i1_opt := array_find
+        (fun b1 =>
+          match Constr.Binder.name b1 with
+          | None => Control.throw_invalid_argument "no-name fixfunc in LHS"
+          | Some id1 => Ident.equal id1 id2
+          end)
+        binders1
+      in
+      match i1_opt with
+      | None => Control.throw_invalid_argument (String.app "RHS fixfunc name not found in LHS fixfunc: " (Ident.to_string id2))
+      | Some i1 => i1
+      end)
   in
   let fn_types2 := Array.map (fun b => nf_of (Constr.Binder.type b)) binders2 in
   let eq := constr:(@Coq.Init.Logic.eq) in
@@ -1623,17 +1638,18 @@ Ltac codegen_solve := ltac2:(codegen_solve).
 
 (*
 Goal forall a b,
-  (fix add1 a b :=
+  (fix add a b :=
     match a with
     | O => b
-    | S a' => S (add1 a' b)
+    | S a' => S (add a' b)
     end) a b =
-  (fix add2 a b :=
+  (fix add a b :=
     match a with
     | O => fun c => c
-    | S a' => fun c => S (add2 a' c)
+    | S a' => fun c => S (add a' c)
     end b) a b.
 Proof.
+  intros.
   codegen_solve.
 Qed.
 *)
@@ -1711,10 +1727,10 @@ Definition add1 :=
     end.
 
 Definition add2 :=
-  fix g (a : nat) : nat -> nat :=
+  fix f (a : nat) : nat -> nat :=
     match a with
     | O => fun b => b
-    | S a' => fun b => S (g a' b)
+    | S a' => fun b => S (f a' b)
     end.
 
 Goal forall a b, add1 a b = add2 a b.
@@ -1770,16 +1786,18 @@ Qed.
 *)
 
 (*
-Fixpoint mem_seq1 (s : list nat) (x : nat) :=
+Definition mem_seq1 :=
+  fix mem_seq (s : list nat) (x : nat) :=
   match s with
   | nil => (fun z => false)
-  | cons y s' => (fun z => orb (Nat.eqb y z) (mem_seq1 s' z))
+  | cons y s' => (fun z => orb (Nat.eqb y z) (mem_seq s' z))
   end x.
 
-Fixpoint mem_seq2 (s : list nat) (x : nat) :=
+Definition mem_seq2 :=
+  fix mem_seq (s : list nat) (x : nat) :=
   match s with
   | nil => false
-  | cons y s' => orb (Nat.eqb y x) (mem_seq2 s' x)
+  | cons y s' => orb (Nat.eqb y x) (mem_seq s' x)
   end.
 
 Goal forall s x, mem_seq1 s x = mem_seq2 s x.
@@ -1791,23 +1809,25 @@ Qed.
 *)
 
 (*
-Fixpoint fib1 (n : nat) : nat :=
+Definition fib1 :=
+fix fib (n : nat) : nat :=
   match n with
   | O => 0
   | S n1 =>
       match n1 with
       | O => 1
-      | S n2 => fib1 n1 + fib1 n2
+      | S n2 => fib n1 + fib n2
       end
   end.
 
-Fixpoint fib2 (n : nat) : nat :=
+Definition fib2 :=
+fix fib (n : nat) : nat :=
   match n with
   | O => 0
   | S n1 =>
       match n1 with
       | O => fun _ => 1
-      | S n2 => fun _ => fib2 n1 + fib2 n2
+      | S n2 => fun _ => fib n1 + fib n2
       end tt
   end.
 
@@ -1820,27 +1840,31 @@ Qed.
 *)
 
 (*
-Fixpoint even1 n :=
+Definition even1 :=
+fix even n :=
   match n with
   | O => true
-  | S n' => odd1 n'
+  | S n' => odd n'
   end
-with odd1 n :=
+with odd n :=
   match n with
   | O => false
-  | S n' => even1 n'
-  end.
+  | S n' => even n'
+  end
+for even.
 
-Fixpoint even2 n :=
+Definition even2 :=
+fix even n :=
   match n with
   | O => fun _ => true
-  | S n' => fun _ => odd2 n'
+  | S n' => fun _ => odd n'
   end tt
-with odd2 n :=
+with odd n :=
   match n with
   | O => false
-  | S n' => even2 n'
-  end.
+  | S n' => even n'
+  end
+for even.
 
 Goal forall n, even1 n = even2 n.
 Proof.
@@ -1851,27 +1875,31 @@ Qed.
 *)
 
 (*
-Fixpoint half1 n :=
+Definition half1 :=
+fix half n :=
   match n with
   | O => O
-  | S n' => half1' n'
+  | S n' => half' n'
   end
-with half1' n :=
+with half' n :=
   match n with
   | O => O
-  | S n' => S (half1 n')
-  end.
+  | S n' => S (half n')
+  end
+for half.
 
-Fixpoint half2 n :=
+Definition half2 :=
+fix half n :=
   match n with
   | O => O
-  | S n' => half2' n'
+  | S n' => half' n'
   end
-with half2' n :=
+with half' n :=
   match n with
   | O => fun _ => O
-  | S n' => fun _ => S (half2 n')
-  end tt.
+  | S n' => fun _ => S (half n')
+  end tt
+for half.
 
 Goal forall n, half1 n = half2 n.
 Proof.
@@ -1882,18 +1910,20 @@ Qed.
 *)
 
 (*
-Fixpoint odd1' n :=
+Definition odd1' :=
+fix odd' n :=
   match n with
   | O => false
   | S O => true
-  | S (S n') => odd1' n'
+  | S (S n') => odd' n'
   end.
 
-Fixpoint odd2' n :=
+Definition odd2' :=
+fix odd' n :=
   match n with
   | O => fun _ => false
   | S O => fun _ => true
-  | S (S n') => fun _ => odd2' n'
+  | S (S n') => fun _ => odd' n'
   end tt.
 
 Goal forall n, odd1' n = odd2' n.
@@ -1978,25 +2008,29 @@ with forest : Set :=
 | leaf : B -> forest
 | cons : tree -> forest -> forest.
 
-Fixpoint size_tree1 t :=
+Definition size_tree1 :=
+fix size_tree t :=
   match t with
-  | node _ f => 1 + (size_forest1 f)
+  | node _ f => 1 + (size_forest f)
   end
-with size_forest1 f :=
+with size_forest f :=
   match f with
   | leaf _ => 1
-  | cons t f' => size_tree1 t + size_forest1 f'
-  end.
+  | cons t f' => size_tree t + size_forest f'
+  end
+for size_tree.
 
-Fixpoint size_tree2 t :=
+Definition size_tree2 :=
+fix size_tree t :=
   match t with
-  | node _ f => fun _ => 1 + (size_forest2 f)
+  | node _ f => fun _ => 1 + (size_forest f)
   end tt
-with size_forest2 f :=
+with size_forest f :=
   match f with
   | leaf _ => fun _ => 1
-  | cons t f' => fun _ => size_tree2 t + size_forest2 f'
-  end tt.
+  | cons t f' => fun _ => size_tree t + size_forest f'
+  end tt
+for size_tree.
 
 Goal forall t, size_tree1 t = size_tree2 t.
 Proof.
