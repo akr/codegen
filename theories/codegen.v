@@ -16,6 +16,6 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
-From codegen Require Import matchapp.
+From codegen Require Import verify.
 
 Declare ML Module "coq-codegen.plugin".

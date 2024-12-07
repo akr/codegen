@@ -28,8 +28,7 @@ open CErrors
 open Cgenutil
 open State
 open Filegen
-
-open Matchapp
+open Verify
 
 type func_mods = {
   func_mods_static : bool option;

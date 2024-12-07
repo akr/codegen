@@ -16,8 +16,8 @@ src/snippet.mli
 src/snippet.ml
 src/induc.mli
 src/induc.ml
-src/matchapp.mli
-src/matchapp.ml
+src/verify.mli
+src/verify.ml
 src/specialize.mli
 src/specialize.ml
 src/linear.mli
@@ -28,5 +28,5 @@ src/indimp.mli
 src/indimp.ml
 src/g_codegen.mli
 src/g_codegen.mlg
-theories/matchapp.v
+theories/verify.v
 theories/codegen.v
