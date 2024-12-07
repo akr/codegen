@@ -48,6 +48,7 @@ Makefile.coq : _CoqProject
 
 check checker:
 	cd test; $(MAKE) $@
+	coqc test/test_verify.v
 
 run-sample:
 	coqtop -batch -l sample/ind.v
