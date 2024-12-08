@@ -117,9 +117,9 @@ let combine_verification_steps (env : Environ.env) (sigma: Evd.evar_map) (first_
         eq_proof
     | { vstep_proof=step_proof } :: [] ->
         step_proof
-    | { vstep_lhs_fun=last_step_lhs_fun; vstep_rhs_fun=last_step_rhs_fun; vstep_goal=last_step_prop; vstep_proof=last_step_proof } :: rest ->
+    | { vstep_proof=last_step_proof } :: rest ->
         let proof = List.fold_left
-          (fun acc_proof { vstep_lhs_fun=prev_lhs_fun; vstep_rhs_fun=prev_rhs_fun; vstep_goal=prev_prop; vstep_proof=prev_proof } ->
+          (fun acc_proof { vstep_lhs_fun=prev_lhs_fun; vstep_rhs_fun=prev_rhs_fun; vstep_proof=prev_proof } ->
             mkApp (eq_trans, [| val_type; mkApp (prev_lhs_fun, args); mkApp (prev_rhs_fun, args); mkApp (last_term, args); mkApp (prev_proof, args); acc_proof |]))
           (mkApp (last_step_proof, args))
           rest
