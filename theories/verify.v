@@ -408,23 +408,23 @@ Ltac2 destEqApp_opt (t : constr) : (constr * constr * constr array * constr * co
 Ltac2 Eval print (of_constr constr:(@Coq.Init.Logic.eq)).
 *)
 
-Ltac2 intarray_ascending (start : int) (n : int) : int array :=
+Ltac2 intarray_inc (start : int) (n : int) : int array :=
   Array.init n (fun k => Int.add start k).
 
-Ltac2 intarray_descending (start : int) (n : int) : int array :=
+Ltac2 intarray_dec (start : int) (n : int) : int array :=
   Array.init n (fun k => Int.sub start k).
 
-Ltac2 mkRel_ascending (start : int) (n : int) : constr array :=
-  Array.map mkRel (intarray_ascending start n).
+Ltac2 mkRels_inc (start : int) (n : int) : constr array :=
+  Array.map mkRel (intarray_inc start n).
 
-Ltac2 mkRel_descending (start : int) (n : int) : constr array :=
-  Array.map mkRel (intarray_descending start n).
+Ltac2 mkRels_dec (start : int) (n : int) : constr array :=
+  Array.map mkRel (intarray_dec start n).
 
 Ltac2 make_exteq (nftype : constr) (lhs : constr) (rhs : constr) : constr :=
   let eq := constr:(@Coq.Init.Logic.eq) in
   let (binders, ret) := decompose_prod nftype in
   let n := List.length binders in
-  let args := mkRel_descending n n in
+  let args := mkRels_dec n n in
   let lhs' := mkApp_beta (Constr.Unsafe.liftn n 1 lhs) args in
   let rhs' := mkApp_beta (Constr.Unsafe.liftn n 1 rhs) args in
   compose_prod binders (mkApp eq [|ret; lhs'; rhs'|]).
@@ -528,7 +528,7 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
       let branch2' := mkApp_beta branch2_body rhs_args in
       let subgoal_type := compose_prod binders1 (mkApp eq [| eq_type; branch1'; branch2' |]) in
       let subgoal := make_simple_subgoal subgoal_type in
-      let subgoal_args := Array.init cstr_numargs (fun k => mkRel (Int.sub cstr_numargs k)) in
+      let subgoal_args := mkRels_dec cstr_numargs cstr_numargs in
       let new_branch := compose_lambda binders1 (mkApp subgoal subgoal_args) in
       new_branch) in
 
@@ -649,7 +649,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
       let body1 := Array.get substituted_bodies1 i1 in
       let (arg_binders, ret_type) := decompose_prod fn_type in
       let numargs := List.length arg_binders in
-      let args := Array.init numargs (fun k => mkRel (Int.sub numargs k)) in
+      let args := mkRels_dec numargs numargs in
       let new_type := compose_prod arg_binders (mkApp eq [| ret_type; mkApp_beta body1 args; mkApp_beta body2 args |]) in
       new_type)
   in
@@ -663,7 +663,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let (arg_binders, ret_type) := decompose_prod fn_type in
         let numargs := List.length arg_binders in
         let ih_type :=
-          let args := Array.init numargs (fun k => mkRel (Int.sub numargs k)) in
+          let args := mkRels_dec numargs numargs in
           compose_prod arg_binders (mkApp eq [| ret_type; mkApp fix1 args; mkApp fix2 args |])
         in
         ih_type)
@@ -704,7 +704,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
               let branch_body_args := Array.init numargs
                 (fun k =>
                   if Int.equal k decarg then
-                    mkApp cstr (Array.append decarg_type_args (Array.init cstr_numargs_without_params (fun l => mkRel (Int.sub cstr_numargs_without_params l))))
+                    mkApp cstr (Array.append decarg_type_args (mkRels_dec cstr_numargs_without_params cstr_numargs_without_params))
                   else
                     mkRel (Int.sub (Int.add numargs (Int.add 1 cstr_numargs_without_params)) k))
               in
@@ -716,7 +716,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let case_term := mkCase cinfo new_ret Constr.Binder.Relevant Constr.Unsafe.NoInvert citem branches in
         let subgoal_type := Array.get subgoal_types i2 in
         let subgoal :=
-          mkApp_beta (Array.get subgoals i2) (mkRel_descending (Int.add h2 (List.length arg_binders)) h2)
+          mkApp_beta (Array.get subgoals i2) (mkRels_dec (Int.add h2 (List.length arg_binders)) h2)
         in
         let let_term := mkLetIn (Constr.Binder.make None subgoal_type) subgoal case_term in
         let new_fn := compose_lambda arg_binders let_term in
@@ -1413,7 +1413,7 @@ Qed.
 
 Ltac2 rec make_funext_subgoal (arg_binders_rev : binder list) (ty : constr) (t1 : constr) (t2 : constr) : constr :=
   let nbinders := List.length arg_binders_rev in
-  let args := mkRel_descending nbinders nbinders in
+  let args := mkRels_dec nbinders nbinders in
   let lhs := mkApp t1 args in
   let rhs := mkApp t2 args in
   match Constr.Unsafe.kind ty with
