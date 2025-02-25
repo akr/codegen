@@ -403,7 +403,7 @@ We use $|x|$ to represent the number of elements: $|x|=n$ if $x$ is an $n$-eleme
 \subsection{Number of Arguments}
 
 \begin{itemize}
-  \item $\NA_t$ is the number of arguments of $t$: \quad $\NA_t=m$ if $t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0$ and $T_0$ is an inductive type.
+  \item $\NA_t$ is the number of arguments of $t$: \quad $\NA_t=m$ if $t : T_1 \rightarrow \dotsb \rightarrow T_m \rightarrow T_0$ and $T_0$ is not a function type.
   \item $\NP_I$ is the number of the parameters of the inductive type $I$: \\
     $\NP_I=p$ if $I$ is defined in an inductive definition $\text{\sf Ind}\:[p]\:(\Gamma_I := \Gamma_C)$.
   \item $\NI_I$ is the number of the indexes of the inductive type $I$ (the number of arguments without the parameters for the inductive type): \\
@@ -698,10 +698,10 @@ The entire term is represented as $\tDL$.
 ($\tD$ for functions and $\tE$ for non-function constants.)
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tE &= x \\
     &\bnfor f \\
     &\bnfor c \\
@@ -759,10 +759,10 @@ Since we apply V-reductions for a eta-expanded term,
 the result term can be represented in following syntax.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tE & \text{the type of $\tE$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tE &= x \\
     &\bnfor f \\
     &\bnfor c \\
@@ -896,10 +896,10 @@ Thus, function position can be v-variable, f-variable, constant, construcor, or 
 Also, zeta-flat removes a let-in at the binder term of a let-in.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -918,10 +918,10 @@ because such variables are redex of delta reduction.
 Thus, this transformation makes Unused let-in Deletion (\secref{sec:let-in-deletion}) more effective.
 
 \begin{align*}
-  \tD &= \lamT{x}{\fbox{$T$}}{\tDL} & \leftarrow \\
-      &\bnfor \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{\fbox{$T$}}{\tDL} & \leftarrow \\
+      &\bnfor \ofix{\rep{f/k{:}\fbox{$T$}:=\tD}}{f_j} & \leftarrow \\
   \tL &= \letinM{x}{\tM:\fbox{$T$}}{\tM} & \leftarrow \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -943,10 +943,10 @@ We assume the normalized static arguments have no free variables.
 It makes the syntax as follows.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -1018,10 +1018,10 @@ This transformation removes non-variable arguments from applications.
 Thus the result will be V-normal form again.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -1116,10 +1116,10 @@ Also, constants and constructors are always fully applied to arguments.
 F-variables cannot occur in $\tE$ because they cannot be a inductive type.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -1148,10 +1148,10 @@ This step checks
 (2) types and sorts doesn't occur at expression.
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
@@ -1448,10 +1448,10 @@ we only need to change variable names in binders:
 (4) variables of constructor members of conditional.
 
 \begin{align*}
-  \tD &= \lamT{\fbox{$x$}}{T}{\tDL} & \leftarrow (1) \\
-      &\bnfor \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{\fbox{$x$}}{T}{\tDL} & \leftarrow (1) \\
+      &\bnfor \ofix{\rep{\fbox{$f$}/k{:}T:=\tD}}{f_j} & \leftarrow (2) \\
   \tL &= \letinM{\fbox{$x$}}{\tM:T}{\tM} & \leftarrow (3) \\
   \tM &= \omatch{x}{\rep{C\:\rep{\fbox{$x$}}\Rightarrow \tL}} & \leftarrow (4) \\
       &\bnfor \tE \\
@@ -1466,10 +1466,10 @@ we only need to change variable names in binders:
 \subsection{The \gallina{} Subset for C Code Generation}\label{sec:gallinasubsetforcgen}
 
 \begin{align*}
-  \tD &= \lamT{x}{T}{\tDL} \\
-      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tDL &= \tD \\
        &\bnfor \tL & \text{the type of $\tL$ is an inductive type} \\
+  \tD &= \lamT{x}{T}{\tDL} \\
+      &\bnfor \ofix{\rep{f/k{:}T:=\tD}}{f_j} \\
   \tL &= \letinM{x}{\tM:T}{\tM} \\
   \tM &= \omatch{x}{\rep{C\:\rep{x}\Rightarrow \tL}} \\
       &\bnfor \tE \\
