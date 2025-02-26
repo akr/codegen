@@ -25,7 +25,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs,Gen},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -38,7 +38,7 @@
   keywordstyle=[2]\color{mygreen}\ttfamily,
   morekeywords=[3]{reflexivity},
   keywordstyle=[3]\color{myred}\ttfamily,
-  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs},
+  morekeywords=[4]{CodeGen,GlobalInline,LocalInline,StaticArgs,Gen},
   keywordstyle=[4]\color{myblue}\ttfamily,
 }
 
@@ -1959,10 +1959,104 @@ $\genfuns{c}$ translates the function (constant) $c$ to a single C function.
 
 \codegen{} verifies each step of the \gallina-to-\gallina{} transformations.
 
-Since all transformations except match-app are convertible,
+Most transformations in \codegen{} are convertible.
 \codegen{} checks convertibility of such transformations.
 
-  %&\B{K}{\omatch{x}{\rep{C\:\rep{y}\Rightarrow t}}} = && \text{where}\quad x : T \\
+There are two non-convertible transformations:
+
+\begin{itemize}
+  \item match-app in S-Reductions
+  \item Unreachable Fixfunc Deletion
+\end{itemize}
+
+The match-app transformation moves arguments for function-returning match expression into
+branches of the match expression as follows.
+It transforms \lstinline!((if b then ... else ...) n)! to \lstinline!(if b then ... n else ... n)!.
+The source definition \lstinline!f! is transformed and the result is defined as \lstinline!codegen_s0_f!.
+The equality proof between them is defined as \lstinline!codegen_s0_f_proof!.
+
+\begin{lstlisting}
+From codegen Require Import codegen.
+
+Definition f (b : bool) (n : nat) :=
+  (if b then S else Nat.add n) n.
+CodeGen Gen f.
+
+Print codegen_s0_f.
+(*
+codegen_s0_f = fun (v1_b : bool) (v2_n : nat) => if v1_b then S v2_n else v2_n + v2_n
+     : bool -> nat -> nat
+*)
+
+About codegen_s0_f_proof.
+(* codegen_s0_f_proof : forall (b : bool) (n : nat), f b n = codegen_s0_f b n *)
+\end{lstlisting}
+
+The ``Unreachable Fixfunc Deletion'' drops unreachable functions from mutually-recursive fixpoints as follows.
+The source definition \lstinline!f1! is defined as fixpoint which contains three functions: \lstinline!f1!, \lstinline!f2!, and \lstinline!f3!.
+\lstinline!f1! calls \lstinline!f3!.
+\lstinline!f2! calls \lstinline!f3!.
+\lstinline!f3! calls \lstinline!f1!.
+\lstinline!CodeGen Gen f1! drops \lstinline!f2! because \lstinline!f2! is not reachable from \lstinline!f1!.
+The transformed term is defined as \lstinline!codegen_s0_f1! which doesn't contain \lstinline!f2!.
+The equality of \lstinline!f1! and \lstinline!codegen_s0_f1! is proved as \lstinline!codegen_s0_f1_proof!.
+
+\begin{lstlisting}
+From codegen Require Import codegen.
+
+Fixpoint f1 n := match n with 0 => 0 | S m => f3 m end
+with f2 n := match n with 0 => 0 | S m => f3 m end
+with f3 n := match n with 0 => 0 | S m => f1 m end.
+
+Print f1.
+(*
+f1 =
+fix f1 (n : nat) : nat :=
+  match n with
+  | 0 => 0
+  | S m => f3 m
+  end
+with f2 (n : nat) : nat :=
+  match n with
+  | 0 => 0
+  | S m => f3 m
+  end
+with f3 (n : nat) : nat :=
+  match n with
+  | 0 => 0
+  | S m => f1 m
+  end
+for
+f1
+     : nat -> nat
+*)
+
+CodeGen Gen f1.
+
+Print codegen_s0_f1.
+(*
+codegen_s0_f1 =
+fix fixfunc1_f1 (v1_n : nat) : nat :=
+  match v1_n with
+  | 0 => 0
+  | S v2_m => fixfunc2_f3 v2_m
+  end
+with fixfunc2_f3 (v3_n : nat) : nat :=
+  match v3_n with
+  | 0 => 0
+  | S v4_m => fixfunc1_f1 v4_m
+  end
+for
+fixfunc1_f1
+     : nat -> nat
+*)
+
+About codegen_s0_f1_proof.
+(* codegen_s0_f1_proof : forall n : nat, f1 n = codegen_s0_f1 n *)
+\end{lstlisting}
+
+
+Old Description:
 
 Assuming $t = (\omatch{x}{\rep{C\: \rep{y}\Rightarrow t}}\: z)$,
 $u = (\omatch{x}{\rep{C\: \rep{y} \Rightarrow t\: \underline{z}}})$, and
@@ -1977,6 +2071,8 @@ The proof term is not visible from a user.
 \codegen{} does not verify $K[t] = K[u]$ because
 (1) this verification does not add big guarantee over above because we know same context $K$ is used in LHS and RHS,
 (2) induction is required if $x$ is a decreasing argument of fixpoint in $K$ and it is difficult to automate.
+
+
 
 \bibliographystyle{plain}
 \bibliography{base}
