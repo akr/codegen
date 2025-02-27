@@ -1969,6 +1969,8 @@ There are two non-convertible transformations:
   \item Unreachable Fixfunc Deletion
 \end{itemize}
 
+The verification is implemented in \verb!theories/verify.v!.
+
 The match-app transformation moves arguments for function-returning match expression into
 branches of the match expression as follows.
 It transforms \lstinline!((if b then ... else ...) n)! to \lstinline!(if b then ... n else ... n)!.
@@ -2054,6 +2056,99 @@ fixfunc1_f1
 About codegen_s0_f1_proof.
 (* codegen_s0_f1_proof : forall n : nat, f1 n = codegen_s0_f1 n *)
 \end{lstlisting}
+
+%          reflexivity |
+%          codegen_applyhyp |
+%          codegen_matchapp |
+%          codegen_fix |
+%          codegen_letin |
+%          codegen_apparg ]) ].
+
+
+\begin{verbatim}
+refl:
+  ----------------------
+  Γ |- eq_refl t : t = t
+\end{verbatim}
+
+\begin{verbatim}
+applyhyp:
+  (IH : t ~ u) in Γ
+  ------------------------------
+  Γ |- IH args : t args = u args
+\end{verbatim}
+
+\begin{verbatim}
+matchapp:
+  Γ |- pi : forall ai, ti args1 rest = ui args2 rest
+  ---------------------------------------------------------------- case x
+  Γ |- match x as x' return
+         match x' with ... | Ci ai => ti | ... end args1 rest =
+         match x' with ... | Ci ai => ui args2 | ... end rest
+       with
+       ... | Ci ai => pi ai | ...
+       end : match x with ... | Ci ai => ti | ... end args1 rest =
+             match x with ... | Ci ai => ui args2 | ... end rest
+\end{verbatim}
+
+\begin{verbatim}
+apply-args:
+  T is an inductive type
+  Γ |- p args : T
+  Γ |- p : t1 ~ t2
+  ------------------------------- apply
+  Γ |- p args : t1 args = t2 args
+\end{verbatim}
+
+\begin{verbatim}
+let-in-noconv:
+  Γ |- not (t1 == t2)
+  Γ |- p : t1 ~ t2        Γ, (x1 := t1 : T) (x2 := t2 : T) (H : x1 ~ x2) |- q : u1 = u2
+  ------------------------------------------------------------------------------------- let-in-noconv
+  Γ |- (let x1 := t1 in
+       let x2 := t2 in
+       fun (H : x1 ~ x2) => q) p
+       : (let x1 := t1 in u1) = (let x2 := t2 in u2)
+\end{verbatim}
+
+\begin{verbatim}
+let-in-conv:
+    Γ |- t1 == t2           Γ, (x1 := t1 : T) |- q : u1 = u2[x1/x2]
+    -------------------------------------------------------------------- let-in-conv
+    Γ |- let x1 := t1 in q : (let x1 := t1 in u1) = (let x2 := t2 in u2)
+\end{verbatim}
+
+
+\begin{verbatim}
+verify-fix:
+  h1 is the number of mutual functions in Fj
+  h2 is the number of mutual functions in Gj
+  i1_of_i2 is a mapping from functions in Gj to Fj
+    (This mapping shows what functions dropped)
+  params is the inductive type parameters of T_{ki}
+  forall j, (Fj is (fix ... (fi/ki:Ti := ti) ... for fj))
+  forall j, (Gj is (fix ... (gi/ki:Ti := ui) ... for gj))
+  forall j, (Γ, (IH1 : F_{i1_of_i2 1} ~ G1), ..., (IHh2 : F_{i1_of_i2 h2} ~ Gh2)
+            |- p_j : t_j[F1/f1,...,Fh1/fh1] ~ ui[G1/g1,...,Gh2/gh2])
+  ------------------------------------------------------------------------------
+  Γ |- (fix
+        ...
+        IHi/ki:(F_{i1_of_i2 i} ~ Gi) :=
+          fun a1 ... an =>
+            let H := pi in
+            match a_{ki} as x return
+                  F_{i1_of_i2 i} a1 ... a{ki-1} x a{ki+1} ... an
+                = Gi a1 ... a{ki-1} x a{ki+1} ... an with
+            | C1 cargs1 => H a1 ... a{ki-1} (C1 params cargs1) a{ki+1} ... an
+            | ...
+            | Cm cargsm => H a1 ... a{ki-1} (Cm params cargsm) a{ki+1} ... an
+            end
+        ...
+        for IHj) b1 ... bn : F_{i1_of_i2 j} b1 ... bn = Gj b1 ... bn
+\end{verbatim}
+
+
+
 
 
 Old Description:
