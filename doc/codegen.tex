@@ -87,6 +87,8 @@
 \settowidth{\bnforlen}{$=$}
 \newcommand{\bnfor}{\mathrel{\makebox[\bnforlen]{$|$}}}
 
+\newcommand\eqconv{\mathrel{\overset{\makebox[0pt]{\mbox{\normalfont\tiny\sffamily conv}}}{=}}}
+
 \newcommand{\kwDefinition}{\mbox{\color{myviolet}\ttfamily Definition}}
 \newcommand{\kwSection}{\mbox{\color{myviolet}\ttfamily Section}}
 
@@ -112,6 +114,7 @@
 \newcommand{\glodefB}[2]{(#1:=#2)}
 \newcommand{\lassum}[2]{(#1\mathord{:}#2)}
 \newcommand{\ldef}[3]{(#1:=#2\mathord{:}#3)}
+\newcommand{\ldefB}[2]{(#1:=#2)}
 
 \newcommand{\prodT}[3]{\forall #1\mathord{:}#2.\:#3}
 
@@ -309,6 +312,7 @@
 \newcommand{\WTEG}[2]{\WTE{\Gamma}{#1}{#2}}
 \newcommand{\subst}[3]{#1\{#2/#3\}}
 \newcommand{\substm}[3]{#1\{\overline{#2/#3}\}}
+\newcommand{\substmu}[3]{#1\underline{\{\overline{#2/#3}\}}}
 
 % taken from the Coq reference manual, doc/sphinx/refman-preamble.sty
 \newcommand{\case}{\kw{case}}
@@ -524,6 +528,15 @@ The local definitions represent variables bounded by outer let-in.
   \item Iota-match reduces $\kwmatch\:\mathtt{@cons\:nat\:1\:nil}\:\kwwith\:(\mathtt{nil} \Rightarrow t_1)\:|\:(\mathtt{cons}\:\mathtt{h}\:\mathtt{t} \Rightarrow t_2)\:\kwend$ to $(\lam{\mathtt{h}}{\lam{\mathtt{t}}{t_2}})\:\mathtt{1\:nil}$
     because \lstinline!list! has one parameter $(\NP_\mathtt{nat}=1)$ and \lstinline!cons! has two members $(\NM_\mathtt{cons}=2)$.
 \end{itemize}}
+
+\subsection{Equality of Terms}\label{sec:equality-of-terms}
+
+\begin{itemize}
+  \item $t \equiv u$ means that $t$ and $u$ are same term except names of bound variables
+  \item $t \eqconv u$ means that $t$ and $u$ are convertible
+  \item $t = u$ means that there is a proof term of $t = u$ (\lstinline!Coq.Init.Logic.eq!)
+  \item $t \simeq u$ means extensional equality: $\forall \mathit{args}, t\ \mathit{args} = u\ \mathit{args}$ where $t\ \mathit{args}$ is not a function
+\end{itemize}
 
 \subsection{Free Variables}
 
@@ -2064,6 +2077,210 @@ About codegen_s0_f1_proof.
 %          codegen_letin |
 %          codegen_apparg ]) ].
 
+\begin{gather*}
+  \text{intros:}~
+    \dfrac{
+      E[\Gamma; \mathit{vars}] \vdash p : t = u
+    }{
+      E[\Gamma] \vdash \lam{\mathit{vars}}{p} : \forall \mathit{vars}, t = u
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-refl:}~
+    \dfrac{
+      E[\Gamma] \vdash t \eqconv u
+    }{
+      E[\Gamma] \vdash \mbox{eq\_refl}~t : t = u
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-applyhyp:}~
+    \dfrac{
+      (\mathit{IH} : t \simeq u) \in \Gamma
+    }{
+      E[\Gamma] \vdash \mathit{IH}\ \mathit{args} : t\ \mathit{args} = u\ \mathit{args}
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-matchapp}:
+    \dfrac{
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}_1\:\mathit{args}_3} = u\:\underline{\mathit{args}_2\:\mathit{args}_3}}
+    }{
+      E[\Gamma] \vdash
+        \begin{aligned}[t]
+          & \kwmatch\:x\:\kwas\:x'\:\kwreturn \\
+          & \quad
+              \begin{aligned}
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1\:\mathit{args}_3 = \\
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t\:\underline{\mathit{args}_2}}\:\kwend\:\mathit{args}_3
+              \end{aligned} \\
+          & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend : \\
+          & \quad
+              \begin{aligned}
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1\:\mathit{args}_3 = \\
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t\:\underline{\mathit{args}_2}}\:\kwend\:\mathit{args}_3
+              \end{aligned}
+        \end{aligned}
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-fix}:
+    \dfrac{
+      \begin{aligned}
+        & \{\rep{f}\} \supseteq \{\rep{g}\} \quad f_s \in  \{\rep{g}\} \\
+        & \forall g \in \{\rep{g}\}, (\FV(t_g) \cup \FV(u_g)) \cap (\{\rep{f}\} \backslash \{\rep{g}\}) = \varnothing \quad \mbox{($\{\rep{f}\} \backslash \{\rep{g}\}$ are unreachable from $f_s$)} \\
+        % & h_1 = |\rep{f}| \\
+        % & h_2 = |\rep{g}| \\
+        & \forall g' \in \{\rep{g}\}, E[\Gamma]; \rep{\mathit{IH} : F \simeq G} \vdash p_{g'} : \substm{t_{g'}}{F}{f} \simeq \substm{u_{g'}}{G}{g}
+      \end{aligned}
+    }{
+      \begin{aligned}
+        & (\kwfix\:\rep{\mathit{IH} / k : (F \simeq G) := \mathrm{IH}}\:\kwfor\:\mathit{IH}_{f_s})\:b_1 \ldots b_{\NA_{f_s}}
+          : F_{f_s}\:b_1 \ldots b_{\NA_{f_s}} = G_{f_s}\:b_1 \ldots b_{\NA_{f_s}}
+      \end{aligned}
+    } \\
+    \quad \mbox{where} \quad
+      \begin{aligned}[t]
+        & \mbox{$\{\rep{f}\}$ is the fix-bounded function variable names in the LHS fixpoint} \\
+        & \mbox{$\{\rep{g}\}$ is the fix-bounded function variable names in the RHS fixpoint} \\
+        & \mbox{$k_f$ is the index of the decreasing argument of $f$ ($k_g$ as well)} \\
+        & \mbox{$T_f$ is the type of $f$ ($T_g$ as well)} \\
+        & \mbox{$t_f$ is the function term for $f$ in the LHS fixpoint} \\
+        & \mbox{$u_g$ is the function term for $g$ in the RHS fixpoint} \\
+        & \mbox{$f_s$ specifies the start function of the LHS and RHS fixpoint} \\
+        & \mbox{$\mathit{params}_f$ is the inductive type parameters of the decreasing argument of $f$} \\
+        & F_{f'} := \kwfix\:\rep{f/k_f:T_f:=t_f}\:\kwfor\:{f'} \\
+        & G_{g'} := \kwfix\:\rep{g/k_g:T_g:=t_g}\:\kwfor\:{g'} \\
+        & \mathrm{IH}_{g'} :=
+          \begin{aligned}[t]
+            & \lambda a_1 \ldots a_{\NA_{g'}} . \\
+            & \kwlet\:H := p_{g'}\:\kwin \\
+            & \kwmatch\:a_{k_{g'}}\:\kwas\:x\:\kwreturn \\
+            & \quad F_{g'}\:a_1 \ldots a_{k_{g'}-1}\:x\:a_{k_{g'}+1} \ldots a_{\NA_{g'}} = G_{g'}\:a_1 \ldots a_{k_{g'}-1}\:x\:a_{k_{g'}+1} \ldots a_{\NA_{g'}} \\
+            & \kwwith \\
+            & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:a_1 \ldots a_{k_{g'}-1}}\:(C\:\mathit{params}\:\mathit{cargs})\:\underline{a_{k_{g'}+1} \ldots a_{\NA_{g'}}}} \\
+            & \kwend
+          \end{aligned}
+      \end{aligned} \\
+    \quad \mbox{Note:}~
+      \begin{minipage}[t]{0.8\columnwidth}
+        This verify-fix rule builds a proof term for extensional equality of fixpoints from extensional equality of iota-fix reduced forms.
+        The \kwmatch-expression makes the equality iota-fix reducible by destructing the decreasing argument.
+      \end{minipage}
+    \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-letin-generic:}~
+    \dfrac{
+      \begin{aligned}
+        & E[\Gamma] \vdash p : t_1 \simeq t_2 \\
+        & E[\Gamma; \ldefB{x_1}{t_1}; \ldefB{x_2}{t_2}; (H : x_1 \simeq x_2)] \vdash q : u_1\:\mathit{args}_1 = u_2\:\mathit{args}_2
+      \end{aligned}
+    }{
+      E[\Gamma] \vdash
+        \begin{aligned}[t]
+          ( & \kwlet\: x_1 := t_1 \:\kwin \\
+            & \kwlet\: x_2 := t_2 \:\kwin \\
+            & \lam{(H : x_1 \simeq x_2)}{q})\: p \\
+        :\: & (\kwlet\: x_1 := t_1 \:\kwin\: u_1)\:\mathit{args}_1 = (\kwlet\: x_2 := t_2 \:\kwin\: u_2)\:\mathit{args}_2
+        \end{aligned}
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-letin-simple:}~
+    \dfrac{
+      \begin{aligned}
+        & t_1 \equiv t_2 \\
+        & E[\Gamma; \ldefB{x_1}{t_1}] \vdash q : u_1\:\mathit{args}_1 = \subst{u_2}{x1}{x2}\:\mathit{args}_2
+      \end{aligned}
+    }{
+      E[\Gamma] \vdash
+        \begin{aligned}[t]
+          ( & \kwlet\: x_1 := t_1 \:\kwin\: q) \\
+          :\: & (\kwlet\: x_1 := t_1 \:\kwin\: u_1)\mathit{args}_1 = (\kwlet\: x_2 := t_2 \:\kwin\: u_2)\mathit{args}_2
+        \end{aligned}
+    } \breakrule
+\end{gather*}
+
+\begin{gather*}
+  \text{verify-apparg}:
+    \dfrac{
+      \begin{aligned}
+        & E[\Gamma] \vdash x_1 \not\equiv x_2 \\
+        & E[\Gamma] \vdash p : x_1 = x_2 \\
+        & E[\Gamma] \vdash q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_1\: \mathit{args}_2
+      \end{aligned}
+    }{
+      \mbox{rew}\: p\: \kwin\: q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_2\: \mathit{args}_2
+    } \\
+    \quad \mbox{where} \quad \mbox{rew}\: p\: \kwin\: q := \mbox{eq\_ind}\: x_1\: (\lam{x}{t_1\: \mathit{args}_0\: x\: \mathit{args}_1})\: q\: x_2\: p \\
+    \quad \mbox{Note:}~
+      \begin{minipage}[t]{0.8\columnwidth}
+        When x1 and x2 are functions, p is an equality of functions.  It needs funext.
+      \end{minipage}
+\end{gather*}
+
+\begin{gather*}
+  \text{funext-ind}:
+    \dfrac{
+      \begin{aligned}
+        & \mbox{$t_1$ is not a function} \\
+        & E[\Gamma] \vdash p : t_1 \simeq t_2 \\
+      \end{aligned}
+    }{
+      p : t_1 = t_2
+    }
+\end{gather*}
+
+\begin{gather*}
+  \text{funext-fun}:
+    \dfrac{
+      \begin{aligned}
+        & \mbox{$t_1$ is a function} \\
+        & E[\Gamma] \vdash p : \forall x, t_1\:x = t_2\:x\\
+      \end{aligned}
+    }{
+      p : \mbox{functional\_extensionality}\:t_1\:t_2\:p : t_1 = t_2
+    } \\
+    \quad \mbox{Note:}~
+      \begin{minipage}[t]{0.8\columnwidth}
+        functional\_extensionality is an axiom provided by \coq{} standard library.
+      \end{minipage}
+\end{gather*}
+
+\begin{verbatim}
+funext-ind:
+    t1 is not a function
+    Γ |- p : t1 ~ t2
+    --------------------------------------------------------------------
+    Γ |- p : t1 = t2
+\end{verbatim}
+
+\begin{verbatim}
+funext-fun:
+    t1 is a function
+    Γ |- p : foarll x, t1 x = t2 x
+    --------------------------------------------------------------------
+    Γ |- functional_extensionality t1 t2 p : t1 = t2
+\end{verbatim}
+
+\begin{verbatim}
+apparg:
+    Γ |- x1 !== x2
+    Γ |- p : x1 = x2
+    Γ |- q : t1 args0 x1 args1 = t2 args0 x1 args2
+    --------------------------------------------------------------------
+    Γ |- rew p in q : t1 args0 x1 args1 = t2 args0 x2 args2
+  where
+    rew p in q := eq_ind x1 (fun x => t1 args0 x args1) q x2 p
+  Note: When x1 and x2 are function, p is an equality of functions.  It needs funext.
+\end{verbatim}
 
 \begin{verbatim}
 refl:
@@ -2101,20 +2318,20 @@ apply-args:
 \end{verbatim}
 
 \begin{verbatim}
-let-in-noconv:
+letin-generic:
   Γ |- not (t1 == t2)
   Γ |- p : t1 ~ t2        Γ, (x1 := t1 : T) (x2 := t2 : T) (H : x1 ~ x2) |- q : u1 = u2
-  ------------------------------------------------------------------------------------- let-in-noconv
+  ------------------------------------------------------------------------------------- letin-generic
   Γ |- (let x1 := t1 in
-       let x2 := t2 in
-       fun (H : x1 ~ x2) => q) p
+        let x2 := t2 in
+        fun (H : x1 ~ x2) => q) p
        : (let x1 := t1 in u1) = (let x2 := t2 in u2)
 \end{verbatim}
 
 \begin{verbatim}
-let-in-conv:
+letin-simple:
     Γ |- t1 == t2           Γ, (x1 := t1 : T) |- q : u1 = u2[x1/x2]
-    -------------------------------------------------------------------- let-in-conv
+    -------------------------------------------------------------------- letin-simple
     Γ |- let x1 := t1 in q : (let x1 := t1 in u1) = (let x2 := t2 in u2)
 \end{verbatim}
 
