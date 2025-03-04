@@ -2230,7 +2230,7 @@ About codegen_s0_f1_proof.
   \text{funext-ind}:
     \dfrac{
       \begin{aligned}
-        & \mbox{$t_1$ is not a function} \\
+        & \mbox{$t_1$ and $t_2$ are not a function} \\
         & E[\Gamma] \vdash p : t_1 \simeq t_2 \\
       \end{aligned}
     }{
@@ -2242,7 +2242,7 @@ About codegen_s0_f1_proof.
   \text{funext-fun}:
     \dfrac{
       \begin{aligned}
-        & \mbox{$t_1$ is a function} \\
+        & \mbox{$t_1$ and $t_2$ are a function} \\
         & E[\Gamma] \vdash p : \forall x, t_1\:x = t_2\:x\\
       \end{aligned}
     }{
@@ -2253,6 +2253,10 @@ About codegen_s0_f1_proof.
         functional\_extensionality is an axiom provided by \coq{} standard library.
       \end{minipage}
 \end{gather*}
+
+The axiom, functional\_extensionality, is required when different functions are bounded with \kwlet{} and they are used as a function argument.
+The verify-letin-generic rule introduces $x_1 \simeq x_2$ which is not usable for eq\_ind which require $x_1 = x_2$.
+
 
 \begin{verbatim}
 funext-ind:
