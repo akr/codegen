@@ -101,6 +101,7 @@
 \newcommand{\kwend}{\mbox{\color{mygreen}\ttfamily end}}
 \newcommand{\kwfix}{\mbox{\color{mygreen}\ttfamily fix}}
 \newcommand{\kwfor}{\mbox{\color{mygreen}\ttfamily for}}
+\newcommand{\kwrew}{\mbox{\color{mygreen}\ttfamily rew}}
 
 \newcommand{\lam}[2]{\lambda #1.\:#2}
 \newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.\:#3}
@@ -2217,12 +2218,12 @@ About codegen_s0_f1_proof.
         & E[\Gamma] \vdash q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_1\: \mathit{args}_2
       \end{aligned}
     }{
-      \mbox{rew}\: p\: \kwin\: q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_2\: \mathit{args}_2
+      \kwrew\: p\: \kwin\: q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_2\: \mathit{args}_2
     } \\
-    \quad \mbox{where} \quad \mbox{rew}\: p\: \kwin\: q := \mbox{eq\_ind}\: x_1\: (\lam{x}{t_1\: \mathit{args}_0\: x\: \mathit{args}_1})\: q\: x_2\: p \\
+    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mbox{eq\_ind}\: x_1\: (\lam{x}{t_1\: \mathit{args}_0\: x\: \mathit{args}_1})\: q\: x_2\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        When x1 and x2 are functions, p is an equality of functions.  It needs funext.
+        When x1 and x2 are functions, p is an equality of functions.  It needs functional extensionality.
       \end{minipage}
 \end{gather*}
 
