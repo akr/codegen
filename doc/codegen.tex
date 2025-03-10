@@ -2101,28 +2101,28 @@ About codegen_s0_f1_proof.
     \dfrac{
       (\mathit{IH} : t \simeq u) \in \Gamma
     }{
-      E[\Gamma] \vdash \mathit{IH}\ \mathit{args} : t\ \mathit{args} = u\ \mathit{args}
+      E[\Gamma] \vdash \mathit{IH}\:\mathit{args} : t\ \mathit{args} = u\ \mathit{args}
     } \breakrule
 \end{gather*}
 
 \begin{gather*}
   \text{verify-matchapp}:
     \dfrac{
-      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}_1\:\mathit{args}_3} = u\:\underline{\mathit{args}_2\:\mathit{args}_3}}
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}_1} = u\:\underline{\mathit{args}_2}}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
           & \kwmatch\:x\:\kwas\:x'\:\kwreturn \\
           & \quad
               \begin{aligned}
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1\:\mathit{args}_3 = \\
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t\:\underline{\mathit{args}_2}}\:\kwend\:\mathit{args}_3
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1 = \\
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow u}\:\kwend\:\mathit{args}_2
               \end{aligned} \\
-          & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend : \\
-          & \quad
-              \begin{aligned}
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1\:\mathit{args}_3 = \\
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t\:\underline{\mathit{args}_2}}\:\kwend\:\mathit{args}_3
+          & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend \\
+          & : \quad
+              \begin{aligned}[t]
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1 = \\
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow u}\:\kwend\:\mathit{args}_2
               \end{aligned}
         \end{aligned}
     } \breakrule
@@ -2132,44 +2132,44 @@ About codegen_s0_f1_proof.
   \text{verify-fix}:
     \dfrac{
       \begin{aligned}
-        & \{\rep{f}\} \supseteq \{\rep{g}\} \quad f_s \in  \{\rep{g}\} \\
-        & \forall g \in \{\rep{g}\}, (\FV(t_g) \cup \FV(u_g)) \cap (\{\rep{f}\} \backslash \{\rep{g}\}) = \varnothing \quad \mbox{($\{\rep{f}\} \backslash \{\rep{g}\}$ are unreachable from $f_s$)} \\
+        & \{\rep{f}\} \supseteq \{\rep{g}\} \quad f_\textrm{s} \in  \{\rep{g}\} \\
+        & \forall h \in \{\rep{g}\}, (\FV(t_h) \cup \FV(u_h)) \cap (\{\rep{f}\} \backslash \{\rep{g}\}) = \varnothing \quad \mbox{($\{\rep{f}\} \backslash \{\rep{g}\}$ are unreachable from $f_\textrm{s}$)} \\
         % & h_1 = |\rep{f}| \\
         % & h_2 = |\rep{g}| \\
-        & \forall g' \in \{\rep{g}\}, E[\Gamma]; \rep{\mathit{IH} : F \simeq G} \vdash p_{g'} : \substm{t_{g'}}{F}{f} \simeq \substm{u_{g'}}{G}{g}
+        & \forall h \in \{\rep{g}\}, E[\Gamma]; \rep{\mathit{IH} : F \simeq G} \vdash p_{h} : \substm{t_{h}}{F}{f} \simeq \substm{u_{h}}{G}{g}
       \end{aligned}
     }{
       \begin{aligned}
-        & (\kwfix\:\rep{\mathit{IH} / k : (F \simeq G) := \mathrm{IH}}\:\kwfor\:\mathit{IH}_{f_s})\:b_1 \ldots b_{\NA_{f_s}}
-          : F_{f_s}\:b_1 \ldots b_{\NA_{f_s}} = G_{f_s}\:b_1 \ldots b_{\NA_{f_s}}
+        & (\kwfix\:\rep{\mathit{IH} / k : (F \simeq G) := \mathrm{IH}}\:\kwfor\:\mathit{IH}_{f_\textrm{s}})\:b_1 \ldots b_{\NA_{f_\textrm{s}}}
+          : F_{f_\textrm{s}}\:b_1 \ldots b_{\NA_{f_\textrm{s}}} = G_{f_\textrm{s}}\:b_1 \ldots b_{\NA_{f_\textrm{s}}}
       \end{aligned}
     } \\
     \quad \mbox{where} \quad
       \begin{aligned}[t]
         & \mbox{$\{\rep{f}\}$ is the fix-bounded function variable names in the LHS fixpoint} \\
         & \mbox{$\{\rep{g}\}$ is the fix-bounded function variable names in the RHS fixpoint} \\
-        & \mbox{$k_f$ is the index of the decreasing argument of $f$ ($k_g$ as well)} \\
-        & \mbox{$T_f$ is the type of $f$ ($T_g$ as well)} \\
-        & \mbox{$t_f$ is the function term for $f$ in the LHS fixpoint} \\
-        & \mbox{$u_g$ is the function term for $g$ in the RHS fixpoint} \\
-        & \mbox{$f_s$ specifies the start function of the LHS and RHS fixpoint} \\
-        & \mbox{$\mathit{params}_f$ is the inductive type parameters of the decreasing argument of $f$} \\
-        & F_{f'} := \kwfix\:\rep{f/k_f:T_f:=t_f}\:\kwfor\:{f'} \\
-        & G_{g'} := \kwfix\:\rep{g/k_g:T_g:=t_g}\:\kwfor\:{g'} \\
-        & \mathrm{IH}_{g'} :=
+        & \mbox{$k_h$ is the index of the decreasing argument of $h$} \\
+        & \mbox{$T_h$ is the type of $h$} \\
+        & \mbox{$t_h$ is the function term for $h$ in the LHS fixpoint} \\
+        & \mbox{$u_h$ is the function term for $h$ in the RHS fixpoint} \\
+        & \mbox{$f_\textrm{s}$ specifies the start function of the LHS and RHS fixpoint} \\
+        & \mbox{$\mathit{params}_h$ is the inductive type parameters of the decreasing argument of $h$} \\
+        & F_{h} := \kwfix\:\rep{f/k_f:T_f:=t_f}\:\kwfor\:{h} \\
+        & G_{h} := \kwfix\:\rep{g/k_g:T_g:=u_g}\:\kwfor\:{h} \\
+        & \mathrm{IH}_{h} :=
           \begin{aligned}[t]
-            & \lambda a_1 \ldots a_{\NA_{g'}} . \\
-            & \kwlet\:H := p_{g'}\:\kwin \\
-            & \kwmatch\:a_{k_{g'}}\:\kwas\:x\:\kwreturn \\
-            & \quad F_{g'}\:a_1 \ldots a_{k_{g'}-1}\:x\:a_{k_{g'}+1} \ldots a_{\NA_{g'}} = G_{g'}\:a_1 \ldots a_{k_{g'}-1}\:x\:a_{k_{g'}+1} \ldots a_{\NA_{g'}} \\
+            & \lambda a_1 \ldots a_{\NA_{h}} . \\
+            & \kwlet\:H := p_{h}\:\kwin \\
+            & \kwmatch\:a_{k_{h}}\:\kwas\:x\:\kwreturn \\
+            & \quad F_{h}\:a_1 \ldots a_{k_{h}-1}\:x\:a_{k_{h}+1} \ldots a_{\NA_{h}} = G_{h}\:a_1 \ldots a_{k_{h}-1}\:x\:a_{k_{h}+1} \ldots a_{\NA_{h}} \\
             & \kwwith \\
-            & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:a_1 \ldots a_{k_{g'}-1}}\:(C\:\mathit{params}\:\mathit{cargs})\:\underline{a_{k_{g'}+1} \ldots a_{\NA_{g'}}}} \\
+            & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:a_1 \ldots a_{k_{h}-1}}\:(C\:\mathit{params}\:\mathit{cargs})\:\underline{a_{k_{h}+1} \ldots a_{\NA_{h}}}} \\
             & \kwend
           \end{aligned}
       \end{aligned} \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        This verify-fix rule builds a proof term for extensional equality of fixpoints from extensional equality of iota-fix reduced forms.
+        This verify-fix rule builds a proof term for extensional equality of fixpoints ($\kwfix\ldots\kwfor\:\mathit{IH}_{f_\textrm{s}}$) from extensional equality of iota-fix reduced forms ($p_h$).
         The \kwmatch-expression makes the equality iota-fix reducible by destructing the decreasing argument.
       \end{minipage}
     \breakrule
