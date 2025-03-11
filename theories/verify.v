@@ -611,7 +611,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let (decargs2, entry2, binders2, bodies2) :=
     match destFix_opt fn2 with
     | Some x => x
-    | _ => Control.backtrack_tactic_failure "RHS is not match-expression"
+    | _ => Control.backtrack_tactic_failure "RHS is not fix-expression"
     end
   in
   let h2 := Array.length bodies2 in
@@ -722,8 +722,8 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let new_fn := compose_lambda arg_binders let_term in
         new_fn)
   in
-  let new_binders := Array.map (fun ih_type => Constr.Binder.make None ih_type) ih_types in
-  let new_fix_term := mkFix decargs2 entry2 new_binders new_funcs in
+  let ih_binders := Array.map (fun ih_type => Constr.Binder.make None ih_type) ih_types in
+  let new_fix_term := mkFix decargs2 entry2 ih_binders new_funcs in
   let proof_term := mkApp new_fix_term args1 in
   proof_term.
 
