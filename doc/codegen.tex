@@ -351,25 +351,30 @@ We don't include parenthesis in syntax definition in BNF.
 
 \begin{itemize}
   \item We use overline to represent repetition:
-    $\repopi{x_i+y_i}{<}{1\leq i \leq n}$ means $x_1+y_1 < \ldots < x_n+y_n$.
+    $\repopi{x_i+y_i}{<}{i=a_1, \ldots, a_n}$ means $x_{a_1}+y_{a_1} < \ldots < x_{a_n}+y_{a_n}$.
+  \item It consists body part ($x_i+y_i$), range part ($i=a_1, \ldots, a_n$), and operator part ($\underbracket[0.4pt][1pt]{<}$).
+  \item In many cases, we use integers as indices, but sometimes we use others, such as variable names.
+  \item We may write the range part, $i=1\ldots n$, as $1\leq i \leq n$:
+    $x_1+y_1 < \ldots < x_n+y_n$ means $\repopi{x_i+y_i}{<}{1\leq i \leq n}$.
   \item If the operator part ($\underbracket[0.4pt][1pt]{<}$) is just a punctuation to separate each term,
     we consider the punctuation can be added at first and/or last if appropriate for the context.
-    $\repopi{x_i}{,}{1\leq i \leq n}$ represents
+    $\repopi{x_i}{,}{i=1\ldots n}$ represents
     ``$x_1,\ldots ,x_n$'',
     ``$x_1,\ldots ,x_n,$'',
     ``$,x_1,\ldots ,x_n$'', or
     ``$,x_1,\ldots ,x_n,$''. \\
-    Thus, $(\repopi{x_i}{,}{1\leq i \leq m}\;\repopi{y_i}{,}{1\leq i \leq n})$ can represent \\
+    Thus, $(\repopi{x_i}{,}{i=1\ldots m}\;\repopi{y_i}{,}{i=1\ldots n})$ can represent \\
     $(x_1,\ldots, x_m, y_1,\ldots, y_n)$ when $(0<m) \wedge (0<n)$, \\
     $(x_1,\ldots, x_m)$ when $(0<m)\wedge(n=0)$, \\
     $(y_1,\ldots, y_n)$ when $(m=0)\wedge(0<n)$, and \\
     $()$ when $m=n=0$.
   \item We may omit the operator part when the operator is just a punctuation to separate each term.
-    We write $\repi{x_i+y_i}{1\leq i \leq n}$ for $x_1+y_1, \ldots, x_n+y_n$ if comma is appropriate separator for the context.
+    We write $\repi{x_i+y_i}{i=1\ldots n}$ for $x_1+y_1, \ldots, x_n+y_n$ if comma is appropriate separator for the context.
     (Also, comma can be added at first and/or end as described above.)
-  \item We may write the range part, $1\leq i \leq n$, as $i=1\ldots n$.
   \item We may write the range part as only an index metavariable if the range is clear from the context: $\repi{x_i+y_i}{i}$.
-  \item We may omit the range part ($1\leq i \leq n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
+  \item We may omit the index metavariable in the range part and the body part:
+    $\repi{x+y}{1\ldots n}$ means $\repi{x_i+y_i}{i=1\ldots n}$.
+  \item We may omit the range part ($i=1\ldots n$) and index of metavariables ($i$ of $x_i$ and $y_i$) when the metavariables are sequences of same length.
     We write $\repop{x+y}{<}$ for $x_1+y_1 < \ldots < x_n+y_n$ when $x$ and $y$ are $n$-element sequences.
   \item We omit both the operator and range part if appropriate.
     We write $\rep{x+y}$ for $x_1+y_1, \ldots, x_n+y_n$ if $x$ and $y$ are $n$-element sequences and comma is appropriate separator for the context.
@@ -399,7 +404,7 @@ We don't include parenthesis in syntax definition in BNF.
     $\rep{a \rep{(\underline{b})} c} = a_1 \rep{(\underline{b_1})} c_1 \ldots a_n \rep{(\underline{b_n})} c_n$.
     We cannot define how to repeat $\rep{(\underline{b})}$ because it has no variable without underline.
 
-  \item This notation is taken from \cite{steele2017s}.
+  \item This notation is based on \cite{steele2017s}.
 \end{itemize}
 
 \subsection{Number of Elements}
