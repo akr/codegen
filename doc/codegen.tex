@@ -2087,48 +2087,48 @@ About codegen_s0_f1_proof.
 \begin{gather*}
   \text{intros:}~
     \dfrac{
-      E[\Gamma; \mathit{vars}] \vdash p : t = u
+      E[\Gamma; \mathit{vars}] \vdash p : t = t'
     }{
-      E[\Gamma] \vdash \lam{\mathit{vars}}{p} : \forall \mathit{vars}, t = u
+      E[\Gamma] \vdash \lam{\mathit{vars}}{p} : \forall \mathit{vars}, t = t'
     } \breakrule
 \end{gather*}
 
 \begin{gather*}
   \text{verify-refl:}~
     \dfrac{
-      E[\Gamma] \vdash t \eqconv u
+      E[\Gamma] \vdash t \eqconv t'
     }{
-      E[\Gamma] \vdash \mbox{eq\_refl}~t : t = u
+      E[\Gamma] \vdash \mbox{eq\_refl}~t : t = t'
     } \breakrule
 \end{gather*}
 
 \begin{gather*}
   \text{verify-applyhyp:}~
     \dfrac{
-      (\mathit{IH} : t \simeq u) \in \Gamma
+      (\mathit{IH} : t \simeq t') \in \Gamma
     }{
-      E[\Gamma] \vdash \mathit{IH}\:\mathit{args} : t\ \mathit{args} = u\ \mathit{args}
+      E[\Gamma] \vdash \mathit{IH}\:\mathit{args} : t\ \mathit{args} = t'\ \mathit{args}
     } \breakrule
 \end{gather*}
 
 \begin{gather*}
   \text{verify-matchapp}:
     \dfrac{
-      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}_1} = u\:\underline{\mathit{args}_2}}
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}} = t'\:\underline{\mathit{args}'}}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
           & \kwmatch\:x\:\kwas\:x'\:\kwreturn \\
           & \quad
               \begin{aligned}
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1 = \\
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow u}\:\kwend\:\mathit{args}_2
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args} = \\
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{args}'
               \end{aligned} \\
           & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend \\
           & : \quad
               \begin{aligned}[t]
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args}_1 = \\
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow u}\:\kwend\:\mathit{args}_2
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args} = \\
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{args}'
               \end{aligned}
         \end{aligned}
     } \breakrule
@@ -2184,16 +2184,16 @@ About codegen_s0_f1_proof.
   \text{verify-letin-generic:}~
     \dfrac{
       \begin{aligned}
-        & E[\Gamma] \vdash p : t_1 \simeq t_2 \\
-        & E[\Gamma; \ldefB{x_1}{t_1}; \ldefB{x_2}{t_2}; (H : x_1 \simeq x_2)] \vdash q : u_1\:\mathit{args}_1 = u_2\:\mathit{args}_2
+        & E[\Gamma] \vdash p : t \simeq t' \\
+        & E[\Gamma; \ldefB{x}{t}; \ldefB{x'}{t'}; (H : x \simeq x')] \vdash q : u\:\mathit{args} = u'\:\mathit{args}'
       \end{aligned}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
-          ( & \kwlet\: x_1 := t_1 \:\kwin \\
-            & \kwlet\: x_2 := t_2 \:\kwin \\
-            & \lam{(H : x_1 \simeq x_2)}{q})\: p \\
-        :\: & (\kwlet\: x_1 := t_1 \:\kwin\: u_1)\:\mathit{args}_1 = (\kwlet\: x_2 := t_2 \:\kwin\: u_2)\:\mathit{args}_2
+          ( & \kwlet\: x := t \:\kwin \\
+            & \kwlet\: x' := t' \:\kwin \\
+            & \lam{(H : x \simeq x')}{q})\: p \\
+        :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x' := t' \:\kwin\: u')\:\mathit{args}'
         \end{aligned}
     } \breakrule
 \end{gather*}
@@ -2202,14 +2202,14 @@ About codegen_s0_f1_proof.
   \text{verify-letin-simple:}~
     \dfrac{
       \begin{aligned}
-        & t_1 \equiv t_2 \\
-        & E[\Gamma; \ldefB{x_1}{t_1}] \vdash q : u_1\:\mathit{args}_1 = \subst{u_2}{x1}{x2}\:\mathit{args}_2
+        & t \equiv t' \\
+        & E[\Gamma; \ldefB{x}{t}] \vdash q : u\:\mathit{args} = \subst{u'}{x'}{x}\:\mathit{args}'
       \end{aligned}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
-          ( & \kwlet\: x_1 := t_1 \:\kwin\: q) \\
-          :\: & (\kwlet\: x_1 := t_1 \:\kwin\: u_1)\mathit{args}_1 = (\kwlet\: x_2 := t_2 \:\kwin\: u_2)\mathit{args}_2
+          ( & \kwlet\: x := t \:\kwin\: q) \\
+          :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x' := t' \:\kwin\: u')\:\mathit{args}'
         \end{aligned}
     } \breakrule
 \end{gather*}
@@ -2218,17 +2218,18 @@ About codegen_s0_f1_proof.
   \text{verify-apparg}:
     \dfrac{
       \begin{aligned}
-        & E[\Gamma] \vdash x_1 \not\equiv x_2 \\
-        & E[\Gamma] \vdash p : x_1 = x_2 \\
-        & E[\Gamma] \vdash q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_1\: \mathit{args}_2
+        & E[\Gamma] \vdash x \not\equiv x' \\
+        & E[\Gamma] \vdash p : x = x' \\
+        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}'
       \end{aligned}
     }{
-      \kwrew\: p\: \kwin\: q : t_1\: \mathit{args}_0\: x_1\: \mathit{args}_1 = t_2\: \mathit{args}_0\: x_2\: \mathit{args}_2
+      \kwrew\: p\: \kwin\: q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x'\: \mathit{args}'
     } \\
-    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mbox{eq\_ind}\: x_1\: (\lam{x}{t_1\: \mathit{args}_0\: x\: \mathit{args}_1})\: q\: x_2\: p \\
+    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mbox{eq\_ind}\: x\: (\lam{x}{t\: \mathit{args}_0\: x\: \mathit{args}})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        When x1 and x2 are functions, p is an equality of functions.  It needs functional extensionality.
+        When $x$ and $x'$ are functions, $p$ is an equality of functions.
+        It needs functional extensionality (see the explanation for funext-fun).
       \end{minipage}
 \end{gather*}
 
@@ -2236,11 +2237,11 @@ About codegen_s0_f1_proof.
   \text{funext-ind}:
     \dfrac{
       \begin{aligned}
-        & \mbox{$t_1$ and $t_2$ are not a function} \\
-        & E[\Gamma] \vdash p : t_1 \simeq t_2 \\
+        & \mbox{$t$ and $t'$ are not a function} \\
+        & E[\Gamma] \vdash p : t \simeq t' \\
       \end{aligned}
     }{
-      p : t_1 = t_2
+      p : t = t'
     }
 \end{gather*}
 
@@ -2248,11 +2249,11 @@ About codegen_s0_f1_proof.
   \text{funext-fun}:
     \dfrac{
       \begin{aligned}
-        & \mbox{$t_1$ and $t_2$ are a function} \\
-        & E[\Gamma] \vdash p : \forall x, t_1\:x = t_2\:x\\
+        & \mbox{$t$ and $t'$ are functions} \\
+        & E[\Gamma] \vdash p : \forall x, t\:x = t'\:x\\
       \end{aligned}
     }{
-      p : \mbox{functional\_extensionality}\:t_1\:t_2\:p : t_1 = t_2
+      p : \mbox{functional\_extensionality}\:t\:t'\:p : t = t'
     } \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
