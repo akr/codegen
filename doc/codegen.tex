@@ -2131,7 +2131,11 @@ About codegen_s0_f1_proof.
                 & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{args}'
               \end{aligned}
         \end{aligned}
-    } \breakrule
+    } \\
+    \quad \mbox{Note:}~
+      \begin{minipage}[t]{0.8\columnwidth}
+        Since \codegen{} moves arguments to \kwmatch-expression into branches, $\mathit{args}'$ is empty in general.
+      \end{minipage}
 \end{gather*}
 
 \begin{gather*}
