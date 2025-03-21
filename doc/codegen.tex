@@ -103,6 +103,8 @@
 \newcommand{\kwfor}{\mbox{\color{mygreen}\ttfamily for}}
 \newcommand{\kwrew}{\mbox{\color{mygreen}\ttfamily rew}}
 
+\newcommand{\us}{\textscale{.5}{\textunderscore}}
+
 \newcommand{\lam}[2]{\lambda #1.\:#2}
 \newcommand{\lamT}[3]{\lambda #1\mathord{:}#2.\:#3}
 \newcommand{\lamB}[1]{\lambda #1.\:}
@@ -2098,7 +2100,7 @@ About codegen_s0_f1_proof.
     \dfrac{
       E[\Gamma] \vdash t \eqconv t'
     }{
-      E[\Gamma] \vdash \mbox{eq\_refl}~t : t = t'
+      E[\Gamma] \vdash \mathsf{eq\_refl}~t : t = t'
     } \breakrule
 \end{gather*}
 
@@ -2145,11 +2147,11 @@ About codegen_s0_f1_proof.
         & \forall i \in \{1\ldots h'\}, f_{\sigma(i)} = f'_i \qquad \mbox{(function name equality)} \\
         & \forall i \in \{1\ldots h'\}, k_{\sigma(i)} = k'_i \qquad \mbox{(decreasing argument position equality)} \\
         & \forall i \in \{1\ldots h'\}, \FV(t_{\sigma(i)}) \cap (\{\rep{f}\} \backslash \{\rep{f'}\}) = \varnothing \\
-        & \forall i \in \{1\ldots h'\}, E[\Gamma]; \repi{\mathit{IH}_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
+        & \forall i \in \{1\ldots h'\}, E[\Gamma]; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
       \end{aligned}
     }{
       \begin{aligned}
-        & (\kwfix\:\repi{\mathit{IH}_j / k'_j : (F_{\sigma(j)} \simeq F'_j) := q_j}{j=1\ldots h'}\:\kwfor\:\mathit{IH}_{s'})\:\mathit{fargs} \\
+        & (\kwfix\:\repi{\mathit{IH}\!_j / k'_j : (F_{\sigma(j)} \simeq F'_j) := q_j}{j=1\ldots h'}\:\kwfor\:\mathit{IH}\!_{s'})\:\mathit{fargs} \\
         & : F_s\:\mathit{fargs} = F'_{s'}\:\mathit{fargs}
       \end{aligned}
     } \\
@@ -2171,15 +2173,16 @@ About codegen_s0_f1_proof.
             & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:x_1 \ldots x_{k'_j-1}}\:(C\:\underline{\mathit{params}_j}\:\mathit{cargs})\:\underline{x_{k'_j+1} \ldots x_{\NA_{F'_j}}}} \\
             & \kwend
           \end{aligned} \\
-        & \mbox{$\mathit{cargs}$ is variables the constructors members}
+        & \mbox{$\mathit{cargs}$ is variables for the constructors members}
       \end{aligned} \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
         This verify-fix rule proves the transformation of fixpoints: $F_{s}$ to $F'_{s'}$.
         The transformation may drops functions in $F_{s}$ unreachable from $f_s$.
         The correspondence of functions in the fixpoints is represented with $\sigma$.
-        This rule builds a proof term ($\kwfix\ldots\kwfor\:\mathit{IH}_{s'}$) for extensional equality of fixpoints ($F_{s} \simeq F'_{s'}$) from extensional equality proofs of iota-fix reduced forms ($p_i$).
+        This rule builds a proof term ($\kwfix\ldots\kwfor\:\mathit{IH}\!_{s'}$) for extensional equality of fixpoints ($F_{s} \simeq F'_{s'}$) from extensional equality proofs of iota-fix reduced forms ($p_i$).
         The \kwmatch-expression in $q_j$ makes the equality iota-fix reducible by destructing the decreasing argument.
+        The let-in expression to bind $H$ prevents copy of the proof term $p_j$ for each constructors.
       \end{minipage}
     \breakrule
 \end{gather*}
@@ -2224,12 +2227,12 @@ About codegen_s0_f1_proof.
       \begin{aligned}
         & E[\Gamma] \vdash x \not\equiv x' \\
         & E[\Gamma] \vdash p : x = x' \\
-        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}'
+        & E[\Gamma] \vdash q : t\: x\: \mathit{args} = t'\: x\: \mathit{args}'
       \end{aligned}
     }{
-      \kwrew\: p\: \kwin\: q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x'\: \mathit{args}'
+      \kwrew\: p\: \kwin\: q : t\: x\: \mathit{args} = t'\: x'\: \mathit{args}'
     } \\
-    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mbox{eq\_ind}\: x\: (\lam{x}{t\: \mathit{args}_0\: x\: \mathit{args}})\: q\: x'\: p \\
+    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: y\: \mathit{args}})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
         When $x$ and $x'$ are functions, $p$ is an equality of functions.
@@ -2257,16 +2260,16 @@ About codegen_s0_f1_proof.
         & E[\Gamma] \vdash p : \forall x, t\:x = t'\:x\\
       \end{aligned}
     }{
-      p : \mbox{functional\_extensionality}\:t\:t'\:p : t = t'
+      p : \mathsf{functional\_extensionality}\:t\:t'\:p : t = t'
     } \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        functional\_extensionality is an axiom provided by \coq{} standard library.
+        $\mathsf{functional\_extensionality}$ is an axiom provided by \coq{} standard library.
       \end{minipage}
 \end{gather*}
 
-The axiom, functional\_extensionality, is required when different functions are bounded with \kwlet{} and they are used as a function argument.
-The verify-letin-generic rule introduces $x_1 \simeq x_2$ which is not usable for eq\_ind which require $x_1 = x_2$.
+The axiom, $\mathsf{functional\_extensionality}$, is required when different functions are bounded with \kwlet{} and they are used as an argument for an application.
+The verify-letin-generic rule introduces $x_1 \simeq x_2$ which is not usable for $\mathsf{eq\_ind}$ which require $x_1 = x_2$.
 
 
 \begin{verbatim}
