@@ -1991,11 +1991,11 @@ There are two non-convertible transformations:
   \item Unreachable Fixfunc Deletion
 \end{itemize}
 
-The verification is implemented in \verb!theories/verify.v!.
+The verification for them is implemented in \verb!theories/verify.v!.
 
 The match-app transformation moves arguments for function-returning match expression into
 branches of the match expression as follows.
-It transforms \lstinline!((if b then ... else ...) n)! to \lstinline!(if b then ... n else ... n)!.
+It transforms \lstinline!((if b then t else u) n)! to \lstinline!(if b then t n else u n)!.
 The source definition \lstinline!f! is transformed and the result is defined as \lstinline!codegen_s0_f!.
 The equality proof between them is defined as \lstinline!codegen_s0_f_proof!.
 
@@ -2162,7 +2162,6 @@ About codegen_s0_f1_proof.
         & \sigma : \{1\ldots h'\} \to \{1\ldots h\} \ \mbox{injective} \\
         & s := \sigma(s') \qquad \mbox{(start function index)} \\
         & \mbox{$\mathit{fargs}$ is arguments for the fixpoints (sequence of terms)} \\
-        & \mbox{$\mathit{params}_j$ is the inductive type parameters of the decreasing argument of $f'_j$} \\
         & q_j :=
           \begin{aligned}[t]
             & \lambda x_1 \ldots x_{\NA_{F'_j}} . \\
@@ -2173,7 +2172,8 @@ About codegen_s0_f1_proof.
             & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:x_1 \ldots x_{k'_j-1}}\:(C\:\underline{\mathit{params}_j}\:\mathit{cargs})\:\underline{x_{k'_j+1} \ldots x_{\NA_{F'_j}}}} \\
             & \kwend
           \end{aligned} \\
-        & \mbox{$\mathit{cargs}$ is variables for the constructors members}
+        & \mbox{$\mathit{params}_j$ is the inductive type parameters of the decreasing argument of $f'_j$} \\
+        & \mbox{$\mathit{cargs}$ is variables for the members of constructors}
       \end{aligned} \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
