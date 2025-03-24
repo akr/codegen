@@ -2227,12 +2227,13 @@ About codegen_s0_f1_proof.
       \begin{aligned}
         & E[\Gamma] \vdash x \not\equiv x' \\
         & E[\Gamma] \vdash p : x = x' \\
-        & E[\Gamma] \vdash q : t\: x\: \mathit{args} = t'\: x\: \mathit{args}'
+        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}' \\
+        & \mbox{$t$ and $t'$ are not applications}
       \end{aligned}
     }{
-      \kwrew\: p\: \kwin\: q : t\: x\: \mathit{args} = t'\: x'\: \mathit{args}'
+      \kwrew\: p\: \kwin\: q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x'\: \mathit{args}'
     } \\
-    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: y\: \mathit{args}})\: q\: x'\: p \\
+    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: y\: \mathit{args}'})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
         When $x$ and $x'$ are functions, $p$ is an equality of functions.
@@ -2244,7 +2245,7 @@ About codegen_s0_f1_proof.
   \text{funext-ind}:
     \dfrac{
       \begin{aligned}
-        & \mbox{$t$ and $t'$ are not a function} \\
+        & \mbox{$t$ and $t'$ are not functions} \\
         & E[\Gamma] \vdash p : t \simeq t' \\
       \end{aligned}
     }{
