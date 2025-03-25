@@ -596,6 +596,9 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
     | _ => Control.backtrack_tactic_failure "goal is not equality"
     end
   in
+  if Bool.neg (Array.equal Constr.equal args1 args2) then
+    Control.backtrack_tactic_failure "matchapp-fix"
+  else
   let (decargs1, _entry1, binders1, bodies1) :=
     match destFix_opt fn1 with
     | Some x => x
@@ -605,9 +608,6 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
   let h1 := Array.length bodies1 in
   let fix_terms1 := Array.init h1 (fun i1 => mkFix decargs1 i1 binders1 bodies1) in
   let substituted_bodies1 := substFix decargs1 binders1 bodies1 in
-  if Bool.neg (Array.equal Constr.equal args1 args2) then
-    Control.backtrack_tactic_failure "matchapp-fix"
-  else
   let (decargs2, entry2, binders2, bodies2) :=
     match destFix_opt fn2 with
     | Some x => x
@@ -662,10 +662,8 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let fn_type := Array.get fn_types2 i2 in
         let (arg_binders, ret_type) := decompose_prod fn_type in
         let numargs := List.length arg_binders in
-        let ih_type :=
-          let args := mkRels_dec numargs numargs in
-          compose_prod arg_binders (mkApp eq [| ret_type; mkApp fix1 args; mkApp fix2 args |])
-        in
+        let args := mkRels_dec numargs numargs in
+        let ih_type := compose_prod arg_binders (mkApp eq [| ret_type; mkApp fix1 args; mkApp fix2 args |]) in
         ih_type)
   in
   let subgoals :=
