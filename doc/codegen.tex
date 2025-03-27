@@ -2286,6 +2286,12 @@ In the future, we may register a congruence lemma for each higher-order function
 The reason \codegen{} uses the axiom,functional extensionality, is to automate the verification process.
 In the future, we may introduce the ability to register a congruence lemma for each higher-order function and use it instead of the axioms.
 
+The axiom also solves a problem with an inductive type that contains a function.
+The equality (Coq.Init.Logic.eq, $t = t'$) and extensional equality ($\forall \mathit{args}, t\:\mathit{args}=t'\:\mathit{args}$) are not suitable for such type.
+Currently \codegen{} uses the former equality for inductive types even if they contains function.
+But it requires the axiom to prove equality of a constructor application, $C\:x = C\:x'$ where $x$ and $x'$ are functions with extensional equality.
+We can define new equality type for the type but it is tedious.
+
 \bibliographystyle{plain}
 \bibliography{base}
 
