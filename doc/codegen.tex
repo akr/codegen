@@ -2116,27 +2116,27 @@ About codegen_s0_f1_proof.
 \begin{gather*}
   \text{verify-matchapp}:
     \dfrac{
-      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{args}} = t'\:\underline{\mathit{args}'}}
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{margs}} = t'\:\underline{\mathit{margs}'}}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
           & \kwmatch\:x\:\kwas\:x'\:\kwreturn \\
           & \quad
               \begin{aligned}
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args} = \\
-                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{args}'
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{margs} = \\
+                & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{margs}'
               \end{aligned} \\
           & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend \\
           & : \quad
               \begin{aligned}[t]
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{args} = \\
-                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{args}'
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{margs} = \\
+                & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{margs}'
               \end{aligned}
         \end{aligned}
     } \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        Since \codegen{} moves arguments to \kwmatch-expression into branches, $\mathit{args}'$ is empty in general.
+        Since \codegen{} moves arguments for a \kwmatch-expression into the branches, $\mathit{margs}'$ is empty in general.
       \end{minipage}
 \end{gather*}
 
@@ -2179,6 +2179,7 @@ About codegen_s0_f1_proof.
       \begin{minipage}[t]{0.8\columnwidth}
         This verify-fix rule proves the transformation of fixpoints: $F_{s}$ to $F'_{s'}$.
         The transformation may drops functions in $F_{s}$ unreachable from $f_s$.
+        The unreachable functions are $\{\rep{f}\} \backslash \{\rep{f'}\}$ because we assume the fixpoints uses same function names for corresponding functions.
         The correspondence of functions in the fixpoints is represented with $\sigma$.
         This rule builds a proof term ($\kwfix\ldots\kwfor\:\mathit{IH}\!_{s'}$) for extensional equality of fixpoints ($F_{s} \simeq F'_{s'}$) from extensional equality proofs of iota-fix reduced forms ($p_i$).
         The \kwmatch-expression in $q_j$ makes the equality iota-fix reducible by destructing the decreasing argument.
@@ -2191,8 +2192,9 @@ About codegen_s0_f1_proof.
   \text{verify-letin-generic:}~
     \dfrac{
       \begin{aligned}
+        & x'~\mathrm{fresh} \\
         & E[\Gamma] \vdash p : t \simeq t' \\
-        & E[\Gamma; \ldefB{x}{t}; \ldefB{x'}{t'}; (H : x \simeq x')] \vdash q : u\:\mathit{args} = u'\:\mathit{args}'
+        & E[\Gamma; \ldefB{x}{t}; \ldefB{x'}{t'}; (H : x \simeq x')] \vdash q : u\:\mathit{args} = \subst{u'}{x}{x'}\:\mathit{args}'
       \end{aligned}
     }{
       E[\Gamma] \vdash
@@ -2200,9 +2202,15 @@ About codegen_s0_f1_proof.
           ( & \kwlet\: x := t \:\kwin \\
             & \kwlet\: x' := t' \:\kwin \\
             & \lam{(H : x \simeq x')}{q})\: p \\
-        :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x' := t' \:\kwin\: u')\:\mathit{args}'
+        :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x := t' \:\kwin\: u')\:\mathit{args}'
         \end{aligned}
-    } \breakrule
+    } \\
+    \quad \mbox{Note:}~
+      \begin{minipage}[t]{0.8\columnwidth}
+        We use verify-letin-generic only when $t \not\equiv t'$.
+        We prefer verify-letin-simple over verify-letin-generic for smaller proof terms.
+      \end{minipage}
+    \breakrule
 \end{gather*}
 
 \begin{gather*}
@@ -2210,13 +2218,13 @@ About codegen_s0_f1_proof.
     \dfrac{
       \begin{aligned}
         & t \equiv t' \\
-        & E[\Gamma; \ldefB{x}{t}] \vdash q : u\:\mathit{args} = \subst{u'}{x'}{x}\:\mathit{args}'
+        & E[\Gamma; \ldefB{x}{t}] \vdash q : u\:\mathit{args} = u'\:\mathit{args}'
       \end{aligned}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
           ( & \kwlet\: x := t \:\kwin\: q) \\
-          :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x' := t' \:\kwin\: u')\:\mathit{args}'
+          :\: & (\kwlet\: x := t \:\kwin\: u)\:\mathit{args} = (\kwlet\: x := t' \:\kwin\: u')\:\mathit{args}'
         \end{aligned}
     } \breakrule
 \end{gather*}
@@ -2225,10 +2233,10 @@ About codegen_s0_f1_proof.
   \text{verify-apparg}:
     \dfrac{
       \begin{aligned}
+        & \mbox{$t$ and $t'$ are not applications} \\
         & E[\Gamma] \vdash x \not\equiv x' \\
         & E[\Gamma] \vdash p : x = x' \\
-        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}' \\
-        & \mbox{$t$ and $t'$ are not applications}
+        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}'
       \end{aligned}
     }{
       \kwrew\: p\: \kwin\: q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x'\: \mathit{args}'
@@ -2236,8 +2244,8 @@ About codegen_s0_f1_proof.
     \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: y\: \mathit{args}'})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        When $x$ and $x'$ are functions, $p$ is an equality of functions.
-        It needs functional extensionality (see the explanation for funext-fun).
+        When $x$ and $x'$ are function arguments for higher order functoins $t$ and $t'$, $p$ is an equality of functions.
+        It needs functional extensionality to convert extensional equality in $\Gamma$ (see the explanation for funext-fun).
       \end{minipage}
 \end{gather*}
 
@@ -2269,141 +2277,14 @@ About codegen_s0_f1_proof.
       \end{minipage}
 \end{gather*}
 
-The axiom, $\mathsf{functional\_extensionality}$, is required when different functions are bounded with \kwlet{} and they are used as an argument for an application.
+The axiom, $\mathsf{functional\_extensionality}$, is required when different functions are bounded with let-in and they are used as an argument for an application.
 The verify-letin-generic rule introduces $x_1 \simeq x_2$ which is not usable for $\mathsf{eq\_ind}$ which require $x_1 = x_2$.
 
+The reason \codegen{} uses the axiom, functional extensionality, is to reduce the time required for verification.
+In the future, we may register a congruence lemma for each higher-order function and use it instead of the axioms.
 
-\begin{verbatim}
-funext-ind:
-    t1 is not a function
-    Γ |- p : t1 ~ t2
-    --------------------------------------------------------------------
-    Γ |- p : t1 = t2
-\end{verbatim}
-
-\begin{verbatim}
-funext-fun:
-    t1 is a function
-    Γ |- p : foarll x, t1 x = t2 x
-    --------------------------------------------------------------------
-    Γ |- functional_extensionality t1 t2 p : t1 = t2
-\end{verbatim}
-
-\begin{verbatim}
-apparg:
-    Γ |- x1 !== x2
-    Γ |- p : x1 = x2
-    Γ |- q : t1 args0 x1 args1 = t2 args0 x1 args2
-    --------------------------------------------------------------------
-    Γ |- rew p in q : t1 args0 x1 args1 = t2 args0 x2 args2
-  where
-    rew p in q := eq_ind x1 (fun x => t1 args0 x args1) q x2 p
-  Note: When x1 and x2 are function, p is an equality of functions.  It needs funext.
-\end{verbatim}
-
-\begin{verbatim}
-refl:
-  ----------------------
-  Γ |- eq_refl t : t = t
-\end{verbatim}
-
-\begin{verbatim}
-applyhyp:
-  (IH : t ~ u) in Γ
-  ------------------------------
-  Γ |- IH args : t args = u args
-\end{verbatim}
-
-\begin{verbatim}
-matchapp:
-  Γ |- pi : forall ai, ti args1 rest = ui args2 rest
-  ---------------------------------------------------------------- case x
-  Γ |- match x as x' return
-         match x' with ... | Ci ai => ti | ... end args1 rest =
-         match x' with ... | Ci ai => ui args2 | ... end rest
-       with
-       ... | Ci ai => pi ai | ...
-       end : match x with ... | Ci ai => ti | ... end args1 rest =
-             match x with ... | Ci ai => ui args2 | ... end rest
-\end{verbatim}
-
-\begin{verbatim}
-apply-args:
-  T is an inductive type
-  Γ |- p args : T
-  Γ |- p : t1 ~ t2
-  ------------------------------- apply
-  Γ |- p args : t1 args = t2 args
-\end{verbatim}
-
-\begin{verbatim}
-letin-generic:
-  Γ |- not (t1 == t2)
-  Γ |- p : t1 ~ t2        Γ, (x1 := t1 : T) (x2 := t2 : T) (H : x1 ~ x2) |- q : u1 = u2
-  ------------------------------------------------------------------------------------- letin-generic
-  Γ |- (let x1 := t1 in
-        let x2 := t2 in
-        fun (H : x1 ~ x2) => q) p
-       : (let x1 := t1 in u1) = (let x2 := t2 in u2)
-\end{verbatim}
-
-\begin{verbatim}
-letin-simple:
-    Γ |- t1 == t2           Γ, (x1 := t1 : T) |- q : u1 = u2[x1/x2]
-    -------------------------------------------------------------------- letin-simple
-    Γ |- let x1 := t1 in q : (let x1 := t1 in u1) = (let x2 := t2 in u2)
-\end{verbatim}
-
-
-\begin{verbatim}
-verify-fix:
-  h1 is the number of mutual functions in Fj
-  h2 is the number of mutual functions in Gj
-  i1_of_i2 is a mapping from functions in Gj to Fj
-    (This mapping shows what functions dropped)
-  params is the inductive type parameters of T_{ki}
-  forall j, (Fj is (fix ... (fi/ki:Ti := ti) ... for fj))
-  forall j, (Gj is (fix ... (gi/ki:Ti := ui) ... for gj))
-  forall j, (Γ, (IH1 : F_{i1_of_i2 1} ~ G1), ..., (IHh2 : F_{i1_of_i2 h2} ~ Gh2)
-            |- p_j : t_j[F1/f1,...,Fh1/fh1] ~ ui[G1/g1,...,Gh2/gh2])
-  ------------------------------------------------------------------------------
-  Γ |- (fix
-        ...
-        IHi/ki:(F_{i1_of_i2 i} ~ Gi) :=
-          fun a1 ... an =>
-            let H := pi in
-            match a_{ki} as x return
-                  F_{i1_of_i2 i} a1 ... a{ki-1} x a{ki+1} ... an
-                = Gi a1 ... a{ki-1} x a{ki+1} ... an with
-            | C1 cargs1 => H a1 ... a{ki-1} (C1 params cargs1) a{ki+1} ... an
-            | ...
-            | Cm cargsm => H a1 ... a{ki-1} (Cm params cargsm) a{ki+1} ... an
-            end
-        ...
-        for IHj) b1 ... bn : F_{i1_of_i2 j} b1 ... bn = Gj b1 ... bn
-\end{verbatim}
-
-
-
-
-
-Old Description:
-
-Assuming $t = (\omatch{x}{\rep{C\: \rep{y}\Rightarrow t}}\: z)$,
-$u = (\omatch{x}{\rep{C\: \rep{y} \Rightarrow t\: \underline{z}}})$, and
-some context $K$,
-match-app transformation is $K[t] \reltri K[u]$.
-The match-app redex, $t$, is a subterm of a whole function, $K[t]$.
-Free variables in $t$ and $u$ are bounded by $K$.
-
-\codegen{} verifies match-app transformation by proving $t = u$ internally.
-The proof term is not visible from a user.
-
-\codegen{} does not verify $K[t] = K[u]$ because
-(1) this verification does not add big guarantee over above because we know same context $K$ is used in LHS and RHS,
-(2) induction is required if $x$ is a decreasing argument of fixpoint in $K$ and it is difficult to automate.
-
-
+The reason \codegen{} uses the axiom,functional extensionality, is to automate the verification process.
+In the future, we may introduce the ability to register a congruence lemma for each higher-order function and use it instead of the axioms.
 
 \bibliographystyle{plain}
 \bibliography{base}
