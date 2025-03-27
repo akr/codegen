@@ -2236,12 +2236,12 @@ About codegen_s0_f1_proof.
         & \mbox{$t$ and $t'$ are not applications} \\
         & E[\Gamma] \vdash x \not\equiv x' \\
         & E[\Gamma] \vdash p : x = x' \\
-        & E[\Gamma] \vdash q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x\: \mathit{args}'
+        & E[\Gamma] \vdash q : t\: \mathit{hargs}\: x\: \mathit{targs} = t'\: \mathit{hargs}\: x\: \mathit{targs}'
       \end{aligned}
     }{
-      \kwrew\: p\: \kwin\: q : t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: x'\: \mathit{args}'
+      \kwrew\: p\: \kwin\: q : t\: \mathit{hargs}\: x\: \mathit{targs} = t'\: \mathit{hargs}\: x'\: \mathit{targs}'
     } \\
-    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: \mathit{args}_0\: x\: \mathit{args} = t'\: \mathit{args}_0\: y\: \mathit{args}'})\: q\: x'\: p \\
+    \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: \mathit{hargs}\: x\: \mathit{targs} = t'\: \mathit{hargs}\: y\: \mathit{targs}'})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
         When $x$ and $x'$ are function arguments for higher order functoins $t$ and $t'$, $p$ is an equality of functions.
