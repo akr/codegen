@@ -2087,7 +2087,7 @@ About codegen_s0_f1_proof.
 %          codegen_apparg ]) ].
 
 \begin{gather*}
-  \text{intros:}~
+  \text{verify-forall:}~
     \dfrac{
       E[\Gamma; \mathit{vars}] \vdash p : t = t'
     }{
@@ -2127,8 +2127,7 @@ About codegen_s0_f1_proof.
                 & \kwmatch\:x'\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{margs}'
               \end{aligned} \\
           & \kwwith\:\rep{C\:\mathit{cargs} \Rightarrow p\:\mathit{cargs}}\:\kwend \\
-          & : \quad
-              \begin{aligned}[t]
+          & : \begin{aligned}[t]
                 & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t}\:\kwend\:\mathit{margs} = \\
                 & \kwmatch\:x\:\kwwith\:\rep{C\:\mathit{cargs} \Rightarrow t'}\:\kwend\:\mathit{margs}'
               \end{aligned}
@@ -2146,6 +2145,7 @@ About codegen_s0_f1_proof.
       \begin{aligned}
         & \forall i \in \{1\ldots h'\}, f_{\sigma(i)} = f'_i \qquad \mbox{(function name equality)} \\
         & \forall i \in \{1\ldots h'\}, k_{\sigma(i)} = k'_i \qquad \mbox{(decreasing argument position equality)} \\
+        & \forall i \in \{1\ldots h'\}, T_{\sigma(i)} \equiv T'_i \qquad \mbox{(function type equality)} \\
         & \forall i \in \{1\ldots h'\}, \FV(t_{\sigma(i)}) \cap (\{\rep{f}\} \backslash \{\rep{f'}\}) = \varnothing \\
         & \forall i \in \{1\ldots h'\}, E[\Gamma]; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
       \end{aligned}
@@ -2157,14 +2157,14 @@ About codegen_s0_f1_proof.
     } \\
     \quad \mbox{where} \quad
       \begin{aligned}[t]
-        & F_{i} := \kwfix\:\repi{f/k:=t}{j=1\ldots h}\:\kwfor\:{f_i} \\
-        & F'_{i} := \kwfix\:\repi{f'/k':=t'}{j=1\ldots h'}\:\kwfor\:{f'_i} \\
+        & F_{i} := \kwfix\:\repi{f/k\!:\!T_i:=t}{j=1\ldots h}\:\kwfor\:{f_i} \\
+        & F'_{i} := \kwfix\:\repi{f'/k'\!:\!T'_i:=t'}{j=1\ldots h'}\:\kwfor\:{f'_i} \\
         & \sigma : \{1\ldots h'\} \to \{1\ldots h\} \ \mbox{injective} \\
         & s := \sigma(s') \qquad \mbox{(start function index)} \\
         & \mbox{$\mathit{fargs}$ is arguments for the fixpoints (sequence of terms)} \\
         & q_j :=
           \begin{aligned}[t]
-            & \lambda x_1 \ldots x_{\NA_{F'_j}} . \\
+           & \lambda x_1 \ldots x_{\NA_{F'_j}} . \\
             & \kwlet\:H := p_{j}\:\kwin \\
             & \kwmatch\:x_{k'_j}\:\kwas\:y\:\kwreturn \\
             & \quad F_{\sigma(j)}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{\NA_{F'_j}} = F'_{j}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{\NA_{F'_j}} \\
@@ -2179,11 +2179,11 @@ About codegen_s0_f1_proof.
       \begin{minipage}[t]{0.8\columnwidth}
         This verify-fix rule proves the transformation of fixpoints: $F_{s}$ to $F'_{s'}$.
         The transformation may drops functions in $F_{s}$ unreachable from $f_s$.
-        The unreachable functions are $\{\rep{f}\} \backslash \{\rep{f'}\}$ because we assume the fixpoints uses same function names for corresponding functions.
+        The unreachable functions are $\{\rep{f}\} \backslash \{\rep{f'}\}$ because our transformation does not change the function names in the fixpoints.
         The correspondence of functions in the fixpoints is represented with $\sigma$.
         This rule builds a proof term ($\kwfix\ldots\kwfor\:\mathit{IH}\!_{s'}$) for extensional equality of fixpoints ($F_{s} \simeq F'_{s'}$) from extensional equality proofs of iota-fix reduced forms ($p_i$).
         The \kwmatch-expression in $q_j$ makes the equality iota-fix reducible by destructing the decreasing argument.
-        The let-in expression to bind $H$ prevents copy of the proof term $p_j$ for each constructors.
+        The let-in expression to bind $H$ prevents copy of the proof term $p_j$ for each constructor.
       \end{minipage}
     \breakrule
 \end{gather*}
@@ -2244,7 +2244,7 @@ About codegen_s0_f1_proof.
     \quad \mbox{where} \quad \kwrew\: p\: \kwin\: q := \mathsf{eq\_ind}\: x\: (\lam{y}{t\: \mathit{hargs}\: x\: \mathit{targs} = t'\: \mathit{hargs}\: y\: \mathit{targs}'})\: q\: x'\: p \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        When $x$ and $x'$ are function arguments for higher order functoins $t$ and $t'$, $p$ is an equality of functions.
+        When $x$ and $x'$ are function arguments for higher order functions $t$ and $t'$, $p$ is an equality of functions.
         It needs functional extensionality to convert extensional equality in $\Gamma$ (see the explanation for funext-fun).
       \end{minipage}
 \end{gather*}
@@ -2278,16 +2278,14 @@ About codegen_s0_f1_proof.
 \end{gather*}
 
 The axiom, $\mathsf{functional\_extensionality}$, is required when different functions are bounded with let-in and they are used as an argument for an application.
-The verify-letin-generic rule introduces $x_1 \simeq x_2$ which is not usable for $\mathsf{eq\_ind}$ which require $x_1 = x_2$.
+The verify-letin-generic rule introduces $x \simeq x'$ which is not usable for $\mathsf{eq\_ind}$ which require $x = x'$.
+$\mathsf{functional\_extensionality}$ (and ``verify-forall'' rule) is used multiple times for functions with multiple arguments.
 
-The reason \codegen{} uses the axiom, functional extensionality, is to reduce the time required for verification.
-In the future, we may register a congruence lemma for each higher-order function and use it instead of the axioms.
-
-The reason \codegen{} uses the axiom,functional extensionality, is to automate the verification process.
+The reason \codegen{} uses $\mathsf{functional\_extensionality}$ is to automate the verification process.
 In the future, we may introduce the ability to register a congruence lemma for each higher-order function and use it instead of the axioms.
 
 The axiom also solves a problem with an inductive type that contains a function.
-The equality (Coq.Init.Logic.eq, $t = t'$) and extensional equality ($\forall \mathit{args}, t\:\mathit{args}=t'\:\mathit{args}$) are not suitable for such type.
+The equality (\lstinline!Coq.Init.Logic.eq!, $t = t'$) and extensional equality ($\forall \mathit{args}, t\:\mathit{args}=t'\:\mathit{args}$) are not suitable for such type.
 Currently \codegen{} uses the former equality for inductive types even if they contains function.
 But it requires the axiom to prove equality of a constructor application, $C\:x = C\:x'$ where $x$ and $x'$ are functions with extensional equality.
 We can define new equality type for the type but it is tedious.
