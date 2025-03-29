@@ -2016,7 +2016,7 @@ About codegen_s0_f_proof.
 (* codegen_s0_f_proof : forall (b : bool) (n : nat), f b n = codegen_s0_f b n *)
 \end{lstlisting}
 
-The ``Unreachable Fixfunc Deletion'' drops unreachable functions from mutually-recursive fixpoints as follows.
+The ``Unreachable Fixfunc Deletion'' drops unreachable functions in mutually-recursive fixpoints as follows.
 The source definition \lstinline!f1! is defined as fixpoint which contains three functions: \lstinline!f1!, \lstinline!f2!, and \lstinline!f3!.
 \lstinline!f1! calls \lstinline!f3!.
 \lstinline!f2! calls \lstinline!f3!.
@@ -2091,7 +2091,7 @@ About codegen_s0_f1_proof.
     \dfrac{
       E[\Gamma; \mathit{vars}] \vdash p : t = t'
     }{
-      E[\Gamma] \vdash \lam{\mathit{vars}}{p} : \forall \mathit{vars}, t = t'
+      E[\Gamma] \vdash \lam{\mathit{vars}}{p} : \forall \mathit{vars},\:t = t'
     } \breakrule
 \end{gather*}
 
@@ -2116,7 +2116,7 @@ About codegen_s0_f1_proof.
 \begin{gather*}
   \text{verify-matchapp}:
     \dfrac{
-      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs}, t\:\underline{\mathit{margs}} = t'\:\underline{\mathit{margs}'}}
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs},\: t\:\underline{\mathit{margs}} = t'\:\underline{\mathit{margs}'}}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
@@ -2143,11 +2143,11 @@ About codegen_s0_f1_proof.
   \text{verify-fix}:
     \dfrac{
       \begin{aligned}
-        & \forall i \in \{1\ldots h'\}, f_{\sigma(i)} = f'_i \qquad \mbox{(function name equality)} \\
-        & \forall i \in \{1\ldots h'\}, k_{\sigma(i)} = k'_i \qquad \mbox{(decreasing argument position equality)} \\
-        & \forall i \in \{1\ldots h'\}, T_{\sigma(i)} \equiv T'_i \qquad \mbox{(function type equality)} \\
-        & \forall i \in \{1\ldots h'\}, \FV(t_{\sigma(i)}) \cap (\{\rep{f}\} \backslash \{\rep{f'}\}) = \varnothing \\
-        & \forall i \in \{1\ldots h'\}, E[\Gamma]; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
+        & \forall i \in \{1\ldots h'\},\: f_{\sigma(i)} = f'_i \qquad \mbox{(function name equality)} \\
+        & \forall i \in \{1\ldots h'\},\: k_{\sigma(i)} = k'_i \qquad \mbox{(decreasing argument position equality)} \\
+        & \forall i \in \{1\ldots h'\},\: T_{\sigma(i)} \equiv T'_i \qquad \mbox{(function type equality)} \\
+        & \forall i \in \{1\ldots h'\},\: \FV(t_{\sigma(i)}) \cap (\{\rep{f}\} \backslash \{\rep{f'}\}) = \varnothing \\
+        & \forall i \in \{1\ldots h'\},\: E[\Gamma]; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
       \end{aligned}
     }{
       \begin{aligned}
@@ -2157,21 +2157,22 @@ About codegen_s0_f1_proof.
     } \\
     \quad \mbox{where} \quad
       \begin{aligned}[t]
-        & F_{i} := \kwfix\:\repi{f/k\!:\!T_i:=t}{j=1\ldots h}\:\kwfor\:{f_i} \\
-        & F'_{i} := \kwfix\:\repi{f'/k'\!:\!T'_i:=t'}{j=1\ldots h'}\:\kwfor\:{f'_i} \\
+        & F_{i} := \kwfix\:\repi{f/k\!:\!T:=t}{j=1\ldots h}\:\kwfor\:{f_i} \\
+        & F'_{i} := \kwfix\:\repi{f'/k'\!:\!T':=t'}{j=1\ldots h'}\:\kwfor\:{f'_i} \\
         & \sigma : \{1\ldots h'\} \to \{1\ldots h\} \ \mbox{injective} \\
         & s := \sigma(s') \qquad \mbox{(start function index)} \\
         & \mbox{$\mathit{fargs}$ is arguments for the fixpoints (sequence of terms)} \\
         & q_j :=
           \begin{aligned}[t]
-           & \lambda x_1 \ldots x_{\NA_{F'_j}} . \\
+           & \lambda x_1 \ldots x_{n_j} . \\
             & \kwlet\:H := p_{j}\:\kwin \\
             & \kwmatch\:x_{k'_j}\:\kwas\:y\:\kwreturn \\
-            & \quad F_{\sigma(j)}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{\NA_{F'_j}} = F'_{j}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{\NA_{F'_j}} \\
+            & \quad F_{\sigma(j)}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{n_j} = F'_{j}\:x_1 \ldots x_{k'_j-1}\:y\:x_{k'_j+1} \ldots x_{n_j} \\
             & \kwwith \\
-            & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:x_1 \ldots x_{k'_j-1}}\:(C\:\underline{\mathit{params}_j}\:\mathit{cargs})\:\underline{x_{k'_j+1} \ldots x_{\NA_{F'_j}}}} \\
+            & \rep{|\:C\:\mathit{cargs} \Rightarrow \underline{H\:x_1 \ldots x_{k'_j-1}}\:(C\:\underline{\mathit{params}_j}\:\mathit{cargs})\:\underline{x_{k'_j+1} \ldots x_{n_j}}} \\
             & \kwend
           \end{aligned} \\
+        & n_j := \NA_{F'_j} \qquad \mbox{(number of arguments of $F'_j$)} \\
         & \mbox{$\mathit{params}_j$ is the inductive type parameters of the decreasing argument of $f'_j$} \\
         & \mbox{$\mathit{cargs}$ is variables for the members of constructors}
       \end{aligned} \\
@@ -2266,7 +2267,7 @@ About codegen_s0_f1_proof.
     \dfrac{
       \begin{aligned}
         & \mbox{$t$ and $t'$ are functions} \\
-        & E[\Gamma] \vdash p : \forall x, t\:x = t'\:x\\
+        & E[\Gamma] \vdash p : \forall x,\: t\:x = t'\:x\\
       \end{aligned}
     }{
       p : \mathsf{functional\_extensionality}\:t\:t'\:p : t = t'
