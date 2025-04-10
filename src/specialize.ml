@@ -357,8 +357,7 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
   (sigma, t, ty)
 
 let gensym_simplification (suffix : string) : Names.Id.t * Names.Id.t =
-  let n = !gensym_ps_num in
-  gensym_ps_num := n + 1;
+  let n = inc_gensym_ps_num () in
   let suffix2 = if suffix = "" then suffix else "_" ^ suffix in
   let p = "codegen_p" ^ string_of_int n ^ suffix2 in (* pre-simplified *)
   let s = "codegen_s" ^ string_of_int n ^ suffix2 in (* simplified *)

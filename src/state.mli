@@ -125,7 +125,7 @@ type code_generation =
   | GenSnippet of string * string
   | GenThunk of string * (unit -> string)
 val generation_map : (code_generation list) CString.Map.t ref
-val gensym_ps_num : int ref
+val inc_gensym_ps_num : unit -> int
 val specialize_global_inline : Names.Cpred.t ref
 val specialize_local_inline : Names.Cpred.t Names.Cmap.t ref
 type genflag = DisableDependencyResolver | DisableMutualRecursionDetection

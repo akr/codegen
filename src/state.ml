@@ -318,6 +318,12 @@ let generation_map = Summary.ref ~name:"CodegenGenerationMap"
   (CString.Map.empty : (code_generation list) CString.Map.t)
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
+
+let inc_gensym_ps_num () : int =
+  let n = !gensym_ps_num in
+  gensym_ps_num := n + 1;
+  n
+
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"
 let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"CodegenLocalInline"
 
