@@ -2,19 +2,19 @@ module ConstrMap : CMap.UExtS with type key = Constr.t
 module ConstrSet : CSet.S with type elt = Constr.t
 module StringSet : CSet.S with type elt = String.t
 
-val opt_indimp_auto_linear : bool ref
-val opt_debug_simplification : bool ref
-val opt_debug_normalizeV : bool ref
-val opt_debug_reduction : bool ref
-val opt_debug_reduce_exp : bool ref
-val opt_debug_reduce_app : bool ref
-val opt_debug_replace : bool ref
-val opt_debug_reduce_eta : bool ref
-val opt_debug_complete_arguments : bool ref
-val opt_debug_expand_eta : bool ref
-val opt_debug_delete_let : bool ref
-val opt_debug_borrowcheck : bool ref
-val opt_debug_matchapp : bool ref
+val optread_indimp_auto_linear : unit -> bool
+val optread_debug_simplification : unit -> bool
+val optread_debug_normalizeV : unit -> bool
+val optread_debug_reduction : unit -> bool
+val optread_debug_reduce_exp : unit -> bool
+val optread_debug_reduce_app : unit -> bool
+val optread_debug_replace : unit -> bool
+val optread_debug_reduce_eta : unit -> bool
+val optread_debug_complete_arguments : unit -> bool
+val optread_debug_expand_eta : unit -> bool
+val optread_debug_delete_let : unit -> bool
+val optread_debug_borrowcheck : unit -> bool
+val optread_debug_matchapp : unit -> bool
 
 val gensym_id : int ref
 type string_or_qualid =

@@ -457,10 +457,10 @@ let filter_borrow env sigma term_ty bresult =
 let rec borrowcheck_function (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
     (term : EConstr.t) : borrow_t =
-  if !opt_debug_borrowcheck then
+  if optread_debug_borrowcheck () then
     msg_debug_hov (Pp.str "[codegen:borrowcheck_function] start:" +++ Printer.pr_econstr_env env sigma term);
   let ret = borrowcheck_function1 env sigma lvar_env borrow_env term in
-  if !opt_debug_borrowcheck then
+  if optread_debug_borrowcheck () then
     msg_debug_hov (Pp.str "[codegen:borrowcheck_function] retutrn:" +++
       Pp.str "bresult=" ++ pr_borrow env sigma ret +++
       Printer.pr_econstr_env env sigma term);
@@ -549,7 +549,7 @@ and borrowcheck_function1 (env : Environ.env) (sigma : Evd.evar_map)
 and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
     (lvar_env : int option list) (borrow_env : borrow_t list)
     (term : EConstr.t) (term_ty : EConstr.types) : (IntSet.t * borrow_t * borrow_t) =
-  if !opt_debug_borrowcheck then
+  if optread_debug_borrowcheck () then
     msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] start:" +++
       Pp.str "lvar_env=[" ++
       pp_sjoinmap_ary
@@ -609,7 +609,7 @@ and borrowcheck_expression (env : Environ.env) (sigma : Evd.evar_map)
       Pp.str "]" +++
       Pp.str "but bresult contains" +++
       Pp.int (borrow_max_elt bresult)));
-  if !opt_debug_borrowcheck then
+  if optread_debug_borrowcheck () then
     msg_debug_hov (Pp.str "[codegen:borrowcheck_expression] return:" +++
       Pp.str "lconsumed=" ++ pr_deBruijn_level_set env lconsumed +++
       Pp.str "bused=" ++ pr_borrow env sigma bused +++
