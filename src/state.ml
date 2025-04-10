@@ -211,12 +211,12 @@ type ind_constructor = {
 let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
 let get_ind_config_map () = !ind_config_map
 let set_ind_config_map m = ind_config_map := m
-let update_ind_config_map f = ind_config_map := f (!ind_config_map)
+let update_ind_config_map f = set_ind_config_map (f (!ind_config_map))
 
 let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 let get_linearity_types () = !linearity_types
 let set_linearity_types s = linearity_types := s
-let update_linearity_types f = linearity_types := f (!linearity_types)
+let update_linearity_types f = set_linearity_types (f (!linearity_types))
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
@@ -227,19 +227,19 @@ let downward_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"
 let get_downward_types () = !downward_types
 let set_downward_types s = downward_types := s
-let update_downward_types f = downward_types := f (!downward_types)
+let update_downward_types f = set_downward_types (f (!downward_types))
 
 let borrow_functions = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFuncSet"
 let get_borrow_functions () = !borrow_functions
 let set_borrow_functions s = borrow_functions := s
-let update_borrow_functions f = borrow_functions := f (!borrow_functions)
+let update_borrow_functions f = set_borrow_functions (f (!borrow_functions))
 
 let borrow_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
 let get_borrow_types () = !borrow_types
 let set_borrow_types s = borrow_types := s
-let update_borrow_types f = borrow_types := f (!borrow_types)
+let update_borrow_types f = set_borrow_types (f (!borrow_types))
 
 type simplified_status =
 | SpExpectedId of Id.t (* simplified_id *)
@@ -291,21 +291,21 @@ type specialization_config = {
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
 let get_specialize_config_map () = !specialize_config_map
 let set_specialize_config_map m = specialize_config_map := m
-let update_specialize_config_map f = specialize_config_map := f (!specialize_config_map)
+let update_specialize_config_map f = set_specialize_config_map (f (!specialize_config_map))
 
 (* key is the presimp itself (@cons bool) *)
 let gallina_instance_specialization_map = Summary.ref ~name:"CodegenGallinaInstanceSpecialization"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 let get_gallina_instance_specialization_map () = !gallina_instance_specialization_map
 let set_gallina_instance_specialization_map m = gallina_instance_specialization_map := m
-let update_gallina_instance_specialization_map f = gallina_instance_specialization_map := f (!gallina_instance_specialization_map)
+let update_gallina_instance_specialization_map f = set_gallina_instance_specialization_map (f (!gallina_instance_specialization_map))
 
 (* key is a constant to refer a presimp (codegen_pN_foo) *)
 let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 let get_gallina_instance_codegeneration_map () = !gallina_instance_codegeneration_map
 let set_gallina_instance_codegeneration_map m = gallina_instance_codegeneration_map := m
-let update_gallina_instance_codegeneration_map f = gallina_instance_codegeneration_map := f (!gallina_instance_codegeneration_map)
+let update_gallina_instance_codegeneration_map f = set_gallina_instance_codegeneration_map (f (!gallina_instance_codegeneration_map))
 
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
@@ -317,7 +317,7 @@ let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : cfunc_usage CString.Map.t)
 let get_cfunc_instance_map () = !cfunc_instance_map
 let set_cfunc_instance_map m = cfunc_instance_map := m
-let update_cfunc_instance_map f = cfunc_instance_map := f (!cfunc_instance_map)
+let update_cfunc_instance_map f = set_cfunc_instance_map (f (!cfunc_instance_map))
 
 type string_or_none = string option
 
@@ -349,7 +349,7 @@ let generation_map = Summary.ref ~name:"CodegenGenerationMap"
   (CString.Map.empty : (code_generation list) CString.Map.t)
 let get_generation_map () = !generation_map
 let set_generation_map m = generation_map := m
-let update_generation_map f = generation_map := f (!generation_map)
+let update_generation_map f = set_generation_map (f (!generation_map))
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 
@@ -361,12 +361,12 @@ let inc_gensym_ps_num () : int =
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"
 let get_specialize_global_inline () = !specialize_global_inline
 let set_specialize_global_inline p = specialize_global_inline := p
-let update_specialize_global_inline f = specialize_global_inline := f (!specialize_global_inline)
+let update_specialize_global_inline f = set_specialize_global_inline (f (!specialize_global_inline))
 
 let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"CodegenLocalInline"
 let get_specialize_local_inline () = !specialize_local_inline
 let set_specialize_local_inline p = specialize_local_inline := p
-let update_specialize_local_inline f = specialize_local_inline := f (!specialize_local_inline)
+let update_specialize_local_inline f = set_specialize_local_inline (f (!specialize_local_inline))
 type genflag = DisableDependencyResolver
              | DisableMutualRecursionDetection
 

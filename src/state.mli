@@ -63,11 +63,9 @@ type sp_instance_names = {
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
 
 val get_ind_config_map : unit -> ind_config ConstrMap.t
-val set_ind_config_map : ind_config ConstrMap.t -> unit
 val update_ind_config_map : (ind_config ConstrMap.t -> ind_config ConstrMap.t) -> unit
 
 val get_linearity_types : unit -> ConstrSet.t
-val set_linearity_types : ConstrSet.t -> unit
 val update_linearity_types : (ConstrSet.t -> ConstrSet.t) -> unit
 
 type dealloc_cstr_deallocator = {
@@ -76,15 +74,12 @@ type dealloc_cstr_deallocator = {
 }
 
 val get_downward_types : unit -> ConstrSet.t
-val set_downward_types : ConstrSet.t -> unit
 val update_downward_types : (ConstrSet.t -> ConstrSet.t) -> unit
 
 val get_borrow_functions : unit -> Names.Cset.t
-val set_borrow_functions : Names.Cset.t -> unit
 val update_borrow_functions : (Names.Cset.t -> Names.Cset.t) -> unit
 
 val get_borrow_types : unit -> ConstrSet.t
-val set_borrow_types : ConstrSet.t -> unit
 val update_borrow_types : (ConstrSet.t -> ConstrSet.t) -> unit
 
 type simplified_status =
@@ -118,15 +113,12 @@ type specialization_config = {
 }
 
 val get_specialize_config_map : unit -> specialization_config ConstrMap.t
-val set_specialize_config_map : specialization_config ConstrMap.t -> unit
 val update_specialize_config_map : (specialization_config ConstrMap.t -> specialization_config ConstrMap.t) -> unit
 
 val get_gallina_instance_specialization_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
-val set_gallina_instance_specialization_map : (specialization_config * specialization_instance) ConstrMap.t -> unit
 val update_gallina_instance_specialization_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit
 
 val get_gallina_instance_codegeneration_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
-val set_gallina_instance_codegeneration_map : (specialization_config * specialization_instance) ConstrMap.t -> unit
 val update_gallina_instance_codegeneration_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit
 
 type cfunc_usage =
@@ -134,7 +126,6 @@ type cfunc_usage =
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
 val get_cfunc_instance_map : unit -> cfunc_usage CString.Map.t
-val set_cfunc_instance_map : cfunc_usage CString.Map.t -> unit
 val update_cfunc_instance_map : (cfunc_usage CString.Map.t -> cfunc_usage CString.Map.t) -> unit
 
 type string_or_none = string option
@@ -161,11 +152,9 @@ val update_generation_map : ((code_generation list) CString.Map.t -> (code_gener
 val inc_gensym_ps_num : unit -> int
 
 val get_specialize_global_inline : unit -> Names.Cpred.t
-val set_specialize_global_inline : Names.Cpred.t -> unit
 val update_specialize_global_inline : (Names.Cpred.t -> Names.Cpred.t) -> unit
 
 val get_specialize_local_inline : unit -> Names.Cpred.t Names.Cmap.t
-val set_specialize_local_inline : Names.Cpred.t Names.Cmap.t -> unit
 val update_specialize_local_inline : (Names.Cpred.t Names.Cmap.t -> Names.Cpred.t Names.Cmap.t) -> unit
 
 type genflag = DisableDependencyResolver | DisableMutualRecursionDetection
