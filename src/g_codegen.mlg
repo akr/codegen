@@ -32,7 +32,6 @@ open Genc
 open Snippet
 open Indimp
 open Induc
-open Filegen
 
 open Stdarg (* for wit_string *)
 
@@ -246,11 +245,11 @@ END
 
 VERNAC ARGUMENT EXTEND filename_and_sectionopt
 | [ string(filename) ":" string(section) ] -> { (filename, Some section) }
-| [ "current_source" ":" string(section) ] -> { (!current_source_filename, Some section) }
-| [ "current_header" ":" string(section) ] -> { (!current_header_filename, Some section) }
+| [ "current_source" ":" string(section) ] -> { (get_current_source_filename (), Some section) }
+| [ "current_header" ":" string(section) ] -> { (get_current_header_filename (), Some section) }
 | [ string(filename) ] -> { (filename, None) }
-| [ "current_source" ] -> { (!current_source_filename, None) }
-| [ "current_header" ] -> { (!current_header_filename, None) }
+| [ "current_source" ] -> { (get_current_source_filename (), None) }
+| [ "current_header" ] -> { (get_current_header_filename (), None) }
 END
 
 VERNAC ARGUMENT EXTEND indimp_mod
@@ -314,8 +313,8 @@ VERNAC COMMAND EXTEND CodeGen CLASSIFIED AS SIDEFF
 
     | [ "CodeGen" "Gen" ne_string_or_qualid_list(cfunc_list) ] -> { command_gen cfunc_list }
 
-    | [ "CodeGen" "HeaderFile" string(fn) ] -> { codegen_set_headerfile fn }
-    | [ "CodeGen" "SourceFile" string(fn) ] -> { codegen_set_sourcefile fn }
+    | [ "CodeGen" "HeaderFile" string(fn) ] -> { set_current_header_filename fn }
+    | [ "CodeGen" "SourceFile" string(fn) ] -> { set_current_source_filename fn }
 
     | [ "CodeGen" "GenerateFile" genflag_list(gflist) ] -> { command_generate_file gflist }
     | [ "CodeGen" "GenerateTest" genflag_list(gflist) ] -> { command_generate_test gflist }

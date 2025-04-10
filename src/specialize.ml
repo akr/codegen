@@ -124,7 +124,7 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
     ConstrMap.iter (fun _ -> feedback_instance) sp_cfg.sp_instance_map
   in
   let l = if CList.is_empty funcs then
-            ConstrMap.bindings !specialize_config_map |>
+            ConstrMap.bindings (get_specialize_config_map ()) |>
             (List.sort @@ fun (x,_) (y,_) -> Constr.compare x y) |>
             List.map snd
           else
@@ -136,11 +136,11 @@ let command_print_specialization (funcs : Libnames.qualid list) : unit =
                                  Printer.pr_global gref));
               let sigma', func = fresh_global env sigma gref in
               let func = EConstr.to_constr sigma' func in
-              match ConstrMap.find_opt func !specialize_config_map with
+              match ConstrMap.find_opt func (get_specialize_config_map ()) with
               | None -> user_err (Pp.str "[codegen] not specialized:" +++ Printer.pr_global gref)
               | Some sp_cfg -> sp_cfg
   in
-  msg_info_hov (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal !specialize_config_map));
+  msg_info_hov (Pp.str "Number of source functions:" +++ Pp.int (ConstrMap.cardinal (get_specialize_config_map ())));
   List.iter pr_cfg l
 
 let func_of_qualid (env : Environ.env) (sigma : Evd.evar_map) (qualid : Libnames.qualid) : Evd.evar_map * Constr.t =
@@ -171,14 +171,14 @@ let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env)
     sp_sd_list=sd_list;
     sp_instance_map = ConstrMap.empty
   } in
-  specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
+  update_specialize_config_map (ConstrMap.add func sp_cfg);
   msg_info_hov (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     pr_codegen_arguments env sigma sp_cfg));
   sp_cfg
 
 let codegen_define_or_check_static_arguments ?(cfunc : string option) (env : Environ.env) (sigma : Evd.evar_map) (func : Constr.t) (sd_list : s_or_d list) : specialization_config =
-  match ConstrMap.find_opt func !specialize_config_map with
+  match ConstrMap.find_opt func (get_specialize_config_map ()) with
   | None ->
       codegen_define_static_arguments ?cfunc env sigma func sd_list
   | Some sp_cfg ->
@@ -196,7 +196,7 @@ let command_arguments (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
   let sigma, func = func_of_qualid env sigma func in
-  (if ConstrMap.mem func !specialize_config_map then
+  (if ConstrMap.mem func (get_specialize_config_map ()) then
     user_err (Pp.str "[codegen] specialization already configured:" +++ Printer.pr_constr_env env sigma func));
   ignore (codegen_define_static_arguments env sigma func sd_list)
 
@@ -280,7 +280,7 @@ let codegen_auto_arguments_internal
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : specialization_config =
   assert (Constr.isConst func || Constr.isConstruct func);
-  match ConstrMap.find_opt func !specialize_config_map with
+  match ConstrMap.find_opt func (get_specialize_config_map ()) with
   | Some sp_cfg -> sp_cfg (* already defined *)
   | None ->
       let env = Environ.pop_rel_context (Environ.nb_rel env) env in
@@ -292,7 +292,7 @@ let codegen_auto_sd_list
     (env : Environ.env) (sigma : Evd.evar_map)
     (func : Constr.t) : s_or_d list =
   assert (Constr.isConst func || Constr.isConstruct func);
-  match ConstrMap.find_opt func !specialize_config_map with
+  match ConstrMap.find_opt func (get_specialize_config_map ()) with
   | Some sp_cfg -> sp_cfg.sp_sd_list (* already defined *)
   | None ->
       let env = Environ.pop_rel_context (Environ.nb_rel env) env in
@@ -375,7 +375,7 @@ let label_name_of_constant_or_constructor (func : Constr.t) : string =
   | _ -> user_err (Pp.str "[codegen] expect constant or constructor")
 
 let check_cfunc_name_conflict env sigma icommand presimp cfunc_name =
-  match icommand, CString.Map.find_opt cfunc_name !cfunc_instance_map with
+  match icommand, CString.Map.find_opt cfunc_name (get_cfunc_instance_map ()) with
   | (CodeGenFunc), None -> ()
   | (CodeGenFunc), Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) ->
       user_err
@@ -483,7 +483,7 @@ let make_presimp_for_instance
     (icommand : instance_command) (efunc : EConstr.t) (user_args : EConstr.t option array) (names_opt : sp_instance_names option) :
       Environ.env * Evd.evar_map * specialization_config * EConstr.t option list * Constr.t * Constr.t * (unit -> Id.t) * string =
   let (func, static_args) = check_instance_args env sigma efunc user_args in
-  let sp_cfg = match ConstrMap.find_opt func !specialize_config_map with
+  let sp_cfg = match ConstrMap.find_opt func (get_specialize_config_map ()) with
     | None -> user_err (Pp.str "[codegen] specialization arguments not configured")
     | Some sp_cfg -> sp_cfg
   in
@@ -538,23 +538,23 @@ let register_sp_instance ?(cfunc : string option)
     | Some { sp_gen=sp_gen } -> sp_gen
     | _ -> None
   in
-  specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map;
-  gallina_instance_specialization_map := ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map;
+  update_specialize_config_map (ConstrMap.add func sp_cfg);
+  update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst));
   (match sp_interface with
   | Some sp_interface ->
       msg_info_hov (Pp.str "[codegen]" +++
         (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
         pr_codegen_instance env sigma sp_cfg sp_inst);
-      gallina_instance_codegeneration_map := ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst) !gallina_instance_codegeneration_map;
+      update_gallina_instance_codegeneration_map (ConstrMap.add sp_interface.sp_presimp_constr (sp_cfg, sp_inst));
   | None -> ());
   (match sp_interface, sp_gen with
   | (Some sp_interface), (Some sp_gen) ->
-      cfunc_instance_map := CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) !cfunc_instance_map
+      update_cfunc_instance_map (CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)))
   | (Some sp_interface), None ->
       let cfunc_name = sp_interface.sp_cfunc_name in
-      (match CString.Map.find_opt cfunc_name !cfunc_instance_map with
-      | None -> cfunc_instance_map := CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]) !cfunc_instance_map;
-      | Some (CodeGenCfuncPrimitive l) -> cfunc_instance_map := CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)) !cfunc_instance_map
+      (match CString.Map.find_opt cfunc_name (get_cfunc_instance_map ()) with
+      | None -> update_cfunc_instance_map (CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]));
+      | Some (CodeGenCfuncPrimitive l) -> update_cfunc_instance_map (CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)))
       | Some (CodeGenCfuncGenerate l) -> assert false)
   | None, _ -> ());
   ()
@@ -693,7 +693,7 @@ let command_global_inline (func_qualids : Libnames.qualid list) : unit =
     funcs
   in
   let f pred ctnt = Cpred.add ctnt pred in
-  specialize_global_inline := List.fold_left f !specialize_global_inline ctnts
+  update_specialize_global_inline (fun p -> List.fold_left f p ctnts)
 
 let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
@@ -712,13 +712,14 @@ let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libname
       | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
     funcs
   in
-  let local_inline = !specialize_local_inline in
-  let pred = match Cmap.find_opt ctnt local_inline with
-             | None -> Cpred.empty
-             | Some pred -> pred in
-  let f pred ctnt = Cpred.add ctnt pred in
-  let pred' = List.fold_left f pred ctnts in
-  specialize_local_inline := Cmap.add ctnt pred' local_inline
+  update_specialize_local_inline
+    (fun local_inline ->
+      let pred = match Cmap.find_opt ctnt local_inline with
+                 | None -> Cpred.empty
+                 | Some pred -> pred in
+      let f pred ctnt = Cpred.add ctnt pred in
+      let pred' = List.fold_left f pred ctnts in
+      Cmap.add ctnt pred' local_inline)
 
 let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
   let rec aux term =
@@ -2473,7 +2474,7 @@ let debug_simplification (env : Environ.env) (sigma : Evd.evar_map) (step : stri
 let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   init_debug_simplification ();
   let (sp_cfg, sp_inst, sp_interface, sp_gen) =
-    match CString.Map.find_opt cfunc !cfunc_instance_map with
+    match CString.Map.find_opt cfunc (get_cfunc_instance_map ()) with
     | None ->
         user_err (Pp.str "[codegen] specialization instance not defined:" +++
                   Pp.str (escape_as_coq_string cfunc))
@@ -2501,8 +2502,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     Pp.str "Start simplification:" +++ Id.print s_id);
   let inline_pred =
     let pred_func = Cpred.singleton ctnt in
-    let global_pred = !specialize_global_inline in
-    let local_pred = (match Cmap.find_opt ctnt !specialize_local_inline with
+    let global_pred = (get_specialize_global_inline ()) in
+    let local_pred = (match Cmap.find_opt ctnt (get_specialize_local_inline ()) with
                      | None -> Cpred.empty
                      | Some pred -> pred) in
     Cpred.union (Cpred.union pred_func global_pred) local_pred
@@ -2588,19 +2589,12 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   msg_info_hov (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
-  (let m = !gallina_instance_specialization_map in
-    let m = ConstrMap.set presimp (sp_cfg, sp_inst2) m in
-    gallina_instance_specialization_map := m);
-  (let m = !gallina_instance_codegeneration_map in
-    let m = ConstrMap.set sp_interface.sp_presimp_constr (sp_cfg, sp_inst2) m in
-    gallina_instance_codegeneration_map := m);
-  (let m = !cfunc_instance_map in
-    let m = CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)) m in
-    cfunc_instance_map := m);
+  update_gallina_instance_specialization_map (ConstrMap.set presimp (sp_cfg, sp_inst2));
+  update_gallina_instance_codegeneration_map (ConstrMap.set sp_interface.sp_presimp_constr (sp_cfg, sp_inst2));
+  update_cfunc_instance_map (CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)));
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
-   let m = !specialize_config_map in
-   specialize_config_map := ConstrMap.add sp_cfg.sp_func sp_cfg2 m);
+   update_specialize_config_map (ConstrMap.add sp_cfg.sp_func sp_cfg2));
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt, referred_cfuncs)
 
@@ -2615,7 +2609,7 @@ let rec recursive_simplify (visited : StringSet.t ref) (rev_postorder : string l
     ()
   else
     (visited := StringSet.add cfunc !visited;
-    match CString.Map.find_opt cfunc !cfunc_instance_map with
+    match CString.Map.find_opt cfunc (get_cfunc_instance_map ()) with
     | None -> user_err (Pp.str "[codegen] unknown C function:" +++ Pp.str cfunc)
     | Some (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)) ->
         (match sp_gen with
@@ -2671,8 +2665,7 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
     []
 
 let command_resolve_dependencies () : unit =
-  generation_map :=
-    !generation_map |> CString.Map.map codegen_resolve_dependencies
+  update_generation_map (CString.Map.map codegen_resolve_dependencies)
 
 let command_print_generation_list gen_list =
   List.iter
@@ -2691,9 +2684,9 @@ let command_print_generation_list gen_list =
     (List.rev_append gen_list [])
 
 let command_print_generation_map () =
-  msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string (!current_header_filename)));
-  msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string (!current_source_filename)));
-  !generation_map |> CString.Map.iter
+  msg_info_hov (Pp.str "current_header_filename =" +++ Pp.str (escape_as_coq_string (get_current_header_filename ())));
+  msg_info_hov (Pp.str "current_source_filename =" +++ Pp.str (escape_as_coq_string (get_current_source_filename ())));
+  (get_generation_map ()) |> CString.Map.iter
     (fun filename gen_list ->
       msg_info_hov (Pp.str filename);
       command_print_generation_list gen_list)

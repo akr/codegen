@@ -61,17 +61,31 @@ type sp_instance_names = {
   spi_simplified_id : Names.Id.t option;
 }
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
-val ind_config_map : ind_config ConstrMap.t ref
-val linearity_types : ConstrSet.t ref
+
+val get_ind_config_map : unit -> ind_config ConstrMap.t
+val set_ind_config_map : ind_config ConstrMap.t -> unit
+val update_ind_config_map : (ind_config ConstrMap.t -> ind_config ConstrMap.t) -> unit
+
+val get_linearity_types : unit -> ConstrSet.t
+val set_linearity_types : ConstrSet.t -> unit
+val update_linearity_types : (ConstrSet.t -> ConstrSet.t) -> unit
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
   dealloc_cstr_deallocator: string;
 }
 
-val downward_types : ConstrSet.t ref
-val borrow_functions : Names.Cset.t ref
-val borrow_types : ConstrSet.t ref
+val get_downward_types : unit -> ConstrSet.t
+val set_downward_types : ConstrSet.t -> unit
+val update_downward_types : (ConstrSet.t -> ConstrSet.t) -> unit
+
+val get_borrow_functions : unit -> Names.Cset.t
+val set_borrow_functions : Names.Cset.t -> unit
+val update_borrow_functions : (Names.Cset.t -> Names.Cset.t) -> unit
+
+val get_borrow_types : unit -> ConstrSet.t
+val set_borrow_types : ConstrSet.t -> unit
+val update_borrow_types : (ConstrSet.t -> ConstrSet.t) -> unit
 
 type simplified_status =
   | SpExpectedId of Names.Id.t (* simplified_id *)
@@ -102,30 +116,56 @@ type specialization_config = {
   sp_sd_list : s_or_d list;
   sp_instance_map : specialization_instance ConstrMap.t;
 }
-val specialize_config_map : specialization_config ConstrMap.t ref
-val gallina_instance_specialization_map :
-  (specialization_config * specialization_instance) ConstrMap.t ref
-val gallina_instance_codegeneration_map :
-  (specialization_config * specialization_instance) ConstrMap.t ref
+
+val get_specialize_config_map : unit -> specialization_config ConstrMap.t
+val set_specialize_config_map : specialization_config ConstrMap.t -> unit
+val update_specialize_config_map : (specialization_config ConstrMap.t -> specialization_config ConstrMap.t) -> unit
+
+val get_gallina_instance_specialization_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
+val set_gallina_instance_specialization_map : (specialization_config * specialization_instance) ConstrMap.t -> unit
+val update_gallina_instance_specialization_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit
+
+val get_gallina_instance_codegeneration_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
+val set_gallina_instance_codegeneration_map : (specialization_config * specialization_instance) ConstrMap.t -> unit
+val update_gallina_instance_codegeneration_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit
 
 type cfunc_usage =
 | CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen) (* CodeGenFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
-val cfunc_instance_map :
-  cfunc_usage CString.Map.t ref
+
+val get_cfunc_instance_map : unit -> cfunc_usage CString.Map.t
+val set_cfunc_instance_map : cfunc_usage CString.Map.t -> unit
+val update_cfunc_instance_map : (cfunc_usage CString.Map.t -> cfunc_usage CString.Map.t) -> unit
+
 type string_or_none = string option
 val dummy_header_filename : string
 val dummy_source_filename : string
-val current_header_filename : string ref
-val current_source_filename : string ref
+
+val get_current_header_filename : unit -> string
+val set_current_header_filename : string -> unit
+
+val get_current_source_filename : unit -> string
+val set_current_source_filename : string -> unit
+
 type code_generation =
     GenFunc of string
   | GenMutual of string list
   | GenPrototype of string
   | GenSnippet of string * string
   | GenThunk of string * (unit -> string)
-val generation_map : (code_generation list) CString.Map.t ref
+
+val get_generation_map : unit -> (code_generation list) CString.Map.t
+val set_generation_map : (code_generation list) CString.Map.t -> unit
+val update_generation_map : ((code_generation list) CString.Map.t -> (code_generation list) CString.Map.t) -> unit
+
 val inc_gensym_ps_num : unit -> int
-val specialize_global_inline : Names.Cpred.t ref
-val specialize_local_inline : Names.Cpred.t Names.Cmap.t ref
+
+val get_specialize_global_inline : unit -> Names.Cpred.t
+val set_specialize_global_inline : Names.Cpred.t -> unit
+val update_specialize_global_inline : (Names.Cpred.t -> Names.Cpred.t) -> unit
+
+val get_specialize_local_inline : unit -> Names.Cpred.t Names.Cmap.t
+val set_specialize_local_inline : Names.Cpred.t Names.Cmap.t -> unit
+val update_specialize_local_inline : (Names.Cpred.t Names.Cmap.t -> Names.Cpred.t Names.Cmap.t) -> unit
+
 type genflag = DisableDependencyResolver | DisableMutualRecursionDetection

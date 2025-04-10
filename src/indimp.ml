@@ -411,7 +411,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
         check_user_ind_config env sigma ind_cfg;
         merge_ind_config_right_preference env sigma indimp_generated_ind_cfg ind_cfg
   in
-  ind_config_map := ConstrMap.add (EConstr.to_constr sigma coq_type_i) ind_cfg !ind_config_map;
+  update_ind_config_map (ConstrMap.add (EConstr.to_constr sigma coq_type_i) ind_cfg);
   let ind_names = put_ind_config_in_ind_names env sigma ind_names ind_cfg in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, tuples) =
@@ -423,7 +423,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
         let cstrterm0 = EConstr.to_constr sigma cstrterm in
         ignore (codegen_define_or_check_static_arguments env sigma cstrterm0 (List.init (Array.length params) (fun _ -> SorD_S)));
         let presimp = EConstr.to_constr sigma (mkApp (cstrterm, params)) in
-        match ConstrMap.find_opt presimp !gallina_instance_specialization_map with
+        match ConstrMap.find_opt presimp (get_gallina_instance_specialization_map ()) with
         | None ->
             let spi = { spi_cfunc_name = Some cn_name; spi_presimp_id = None; spi_simplified_id = None } in
             let (env, _sp_cfg, sp_inst, sp_interface) = codegen_instance_command_primitive env sigma cstrterm params0 (Some spi) in
@@ -850,10 +850,10 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let ind_names = generate_indimp_names env sigma coq_type ~global_prefix:indimp_mods.indimp_mods_prefix ~heap:false in
   let env, ind_names = register_indimp env sigma ind_names in
   ignore env;
-  (*let (type_decls_filename, type_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_decls ~default:(!current_source_filename, "type_decls") in*)
-  let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(!current_source_filename, "type_impls") in
-  let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(!current_source_filename, "func_decls") in
-  let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(!current_source_filename, "func_impls") in
+  (*let (type_decls_filename, type_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_decls ~default:(get_current_source_filename (), "type_decls") in*)
+  let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(get_current_source_filename (), "type_impls") in
+  let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(get_current_source_filename (), "func_decls") in
+  let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(get_current_source_filename (), "func_impls") in
   let lazy_code = lazy (gen_indimp_immediate_impl (non_void_ind_names ind_names) indimp_mods) in
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
@@ -871,10 +871,10 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   if optread_indimp_auto_linear () then
     Linear.add_linear_type ~msg_new:true env sigma coq_type;
   ignore env;
-  let (type_decls_filename, type_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_decls ~default:(!current_source_filename, "type_decls") in
-  let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(!current_source_filename, "type_impls") in
-  let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(!current_source_filename, "func_decls") in
-  let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(!current_source_filename, "func_impls") in
+  let (type_decls_filename, type_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_decls ~default:(get_current_source_filename (), "type_decls") in
+  let (type_impls_filename, type_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_type_impls ~default:(get_current_source_filename (), "type_impls") in
+  let (func_decls_filename, func_decls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_decls ~default:(get_current_source_filename (), "func_decls") in
+  let (func_impls_filename, func_impls_section) = Stdlib.Option.value indimp_mods.indimp_mods_output_func_impls ~default:(get_current_source_filename (), "func_impls") in
   let lazy_type = lazy (gen_indimp_heap_decls (non_void_ind_names ind_names) indimp_mods) in
   let lazy_code = lazy (gen_indimp_heap_impls (non_void_ind_names ind_names) indimp_mods) in
   let type_decls () = let type_decl = Lazy.force lazy_type in Pp.string_of_ppcmds (Pp.v 0 type_decl) in

@@ -1575,7 +1575,7 @@ let gen_funcall (c_fname : string) (argvars : string array) : Pp.t =
 
 let gen_app_const_construct (env : Environ.env) (sigma : Evd.evar_map) (f : EConstr.t) (argvars : string array) : Pp.t =
   let (sp_inst, sp_interface) =
-    match ConstrMap.find_opt (EConstr.to_constr sigma f) !gallina_instance_codegeneration_map with
+    match ConstrMap.find_opt (EConstr.to_constr sigma f) (get_gallina_instance_codegeneration_map ()) with
     | None | Some (_, {sp_interface=None})->
         (match EConstr.kind sigma f with
         | Constr.Const (ctnt, _u) ->
@@ -2519,7 +2519,7 @@ let gen_func_multi
 let make_simplified_for_cfunc (cfunc_name : string) :
     cfunc_t * Constr.types * Constr.t =
   let (sp_cfg, sp_inst, sp_interface, sp_gen) =
-    match CString.Map.find_opt cfunc_name !cfunc_instance_map with
+    match CString.Map.find_opt cfunc_name (get_cfunc_instance_map ()) with
     | None ->
         user_err (Pp.str "[codegen] C function name not found:" +++
                   Pp.str cfunc_name)
@@ -2860,13 +2860,13 @@ let gen_file (fn : string) (gen_list : code_generation list) : unit =
     end
 
 let command_generate_file (gflist : genflag list) : unit =
-  let gen_map = complete_gen_map gflist !generation_map in
+  let gen_map = complete_gen_map gflist (get_generation_map ()) in
   gen_map |> CString.Map.iter
     (fun fn gen_list -> gen_file fn (List.rev gen_list));
-  generation_map := CString.Map.empty
+  set_generation_map CString.Map.empty
 
 let command_generate_test (gflist : genflag list) : unit =
-  let gen_map = complete_gen_map gflist !generation_map in
+  let gen_map = complete_gen_map gflist (get_generation_map ()) in
   gen_map |> CString.Map.iter
     (fun fn gen_list ->
       Feedback.msg_info (Pp.str fn);

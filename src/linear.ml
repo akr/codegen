@@ -29,11 +29,11 @@ let add_linear_type ?(msg_new:bool=false) ?(msg_already:bool=false)
   let ty = nf_all env sigma ty in
   (if not (is_concrete_inductive_type env sigma ty) then
     user_err (Pp.str "[codegen] linear: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty));
-  if ConstrSet.mem (EConstr.to_constr sigma ty) !linearity_types then
+  if ConstrSet.mem (EConstr.to_constr sigma ty) (get_linearity_types ()) then
     (if msg_already then
       Feedback.msg_info (Pp.str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty))
   else
-    (linearity_types := ConstrSet.add (EConstr.to_constr sigma ty) !linearity_types;
+    (update_linearity_types (ConstrSet.add (EConstr.to_constr sigma ty));
     if msg_new then
       Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty))
 
@@ -50,9 +50,9 @@ let command_downward (ty : Constrexpr.constr_expr) : unit =
   let ty4 = nf_all env sigma ty2 in
   (if not (is_concrete_inductive_type env sigma ty4) then
     user_err (Pp.str "[codegen] downward: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
-  (if ConstrSet.mem (EConstr.to_constr sigma ty4) !downward_types then
+  (if ConstrSet.mem (EConstr.to_constr sigma ty4) (get_downward_types ()) then
     user_err (Pp.str "[codegen] downwardness already defined:" +++ Printer.pr_econstr_env env sigma ty4));
-  downward_types := ConstrSet.add (EConstr.to_constr sigma ty4) !downward_types;
+  update_downward_types (ConstrSet.add (EConstr.to_constr sigma ty4));
   Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
 let make_mutual_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (mutind : MutInd.t) (u : EInstance.t) (params : EConstr.t array) : EConstr.t array =
@@ -149,7 +149,7 @@ let is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.type
   if has_sort then
     false (* not code-generatable *)
   else
-    not (ConstrSet.disjoint ty_set !linearity_types)
+    not (ConstrSet.disjoint ty_set (get_linearity_types ()))
 
 let is_linear (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (str "[codegen] is_linear:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
@@ -180,7 +180,7 @@ let is_downward_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.ty
   else if has_func then
     true
   else
-    not (ConstrSet.disjoint ty_set !downward_types)
+    not (ConstrSet.disjoint ty_set (get_downward_types ()))
 
 let is_downward (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   (*Feedback.msg_debug (Pp.str "[codegen] is_downward:argument:" ++ Printer.pr_econstr_env env sigma ty);*)
@@ -443,7 +443,7 @@ let is_borrow_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.t) :
   let ty = nf_all env sigma ty in
   (if not (Vars.closed0 sigma ty) then
     user_err_hov (Pp.str "[codegen:is_borrow_type] free variable in type:" +++ Printer.pr_econstr_env env sigma ty));
-  ConstrSet.mem (EConstr.to_constr sigma ty) !borrow_types
+  ConstrSet.mem (EConstr.to_constr sigma ty) (get_borrow_types ())
 
 let filter_borrow env sigma term_ty bresult =
   match component_types env sigma term_ty with
@@ -675,7 +675,7 @@ and borrowcheck_expression1 (env : Environ.env) (sigma : Evd.evar_map)
         let (lconsumed', bused') = check_app lconsumed bresult in
         (lconsumed', bused', filter_result bused')
   | Const (ctnt, univ) ->
-      if Cset.mem ctnt !borrow_functions then
+      if Cset.mem ctnt (get_borrow_functions ()) then
         (assert (List.length vs = 1);
         let l = List.hd vs in (* the argument is a linear variable which we borrow it here *)
         let i = Environ.nb_rel env - l in
@@ -901,10 +901,10 @@ let borrowcheck (env : Environ.env) (sigma : Evd.evar_map)
 let add_borrow_type ?(msg_new:bool=false) ?(msg_already:bool=false)
     (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : unit =
   let tyset = ConstrSet.of_list (CArray.map_to_list (EConstr.to_constr sigma) (mutual_inductive_types env sigma ty)) in
-  let added = ConstrSet.diff tyset !borrow_types in
-  let already_added = ConstrSet.inter tyset !borrow_types in
-  if not (ConstrSet.subset tyset !borrow_types) then
-    borrow_types := ConstrSet.union tyset !borrow_types;
+  let added = ConstrSet.diff tyset (get_borrow_types ()) in
+  let already_added = ConstrSet.inter tyset (get_borrow_types ()) in
+  if not (ConstrSet.subset tyset (get_borrow_types ())) then
+    update_borrow_types (ConstrSet.union tyset);
   if msg_new then
     List.iter
       (fun ty ->
@@ -933,10 +933,10 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
   in
   let set_borrow_type env sigma ty = add_borrow_type ~msg_new:true env sigma (EConstr.of_constr ty) in
   let set_borrow_function ctnt =
-    if Cset.mem ctnt !borrow_functions then
+    if Cset.mem ctnt (get_borrow_functions ()) then
       ()
     else
-      borrow_functions := Cset.add ctnt !borrow_functions
+      update_borrow_functions (Cset.add ctnt)
   in
   let gref = Smartlocate.global_with_alias libref in
   let env = Global.env () in
