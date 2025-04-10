@@ -210,20 +210,20 @@ type ind_constructor = {
 
 let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
 
-let linearity_type_set = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
+let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
   dealloc_cstr_deallocator: string;
 }
 
-let downward_type_set = Summary.ref
+let downward_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"
 
-let borrow_function_set = Summary.ref
+let borrow_functions = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFuncSet"
 
-let borrow_type_set = Summary.ref
+let borrow_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
 
 type simplified_status =

@@ -62,16 +62,16 @@ type sp_instance_names = {
 }
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
 val ind_config_map : ind_config ConstrMap.t ref
-val linearity_type_set : ConstrSet.t ref
+val linearity_types : ConstrSet.t ref
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
   dealloc_cstr_deallocator: string;
 }
 
-val downward_type_set : ConstrSet.t ref
-val borrow_function_set : Names.Cset.t ref
-val borrow_type_set : ConstrSet.t ref
+val downward_types : ConstrSet.t ref
+val borrow_functions : Names.Cset.t ref
+val borrow_types : ConstrSet.t ref
 
 type simplified_status =
   | SpExpectedId of Names.Id.t (* simplified_id *)
