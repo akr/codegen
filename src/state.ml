@@ -154,6 +154,11 @@ let () = let open Goptions in declare_bool_option
 
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
+let global_gensym ?(prefix : string = "g") () : string =
+  let n = !gensym_id in
+  gensym_id := n + 1;
+  prefix ^ string_of_int n
+
 type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
 
 type cstr_interface =

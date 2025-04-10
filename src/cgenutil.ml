@@ -1218,11 +1218,6 @@ let constr_expr_cstr_name (c : Constrexpr.constr_expr) =
   | Constrexpr.CGenarg _ -> "CGenarg"
   | Constrexpr.CGenargGlob _ -> "CGenargGlob"
 
-let global_gensym ?(prefix : string = "g") () : string =
-  let n = !gensym_id in
-  gensym_id := n + 1;
-  prefix ^ string_of_int n
-
 let global_gensym_with_string (s : string) : string =
   global_gensym () ^ "_" ^ s
 

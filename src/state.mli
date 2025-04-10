@@ -16,7 +16,8 @@ val optread_debug_delete_let : unit -> bool
 val optread_debug_borrowcheck : unit -> bool
 val optread_debug_matchapp : unit -> bool
 
-val gensym_id : int ref
+val global_gensym : ?prefix:string -> unit -> string
+
 type string_or_qualid =
     StrOrQid_Str of string
   | StrOrQid_Qid of Libnames.qualid
