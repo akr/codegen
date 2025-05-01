@@ -154,9 +154,15 @@ let () = let open Goptions in declare_bool_option
 
 let gensym_id = Summary.ref 0 ~name:"CodegenGensymID"
 
+let inc_gensym_id_obj : unit -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.superglobal_object "CodeGen GenSymID"
+    ~cache:(fun () -> gensym_id := !gensym_id + 1)
+    ~subst:None
+    ~discharge:(fun x -> Some x)
+
 let global_gensym ?(prefix : string = "g") () : string =
   let n = !gensym_id in
-  gensym_id := n + 1;
+  Lib.add_leaf (inc_gensym_id_obj ());
   prefix ^ string_of_int n
 
 type string_or_qualid = StrOrQid_Str of string | StrOrQid_Qid of Libnames.qualid
@@ -353,9 +359,15 @@ let update_generation_map f = set_generation_map (f (!generation_map))
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 
+let inc_gensym_ps_num_obj : unit -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.superglobal_object "CodeGen SpecializationInstanceNum"
+    ~cache:(fun () -> gensym_ps_num := !gensym_ps_num + 1)
+    ~subst:None
+    ~discharge:(fun x -> Some x)
+
 let inc_gensym_ps_num () : int =
   let n = !gensym_ps_num in
-  gensym_ps_num := n + 1;
+  Lib.add_leaf (inc_gensym_ps_num_obj ());
   n
 
 let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"CodegenGlobalInline"
