@@ -411,7 +411,7 @@ let register_indimp (env : Environ.env) (sigma : Evd.evar_map) (ind_names : memb
         check_user_ind_config env sigma ind_cfg;
         merge_ind_config_right_preference env sigma indimp_generated_ind_cfg ind_cfg
   in
-  update_ind_config_map (ConstrMap.add (EConstr.to_constr sigma coq_type_i) ind_cfg);
+  add_ind_config_map (EConstr.to_constr sigma coq_type_i) ind_cfg;
   let ind_names = put_ind_config_in_ind_names env sigma ind_names ind_cfg in
   (* Merge information from CodeGen Primitive CONSTRUCTOR PARAMS => "CSTR_NAME" *)
   let (env, tuples) =

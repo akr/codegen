@@ -178,8 +178,7 @@ type ind_constructor = {
 
 let ind_config_map = Summary.ref (ConstrMap.empty : ind_config ConstrMap.t) ~name:"CodegenIndInfo"
 let get_ind_config_map () = !ind_config_map
-let set_ind_config_map m = ind_config_map := m
-let update_ind_config_map f = set_ind_config_map (f (!ind_config_map))
+let add_ind_config_map coq_type ind_cfg = ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map
 
 let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 let get_linearity_types () = !linearity_types
