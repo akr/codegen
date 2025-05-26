@@ -38,7 +38,7 @@ type cstr_config = {
   cstr_id: Names.Id.t;
   cstr_caselabel: string option;
   cstr_accessors: string option array;
-  cstr_deallocator: string option Lazy.t option;
+  cstr_deallocator: string option;
 }
 
 type c_typedata = {

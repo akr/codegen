@@ -133,7 +133,7 @@ type 't cstr_names = {
   cn_struct_tag: string;
   cn_umember: string; (* union member name *)
   cn_members: 't list; (* member_names list or nvmember_names list *)
-  cn_deallocator_lazy: string option Lazy.t;
+  cn_deallocator: string option;
 }
 
 type 't ind_names = {
@@ -244,7 +244,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
           let member_type_lazy = lazy (if ind_is_void_type env sigma arg_type then c_type_void else c_typename env sigma arg_type) in
           { member_type_lazy; member_name; member_accessor })
       in
-      let cn_deallocator_lazy = lazy (
+      let cn_deallocator = (
         (* deallocator depends on user configuration (heap or not, void or not, constant or not) *)
         if not heap then
           None
@@ -254,7 +254,7 @@ let generate_indimp_names (env : Environ.env) (sigma : Evd.evar_map) (coq_type :
             Some "free"
           else
             None) in
-      { cn_j; cn_id; cn_name; cn_enum_const; cn_struct_tag; cn_umember; cn_members; cn_deallocator_lazy; })
+      { cn_j; cn_id; cn_name; cn_enum_const; cn_struct_tag; cn_umember; cn_members; cn_deallocator; })
   in
   let result = { inm_pind=pind; inm_params=params; inm_name; inm_struct_tag; inm_enum_tag; inm_swfunc; inm_cstrs } in
   (*msg_info_v (pr_ind_names env sigma result);*)
@@ -266,10 +266,10 @@ let get_ind_config_from_ind_names (sigma : Evd.evar_map) (ind_names : member_nam
   let ind_c_type = Some (simple_c_type inm_name) in
   let ind_c_swfunc = Some inm_swfunc in
   let ind_cstr_configs =
-    inm_cstrs |> Array.map (fun { cn_id; cn_enum_const; cn_members; cn_deallocator_lazy } ->
+    inm_cstrs |> Array.map (fun { cn_id; cn_enum_const; cn_members; cn_deallocator } ->
       let cstr_id = cn_id in
       let cstr_caselabel = Some cn_enum_const in
-      let cstr_deallocator = Some cn_deallocator_lazy in
+      let cstr_deallocator = cn_deallocator in
       let cstr_accessors = cn_members |> CArray.map_of_list (fun { member_name } -> Some member_name) in
       { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator; })
   in
@@ -299,8 +299,7 @@ let check_user_ind_config (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : 
     begin
       match cstr_deallocator with
       | None -> ()
-      | Some (lazy None) -> ()
-      | Some (lazy (Some dealloc)) ->
+      | Some dealloc ->
           user_err_hov (Pp.str "[codegen] IndImp needs deallocator not configured:" +++
           Printer.pr_constr_env env sigma ind_coq_type +++ Id.print cstr_id +++ Pp.str (quote_coq_string dealloc))
     end;
@@ -342,16 +341,7 @@ let merge_ind_config_right_preference (env : Environ.env) (sigma : Evd.evar_map)
             let accessor2 = if i < n2 then cstr_accessors2.(i) else None in
             merge_option_right_preference accessor1 accessor2)
         in
-        let cstr_deallocator =
-          match cstr_deallocator1, cstr_deallocator2 with
-          | None, None -> None
-          | None, Some _ -> cstr_deallocator2
-          | Some _, None -> cstr_deallocator1
-          | Some str_opt_lazy1, Some str_opt_lazy2 ->
-              Some (lazy begin
-                let (lazy str_opt1, lazy str_opt2) = (str_opt_lazy1, str_opt_lazy2) in
-                merge_option_right_preference str_opt1 str_opt2
-              end)
+        let cstr_deallocator = merge_option_right_preference cstr_deallocator1 cstr_deallocator2
         in
         { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator })
       ind_cstr_configs1 ind_cstr_configs2
@@ -368,7 +358,7 @@ let put_ind_config_in_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_
   in
   let inm_swfunc = Stdlib.Option.value ind_cfg.ind_c_swfunc ~default:inm_swfunc in
   let inm_cstrs =
-    Array.map2 (fun ({ cn_id; cn_enum_const; cn_members; cn_deallocator_lazy; } as cstr_names)
+    Array.map2 (fun ({ cn_id; cn_enum_const; cn_members; cn_deallocator; } as cstr_names)
                     { cstr_id; cstr_caselabel; cstr_accessors; cstr_deallocator; } ->
         let cn_enum_const = Stdlib.Option.value cstr_caselabel ~default:cn_enum_const in
         (* cstr_deallocator is ignored because check_user_ind_config checks that it is not specified *)
@@ -384,7 +374,7 @@ let put_ind_config_in_ind_names (env : Environ.env) (sigma : Evd.evar_map) (ind_
             { cn_mem with member_accessor })
         in
         let cn_members = Array.to_list cn_members in
-        { cstr_names with cn_enum_const; cn_members; cn_deallocator_lazy; })
+        { cstr_names with cn_enum_const; cn_members; cn_deallocator; })
       inm_cstrs ind_cstr_configs
   in
   { ind_names with inm_name; inm_swfunc; inm_cstrs; }

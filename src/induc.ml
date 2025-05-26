@@ -67,13 +67,7 @@ let pr_codegen_indtype (env : Environ.env) (sigma : Evd.evar_map) (ind_cfg : ind
         let pp_deallocator =
           match cstr_cfg.cstr_deallocator with
           | None -> Pp.mt ()
-          | Some str_opt_lazy ->
-              if Lazy.is_val str_opt_lazy then
-                match Lazy.force str_opt_lazy with
-                | None -> Pp.mt ()
-                | Some deallocator -> Pp.str "deallocator" +++ Pp.str (quote_coq_string deallocator)
-              else
-                Pp.str "deallocator" +++ Pp.str "(lazy)"
+          | Some deallocator -> Pp.str "deallocator" +++ Pp.str (quote_coq_string deallocator)
         in
         let pp_cfg = pp_caselabel +++ pp_accessors +++ pp_deallocator in
         if Pp.ismt pp_cfg then
@@ -374,7 +368,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_mods : (Id.t * cstr_mod) list) : unit =
   let cstr_cfgs =
     cstr_mods |> List.map (fun (cstr_id, { cm_caselabel; cm_accessors; cm_deallocator }) ->
-      { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = Option.map (fun dealloc -> Lazy.from_val (Some dealloc)) cm_deallocator })
+      { cstr_id; cstr_caselabel = cm_caselabel; cstr_accessors = cm_accessors; cstr_deallocator = cm_deallocator })
   in
   let (c_type_opt, swfunc_opt) = indtype_ind_args in
   let env = Global.env () in
@@ -480,7 +474,7 @@ let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
   let result =
     match ind_cfg.ind_cstr_configs.(j-1).cstr_deallocator with
     | None -> None
-    | Some string_opt_lazy -> Lazy.force string_opt_lazy
+    | Some deallocator -> Some deallocator
   in
   (*
   (let pp = Pp.str "case_deallocator" +++  Printer.pr_econstr_env env sigma t +++ Id.print ind_cfg.ind_cstr_configs.(j-1).cstr_id ++ Pp.str "(j=" ++ Pp.int j ++ Pp.str ")" in
