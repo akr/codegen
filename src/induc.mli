@@ -22,3 +22,4 @@ val case_cstrmember :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> int -> string option
 val case_deallocator :
   Environ.env -> Evd.evar_map -> EConstr.types -> int -> string option
+val command_test_has_ind_config : Constrexpr.constr_expr -> unit

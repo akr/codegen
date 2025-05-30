@@ -5174,6 +5174,21 @@ let test_list = add_test test_list "test_indtype_duplicated_option" begin fun (c
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_ind_config_import" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Fail CodeGen TestHasIndConfig bool.
+      Module M.
+        CodeGen IndType bool => "bool" swfunc "" with
+        | true => case "" | false => case "0".
+        CodeGen TestHasIndConfig bool.
+      End M.
+      Fail CodeGen TestHasIndConfig bool.
+      Import M.
+      CodeGen TestHasIndConfig bool.
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 

@@ -483,3 +483,13 @@ let case_deallocator (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.typ
    | Some str -> msg_debug_hov (pp +++ Pp.str "deallocator=" ++ Pp.str str));
   *)
   result
+
+let command_test_has_ind_config (user_coq_type : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  let ind_config_map = get_ind_config_map () in
+  if ConstrMap.mem (EConstr.to_constr sigma coq_type) ind_config_map then
+    ()
+  else
+    user_err (Pp.str "[codegen] inductive type configuration not found:" +++ Printer.pr_econstr_env env sigma coq_type)
