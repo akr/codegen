@@ -129,6 +129,8 @@ let check_ind_coq_type_not_registered (env : Environ.env) (sigma : Evd.evar_map)
 
 let codegen_void_type_memo = Summary.ref (ConstrMap.empty : bool ConstrMap.t) ~name:"CodegenVoidTypeMemo"
 
+let add_codegen_void_type_memo (key, b) = codegen_void_type_memo := ConstrMap.add key b !codegen_void_type_memo
+
 let rec coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) : bool =
   let coq_type = Reductionops.nf_all env sigma coq_type in
   if EConstr.Vars.closed0 sigma coq_type then
@@ -136,9 +138,9 @@ let rec coq_type_is_void_type (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
     match ConstrMap.find_opt key !codegen_void_type_memo with
     | Some b -> b
     | None ->
-        codegen_void_type_memo := ConstrMap.add key false !codegen_void_type_memo; (* recursive occurences are considered to be non-void *)
+        add_codegen_void_type_memo (key, false); (* recursive occurences are considered to be non-void *)
         let b = coq_type_is_void_type1 env sigma coq_type in
-        codegen_void_type_memo := ConstrMap.add key b !codegen_void_type_memo;
+        add_codegen_void_type_memo (key, b);
         b
   else
     coq_type_is_void_type1 env sigma coq_type
