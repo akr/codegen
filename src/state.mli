@@ -80,7 +80,7 @@ val get_borrow_functions : unit -> Names.Cset.t
 val add_borrow_function : Names.Constant.t -> unit
 
 val get_borrow_types : unit -> ConstrSet.t
-val update_borrow_types : (ConstrSet.t -> ConstrSet.t) -> unit
+val add_borrow_types : ConstrSet.t -> unit
 
 type simplified_status =
   | SpExpectedId of Names.Id.t (* simplified_id *)

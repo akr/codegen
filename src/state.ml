@@ -219,6 +219,7 @@ let borrow_types = Summary.ref
 let get_borrow_types () = !borrow_types
 let set_borrow_types s = borrow_types := s
 let update_borrow_types f = set_borrow_types (f (!borrow_types))
+let add_borrow_types tyset = update_borrow_types (ConstrSet.union tyset)
 
 type simplified_status =
 | SpExpectedId of Id.t (* simplified_id *)

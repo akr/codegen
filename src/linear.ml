@@ -904,7 +904,7 @@ let add_borrow_type ?(msg_new:bool=false) ?(msg_already:bool=false)
   let added = ConstrSet.diff tyset (get_borrow_types ()) in
   let already_added = ConstrSet.inter tyset (get_borrow_types ()) in
   if not (ConstrSet.subset tyset (get_borrow_types ())) then
-    update_borrow_types (ConstrSet.union tyset);
+    add_borrow_types tyset;
   if msg_new then
     List.iter
       (fun ty ->
