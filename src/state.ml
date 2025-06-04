@@ -272,6 +272,7 @@ let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config
 let get_specialize_config_map () = !specialize_config_map
 let set_specialize_config_map m = specialize_config_map := m
 let update_specialize_config_map f = set_specialize_config_map (f (!specialize_config_map))
+let add_specialize_config func sp_cfg = update_specialize_config_map (ConstrMap.add func sp_cfg)
 
 (* key is the presimp itself (@cons bool) *)
 let gallina_instance_specialization_map = Summary.ref ~name:"CodegenGallinaInstanceSpecialization"

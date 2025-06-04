@@ -171,7 +171,7 @@ let codegen_define_static_arguments ?(cfunc : string option) (env : Environ.env)
     sp_sd_list=sd_list;
     sp_instance_map = ConstrMap.empty
   } in
-  update_specialize_config_map (ConstrMap.add func sp_cfg);
+  add_specialize_config func sp_cfg;
   msg_info_hov (Pp.hov 2 (Pp.str "[codegen]" +++
     (match cfunc with Some f -> Pp.str "[cfunc:" ++ Pp.str f ++ Pp.str "]" | None -> Pp.mt ()) +++
     pr_codegen_arguments env sigma sp_cfg));
@@ -538,7 +538,7 @@ let register_sp_instance ?(cfunc : string option)
     | Some { sp_gen=sp_gen } -> sp_gen
     | _ -> None
   in
-  update_specialize_config_map (ConstrMap.add func sp_cfg);
+  add_specialize_config func sp_cfg;
   update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst));
   (match sp_interface with
   | Some sp_interface ->
@@ -2594,7 +2594,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   update_cfunc_instance_map (CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)));
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
-   update_specialize_config_map (ConstrMap.add sp_cfg.sp_func sp_cfg2));
+   add_specialize_config sp_cfg.sp_func sp_cfg2);
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] declared_ctnt=" ++ Printer.pr_constant env declared_ctnt);*)
   (env, declared_ctnt, referred_cfuncs)
 
