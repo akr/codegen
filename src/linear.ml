@@ -52,7 +52,7 @@ let command_downward (ty : Constrexpr.constr_expr) : unit =
     user_err (Pp.str "[codegen] downward: concrete inductive type expected:" +++ Printer.pr_econstr_env env sigma ty4));
   (if ConstrSet.mem (EConstr.to_constr sigma ty4) (get_downward_types ()) then
     user_err (Pp.str "[codegen] downwardness already defined:" +++ Printer.pr_econstr_env env sigma ty4));
-  update_downward_types (ConstrSet.add (EConstr.to_constr sigma ty4));
+  add_downward_type (EConstr.to_constr sigma ty4);
   Feedback.msg_info (Pp.str "[codegen] downward type registered:" +++ Printer.pr_econstr_env env sigma ty2)
 
 let make_mutual_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) (mutind : MutInd.t) (u : EInstance.t) (params : EConstr.t array) : EConstr.t array =

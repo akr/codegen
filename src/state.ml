@@ -205,6 +205,7 @@ let downward_types = Summary.ref
 let get_downward_types () = !downward_types
 let set_downward_types s = downward_types := s
 let update_downward_types f = set_downward_types (f (!downward_types))
+let add_downward_type ty = update_downward_types (ConstrSet.add ty)
 
 let borrow_functions = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFuncSet"

@@ -74,7 +74,7 @@ type dealloc_cstr_deallocator = {
 }
 
 val get_downward_types : unit -> ConstrSet.t
-val update_downward_types : (ConstrSet.t -> ConstrSet.t) -> unit
+val add_downward_type : Constr.t -> unit
 
 val get_borrow_functions : unit -> Names.Cset.t
 val update_borrow_functions : (Names.Cset.t -> Names.Cset.t) -> unit
