@@ -193,7 +193,7 @@ let register_empty_ind_type (env : Environ.env) (sigma : Evd.evar_map) (coq_type
     ind_c_swfunc = None;
     ind_cstr_configs = cstr_cfgs;
   } in
-  add_ind_config_map coq_type ind_cfg;
+  add_ind_config coq_type ind_cfg;
   ind_cfg
 
 let lookup_ind_config (sigma : Evd.evar_map) (t : EConstr.types) : ind_config option =
@@ -214,7 +214,7 @@ let register_ind_type (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.ty
   | None ->
       let ind_cfg2 = { ind_cfg with ind_c_type = Some c_type } in
       let coq_type = EConstr.to_constr sigma t in
-      add_ind_config_map coq_type ind_cfg2;
+      add_ind_config coq_type ind_cfg2;
       ind_cfg2
   | Some c_type ->
       user_err (Pp.str "[codegen] c_type already registered:" +++ Printer.pr_econstr_env env sigma t +++ Pp.str "=>" +++ pr_c_abstract_decl c_type)
@@ -364,7 +364,7 @@ let register_ind_match (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EC
       ind_c_swfunc = swfunc_opt;
       ind_cstr_configs = CArray.map2_i f ind_cfg.ind_cstr_configs cstr_caselabel_accessors_ary }
   in
-  add_ind_config_map (EConstr.to_constr sigma coq_type) ind_cfg;
+  add_ind_config (EConstr.to_constr sigma coq_type) ind_cfg;
   ind_cfg
 
 let command_ind_type (user_coq_type : Constrexpr.constr_expr) (indtype_ind_args : c_typedata option * string option) (cstr_mods : (Id.t * cstr_mod) list) : unit =

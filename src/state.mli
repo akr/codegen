@@ -63,7 +63,7 @@ type sp_instance_names = {
 type ind_constructor = { ic_coq_cstr : Names.Id.t; ic_c_cstr : string; }
 
 val get_ind_config_map : unit -> ind_config ConstrMap.t
-val add_ind_config_map : Constr.t -> ind_config -> unit
+val add_ind_config : Constr.t -> ind_config -> unit
 
 val get_linearity_types : unit -> ConstrSet.t
 val add_linear_type : Constr.t -> unit

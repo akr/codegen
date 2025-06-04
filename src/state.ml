@@ -183,11 +183,11 @@ let subst_ind_config (subst, (coq_type, ind_cfg)) =
   let coq_type' = Mod_subst.subst_mps subst coq_type in
   let ind_cfg' = { ind_cfg with ind_coq_type = Mod_subst.subst_mps subst ind_cfg.ind_coq_type } in
   (coq_type', ind_cfg')
-let add_ind_config_map_obj : (Constr.t * ind_config) -> Libobject.obj =
+let add_ind_config_obj : (Constr.t * ind_config) -> Libobject.obj =
   Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen IndInfo"
     ~cache:(fun (coq_type, ind_cfg) -> ind_config_map := ConstrMap.add coq_type ind_cfg !ind_config_map)
     ~subst:(Some subst_ind_config)
-let add_ind_config_map coq_type ind_cfg = Lib.add_leaf (add_ind_config_map_obj (coq_type, ind_cfg))
+let add_ind_config coq_type ind_cfg = Lib.add_leaf (add_ind_config_obj (coq_type, ind_cfg))
 
 let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 let get_linearity_types () = !linearity_types
