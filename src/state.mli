@@ -77,7 +77,7 @@ val get_downward_types : unit -> ConstrSet.t
 val add_downward_type : Constr.t -> unit
 
 val get_borrow_functions : unit -> Names.Cset.t
-val update_borrow_functions : (Names.Cset.t -> Names.Cset.t) -> unit
+val add_borrow_function : Names.Constant.t -> unit
 
 val get_borrow_types : unit -> ConstrSet.t
 val update_borrow_types : (ConstrSet.t -> ConstrSet.t) -> unit

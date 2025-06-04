@@ -212,6 +212,7 @@ let borrow_functions = Summary.ref
 let get_borrow_functions () = !borrow_functions
 let set_borrow_functions s = borrow_functions := s
 let update_borrow_functions f = set_borrow_functions (f (!borrow_functions))
+let add_borrow_function ctnt = update_borrow_functions (Cset.add ctnt)
 
 let borrow_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"

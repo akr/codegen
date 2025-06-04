@@ -936,7 +936,7 @@ let command_borrow_function (libref : Libnames.qualid) : unit =
     if Cset.mem ctnt (get_borrow_functions ()) then
       ()
     else
-      update_borrow_functions (Cset.add ctnt)
+      add_borrow_function ctnt
   in
   let gref = Smartlocate.global_with_alias libref in
   let env = Global.env () in
