@@ -66,7 +66,7 @@ val get_ind_config_map : unit -> ind_config ConstrMap.t
 val add_ind_config_map : Constr.t -> ind_config -> unit
 
 val get_linearity_types : unit -> ConstrSet.t
-val update_linearity_types : (ConstrSet.t -> ConstrSet.t) -> unit
+val add_linear_type : Constr.t -> unit
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;

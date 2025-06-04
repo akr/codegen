@@ -33,7 +33,7 @@ let add_linear_type ?(msg_new:bool=false) ?(msg_already:bool=false)
     (if msg_already then
       Feedback.msg_info (Pp.str "[codegen] linearity already defined:" +++ Printer.pr_econstr_env env sigma ty))
   else
-    (update_linearity_types (ConstrSet.add (EConstr.to_constr sigma ty));
+    (add_linear_type (EConstr.to_constr sigma ty);
     if msg_new then
       Feedback.msg_info (Pp.str "[codegen] linear type registered:" +++ Printer.pr_econstr_env env sigma ty))
 

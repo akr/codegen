@@ -193,6 +193,7 @@ let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 let get_linearity_types () = !linearity_types
 let set_linearity_types s = linearity_types := s
 let update_linearity_types f = set_linearity_types (f (!linearity_types))
+let add_linear_type ty = update_linearity_types (ConstrSet.add ty)
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;
