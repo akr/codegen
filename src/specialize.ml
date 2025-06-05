@@ -539,7 +539,7 @@ let register_sp_instance ?(cfunc : string option)
     | _ -> None
   in
   add_specialize_config func sp_cfg;
-  update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst));
+  add_gallina_instance_specialization presimp sp_cfg sp_inst;
   (match sp_interface with
   | Some sp_interface ->
       msg_info_hov (Pp.str "[codegen]" +++
@@ -2589,7 +2589,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   msg_info_hov (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
-  update_gallina_instance_specialization_map (ConstrMap.set presimp (sp_cfg, sp_inst2));
+  set_gallina_instance_specialization presimp sp_cfg sp_inst2;
   update_gallina_instance_codegeneration_map (ConstrMap.set sp_interface.sp_presimp_constr (sp_cfg, sp_inst2));
   update_cfunc_instance_map (CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)));
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in

@@ -116,7 +116,8 @@ val get_specialize_config_map : unit -> specialization_config ConstrMap.t
 val add_specialize_config : Constr.t -> specialization_config -> unit
 
 val get_gallina_instance_specialization_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
-val update_gallina_instance_specialization_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit
+val add_gallina_instance_specialization : Constr.t -> specialization_config -> specialization_instance -> unit
+val set_gallina_instance_specialization : Constr.t -> specialization_config -> specialization_instance -> unit
 
 val get_gallina_instance_codegeneration_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
 val update_gallina_instance_codegeneration_map : ((specialization_config * specialization_instance) ConstrMap.t -> (specialization_config * specialization_instance) ConstrMap.t) -> unit

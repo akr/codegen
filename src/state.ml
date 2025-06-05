@@ -280,6 +280,10 @@ let gallina_instance_specialization_map = Summary.ref ~name:"CodegenGallinaInsta
 let get_gallina_instance_specialization_map () = !gallina_instance_specialization_map
 let set_gallina_instance_specialization_map m = gallina_instance_specialization_map := m
 let update_gallina_instance_specialization_map f = set_gallina_instance_specialization_map (f (!gallina_instance_specialization_map))
+let add_gallina_instance_specialization presimp sp_cfg sp_inst =
+  update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst))
+let set_gallina_instance_specialization presimp sp_cfg sp_inst =
+  update_gallina_instance_specialization_map (ConstrMap.set presimp (sp_cfg, sp_inst))
 
 (* key is a constant to refer a presimp (codegen_pN_foo) *)
 let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
