@@ -291,6 +291,10 @@ let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInsta
 let get_gallina_instance_codegeneration_map () = !gallina_instance_codegeneration_map
 let set_gallina_instance_codegeneration_map m = gallina_instance_codegeneration_map := m
 let update_gallina_instance_codegeneration_map f = set_gallina_instance_codegeneration_map (f (!gallina_instance_codegeneration_map))
+let add_gallina_instance_codegeneration presimp sp_cfg sp_inst =
+  update_gallina_instance_codegeneration_map (ConstrMap.add presimp (sp_cfg, sp_inst))
+let set_gallina_instance_codegeneration presimp sp_cfg sp_inst =
+  update_gallina_instance_codegeneration_map (ConstrMap.set presimp (sp_cfg, sp_inst))
 
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
