@@ -692,8 +692,7 @@ let command_global_inline (func_qualids : Libnames.qualid list) : unit =
       | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
     funcs
   in
-  let f pred ctnt = Cpred.add ctnt pred in
-  update_specialize_global_inline (fun p -> List.fold_left f p ctnts)
+  List.iter add_specialize_global_inline ctnts
 
 let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in

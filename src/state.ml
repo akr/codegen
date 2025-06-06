@@ -361,6 +361,8 @@ let specialize_global_inline = Summary.ref (Cpred.empty : Cpred.t) ~name:"Codege
 let get_specialize_global_inline () = !specialize_global_inline
 let set_specialize_global_inline p = specialize_global_inline := p
 let update_specialize_global_inline f = set_specialize_global_inline (f (!specialize_global_inline))
+let add_specialize_global_inline ctnt =
+  update_specialize_global_inline (fun pred -> Cpred.add ctnt pred)
 
 let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"CodegenLocalInline"
 let get_specialize_local_inline () = !specialize_local_inline
