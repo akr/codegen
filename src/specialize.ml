@@ -549,12 +549,12 @@ let register_sp_instance ?(cfunc : string option)
   | None -> ());
   (match sp_interface, sp_gen with
   | (Some sp_interface), (Some sp_gen) ->
-      update_cfunc_instance_map (CString.Map.add sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen)))
+      add_cfunc_instance sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen))
   | (Some sp_interface), None ->
       let cfunc_name = sp_interface.sp_cfunc_name in
       (match CString.Map.find_opt cfunc_name (get_cfunc_instance_map ()) with
-      | None -> update_cfunc_instance_map (CString.Map.add cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]));
-      | Some (CodeGenCfuncPrimitive l) -> update_cfunc_instance_map (CString.Map.add cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l)))
+      | None -> add_cfunc_instance cfunc_name (CodeGenCfuncPrimitive [(sp_cfg, sp_inst)]);
+      | Some (CodeGenCfuncPrimitive l) -> add_cfunc_instance cfunc_name (CodeGenCfuncPrimitive ((sp_cfg, sp_inst)::l))
       | Some (CodeGenCfuncGenerate l) -> assert false)
   | None, _ -> ());
   ()
@@ -2591,7 +2591,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
   set_gallina_instance_specialization presimp sp_cfg sp_inst2;
   set_gallina_instance_codegeneration sp_interface.sp_presimp_constr sp_cfg sp_inst2;
-  update_cfunc_instance_map (CString.Map.set sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2)));
+  set_cfunc_instance sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2));
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    add_specialize_config sp_cfg.sp_func sp_cfg2);

@@ -307,6 +307,10 @@ let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
 let get_cfunc_instance_map () = !cfunc_instance_map
 let set_cfunc_instance_map m = cfunc_instance_map := m
 let update_cfunc_instance_map f = set_cfunc_instance_map (f (!cfunc_instance_map))
+let add_cfunc_instance cfunc_name usage =
+  update_cfunc_instance_map (CString.Map.add cfunc_name usage)
+let set_cfunc_instance cfunc_name usage =
+  update_cfunc_instance_map (CString.Map.set cfunc_name usage)
 
 type string_or_none = string option
 

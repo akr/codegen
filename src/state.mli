@@ -128,7 +128,8 @@ type cfunc_usage =
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
 val get_cfunc_instance_map : unit -> cfunc_usage CString.Map.t
-val update_cfunc_instance_map : (cfunc_usage CString.Map.t -> cfunc_usage CString.Map.t) -> unit
+val add_cfunc_instance : string -> cfunc_usage -> unit
+val set_cfunc_instance : string -> cfunc_usage -> unit
 
 type string_or_none = string option
 val dummy_header_filename : string
