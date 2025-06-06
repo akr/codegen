@@ -697,28 +697,23 @@ let command_global_inline (func_qualids : Libnames.qualid list) : unit =
 let command_local_inline (func_qualid : Libnames.qualid) (func_qualids : Libnames.qualid list) : unit =
   let env = Global.env () in
   let sigma = Evd.from_env env in
-  let sigma, func = func_of_qualid env sigma func_qualid in
-  let ctnt =
-    match Constr.kind func with
+  let sigma, func_caller = func_of_qualid env sigma func_qualid in
+  let ctnt_caller =
+    match Constr.kind func_caller with
     | Const (ctnt, _u) -> ctnt
-    | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func)
+    | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func_caller)
   in
-  let sigma, funcs = CList.fold_left_map (fun sigma func -> func_of_qualid env sigma func) sigma func_qualids in
-  let ctnts = List.map
+  let sigma, funcs_callee = CList.fold_left_map (fun sigma func -> func_of_qualid env sigma func) sigma func_qualids in
+  let ctnts_callee = List.map
     (fun func ->
       match Constr.kind func with
       | Const (ctnt, _u) -> ctnt
       | _ -> user_err_hov (Pp.str "[codegen] constant expected:" +++ Printer.pr_constr_env env sigma func))
-    funcs
+    funcs_callee
   in
-  update_specialize_local_inline
-    (fun local_inline ->
-      let pred = match Cmap.find_opt ctnt local_inline with
-                 | None -> Cpred.empty
-                 | Some pred -> pred in
-      let f pred ctnt = Cpred.add ctnt pred in
-      let pred' = List.fold_left f pred ctnts in
-      Cmap.add ctnt pred' local_inline)
+  List.iter
+    (fun ctnt_callee -> add_specialize_local_inline ctnt_caller ctnt_callee)
+    ctnts_callee
 
 let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : EConstr.t) : EConstr.t =
   let rec aux term =

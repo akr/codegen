@@ -158,6 +158,6 @@ val get_specialize_global_inline : unit -> Names.Cpred.t
 val add_specialize_global_inline : Names.Constant.t -> unit
 
 val get_specialize_local_inline : unit -> Names.Cpred.t Names.Cmap.t
-val update_specialize_local_inline : (Names.Cpred.t Names.Cmap.t -> Names.Cpred.t Names.Cmap.t) -> unit
+val add_specialize_local_inline : Names.Constant.t -> Names.Constant.t -> unit
 
 type genflag = DisableDependencyResolver | DisableMutualRecursionDetection

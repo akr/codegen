@@ -368,6 +368,15 @@ let specialize_local_inline = Summary.ref (Cmap.empty : Cpred.t Cmap.t) ~name:"C
 let get_specialize_local_inline () = !specialize_local_inline
 let set_specialize_local_inline p = specialize_local_inline := p
 let update_specialize_local_inline f = set_specialize_local_inline (f (!specialize_local_inline))
+let add_specialize_local_inline ctnt_caller ctnt_callee =
+  update_specialize_local_inline
+    (fun local_inline ->
+      let pred = match Cmap.find_opt ctnt_caller local_inline with
+                 | None -> Cpred.empty
+                 | Some pred -> pred in
+      let pred' = Cpred.add ctnt_callee pred in
+      Cmap.add ctnt_caller pred' local_inline)
+
 type genflag = DisableDependencyResolver
              | DisableMutualRecursionDetection
 
