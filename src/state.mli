@@ -149,7 +149,6 @@ type code_generation =
   | GenThunk of string * (unit -> string)
 
 val get_generation_map : unit -> (code_generation list) CString.Map.t
-val set_generation_map : (code_generation list) CString.Map.t -> unit
 val update_generation_map : ((code_generation list) CString.Map.t -> (code_generation list) CString.Map.t) -> unit
 val add_generation : string -> code_generation -> unit
 val clear_generation_map : unit -> unit
