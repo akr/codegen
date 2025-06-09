@@ -350,6 +350,7 @@ unit =
       match generation_list_opt with
       | None -> Some [generation]
       | Some generation_list -> Some (generation :: generation_list)))
+let clear_generation_map () = set_generation_map CString.Map.empty
 
 let gensym_ps_num = Summary.ref 0 ~name:"CodegenSpecializationInstanceNum"
 

@@ -2863,7 +2863,7 @@ let command_generate_file (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist (get_generation_map ()) in
   gen_map |> CString.Map.iter
     (fun fn gen_list -> gen_file fn (List.rev gen_list));
-  set_generation_map CString.Map.empty
+  clear_generation_map ()
 
 let command_generate_test (gflist : genflag list) : unit =
   let gen_map = complete_gen_map gflist (get_generation_map ()) in
