@@ -151,6 +151,7 @@ type code_generation =
 val get_generation_map : unit -> (code_generation list) CString.Map.t
 val set_generation_map : (code_generation list) CString.Map.t -> unit
 val update_generation_map : ((code_generation list) CString.Map.t -> (code_generation list) CString.Map.t) -> unit
+val add_generation : string -> code_generation -> unit
 
 val inc_gensym_ps_num : unit -> int
 

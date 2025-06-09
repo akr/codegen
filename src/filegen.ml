@@ -28,18 +28,11 @@ let defined_sections = [
   "epilogue";
 ]
 
-let codegen_add_generation (filename : string) (generation : code_generation) : unit =
-  update_generation_map (CString.Map.update filename
-    (fun generation_list_opt ->
-      match generation_list_opt with
-      | None -> Some [generation]
-      | Some generation_list -> Some (generation :: generation_list)))
-
 let codegen_add_source_generation (generation : code_generation) : unit =
-  codegen_add_generation (get_current_source_filename ()) generation
+  add_generation (get_current_source_filename ()) generation
 
 let codegen_add_header_generation (generation : code_generation) : unit =
-  codegen_add_generation (get_current_header_filename ()) generation
+  add_generation (get_current_header_filename ()) generation
 
 let check_section (section : string) : unit =
   (if not (List.mem section defined_sections) then

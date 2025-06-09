@@ -21,7 +21,6 @@ open CErrors
 open EConstr
 
 open Cgenutil
-open Filegen
 open State
 open Induc
 open Specialize
@@ -848,9 +847,9 @@ let generate_indimp_immediate (env : Environ.env) (sigma : Evd.evar_map) (coq_ty
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
   let func_impls () = let (_type_impls, _func_decls, func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_impls) in
-  codegen_add_generation type_impls_filename (GenThunk (type_impls_section, type_impls));
-  codegen_add_generation func_decls_filename (GenThunk (func_decls_section, func_decls));
-  codegen_add_generation func_impls_filename (GenThunk (func_impls_section, func_impls));
+  add_generation type_impls_filename (GenThunk (type_impls_section, type_impls));
+  add_generation func_decls_filename (GenThunk (func_decls_section, func_decls));
+  add_generation func_impls_filename (GenThunk (func_impls_section, func_impls));
   ()
 
 let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : EConstr.types) (indimp_mods : indimp_mods) : unit =
@@ -871,10 +870,10 @@ let generate_indimp_heap (env : Environ.env) (sigma : Evd.evar_map) (coq_type : 
   let type_impls () = let (type_impls, _func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 type_impls) in
   let func_decls () = let (_type_impls, func_decls, _func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_decls) in
   let func_impls () = let (_type_impls, _func_decls, func_impls) = Lazy.force lazy_code in Pp.string_of_ppcmds (Pp.v 0 func_impls) in
-  codegen_add_generation type_decls_filename (GenThunk (type_decls_section, type_decls));
-  codegen_add_generation type_impls_filename (GenThunk (type_impls_section, type_impls));
-  codegen_add_generation func_decls_filename (GenThunk (func_decls_section, func_decls));
-  codegen_add_generation func_impls_filename (GenThunk (func_impls_section, func_impls));
+  add_generation type_decls_filename (GenThunk (type_decls_section, type_decls));
+  add_generation type_impls_filename (GenThunk (type_impls_section, type_impls));
+  add_generation func_decls_filename (GenThunk (func_decls_section, func_decls));
+  add_generation func_impls_filename (GenThunk (func_impls_section, func_impls));
   ()
 
 let command_indimp (user_coq_type : Constrexpr.constr_expr) (indimp_mods : indimp_mods) : unit =
