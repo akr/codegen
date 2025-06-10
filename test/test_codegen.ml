@@ -5204,6 +5204,39 @@ let test_list = add_test test_list "test_lineartype_import" begin fun (ctx : tes
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_downwardtype_import" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Fail CodeGen TestHasDownwardType bool.
+      Module M.
+        Fail CodeGen TestHasDownwardType bool.
+        CodeGen Downward bool.
+        CodeGen TestHasDownwardType bool.
+      End M.
+      Fail CodeGen TestHasDownwardType bool.
+      Import M.
+      CodeGen TestHasDownwardType bool.
+    |}) {| |}
+end
+
+let test_list = add_test test_list "test_borrow_function_import" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Inductive I1 := C1.
+      Inductive I2 := C2.
+      Definition borrow (x : I1) : I2 := C2.
+      Fail CodeGen TestHasBorrowFunc borrow.
+      Module M.
+        Fail CodeGen TestHasBorrowFunc borrow.
+        CodeGen BorrowFunc borrow.
+        CodeGen TestHasBorrowFunc borrow.
+      End M.
+      Fail CodeGen TestHasBorrowFunc borrow.
+      Import M.
+      CodeGen TestHasBorrowFunc borrow.
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 

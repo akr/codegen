@@ -208,16 +208,24 @@ type dealloc_cstr_deallocator = {
 let downward_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenDownwardTypeSet"
 let get_downward_types () = !downward_types
-let set_downward_types s = downward_types := s
-let update_downward_types f = set_downward_types (f (!downward_types))
-let add_downward_type ty = update_downward_types (ConstrSet.add ty)
+let subst_downward_type (subst, coq_type) =
+  let coq_type' = Mod_subst.subst_mps subst coq_type in
+  coq_type'
+let add_downward_type_obj : Constr.t -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen DownwardTypes"
+    ~cache:(fun coq_type -> downward_types := ConstrSet.add coq_type !downward_types)
+    ~subst:(Some subst_downward_type)
+let add_downward_type coq_type = Lib.add_leaf (add_downward_type_obj coq_type)
 
 let borrow_functions = Summary.ref
   (Cset.empty : Cset.t) ~name:"CodeGenBorrowFuncSet"
 let get_borrow_functions () = !borrow_functions
-let set_borrow_functions s = borrow_functions := s
-let update_borrow_functions f = set_borrow_functions (f (!borrow_functions))
-let add_borrow_function ctnt = update_borrow_functions (Cset.add ctnt)
+let subst_borrow_function (subst, cnst) = Mod_subst.subst_constant subst cnst
+let add_borrow_function_obj : Constant.t -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen BorrowFunction"
+    ~cache:(fun cnst -> borrow_functions := Cset.add cnst !borrow_functions)
+    ~subst:(Some subst_borrow_function)
+let add_borrow_function cnst = Lib.add_leaf (add_borrow_function_obj cnst)
 
 let borrow_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"

@@ -9,5 +9,6 @@ val command_test_linear : Constrexpr.constr_expr -> unit
 val command_test_unrestricted : Constrexpr.constr_expr -> unit
 val command_borrow_function : Libnames.qualid -> unit
 val command_test_borrowcheck : Constrexpr.constr_expr -> unit
+val command_test_has_downward_type : Constrexpr.constr_expr -> unit
+val command_test_has_borrow_func : Constrexpr.constr_expr -> unit
 val add_linear_type : ?msg_new:bool -> ?msg_already:bool -> Environ.env -> Evd.evar_map -> EConstr.types -> unit
-

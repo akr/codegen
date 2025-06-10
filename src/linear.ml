@@ -1003,4 +1003,27 @@ let command_test_borrowcheck (term : Constrexpr.constr_expr) : unit =
   let (sigma, term) = Constrintern.interp_constr_evars env sigma term in
   borrowcheck env sigma term
 
+let command_test_has_downward_type (user_coq_type : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  let downward_types = get_downward_types () in
+  if ConstrSet.mem (EConstr.to_constr sigma coq_type) downward_types then
+    ()
+  else
+    user_err (Pp.str "[codegen] downward type not found:" +++ Printer.pr_econstr_env env sigma coq_type)
 
+let command_test_has_borrow_func (user_coq_term : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_term) = Constrintern.interp_constr_evars env sigma user_coq_term in
+  let cnst =
+    match EConstr.kind sigma coq_term with
+    | Const (cnst, u) -> cnst
+    | _ -> user_err (Pp.str "[codegen] borrow function should be a constant:" +++ Printer.pr_econstr_env env sigma coq_term)
+  in
+  let borrow_functions = get_borrow_functions () in
+  if Cset.mem cnst borrow_functions then
+    ()
+  else
+    user_err (Pp.str "[codegen] borrow function not found:" +++ Printer.pr_econstr_env env sigma coq_term)
