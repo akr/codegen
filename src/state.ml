@@ -343,8 +343,7 @@ let generation_map = Summary.ref ~name:"CodegenGenerationMap"
 let get_generation_map () = !generation_map
 let set_generation_map m = generation_map := m
 let update_generation_map f = set_generation_map (f (!generation_map))
-let add_generation (filename : string) (generation : code_generation) :
-unit =
+let add_generation (filename : string) (generation : code_generation) : unit =
   update_generation_map (CString.Map.update filename
     (fun generation_list_opt ->
       match generation_list_opt with
