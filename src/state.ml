@@ -191,9 +191,14 @@ let add_ind_config coq_type ind_cfg = Lib.add_leaf (add_ind_config_obj (coq_type
 
 let linearity_types = Summary.ref ConstrSet.empty ~name:"CodeGenLinearTypeSet"
 let get_linearity_types () = !linearity_types
-let set_linearity_types s = linearity_types := s
-let update_linearity_types f = set_linearity_types (f (!linearity_types))
-let add_linear_type ty = update_linearity_types (ConstrSet.add ty)
+let subst_linearity_type (subst, coq_type) =
+  let coq_type' = Mod_subst.subst_mps subst coq_type in
+  coq_type'
+let add_linear_type_obj : Constr.t -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen LinearTypes"
+    ~cache:(fun coq_type -> linearity_types := ConstrSet.add coq_type !linearity_types)
+    ~subst:(Some subst_linearity_type)
+let add_linear_type coq_type = Lib.add_leaf (add_linear_type_obj coq_type)
 
 type dealloc_cstr_deallocator = {
   dealloc_cstr_id: Names.Id.t;

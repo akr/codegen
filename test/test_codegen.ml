@@ -5189,6 +5189,21 @@ let test_list = add_test test_list "test_ind_config_import" begin fun (ctx : tes
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_lineartype_import" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Fail CodeGen TestLinearType bool.
+      Module M.
+        Fail CodeGen TestLinearType bool.
+        CodeGen Linear bool.
+        CodeGen TestLinearType bool.
+      End M.
+      Fail CodeGen TestLinearType bool.
+      Import M.
+      CodeGen TestLinearType bool.
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 
