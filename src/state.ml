@@ -459,7 +459,7 @@ let get_specialize_local_inline () = !specialize_local_inline
 let subst_local_inline (subst, (ctnt_caller, ctnt_callee)) =
   (Mod_subst.subst_constant subst ctnt_caller,
    Mod_subst.subst_constant subst ctnt_callee)
-let add_specialize_local_inline : (Constant.t * Constant.t) -> Libobject.obj =
+let add_specialize_local_inline_obj : (Constant.t * Constant.t) -> Libobject.obj =
   let f ctnt_caller ctnt_callee local_inline =
     let pred = match Cmap.find_opt ctnt_caller local_inline with
                | None -> Cpred.empty
@@ -470,7 +470,7 @@ let add_specialize_local_inline : (Constant.t * Constant.t) -> Libobject.obj =
   Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen LocalInlines"
     ~cache:(fun (ctnt_caller, ctnt_callee)-> specialize_local_inline := f ctnt_caller ctnt_callee !specialize_local_inline)
     ~subst:(Some subst_local_inline)
-let add_specialize_local_inline ctnt_caller ctnt_callee = Lib.add_leaf (add_specialize_local_inline (ctnt_caller, ctnt_callee))
+let add_specialize_local_inline ctnt_caller ctnt_callee = Lib.add_leaf (add_specialize_local_inline_obj (ctnt_caller, ctnt_callee))
 
 type genflag = DisableDependencyResolver
              | DisableMutualRecursionDetection
