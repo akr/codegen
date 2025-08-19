@@ -5237,6 +5237,21 @@ let test_list = add_test test_list "test_borrow_function_import" begin fun (ctx 
     |}) {| |}
 end
 
+let test_list = add_test test_list "test_borrow_type_import" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ~goal:UntilCoq ctx
+    ({|
+      Fail CodeGen TestHasBorrowType bool.
+      Module M.
+        Fail CodeGen TestHasBorrowType bool.
+        CodeGen BorrowType bool.
+        CodeGen TestHasBorrowType bool.
+      End M.
+      Fail CodeGen TestHasBorrowType bool.
+      Import M.
+      CodeGen TestHasBorrowType bool.
+    |}) {| |}
+end
+
 let suite : OUnit2.test =
   "TestCodeGen" >::: (List.rev test_list)
 

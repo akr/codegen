@@ -1027,3 +1027,13 @@ let command_test_has_borrow_func (user_coq_term : Constrexpr.constr_expr) : unit
     ()
   else
     user_err (Pp.str "[codegen] borrow function not found:" +++ Printer.pr_econstr_env env sigma coq_term)
+
+let command_test_has_borrow_type (user_coq_type : Constrexpr.constr_expr) : unit =
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+  let (sigma, coq_type) = nf_interp_type env sigma user_coq_type in
+  let borrow_types = get_borrow_types () in
+  if ConstrSet.mem (EConstr.to_constr sigma coq_type) borrow_types then
+    ()
+  else
+    user_err (Pp.str "[codegen] borrow type not found:" +++ Printer.pr_econstr_env env sigma coq_type)

@@ -230,9 +230,16 @@ let add_borrow_function cnst = Lib.add_leaf (add_borrow_function_obj cnst)
 let borrow_types = Summary.ref
   (ConstrSet.empty : ConstrSet.t) ~name:"CodeGenBorrowTypeSet"
 let get_borrow_types () = !borrow_types
-let set_borrow_types s = borrow_types := s
-let update_borrow_types f = set_borrow_types (f (!borrow_types))
-let add_borrow_types tyset = update_borrow_types (ConstrSet.union tyset)
+let subst_borrow_type (subst, coq_type) =
+  let coq_type' = Mod_subst.subst_mps subst coq_type in
+  coq_type'
+let add_borrow_type_obj : Constr.t -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen BorrowTypes"
+    ~cache:(fun coq_type -> borrow_types := ConstrSet.add coq_type !borrow_types)
+    ~subst:(Some subst_borrow_type)
+let add_borrow_types tyset =
+  let add_borrow_type coq_type = Lib.add_leaf (add_borrow_type_obj coq_type) in
+  ConstrSet.iter (fun ty -> add_borrow_type ty) tyset
 
 type simplified_status =
 | SpExpectedId of Id.t (* simplified_id *)
