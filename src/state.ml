@@ -418,6 +418,14 @@ type code_generation =
 (*
  * map from filename (string) to list of code_generation in reverse order.
  * CodeGen GenerateFile consumes this.
+ *
+ * The operations for generation_map is not registered as libobjects
+ * because:
+ * - GenThunk contains a function
+ * - specialize.ml's command_resolve_dependencies modifeis it
+ *   using codegen_resolve_dependencies.
+ * - it is cleared after code generation.
+ * It is not sure that replaying such operation is suitable.
  *)
 let generation_map = Summary.ref ~name:"CodegenGenerationMap"
   (CString.Map.empty : (code_generation list) CString.Map.t)
