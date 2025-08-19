@@ -336,8 +336,6 @@ let set_gallina_instance_specialization_map m = gallina_instance_specialization_
 let update_gallina_instance_specialization_map f = set_gallina_instance_specialization_map (f (!gallina_instance_specialization_map))
 let add_gallina_instance_specialization presimp sp_cfg sp_inst =
   update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst))
-let set_gallina_instance_specialization presimp sp_cfg sp_inst =
-  update_gallina_instance_specialization_map (ConstrMap.set presimp (sp_cfg, sp_inst))
 
 (* key is a constant to refer a presimp (codegen_pN_foo) *)
 let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
@@ -347,8 +345,6 @@ let set_gallina_instance_codegeneration_map m = gallina_instance_codegeneration_
 let update_gallina_instance_codegeneration_map f = set_gallina_instance_codegeneration_map (f (!gallina_instance_codegeneration_map))
 let add_gallina_instance_codegeneration presimp sp_cfg sp_inst =
   update_gallina_instance_codegeneration_map (ConstrMap.add presimp (sp_cfg, sp_inst))
-let set_gallina_instance_codegeneration presimp sp_cfg sp_inst =
-  update_gallina_instance_codegeneration_map (ConstrMap.set presimp (sp_cfg, sp_inst))
 
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
@@ -363,8 +359,6 @@ let set_cfunc_instance_map m = cfunc_instance_map := m
 let update_cfunc_instance_map f = set_cfunc_instance_map (f (!cfunc_instance_map))
 let add_cfunc_instance cfunc_name usage =
   update_cfunc_instance_map (CString.Map.add cfunc_name usage)
-let set_cfunc_instance cfunc_name usage =
-  update_cfunc_instance_map (CString.Map.set cfunc_name usage)
 
 type string_or_none = string option
 

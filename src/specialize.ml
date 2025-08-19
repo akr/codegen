@@ -2583,9 +2583,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   msg_info_hov (Pp.str "[codegen]" +++
     Pp.str "[cfunc:" ++ Pp.str cfunc ++ Pp.str "]" +++
     Pp.str "Simplified function defined:" +++ Printer.pr_constant env declared_ctnt);
-  set_gallina_instance_specialization presimp sp_cfg sp_inst2;
-  set_gallina_instance_codegeneration sp_interface.sp_presimp_constr sp_cfg sp_inst2;
-  set_cfunc_instance sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2));
+  add_gallina_instance_specialization presimp sp_cfg sp_inst2;
+  add_gallina_instance_codegeneration sp_interface.sp_presimp_constr sp_cfg sp_inst2;
+  add_cfunc_instance sp_interface.sp_cfunc_name (CodeGenCfuncGenerate (sp_cfg, sp_inst2, sp_interface2, sp_gen2));
   (let inst_map = ConstrMap.add presimp sp_inst2 sp_cfg.sp_instance_map in
    let sp_cfg2 = { sp_cfg with sp_instance_map = inst_map } in
    add_specialize_config sp_cfg.sp_func sp_cfg2);

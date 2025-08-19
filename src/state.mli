@@ -117,11 +117,8 @@ val add_specialize_config : Constr.t -> specialization_config -> unit
 
 val get_gallina_instance_specialization_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
 val add_gallina_instance_specialization : Constr.t -> specialization_config -> specialization_instance -> unit
-val set_gallina_instance_specialization : Constr.t -> specialization_config -> specialization_instance -> unit
-
 val get_gallina_instance_codegeneration_map : unit -> (specialization_config * specialization_instance) ConstrMap.t
 val add_gallina_instance_codegeneration : Constr.t -> specialization_config -> specialization_instance -> unit
-val set_gallina_instance_codegeneration : Constr.t -> specialization_config -> specialization_instance -> unit
 
 type cfunc_usage =
 | CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen) (* CodeGenFunc *)
@@ -129,7 +126,6 @@ type cfunc_usage =
 
 val get_cfunc_instance_map : unit -> cfunc_usage CString.Map.t
 val add_cfunc_instance : string -> cfunc_usage -> unit
-val set_cfunc_instance : string -> cfunc_usage -> unit
 
 type string_or_none = string option
 val dummy_header_filename : string
