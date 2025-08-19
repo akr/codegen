@@ -312,12 +312,19 @@ let constrmap_of_bindings bs =
     ConstrMap.empty
     bs
 
-let subst_specialization_config (subst, (func, sp_cfg)) =
-  (Mod_subst.subst_mps subst func,
-   { sp_cfg with
-     sp_func = Mod_subst.subst_mps subst sp_cfg.sp_func;
-     sp_instance_map = constrmap_of_bindings (ConstrMap.bindings sp_cfg.sp_instance_map |> List.map (fun (presimp, sp_inst) -> (Mod_subst.subst_mps subst presimp, subst_specialization_instance (subst, sp_inst))))
-   })
+let subst_specialization_config (subst, sp_cfg) =
+  { sp_cfg with
+    sp_func = Mod_subst.subst_mps subst sp_cfg.sp_func;
+    sp_instance_map = constrmap_of_bindings (ConstrMap.bindings sp_cfg.sp_instance_map |> List.map (fun (presimp, sp_inst) -> (Mod_subst.subst_mps subst presimp, subst_specialization_instance (subst, sp_inst))))
+  }
+
+let subst_func_specialization_config (subst, (func, sp_cfg)) =
+  (Mod_subst.subst_mps subst func, subst_specialization_config (subst, sp_cfg))
+
+let subst_presimp_specialization_instance (subst, (presimp, (sp_cfg, sp_inst))) =
+  (Mod_subst.subst_mps subst presimp,
+   (subst_specialization_config (subst, sp_cfg),
+    subst_specialization_instance (subst, sp_inst)))
 
 (* key is constant or constructor which is the target of specialization *)
 let specialize_config_map = Summary.ref (ConstrMap.empty : specialization_config ConstrMap.t) ~name:"CodegenSpecialize"
@@ -325,17 +332,18 @@ let get_specialize_config_map () = !specialize_config_map
 let add_specialize_config_obj : (Constr.t * specialization_config) -> Libobject.obj =
   Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen SpecializationConfigs"
     ~cache:(fun (func, sp_cfg) -> specialize_config_map := ConstrMap.add func sp_cfg !specialize_config_map)
-    ~subst:(Some subst_specialization_config)
+    ~subst:(Some subst_func_specialization_config)
 let add_specialize_config func sp_cfg = Lib.add_leaf (add_specialize_config_obj (func, sp_cfg))
 
 (* key is the presimp itself (@cons bool) *)
 let gallina_instance_specialization_map = Summary.ref ~name:"CodegenGallinaInstanceSpecialization"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 let get_gallina_instance_specialization_map () = !gallina_instance_specialization_map
-let set_gallina_instance_specialization_map m = gallina_instance_specialization_map := m
-let update_gallina_instance_specialization_map f = set_gallina_instance_specialization_map (f (!gallina_instance_specialization_map))
-let add_gallina_instance_specialization presimp sp_cfg sp_inst =
-  update_gallina_instance_specialization_map (ConstrMap.add presimp (sp_cfg, sp_inst))
+let add_gallina_instance_specialization_obj : (Constr.t * (specialization_config * specialization_instance)) -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen SpecializationInstances"
+    ~cache:(fun (presimp, (sp_cfg, sp_inst)) -> gallina_instance_specialization_map := ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_specialization_map)
+    ~subst:(Some subst_presimp_specialization_instance)
+let add_gallina_instance_specialization presimp sp_cfg sp_inst = Lib.add_leaf (add_gallina_instance_specialization_obj (presimp, (sp_cfg, sp_inst)))
 
 (* key is a constant to refer a presimp (codegen_pN_foo) *)
 let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
