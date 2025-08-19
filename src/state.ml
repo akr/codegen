@@ -349,10 +349,11 @@ let add_gallina_instance_specialization presimp sp_cfg sp_inst = Lib.add_leaf (a
 let gallina_instance_codegeneration_map = Summary.ref ~name:"CodegenGallinaInstanceCodegeneration"
   (ConstrMap.empty : (specialization_config * specialization_instance) ConstrMap.t)
 let get_gallina_instance_codegeneration_map () = !gallina_instance_codegeneration_map
-let set_gallina_instance_codegeneration_map m = gallina_instance_codegeneration_map := m
-let update_gallina_instance_codegeneration_map f = set_gallina_instance_codegeneration_map (f (!gallina_instance_codegeneration_map))
-let add_gallina_instance_codegeneration presimp sp_cfg sp_inst =
-  update_gallina_instance_codegeneration_map (ConstrMap.add presimp (sp_cfg, sp_inst))
+let add_gallina_instance_codegeneration_obj : (Constr.t * (specialization_config * specialization_instance)) -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen GallinaInstanceCodeGenerations"
+    ~cache:(fun (presimp, (sp_cfg, sp_inst)) -> gallina_instance_codegeneration_map := ConstrMap.add presimp (sp_cfg, sp_inst) !gallina_instance_codegeneration_map)
+    ~subst:(Some subst_presimp_specialization_instance)
+let add_gallina_instance_codegeneration presimp sp_cfg sp_inst = Lib.add_leaf (add_gallina_instance_codegeneration_obj (presimp, (sp_cfg, sp_inst)))
 
 (* CodeGenFunc and CodeGenStaticFunc needs unique C function name
   but CodeGenPrimitive and CodeGenConstant don't need. *)
@@ -360,13 +361,29 @@ type cfunc_usage =
 | CodeGenCfuncGenerate of (specialization_config * specialization_instance * specialization_instance_interface * specialization_instance_gen) (* CodeGenFunc or CodeGenStaticFunc *)
 | CodeGenCfuncPrimitive of (specialization_config * specialization_instance) list (* CodeGenPrimitive or CodeGenConstant *)
 
+let subst_cfunc_usage (subst, (cfunc, usage)) =
+  (cfunc,
+   match usage with
+   | CodeGenCfuncGenerate (sp_cfg, sp_inst, sp_interface, sp_gen) ->
+       CodeGenCfuncGenerate (subst_specialization_config (subst, sp_cfg),
+                             subst_specialization_instance (subst, sp_inst),
+                             subst_specialization_instance_interface (subst, sp_interface),
+                             subst_specialization_instance_gen (subst, sp_gen))
+   | CodeGenCfuncPrimitive sp_cfg_inst_list ->
+       CodeGenCfuncPrimitive
+         (List.map (fun (sp_cfg, sp_inst) ->
+                     (subst_specialization_config (subst, sp_cfg),
+                      subst_specialization_instance (subst, sp_inst)))
+                   sp_cfg_inst_list))
+
 let cfunc_instance_map = Summary.ref ~name:"CodegenCInstance"
   (CString.Map.empty : cfunc_usage CString.Map.t)
 let get_cfunc_instance_map () = !cfunc_instance_map
-let set_cfunc_instance_map m = cfunc_instance_map := m
-let update_cfunc_instance_map f = set_cfunc_instance_map (f (!cfunc_instance_map))
-let add_cfunc_instance cfunc_name usage =
-  update_cfunc_instance_map (CString.Map.add cfunc_name usage)
+let add_cfunc_instance_obj : (string * cfunc_usage) -> Libobject.obj =
+  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen CInstances"
+    ~cache:(fun (cfunc, usage) -> cfunc_instance_map := CString.Map.add cfunc usage !cfunc_instance_map)
+    ~subst:(Some subst_cfunc_usage)
+let add_cfunc_instance cfunc usage = Lib.add_leaf (add_cfunc_instance_obj (cfunc, usage))
 
 type string_or_none = string option
 
