@@ -2659,7 +2659,9 @@ let codegen_resolve_dependencies (gen_list : code_generation list) : code_genera
     []
 
 let command_resolve_dependencies () : unit =
-  update_generation_map (CString.Map.map codegen_resolve_dependencies)
+  let gmap = get_generation_map () in
+  let gmap' = CString.Map.map codegen_resolve_dependencies gmap in
+  set_generation_map gmap'
 
 let command_print_generation_list gen_list =
   List.iter
