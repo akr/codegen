@@ -63,6 +63,8 @@ run-sample:
 	gcc -g -Wall sample/sprintf.c -o sample/sprintf
 	sample/sprintf
 	(cd sample/lseq; make clean all; ./test_lseq)
+	(cd sample/str; make clean all)
+	(cd sample/str2; make clean all)
 
 clean :
 	rm -f \
