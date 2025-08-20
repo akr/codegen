@@ -393,20 +393,12 @@ let dummy_source_filename = "//dummy.c//"
 let current_header_filename = Summary.ref ~name:"CodegenCurrentHeaderFilename"
   dummy_header_filename
 let get_current_header_filename () = !current_header_filename
-let set_current_header_filename_obj : string -> Libobject.obj =
-  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen HeaderFilename"
-    ~cache:(fun filename -> current_header_filename := filename)
-    ~subst:None
-let set_current_header_filename s = Lib.add_leaf (set_current_header_filename_obj s)
+let set_current_header_filename s = current_header_filename := s
 
 let current_source_filename = Summary.ref ~name:"CodegenCurrentImplementationFilename"
   dummy_source_filename
 let get_current_source_filename () = !current_source_filename
-let set_current_source_filename_obj : string -> Libobject.obj =
-  Libobject.declare_object @@ Libobject.global_object_nodischarge "CodeGen SourceFilename"
-    ~cache:(fun filename -> current_source_filename := filename)
-    ~subst:None
-let set_current_source_filename s = Lib.add_leaf (set_current_source_filename_obj s)
+let set_current_source_filename s = current_source_filename := s
 
 type code_generation =
   GenFunc of string     (* C function name *)
