@@ -18,4 +18,4 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 From codegen Require Import verify.
 
-Declare ML Module "coq-codegen.plugin".
+Declare ML Module "rocq-codegen.plugin".

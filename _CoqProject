@@ -1,4 +1,4 @@
-src/META.coq-codegen
+src/META.rocq-codegen
 -Q theories codegen
 -I src
 

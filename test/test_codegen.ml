@@ -70,7 +70,7 @@ let write_file (fn : string) (content : string) : unit =
 
 let search_topdir () : string option =
   let rec f d =
-    let fn = d ^ "/Makefile.coq.conf" in
+    let fn = d ^ "/Makefile.rocq.conf" in
     if Sys.file_exists fn then
       Some d
     else if d = "/" then

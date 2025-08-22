@@ -16,13 +16,13 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 *)
 
-DECLARE PLUGIN "coq-codegen.plugin"
+DECLARE PLUGIN "rocq-codegen.plugin"
 
 {
 
-let () = Mltop.add_init_function "coq-codegen.plugin"
+let () = Mltop.add_init_function "rocq-codegen.plugin"
   (fun () ->
-    Feedback.msg_info Pp.(str"coq-codegen 0.1"))
+    Feedback.msg_info Pp.(str"rocq-codegen 0.1"))
 
 open Cgenutil
 open State
