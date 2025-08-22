@@ -15,20 +15,13 @@ uninstall : Makefile.coq
 
 ifdef COQMF_COQLIB
 development-without-install : revert-development-without-install
-	ln -s ../src/META.coq-codegen theories
-	ln -s ../src/codegen_plugin.cmi theories
-	ln -s ../src/codegen_plugin.cmxs theories
-	ln -s ../src/codegen_plugin.cmxa theories
-	ln -s ../src/codegen_plugin.cmx theories
-	ln -s `pwd`/theories $(COQMF_COQLIB)/user-contrib/codegen
+	ln -s META.coq-codegen src/META
+	ln -s `pwd`/theories "$(COQMF_COQLIB)/user-contrib/codegen"
+	ln -s `pwd`/src "$(COQMF_COQLIB)/../coq-codegen"
 
 revert-development-without-install :
-	rm -f "$(COQMF_COQLIB)/user-contrib/codegen" || ( echo "Do 'make uninstall' first"; false )
-	rm -f theories/META.coq-codegen
-	rm -f theories/codegen_plugin.cmi
-	rm -f theories/codegen_plugin.cmxs
-	rm -f theories/codegen_plugin.cmxa
-	rm -f theories/codegen_plugin.cmx
+	rm -f "$(COQMF_COQLIB)/user-contrib/codegen" "$(COQMF_COQLIB)/../coq-codegen" || ( echo "Do 'make uninstall' first"; false )
+	rm -f src/META
 else
 development-without-install :
 	@echo 'COQMF_COQLIB not defined.  run "make" first.'
