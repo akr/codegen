@@ -323,6 +323,12 @@ let command_test_args (func : Libnames.qualid) (sd_list : s_or_d list) : unit =
     Pp.str "expected but" +++
     Pp.str "[" ++ pp_sjoinmap_list pr_s_or_d sd_list_defined ++ Pp.str "]"))
 
+let flush_and_check_evars (env : Environ.env) (sigma : Evd.evar_map) (t : EConstr.t) : Constr.t =
+  let t = Evarutil.nf_evar sigma t in
+  (if Evarutil.has_undefined_evars sigma t then
+    user_err_hov (Pp.str "[codegen:bug] evar remains:" +++ Printer.pr_econstr_env env sigma t));
+  EConstr.to_constr sigma t
+
 let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
     (f : EConstr.t) (f_type : EConstr.types) (static_args : EConstr.t option list) : (Evd.evar_map * Constr.t * EConstr.types) =
   let rec aux env f f_type static_args =
@@ -350,7 +356,7 @@ let build_presimp (env : Environ.env) (sigma : Evd.evar_map)
   let t = aux env f f_type static_args in
   let (sigma, ty) = Typing.type_of env sigma t in
   Pretyping.check_evars env ~initial:sigma0 sigma t;
-  let t = Evarutil.flush_and_check_evars sigma t in
+  let t = flush_and_check_evars env sigma t in
   let ty = Reductionops.nf_all env sigma ty in
   (if not (is_monomorphic_type env sigma ty) then
     user_err (Pp.hov 2 (Pp.str "[codegen] pre-simplified term must have monomorphic type:" +++ Printer.pr_econstr_env env sigma ty)));
@@ -472,7 +478,7 @@ let check_instance_args (env : Environ.env) (sigma : Evd.evar_map) (func : ECons
       Pp.str "(" ++
       Pp.int (List.length sd_list) ++ Pp.str ")"));
   let args = List.map (Option.map (Reductionops.nf_all env sigma)) (Array.to_list static_args) in
-  let args = List.map (Option.map (Evarutil.flush_and_check_evars sigma)) args in
+  let args = List.map (Option.map (flush_and_check_evars env sigma)) args in
   let args = List.map (Option.map EConstr.of_constr) args in
   let func0 = EConstr.to_constr sigma func in
   ignore (codegen_define_or_check_static_arguments env sigma func0 sd_list);

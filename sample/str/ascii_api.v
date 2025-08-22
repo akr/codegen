@@ -1,6 +1,6 @@
 Require Import codegen.codegen.
 
-Require Import Ascii.
+From Stdlib Require Import Ascii.
 Require Import ascii.
 (*
 Inductive ascii : Set :=

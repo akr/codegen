@@ -90,10 +90,10 @@ let cc_opts : string list =
   | Some v -> List.filter (fun s -> s <> "") (String.split_on_char ' ' v)
   | None -> ["-Werror=unused-label"]
 
-let coqc : string =
-  match Sys.getenv_opt "COQC" with
+let rocq_command : string =
+  match Sys.getenv_opt "ROCQ" with
   | Some v -> v
-  | None -> "coqc"
+  | None -> "rocq"
 
 let topdir_opt : string option = search_topdir ()
 
@@ -381,7 +381,8 @@ let codegen_test_template
     ?exit_code:coq_exit_code
     ~use_stderr:true
     ?foutput:coq_foutput
-    coqc (List.append coq_opts [src_fn]);
+    rocq_command
+    ("c" :: (List.append coq_opts [src_fn]));
   (match generated_code_regexp with
   | None -> ()
   | Some regexp ->

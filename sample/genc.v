@@ -123,7 +123,7 @@ CodeGen Gen "foo9".
 
 Section Sec1.
 Variable a : nat.
-Fixpoint foo10 b := a + b.
+Fixpoint foo10 b := a + b. (* non-recursive fixpoint *)
 End Sec1.
 Definition foo10' := foo10.
 CodeGen Func foo10 => "foo10".

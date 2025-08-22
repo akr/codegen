@@ -31,7 +31,7 @@ open Tac2val
 open Tac2core
 
 let codegen_solve () : unit Proofview.tactic =
-  let gr = Coqlib.lib_ref "codegen.verification_anchor" in
+  let gr = Rocqlib.lib_ref "codegen.verification_anchor" in
   let cnst =
     match gr with
     | ConstRef cnst -> cnst

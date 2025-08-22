@@ -1,10 +1,13 @@
+ROCQOPTS = -Q ../../theories codegen -I ../../src
+ROCQC = rocq c
+
 all: test_lseq
 
 lseq.vo : lseq.v
-	coqc lseq.v
+	$(ROCQC) $(ROCQOPTS) lseq.v
 
 lseq.c lseq.h : gen_lseq.v lseq.vo
-	coqc gen_lseq.v
+	$(ROCQC) $(ROCQOPTS) gen_lseq.v
 
 lseq.o : lseq.c
 	$(CC) -g -c lseq.c

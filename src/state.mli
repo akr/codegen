@@ -1,6 +1,6 @@
 module ConstrMap : CMap.UExtS with type key = Constr.t
-module ConstrSet : CSet.S with type elt = Constr.t
-module StringSet : CSet.S with type elt = String.t
+module ConstrSet : CSet.ExtS with type elt = Constr.t
+module StringSet : CSet.ExtS with type elt = String.t
 
 val optread_indimp_auto_linear : unit -> bool
 val optread_debug_simplification : unit -> bool

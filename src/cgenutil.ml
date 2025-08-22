@@ -1394,7 +1394,7 @@ let show_goals () : unit Proofview.tactic =
   end
 
 let lib_ref (env : Environ.env) (sigma : Evd.evar_map) (name : string) : Evd.evar_map * EConstr.t =
-  let gr = Coqlib.lib_ref name in
+  let gr = Rocqlib.lib_ref name in
   fresh_global env sigma gr
 
 let exact_term_eq (sigma : Evd.evar_map) (t1 : EConstr.t) (t2 : EConstr.t) : bool =

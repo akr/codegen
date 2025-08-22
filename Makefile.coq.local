@@ -1,7 +1,7 @@
 # Merlin needs -bin-annot
 CAMLFLAGS += -bin-annot
 
-# This is required to print backtrace with coqide -bt.
+# This is required to print backtrace with rocqide -bt.
 CAMLDEBUG += -g
 
-CAMLPKGS += -package coq-core.plugins.ltac2
+CAMLPKGS += -package rocq-runtime.plugins.ltac2

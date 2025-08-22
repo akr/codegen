@@ -40,8 +40,8 @@ open Stdarg (* for wit_string *)
 open Ltac_plugin
 open Extraargs
 
-open Pcoq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
-open Pcoq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
+open Procq.Prim (* for reference(id) in VERNAC ARGUMENT EXTEND *)
+open Procq.Constr (* for constr(term) in VERNAC ARGUMENT EXTEND *)
 }
 
 (*

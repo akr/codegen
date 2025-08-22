@@ -1,15 +1,18 @@
 From mathcomp Require Import all_ssreflect.
 From HB Require Import structures.
 
-Require Ascii.
+From Stdlib Require Ascii.
 Require Import ascii.
 
-Require Import String.
+From Stdlib Require Import String.
 (*
 Inductive string : Set :=
 | EmptyString : string
 | String : ascii -> string -> string.
 *)
+
+Open Scope string_scope. (* enable "string-literal" and str ++ str *)
+Open Scope seq_scope. (* prefer seq ++ seq over str ++ str *)
 
 Fixpoint seq_of_str str :=
   match str with

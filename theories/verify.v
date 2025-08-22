@@ -1,7 +1,7 @@
 From Ltac2 Require Import Ltac2.
 From Ltac2 Require Import Message.
 
-Require FunctionalExtensionality.
+From Stdlib Require FunctionalExtensionality.
 
 Definition codegen_verification_anchor := tt.
 Register codegen_verification_anchor as codegen.verification_anchor.
@@ -405,7 +405,7 @@ Ltac2 destEqApp_opt (t : constr) : (constr * constr * constr array * constr * co
   end.
 
 (*
-Ltac2 Eval print (of_constr constr:(@Coq.Init.Logic.eq)).
+Ltac2 Eval print (of_constr constr:(@Corelib.Init.Logic.eq)).
 *)
 
 Ltac2 intarray_inc (start : int) (n : int) : int array :=
@@ -421,7 +421,7 @@ Ltac2 mkRels_dec (start : int) (n : int) : constr array :=
   Array.map mkRel (intarray_dec start n).
 
 Ltac2 make_exteq (nftype : constr) (lhs : constr) (rhs : constr) : constr :=
-  let eq := constr:(@Coq.Init.Logic.eq) in
+  let eq := constr:(@Corelib.Init.Logic.eq) in
   let (binders, ret) := decompose_prod nftype in
   let n := List.length binders in
   let args := mkRels_dec n n in
@@ -500,7 +500,7 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
     | _ =>  Control.backtrack_tactic_failure "return-clause is not Lambda"
     end
   in
-  let eq := constr:(@Coq.Init.Logic.eq) in
+  let eq := constr:(@Corelib.Init.Logic.eq) in
   let new_ret_item := mkRel 1 in
   let new_ret := Constr.Unsafe.make (Constr.Unsafe.Lambda item_binder
     (mkApp eq [| eq_type;
@@ -640,7 +640,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
       end)
   in
   let fn_types2 := Array.map (fun b => nf_of (Constr.Binder.type b)) binders2 in
-  let eq := constr:(@Coq.Init.Logic.eq) in
+  let eq := constr:(@Corelib.Init.Logic.eq) in
   let subgoal_types := Array.init h2
     (fun i2 =>
       let i1 := Array.get index1_of_index2 i2 in
@@ -1302,7 +1302,7 @@ Ltac2 make_proof_term_for_letin (goal_type : constr) :=
     | None => Control.backtrack_tactic_failure "RHS is not LetIn-expression"
     end
   in
-  let eq := constr:(@Coq.Init.Logic.eq) in
+  let eq := constr:(@Corelib.Init.Logic.eq) in
   if Constr.equal exp1 exp2 then
     let lhs := mkApp body1 lhs_args in
     let rhs := mkApp body2 rhs_args in
@@ -1441,7 +1441,7 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
   let argtypes := Array.map nftype_of lhs_args in (* we want to use parametric inductive types for testing *)
   let n := Array.length lhs_args in
   Control.assert_valid_argument "number of arguments in LHS and RHS are different" (Int.equal n (Array.length rhs_args));
-  let eq := constr:(@Coq.Init.Logic.eq) in
+  let eq := constr:(@Corelib.Init.Logic.eq) in
   let rec aux i :=
     if Int.equal i n then
       Control.backtrack_tactic_failure "different argument not found"
@@ -1456,7 +1456,7 @@ Ltac2 make_proof_term_for_apparg (goal_type : constr) : constr :=
     let make_goal x := mkApp eq [|eq_type; mkApp lhs_fn lhs_args; mkApp rhs_fn (make_rhs_args x)|] in
     let subgoal_arg := make_funext_subgoal [] arg_type a1 a2 in
     let subgoal_next := make_simple_subgoal (make_goal a1) in
-    let eq_ind := constr:(@Coq.Init.Logic.eq_ind) in
+    let eq_ind := constr:(@Corelib.Init.Logic.eq_ind) in
     let pred := mkLambda (Constr.Binder.make (Some ident:(x)) arg_type) (make_goal (mkRel 1)) in
     let proof_term :=
       mkApp eq_ind [|arg_type; a1; pred; subgoal_next; a2; subgoal_arg|]

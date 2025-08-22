@@ -4,7 +4,7 @@ Require Import nat.
 Require Import ascii.
 Require Import str.
 
-Require Import String.
+From Stdlib Require Import String.
 
 CodeGen IndType string => "str_t" swfunc "str_sw" with
 | EmptyString => primitive "str_empty" case "0"

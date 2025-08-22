@@ -1,7 +1,7 @@
-Require Import String.
-Require Import Ascii.
-Require Import Arith.
-Require Import List.
+From Stdlib Require Import String.
+From Stdlib Require Import Ascii.
+From Stdlib Require Import Arith.
+From Stdlib Require Import List.
 
 Open Scope string_scope. (* enable "string-literal" and str ++ str *)
 

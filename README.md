@@ -1,6 +1,6 @@
-# codegen plugin for Coq
+# codegen plugin for Rocq
 
-This software provides Coq commands to generate C source code
+This software provides Rocq commands to generate C source code
 from Gallina definitions.
 
 ## Home page
@@ -19,14 +19,14 @@ https://github.com/akr/codegen
 
 ## Requiements
 
-You need Coq and OCaml.
+You need Rocq and OCaml.
 
-- Coq 8.20 (Coq 8.19 doesn't work)
-- OCaml 5.2.0
+- Rocq 9.0 (Coq 8.20 doesn't work)
+- OCaml 5.3.0
 
 You also need following to test codegen.
 
-- ocamlfind 1.9.6
+- ocamlfind 1.9.8
 - ounit2 2.2.7 (ounit2 2.2.5 doesn't work)
 
 ## How to build, test and install
@@ -130,20 +130,20 @@ This is useful as a part of a project.
 
 power function:
 
-    coqc -Q theories codegen -I src sample/pow.v # generates sample/pow_generated.c
+    rocq c -Q theories codegen -I src sample/pow.v # generates sample/pow_generated.c
     gcc -g -Wall sample/pow.c -o sample/pow
     sample/pow
 
 rank algorithm of succinct data structure:
 
-    coqc -Q theories codegen -I src sample/rank.v # generates sample/rank_generated.c
+    rocq c -Q theories codegen -I src sample/rank.v # generates sample/rank_generated.c
     gcc -g -Wall sample/rank.c -o sample/rank
     sample/rank rand
     sample/rank 11011110001010101111
 
 sprintf function:
 
-    coqc -Q theories codegen -I src sample/sprintf.v # generates sample/sprintf_generated.c
+    rocq c -Q theories codegen -I src sample/sprintf.v # generates sample/sprintf_generated.c
     gcc -g -Wall sample/sprintf.c -o sample/sprintf
     sample/sprintf
 
