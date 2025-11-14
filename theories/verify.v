@@ -243,7 +243,7 @@ Ltac2 rec decompose_letin (t : constr) : (binder * constr) list * constr :=
   | _ => ([], t)
   end.
 
-Ltac2 mkApp_beta1 (fn : constr) (args : constr array) : constr :=
+Ltac2 mkApp_beta_zeta1 (fn : constr) (args : constr array) : constr :=
   let rec aux nbinders t ofs :=
     let n := Int.sub (Array.length args) ofs in
     if Int.le n 0 then
@@ -265,12 +265,12 @@ Ltac2 mkApp_beta1 (fn : constr) (args : constr array) : constr :=
   in
   aux 0 fn 0.
 
-Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
+Ltac2 mkApp_beta_zeta (fn : constr) (args : constr array) : constr :=
   let (fn, args0) := decompose_app fn in
-  mkApp_beta1 fn (Array.append args0 args).
+  mkApp_beta_zeta1 fn (Array.append args0 args).
 
 (*
-Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
+Ltac2 mkApp_beta_zeta (fn : constr) (args : constr array) : constr :=
   let rec aux t args :=
     match args with
     | [] => t
@@ -289,16 +289,16 @@ Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
 *)
 
 (*
-Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2); constr:(3) |].
-Ltac2 Eval mkApp_beta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) |].
-Ltac2 Eval mkApp_beta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
-Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a b => a + b) [| constr:(1) |].
-Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4) |].
-Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5) |].
-Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5); constr:(6) |].
-Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
-Ltac2 Eval let (b,t) := destLambda constr:(fun a => a + let x := 1 in a + x) in mkLambda b (mkApp_beta t [| mkRel 1 |]).
-Ltac2 Eval mkApp_beta constr:((fun a b => a + b) 0) [| constr:(1) |].
+Ltac2 Eval mkApp_beta_zeta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2); constr:(3) |].
+Ltac2 Eval mkApp_beta_zeta constr:(fun a b c => a + b + c) [| constr:(1); constr:(2) |].
+Ltac2 Eval mkApp_beta_zeta constr:(fun a b => match a with O => fun c => a + b | S m => fun c => b + c end) [| constr:(1); constr:(2); constr:(3) |].
+Ltac2 Eval mkApp_beta_zeta constr:(let x := 0 in fun a b => a + b) [| constr:(1) |].
+Ltac2 Eval mkApp_beta_zeta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4) |].
+Ltac2 Eval mkApp_beta_zeta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5) |].
+Ltac2 Eval mkApp_beta_zeta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5); constr:(6) |].
+Ltac2 Eval mkApp_beta_zeta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
+Ltac2 Eval let (b,t) := destLambda constr:(fun a => a + let x := 1 in a + x) in mkLambda b (mkApp_beta_zeta t [| mkRel 1 |]).
+Ltac2 Eval mkApp_beta_zeta constr:((fun a b => a + b) 0) [| constr:(1) |].
 *)
 
 Ltac2 make_simple_subgoal (concl : constr) : constr :=
@@ -430,8 +430,8 @@ Ltac2 make_exteq (nftype : constr) (lhs : constr) (rhs : constr) : constr :=
   let (binders, ret) := decompose_prod nftype in
   let n := List.length binders in
   let args := mkRels_dec n n in
-  let lhs' := mkApp_beta (Constr.Unsafe.liftn n 1 lhs) args in
-  let rhs' := mkApp_beta (Constr.Unsafe.liftn n 1 rhs) args in
+  let lhs' := mkApp_beta_zeta (Constr.Unsafe.liftn n 1 lhs) args in
+  let rhs' := mkApp_beta_zeta (Constr.Unsafe.liftn n 1 rhs) args in
   compose_prod binders (mkApp eq [|ret; lhs'; rhs'|]).
 
 (* Ltac2 Eval print (of_constr (make_exteq constr:(nat -> nat -> nat) constr:(Nat.add) constr:(Nat.sub))). *)
@@ -529,8 +529,8 @@ Ltac2 make_proof_term_for_matchapp (goal_type : constr) : constr :=
       let (binders1, branch1_body) := decompose_lambda_n cstr_numargs branch1 in
       let branch2 := Array.get branches2 j in
       let (_binders2, branch2_body) := decompose_lambda_n cstr_numargs branch2 in
-      let branch1' := mkApp_beta branch1_body lhs_args in
-      let branch2' := mkApp_beta branch2_body rhs_args in
+      let branch1' := mkApp_beta_zeta branch1_body lhs_args in
+      let branch2' := mkApp_beta_zeta branch2_body rhs_args in
       let subgoal_type := compose_prod binders1 (mkApp eq [| eq_type; branch1'; branch2' |]) in
       let subgoal := make_simple_subgoal subgoal_type in
       let subgoal_args := mkRels_dec cstr_numargs cstr_numargs in
@@ -655,7 +655,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
       let (arg_binders, ret_type) := decompose_prod fn_type in
       let numargs := List.length arg_binders in
       let args := mkRels_dec numargs numargs in
-      let new_type := compose_prod arg_binders (mkApp eq [| ret_type; mkApp_beta body1 args; mkApp_beta body2 args |]) in
+      let new_type := compose_prod arg_binders (mkApp eq [| ret_type; mkApp_beta_zeta body1 args; mkApp_beta_zeta body2 args |]) in
       new_type)
   in
   let ih_types :=
@@ -719,7 +719,7 @@ Ltac2 make_proof_term_for_fix (goal_type : constr) :=
         let case_term := mkCase cinfo new_ret Constr.Binder.Relevant Constr.Unsafe.NoInvert citem branches in
         let subgoal_type := Array.get subgoal_types i2 in
         let subgoal :=
-          mkApp_beta (Array.get subgoals i2) (mkRels_dec (Int.add h2 (List.length arg_binders)) h2)
+          mkApp_beta_zeta (Array.get subgoals i2) (mkRels_dec (Int.add h2 (List.length arg_binders)) h2)
         in
         let let_term := mkLetIn (Constr.Binder.make None subgoal_type) subgoal case_term in
         let new_fn := compose_lambda arg_binders let_term in
