@@ -1480,7 +1480,7 @@ let rec transform_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let e2 = transform_matchapp env2 sigma e [||] in
       mkApp (mkLambda (x, t, e2), Array.map mkRel rels)
   | LetIn (x,e,t,b) ->
-      let env2 = env_push_assum env x t in
+      let env2 = env_push_assum env x t in (* It is intentional to use env_push_assum instead of env_push_def because we don't want zeta-expansion this phase to ease the verification (using Ltac2). *)
       let e2 = transform_matchapp env sigma e [||] in
       let b2 = transform_matchapp env2 sigma b (Array.map (Stdlib.Int.add 1) rels) in
       mkLetIn (x, e2, t, b2)
@@ -1489,12 +1489,13 @@ let rec transform_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       let rec decompose_prod_n_acc env fargs n term =
         let term = whd_all env sigma term in
         if n <= 0 then
+          let term = nf_all env sigma term in
           (fargs, term)
         else
           match EConstr.kind sigma term with
           | Prod (x,t,e) ->
               let t' = nf_all env sigma t in
-              let env2 = env_push_assum env x t in
+              let env2 = env_push_assum env x t' in
               decompose_prod_n_acc env2 ((x,t')::fargs) (n-1) e
           | _ ->
               user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (prod not exposed):" +++
@@ -1502,26 +1503,40 @@ let rec transform_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EC
       in
       let na = Array.length rels in
       let (mpred_fargs, mpred_body) = decompose_prod_n_acc env [] na mpred_body in
-      if List.exists (fun (x,t) -> not (Vars.closed0 sigma t)) mpred_fargs then
-        user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (dependent argument):" +++
-                  Printer.pr_econstr_env env sigma term)
-      else
-        let mpred_body =
-          let n = List.length mpred_ctx in
-          let ma_args = Array.map (fun i -> mkRel (i + n)) rels in
-          Vars.substl (CArray.rev_to_list ma_args) mpred_body
+      begin
+        let rec check cenv fargs =
+          match fargs with
+          | [] -> ()
+          | (x,t) :: rest ->
+              if Vars.closed0 sigma t then
+                let cenv2 = env_push_assum cenv x t in
+                check cenv2 rest
+              else
+                user_err (Pp.str "[codegen] could not move arg of (match ... end arg) because dependent-match (dependent argument," +++
+                          Pp.str (str_of_name_permissive (Context.binder_name x)) +++
+                          Pp.str ":" +++
+                          Printer.pr_econstr_env cenv sigma t +++
+                          Pp.str "):" +++
+                          Printer.pr_econstr_env env sigma term)
         in
-        let bl2 =
-          Array.map2
-            (fun (nas,body) (ctx,_) ->
-              let nctx = List.length ctx in
-              let env2 = EConstr.push_rel_context ctx env in
-              let body2 = transform_matchapp env2 sigma body (Array.map (Stdlib.Int.add nctx) rels) in
-              (nas,body2))
-            bl bl0
-        in
-        let mpred_sr = EConstr.ERelevance.relevant in
-        mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl2)
+        check env mpred_fargs
+      end;
+      let mpred_body =
+        let n = List.length mpred_ctx in
+        let ma_args = Array.map (fun i -> mkRel (i + n)) rels in
+        Vars.substl (CArray.rev_to_list ma_args) mpred_body
+      in
+      let bl2 =
+        Array.map2
+          (fun (nas,body) (ctx,_) ->
+            let nctx = List.length ctx in
+            let env2 = EConstr.push_rel_context ctx env in
+            let body2 = transform_matchapp env2 sigma body (Array.map (Stdlib.Int.add nctx) rels) in
+            (nas,body2))
+          bl bl0
+      in
+      let mpred_sr = EConstr.ERelevance.relevant in
+      mkCase (ci, u, pms, ((mpred_nas, mpred_body), mpred_sr), iv, item, bl2)
 
 (*
   (sigma, term', step_opt) = simplify_matchapp env sigma term
@@ -1543,9 +1558,9 @@ let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
     end
   else
     begin
-      let (sigma, step_opt) = verify_transformation env sigma term term' in
       if optread_debug_matchapp () then
         msg_debug_hov (Pp.str "[codegen] simplify_matchapp_result:" +++ Printer.pr_econstr_env env sigma term');
+      let (sigma, step_opt) = verify_transformation env sigma term term' in
       (sigma, term', step_opt)
     end
 
@@ -1775,9 +1790,10 @@ and delete_unused_let_rec1 (env : Environ.env) (sigma : Evd.evar_map) (term : EC
         (Linear.is_linear env sigma t) ||
         (IntSet.exists
           (fun i ->
+            let env' = Environ.env_of_rel (Environ.nb_rel env - i) env in
             let rel = EConstr.lookup_rel (Environ.nb_rel env - i) env in
             let ty = Context.Rel.Declaration.get_type rel in
-            Linear.is_linear env sigma ty)
+            Linear.is_linear env' sigma ty)
           fvse)
       in
       if retain then
@@ -2521,6 +2537,10 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     let term1 = term in
     let term = reduce_exp (aenv_of_env env) sigma term in
     debug_simplification env sigma "reduce_exp" term;
+    let term = normalize_types env sigma term in
+    debug_simplification env sigma "normalize_types-before-simplify_matchapp" term;
+    let term = delete_unused_let env sigma term in
+    debug_simplification env sigma "delete_unused_let-before-simplify_matchapp" term;
     let (sigma, term, step_opt) = simplify_matchapp env sigma term in
     debug_simplification env sigma "simplify_matchapp" term;
     if EConstr.eq_constr sigma term1 term then

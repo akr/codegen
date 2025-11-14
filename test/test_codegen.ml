@@ -1943,6 +1943,40 @@ let test_list = add_test test_list "test_map_succ" begin fun (ctx : test_ctxt) -
     |}
 end
 
+let test_list = add_test test_list "test_mem_seq_nat" begin fun (ctx : test_ctxt) ->
+  codegen_test_template ctx
+    (bool_src ^ nat_src ^ list_nat_src ^
+    {|
+      (* nat-specialized version of xpred0, xpredU1 and mem_seq in mathcomp *)
+      Definition xpred0 : nat -> bool := (fun x => false).
+      Definition xpredU1 (a : nat) (p : nat -> bool) : nat -> bool :=
+        (fun x => orb (Nat.eqb x a) (p x)).
+      Fixpoint mem_seq_nat (s : list nat) :=
+        match s with
+        | nil => xpred0
+        | cons y s' => xpredU1 y (mem_seq_nat s')
+        end.
+      CodeGen GlobalInline xpred0 xpredU1.
+      CodeGen Func mem_seq_nat.
+    |})
+    {|
+      #define is_nil(s) list_nat_is_nil(s)
+      #define head(s) list_nat_head(s)
+      #define tail(s) list_nat_tail(s)
+      #define cons(h,t) list_nat_cons(h,t)
+      list_nat s3 = cons(2, NULL);
+      list_nat s2 = cons(1, s3);
+      list_nat s1 = cons(4, s2);
+      assert(mem_seq_nat(s1, 0) == false);
+      assert(mem_seq_nat(s1, 1) == true);
+      assert(mem_seq_nat(s1, 2) == true);
+      assert(mem_seq_nat(s1, 3) == false);
+      assert(mem_seq_nat(s1, 4) == true);
+      assert(mem_seq_nat(s1, 5) == false);
+      list_nat_free(s1);
+    |}
+end
+
 let test_list = add_test test_list "test_fully_dynamic_func_with_presimp_name" begin fun (ctx : test_ctxt) ->
   template_coq_success ctx
     (nat_src ^

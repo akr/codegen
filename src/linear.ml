@@ -97,8 +97,13 @@ let ind_cstrarg_iter (env : Environ.env) (sigma : Evd.evar_map) (pind : inductiv
       ind_nf_lc_iter env sigma ctx (Array.to_list params)
         (fun env2 ty ->
           let ty' = nf_all env2 sigma ty in
+          (*
           if not (Vars.closed0 sigma ty') then
-            user_err_hov (Pp.str "[codegen] dependent constructor argument:" +++ Id.print ind_id +++ Id.print cstr_id +++ Printer.pr_econstr_env env2 sigma ty');
+            user_err_hov (Pp.str "[codegen] dependent constructor argument:"
+                          +++ Pp.str "indtype:" ++ Id.print ind_id
+                          +++ Pp.str "constructor:" ++ Id.print cstr_id
+                          +++ Pp.str "argtype:" ++ Printer.pr_econstr_env env2 sigma ty');
+          *)
           f ind_id cstr_id ty';
           None))
     oneind_body.mind_consnames (arities_of_constructors sigma pind mind_specif)
