@@ -243,7 +243,7 @@ Ltac2 rec decompose_letin (t : constr) : (binder * constr) list * constr :=
   | _ => ([], t)
   end.
 
-Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
+Ltac2 mkApp_beta1 (fn : constr) (args : constr array) : constr :=
   let rec aux nbinders t ofs :=
     let n := Int.sub (Array.length args) ofs in
     if Int.le n 0 then
@@ -264,6 +264,10 @@ Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
     end
   in
   aux 0 fn 0.
+
+Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
+  let (fn, args0) := decompose_app fn in
+  mkApp_beta1 fn (Array.append args0 args).
 
 (*
 Ltac2 mkApp_beta (fn : constr) (args : constr array) : constr :=
@@ -294,6 +298,7 @@ Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => 
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => c + 3) [| constr:(4); constr:(5); constr:(6) |].
 Ltac2 Eval mkApp_beta constr:(let x := 0 in fun a => let y := a + 1 in fun b => let z := a + b + 2 in fun c => Nat.add (c + 3)) [| constr:(4); constr:(5); constr:(6); constr:(7) |].
 Ltac2 Eval let (b,t) := destLambda constr:(fun a => a + let x := 1 in a + x) in mkLambda b (mkApp_beta t [| mkRel 1 |]).
+Ltac2 Eval mkApp_beta constr:((fun a b => a + b) 0) [| constr:(1) |].
 *)
 
 Ltac2 make_simple_subgoal (concl : constr) : constr :=
