@@ -142,7 +142,7 @@ let component_types (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.typ
   - linear type is
     - a inductive type which is registered with CodeGen Linear, or
     - a inductive type which has (possibly indirectly) have a component which type is linear.
-  - function type is always unrestricted.
+  - function type is always non-linear (unrestricted).
 *)
 let is_linear_type (env : Environ.env) (sigma : Evd.evar_map) (ty : EConstr.types) : bool =
   let (ty_set, has_func, has_sort) = traverse_constructor_argument_types env sigma ty in
