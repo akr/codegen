@@ -1948,15 +1948,14 @@ let test_list = add_test test_list "test_mem_seq_nat" begin fun (ctx : test_ctxt
     (bool_src ^ nat_src ^ list_nat_src ^
     {|
       (* nat-specialized version of xpred0, xpredU1 and mem_seq in mathcomp *)
-      Definition xpred0 : nat -> bool := (fun x => false).
-      Definition xpredU1 (a : nat) (p : nat -> bool) : nat -> bool :=
-        (fun x => orb (Nat.eqb x a) (p x)).
-      Fixpoint mem_seq_nat (s : list nat) :=
+      Notation xpred0 := (fun (x : nat) => false).
+      Notation xpredU1 := (fun (a : nat) (p : nat -> bool) =>
+        (fun (x : nat) => orb (Nat.eqb x a) (p x))).
+      Fixpoint mem_seq_nat (s : list nat) : nat -> bool :=
         match s with
         | nil => xpred0
         | cons y s' => xpredU1 y (mem_seq_nat s')
         end.
-      CodeGen GlobalInline xpred0 xpredU1.
       CodeGen Func mem_seq_nat.
     |})
     {|
