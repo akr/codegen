@@ -127,6 +127,7 @@
 
 \newcommand{\omatch}[2]{\kwmatch\:#1\:\kwwith\:{#2}\:\kwend}
 \newcommand{\match}[4]{\kwmatch\:#1\:\kwwith\:(#2 \Rightarrow #3)_{#4}\:\kwend}
+\newcommand{\omatchasinret}[5]{\kwmatch\:#1\:\kwas\:#2\:\kwin\:#3\:\kwreturn\:#4\:\kwwith\:{#5}\:\kwend}
 \newcommand{\matchasinret}[7]{\kwmatch\:#1\:\kwas\:#2\:\kwin\:#3\:\kwreturn\:#4\:\kwwith\:(#5 \Rightarrow #6)_{#7}\:\kwend}
 
 \newcommand{\ofix}[2]{\kwfix\:{#1}\:\kwfor\:{#2}}
@@ -449,7 +450,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
     &\bnfor \lamT{x}{T}{t}        & \text{abstraction} \\
     &\bnfor t\:u                  & \text{application} \\
     &\bnfor \letin{x}{t:T}{u}     & \text{let-in} \\
-    &\bnfor \omatch{t}{\repop{C\:\rep{x{:}T}\Rightarrow u}{|}} & \text{conditional} \\
+    &\bnfor \omatchasinret{t}{y}{V\:\rep{z}}{U}{\repop{C\:\rep{x{:}T}\Rightarrow u}{|}} & \text{conditional} \\
     &\bnfor \ofix{\repop{f/k{:}T:=t}{\kwwith}}{f_j} & \text{fixpoint}
 \end{align*}
 {\small Note:
@@ -457,7 +458,7 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \item $u, a, b$ represents a term as $t$. \\
     $v, w, y, z$ represent a v-variable as $x$. \\
     $g$ represent a f-variable as $f$. \\
-    $U, V$ represents a type as $T$.
+    $U, V, W$ represents a type and type-constructor as $T$.
   \item We distinguish v-variables (such as $x$) and f-variables (such as $f$) in the syntax.
     V-variables are variables bounded by abstraction, let-in, and conditional.
     F-variables are variables bounded by fixpoint.
@@ -468,8 +469,8 @@ We use $\substm{t}{x}{u}$ for parallel substituion.
   \item We write $\letin{x_1}{t_1{:}T_1}{(\ldots(\letin{x_n}{t_n{:}T_n}{u})\ldots)}$ as $\letinM{x}{t{:}T}{u}$.
   \item $k$ is an integer. \\ $k_i$ for fixpoint specify the decreasing argument for $f_i$.
   \item If it is unambiguous, we omit type annotations for the sake of simplicity.  We also omit $k_i$ in fixpoints if they are not used.
-  \item We omitted the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) in the syntax.
-  \item We omitted the dummy parameters (underscores between $C$ and $\rep{x{:}T}$) in conditionals.
+  \item We omit the elimination predicate (\kwas-\kwin-\kwreturn{} clause of \kwmatch-expression) when it is not interesting.
+  \item We omitted the dummy parameters (underscores between $C$ and $\rep{x{:}T}$ and betwenn $V$ and $\rep{z}$) in conditionals.
   \item We consider inductive types and constructor types has no let-in in binders.
   \item We omitted the detail of the types.  Actual \gallina{} permits any \gallina{} term which evaluates to a type.
 \end{itemize}}
