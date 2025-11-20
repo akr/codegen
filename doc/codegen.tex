@@ -306,6 +306,9 @@
 \DeclareMathOperator{\Eop}{E}
 \newcommand{\E}[3]{\Eop\BRA{#1\,/\,#2}_{#3}}
 
+\DeclareMathOperator{\BZop}{BZ}
+\newcommand{\BZ}[1]{\BZop\BRA{#1}}
+
 % based on the Coq reference manual, doc/common/macros.tex
 \newcommand{\kw}[1]{\textsf{#1}}
 \newcommand{\WF}[2]{\ensuremath{{\mathcal{W\!F}}(#1)[#2]}}
@@ -2117,7 +2120,7 @@ About codegen_s0_f1_proof.
 \begin{gather*}
   \text{verify-matchapp}:
     \dfrac{
-      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs},\: t\:\underline{\mathit{margs}} = t'\:\underline{\mathit{margs}'}}
+      \rep{\underline{E[\Gamma]} \vdash p : \forall \mathit{cargs},\: \BZ{t\:\underline{\mathit{margs}}} = \BZ{t'\:\underline{\mathit{margs}'}}}
     }{
       E[\Gamma] \vdash
         \begin{aligned}[t]
@@ -2134,9 +2137,19 @@ About codegen_s0_f1_proof.
               \end{aligned}
         \end{aligned}
     } \\
+    \quad \mbox{where} \quad
+    \BZ{t\:y\:\rep{z}} =
+      \begin{cases}
+        \BZ{\subst{t}{x}{u}\:\rep{z}} & \text{if $t$ is $\lam{x}{t}$} \\
+        \letin{x}{t}{\BZ{u\:y\:\rep{z}}} & \text{if $t$ is $\letin{x}{t}{u}$} \\
+        t\:y\:\rep{z} & \text{otherwise}
+      \end{cases} \\
     \quad \mbox{Note:}~
       \begin{minipage}[t]{0.8\columnwidth}
-        Since \codegen{} moves arguments for a \kwmatch-expression into the branches, $t' = t\ \mathit{margs}$ and $\mathit{margs}'$ is empty in general.
+        \begin{itemize}
+          \item Since \codegen{} moves arguments for a \kwmatch-expression into the branches, $t' = t\ \mathit{margs}$ and $\mathit{margs}'$ is empty in general.
+          \item $\BZop$ moves the arguments into let-in body (zeta-app) and apply beta-var reduction as much as possible.  This transforms removes redundant applications.
+        \end{itemize}
       \end{minipage}
 \end{gather*}
 
