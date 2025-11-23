@@ -899,6 +899,12 @@ and search_fixclo_to_expand_eta (env : Environ.env) (sigma : Evd.evar_map)
       mkLambda (x, t, b')
   | LetIn (x, e, t, b) ->
       let env2 = env_push_def env x e t in
+      (* e can be function but we don't eta-expansion here.
+         Because partial application may contain computations in
+         its function and arguments.
+         They should be evaluated before closure generation.
+         complete_args (Argument completion) will transform it as a lambda
+         expresion.  *)
       let e' = search_fixclo_to_expand_eta env sigma e in
       let b' = search_fixclo_to_expand_eta env2 sigma b in
       mkLetIn (x, e', t, b')
