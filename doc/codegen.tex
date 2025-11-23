@@ -688,6 +688,8 @@ We consider explicit lambdas are closure generation.
 This makes beta-var applicable for partial applications without worrying to expose computation.
 (CIC~\cite{coqrefman8.12.0} uses lambdas for match-branches but our syntax uses no lambdas for them.
 Thus match-branches doesn't trigger the eta expansion.)
+Note that we don't apply eta-expansion for partial application in let-in binding.
+The computation in the function-position and arguments of the partial application should be evaluated before closure generation.
 
 \begin{gather*}
   \text{etaex-top:}~
