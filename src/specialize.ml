@@ -726,12 +726,7 @@ let inline1 (env : Environ.env) (sigma : Evd.evar_map) (pred : Cpred.t) (term : 
     match EConstr.kind sigma term with
     | Const (ctnt, univ) ->
         if Cpred.mem ctnt pred then
-          let cbody = Environ.lookup_constant ctnt env in
-          let body =
-            match cbody.const_body with
-            | Def term -> term
-            | _ -> user_err (Pp.str "[codegen] couldn't obtain the body:" +++ Printer.pr_constant env ctnt)
-          in
+          let body = Environ.constant_value_in env (ctnt, EConstr.EInstance.kind sigma univ) in
           aux (EConstr.of_constr body)
         else
           term
