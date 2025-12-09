@@ -2142,8 +2142,8 @@ About codegen_s0_f1_proof.
     \quad \mbox{where} \quad
     \BZ{t\:y\:\rep{z}} =
       \begin{cases}
-        \BZ{\subst{t}{x}{u}\:\rep{z}} & \text{if $t$ is $\lam{x}{t}$} \\
-        \letin{x}{t}{\BZ{u\:y\:\rep{z}}} & \text{if $t$ is $\letin{x}{t}{u}$} \\
+        \BZ{\subst{u}{x}{y}\:\rep{z}} & \text{if $t$ is $\lam{x}{u}$} \\
+        \letin{x}{u}{\BZ{u'\:y\:\rep{z}}} & \text{if $t$ is $\letin{x}{u}{u'}$} \\
         t\:y\:\rep{z} & \text{otherwise}
       \end{cases} \\
     \quad \mbox{Note:}~
