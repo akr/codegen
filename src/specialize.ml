@@ -1562,6 +1562,7 @@ let simplify_matchapp (env : Environ.env) (sigma : Evd.evar_map) (term : EConstr
       if optread_debug_matchapp () then
         msg_debug_hov (Pp.str "[codegen] simplify_matchapp_result:" +++ Printer.pr_econstr_env env sigma term');
       let (sigma, step_opt) = verify_transformation env sigma term term' in
+      (*(match step_opt with Some step -> ignore (Typeops.infer env (EConstr.to_constr sigma step.vstep_proof)) | _ -> ());*)
       (sigma, term', step_opt)
     end
 
@@ -2543,6 +2544,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     let term = delete_unused_let env sigma term in
     debug_simplification env sigma "delete_unused_let-before-simplify_matchapp" term;
     let (sigma, term, step_opt) = simplify_matchapp env sigma term in
+    (*(match step_opt with Some step -> ignore (Typeops.infer env (EConstr.to_constr sigma step.vstep_proof)) | _ -> ());*)
     debug_simplification env sigma "simplify_matchapp" term;
     if EConstr.eq_constr sigma term1 term then
       (term, rev_steps)
@@ -2564,7 +2566,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   debug_simplification env sigma "complete_args" term;
   let term' = delete_unreachable_fixfuncs env sigma term in
   let (sigma, step_opt) = verify_transformation env sigma term term' in
+  (*(match rev_steps with [proof] -> ignore (Typeops.infer env (EConstr.to_constr sigma proof.vstep_proof)) | _ -> ());*)
   let rev_steps = cons_opt step_opt rev_steps in
+  (*(match rev_steps with [proof] -> ignore (Typeops.infer env (EConstr.to_constr sigma proof.vstep_proof)) | _ -> ());*)
   let term = term' in
   debug_simplification env sigma "delete_unreachable_fixfuncs" term;
   monomorphism_check env sigma term;
@@ -2572,6 +2576,22 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
+  (* define constants *)
+
+  let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps term in
+  msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);
+  msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_proof=" +++ Printer.pr_econstr_env env sigma eq_proof);
+  let rawproof_globref = Declare.declare_definition
+    ~info:(Declare.Info.make ())
+    ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof0")) ~typ:(Some eq_prop) ())
+    ~opaque:true
+    ~body:eq_proof
+    sigma
+  in
+  ignore rawproof_globref;
+  let env = Global.env () in
+  let sigma = Evd.from_env env in
+
   let specialized_globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())
@@ -2585,6 +2605,7 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let (sigma, declared_ctnt_term) = fresh_global env sigma specialized_globref in
   let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps declared_ctnt_term in
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);*)
+  (*ignore (Typeops.infer env (EConstr.to_constr sigma eq_proof));*)
   let proof_globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof")) ~typ:(Some eq_prop) ())

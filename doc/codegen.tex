@@ -528,7 +528,7 @@ The local definitions represent variables bounded by outer let-in.
       u_{k_j} = C\:\rep{a} \quad
       |u| = k_j
     }{
-      E[\Gamma] \vdash\; (\ofix{\rep{f/k:=t}}{f_j})\:\rep{u} \reltri\; \substm{t_j}{f}{\ofix{\underline{(\rep{f/k:=t})}}{f}} \: \rep{u}
+      E[\Gamma] \vdash\; (\ofix{\rep{f/k:=t}}{f_j})\:\rep{u} \reltri\; \substm{t_j}{f}{\ofix{\underline{(\rep{f/k:=t})}}{f_j}} \: \rep{u}
     } \\
   \text{eta expansion:}~
     \dfrac{\WTEG{t}{\prodT{x}{T}{U}}}{E[\Gamma] \vdash t \reltri \lamT{x}{T}{(t\:x)}}
@@ -2234,7 +2234,7 @@ About codegen_s0_f1_proof.
   \text{verify-letin-simple:}~
     \dfrac{
       \begin{aligned}
-        & t \equiv t' \\
+        & t \eqconv t' \\
         & E[\Gamma; \ldefB{x}{t}] \vdash q : u\:\mathit{args} = u'\:\mathit{args}'
       \end{aligned}
     }{
