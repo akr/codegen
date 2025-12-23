@@ -1484,7 +1484,7 @@ and pp_side_chars_rec (doc : Pp.doc_view) : pp_sides =
   let open Pp in
   match doc with
   | Ppcmd_empty -> AlwaysEmpty
-  | Ppcmd_string str ->
+  | Ppcmd_string str | Ppcmd_sized_string (_, str) ->
       if CString.is_empty str then
         AlwaysEmpty
       else
@@ -1632,7 +1632,7 @@ and doc_first_non_white_space_character (doc : Pp.doc_view) : char option =
   let open Pp in
   match doc with
   | Ppcmd_empty -> None
-  | Ppcmd_string str ->
+  | Ppcmd_string str | Ppcmd_sized_string (_, str) ->
       str_first_non_white_space_character str
   | Ppcmd_glue pps ->
       List.fold_left

@@ -69,7 +69,7 @@ let verify_transformation (env : Environ.env) (sigma : Evd.evar_map) (lhs_fun : 
     ignore (Typeops.infer env (EConstr.to_constr sigma goal));
     msg_debug_hov (Pp.str "[codegen:verify_transformation] sigma1=" +++ UState.pr (Evd.ustate sigma));
     let (entry, pv) = Proofview.init sigma [(env, goal)] in
-    let ((), pv, unsafe, tree) =
+    let ((), pv, env, unsafe, tree) =
       Proofview.apply
         ~name:(Names.Id.of_string "codegen")
         ~poly:false

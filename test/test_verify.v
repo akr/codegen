@@ -447,12 +447,16 @@ Definition div2 n d :=
       in f n
   end.
 
+(* Rocq 9.0.0 works, but Rocq 9.1.0 don't.
+  https://github.com/rocq-prover/rocq/issues/21452 *)
+(*
 Goal forall n d, div1 n d = div2 n d.
 Proof.
   intros.
   cbv beta delta [div1 div2].
   codegen_solve.
 Qed.
+*)
 
 Definition mod1 n d :=
   match d with
