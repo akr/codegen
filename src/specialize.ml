@@ -2547,11 +2547,11 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
     (*(match step_opt with Some step -> ignore (Typeops.infer env (EConstr.to_constr sigma step.vstep_proof)) | _ -> ());*)
     debug_simplification env sigma "simplify_matchapp" term;
     if EConstr.eq_constr sigma term1 term then
-      (term, rev_steps)
+      (sigma, term, rev_steps)
     else
       repeat_reduction sigma term (cons_opt step_opt rev_steps)
   in
-  let (term, rev_steps) = repeat_reduction sigma term [] in
+  let (sigma, term, rev_steps) = repeat_reduction sigma term [] in
   let term = normalize_types env sigma term in
   debug_simplification env sigma "normalize_types" term;
   let term = normalize_static_arguments env sigma term in
@@ -2587,11 +2587,9 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   in
   let declared_ctnt = Globnames.destConstRef specialized_globref in
   let env = Global.env () in
-  let sigma = Evd.from_env env in
   let (sigma, declared_ctnt_term) = fresh_global env sigma specialized_globref in
   let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps declared_ctnt_term in
   (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);*)
-  (*ignore (Typeops.infer env (EConstr.to_constr sigma eq_proof));*)
   let proof_globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof")) ~typ:(Some eq_prop) ())
