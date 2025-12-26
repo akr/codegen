@@ -2576,22 +2576,8 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   Linear.downwardcheck env sigma cfunc term;
   let term = rename_vars env sigma term in
   debug_simplification env sigma "rename_vars" term;
+
   (* define constants *)
-
-  let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps term in
-  msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);
-  msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_proof=" +++ Printer.pr_econstr_env env sigma eq_proof);
-  let rawproof_globref = Declare.declare_definition
-    ~info:(Declare.Info.make ())
-    ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof0")) ~typ:(Some eq_prop) ())
-    ~opaque:true
-    ~body:eq_proof
-    sigma
-  in
-  ignore rawproof_globref;
-  let env = Global.env () in
-  let sigma = Evd.from_env env in
-
   let specialized_globref = Declare.declare_definition
     ~info:(Declare.Info.make ())
     ~cinfo:(Declare.CInfo.make ~name:s_id ~typ:None ())

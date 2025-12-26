@@ -66,8 +66,6 @@ let verify_transformation (env : Environ.env) (sigma : Evd.evar_map) (lhs_fun : 
     let rhs' = mkApp_beta sigma rhs_fun args in
     let equal = mkApp (eq, [| ret_ty; lhs'; rhs' |]) in
     let goal = compose_prod ctx equal in
-    ignore (Typeops.infer env (EConstr.to_constr sigma goal));
-    msg_debug_hov (Pp.str "[codegen:verify_transformation] sigma1=" +++ UState.pr (Evd.ustate sigma));
     let (entry, pv) = Proofview.init sigma [(env, goal)] in
     let ((), pv, env, unsafe, tree) =
       Proofview.apply
@@ -84,18 +82,14 @@ let verify_transformation (env : Environ.env) (sigma : Evd.evar_map) (lhs_fun : 
       user_err (Pp.str "[codegen] could not prove matchapp equality:" +++
         Printer.pr_econstr_env env sigma goal);
     let sigma = Proofview.return pv in
-    msg_debug_hov (Pp.str "[codegen:verify_transformation] sigma2=" +++ UState.pr (Evd.ustate sigma));
     let proofs = Proofview.partial_proof entry pv in
     assert (List.length proofs = 1);
     let proof = List.hd proofs in
-    ignore (Typeops.infer env (EConstr.to_constr sigma proof));
     (* Feedback.msg_info (Pp.hov 2 (Pp.str "[codegen]" +++ Pp.str "proofterm=" ++ (Printer.pr_econstr_env env sigma proof))); *)
     if Evarutil.has_undefined_evars sigma proof then
       user_err (Pp.str "[codegen] could not prove matchapp equality (evar remains):" +++
         Printer.pr_econstr_env env sigma goal);
-    (*ignore (Typeops.infer env (EConstr.to_constr sigma proof));*)
     let (sigma, ty) = Typing.type_of env sigma (mkCast (proof, DEFAULTcast, goal)) in (* verify proof term *)
-    (*ignore (Typeops.infer env (EConstr.to_constr sigma proof));*)
     (sigma, Some { vstep_lhs_fun=lhs_fun; vstep_rhs_fun=rhs_fun; vstep_goal=ty; vstep_proof=proof })
 
 let combine_verification_steps (env : Environ.env) (sigma: Evd.evar_map) (first_term : EConstr.t) (rev_steps : verification_step list) (last_term : EConstr.t) : Evd.evar_map * EConstr.types * EConstr.t =
@@ -120,10 +114,8 @@ let combine_verification_steps (env : Environ.env) (sigma: Evd.evar_map) (first_
     match rev_steps with
     | [] ->
         let eq_proof = it_mkLambda (mkApp (eq_refl, [| val_type; mkApp (last_term, args) |])) prod_ctx in
-        (*ignore (Typeops.infer env (EConstr.to_constr sigma eq_proof));*)
         eq_proof
     | { vstep_proof=step_proof } :: [] ->
-        (*ignore (Typeops.infer env (EConstr.to_constr sigma step_proof));*)
         step_proof
     | { vstep_proof=last_step_proof } :: rest ->
         let proof = List.fold_left
@@ -133,10 +125,8 @@ let combine_verification_steps (env : Environ.env) (sigma: Evd.evar_map) (first_
           rest
         in
         let eq_proof = it_mkLambda proof prod_ctx in
-        (*ignore (Typeops.infer env (EConstr.to_constr sigma eq_proof));*)
         eq_proof
   in
   (*msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] eq_prop=" ++ Printer.pr_econstr_env env sigma eq_prop);
-  msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] eq_proof=" ++ Printer.pr_econstr_env env sigma eq_proof);*)
-  (*ignore (Typeops.infer env (EConstr.to_constr sigma eq_proof));*)
+    msg_debug_hov (Pp.str "[codegen:combine_equality_proofs] eq_proof=" ++ Printer.pr_econstr_env env sigma eq_proof);*)
   (sigma, eq_prop, eq_proof)
