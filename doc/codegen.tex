@@ -2163,7 +2163,7 @@ About codegen_s0_f1_proof.
         & \forall i \in \{1\ldots h'\},\: k_{\sigma(i)} = k'_i \qquad \mbox{(decreasing argument position equality)} \\
         & \forall i \in \{1\ldots h'\},\: T_{\sigma(i)} \equiv T'_i \qquad \mbox{(function type equality)} \\
         & \forall i \in \{1\ldots h'\},\: \FV(t_{\sigma(i)}) \cap (\{\rep{f}\} \backslash \{\rep{f'}\}) = \varnothing \\
-        & \forall i \in \{1\ldots h'\},\: E[\Gamma]; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
+        & \forall i \in \{1\ldots h'\},\: E[\Gamma; \repi{\mathit{IH}\!_j : F_{\sigma(j)} \simeq F'_j}]{j=1\ldots h'} \vdash p_i : \substm{t_{\sigma(i)}}{f}{F} \simeq \substm{t'_{i}}{f'}{F'}
       \end{aligned}
     }{
       \begin{aligned}
