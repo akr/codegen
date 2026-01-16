@@ -29,6 +29,13 @@ let { Goptions.get = optread_indimp_auto_linear } =
     ~value:false
     ()
 
+(* Unset/Set CodeGen TransformationVerification. *)
+let { Goptions.get = optread_transformation_verification } =
+  Goptions.declare_bool_option_and_ref
+    ~key:["CodeGen";"TransformationVerification"]
+    ~value:true
+    ()
+
 (* Unset/Set Debug CodeGen Simplification. *)
 let { Goptions.get = optread_debug_simplification } =
   Goptions.declare_bool_option_and_ref

@@ -23,6 +23,7 @@ open Constr
 open EConstr
 
 open Cgenutil
+open State
 
 open Ltac2_plugin
 open Tac2expr
@@ -54,7 +55,9 @@ type verification_step = {
 }
 
 let verify_transformation (env : Environ.env) (sigma : Evd.evar_map) (lhs_fun : EConstr.t) (rhs_fun : EConstr.t) : (Evd.evar_map * verification_step option) =
-  if EConstr.eq_constr sigma lhs_fun rhs_fun then
+  if not (optread_transformation_verification ()) then
+    (sigma, None)
+  else if EConstr.eq_constr sigma lhs_fun rhs_fun then
     (sigma, None)
   else
     let sigma, eq = lib_ref env sigma "core.eq.type" in

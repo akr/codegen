@@ -2588,16 +2588,23 @@ let codegen_simplify (cfunc : string) : Environ.env * Constant.t * StringSet.t =
   let declared_ctnt = Globnames.destConstRef specialized_globref in
   let env = Global.env () in
   let (sigma, declared_ctnt_term) = fresh_global env sigma specialized_globref in
-  let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps declared_ctnt_term in
-  (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);*)
-  let proof_globref = Declare.declare_definition
-    ~info:(Declare.Info.make ())
-    ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof")) ~typ:(Some eq_prop) ())
-    ~opaque:true
-    ~body:eq_proof
-    sigma
+  let sigma =
+    if optread_transformation_verification () then
+      let (sigma, eq_prop, eq_proof) = combine_verification_steps env sigma epresimp rev_steps declared_ctnt_term in
+      (*msg_debug_hov (Pp.str "[codegen:codegen_simplify] eq_prop=" +++ Printer.pr_econstr_env env sigma eq_prop);*)
+      let proof_globref = Declare.declare_definition
+        ~info:(Declare.Info.make ())
+        ~cinfo:(Declare.CInfo.make ~name:(Id.of_string (Id.to_string s_id ^ "_proof")) ~typ:(Some eq_prop) ())
+        ~opaque:true
+        ~body:eq_proof
+        sigma
+      in
+      ignore proof_globref;
+      sigma
+    else
+      sigma
   in
-  ignore proof_globref;
+  ignore sigma;
   let env = Global.env () in
   let sp_gen2 = { sp_static_storage=sp_gen.sp_static_storage; sp_simplified_status=(SpDefined (declared_ctnt, referred_cfuncs)) } in
   let sp_interface2 = {

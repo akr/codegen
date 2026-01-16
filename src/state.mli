@@ -3,6 +3,7 @@ module ConstrSet : CSet.ExtS with type elt = Constr.t
 module StringSet : CSet.ExtS with type elt = String.t
 
 val optread_indimp_auto_linear : unit -> bool
+val optread_transformation_verification : unit -> bool
 val optread_debug_simplification : unit -> bool
 val optread_debug_normalizeV : unit -> bool
 val optread_debug_reduction : unit -> bool
